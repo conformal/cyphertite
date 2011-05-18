@@ -27,15 +27,9 @@ rm -f ~/"$CT_SNAPSHOTS_DIR/$CT_RELEASE_TARBALL"
 # make release directory and checkout source
 mkdir -p ~/"$CT_SNAPSHOTS_DIR/$CT_RELEASE_DIR/"
 cd ~/"$CT_SNAPSHOTS_DIR/$CT_RELEASE_DIR/"
-CT_PKGS="clens clog assl xmlsd shrink exude"
+CT_PKGS="clens clog cyphertite assl xmlsd shrink exude"
 for pkg in $CT_PKGS; do
 	cvs -d anoncvs@opensource.conformal.com:/anoncvs/$pkg co -PA $pkg || \
-		error "failed to checkout $pkg source via cvs."
-done
-
-# checkout cyphertite separately until it's available on opensource
-for pkg in cyphertite; do
-	cvs -d $USER@cvs.conformal.com:/cvs/$pkg co -PA $pkg || \
 		error "failed to checkout $pkg source via cvs."
 done
 
