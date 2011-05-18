@@ -1,0 +1,7 @@
+# $cyphertite$
+
+ARFLAGS = crs
+
+LIB.STATIC = lib$(LIB.NAME).a
+
+CPPFLAGS += -D_GNU_SOURCE

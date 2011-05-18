@@ -1,0 +1,105 @@
+.\" $cyphertite$
+.\"
+.\" Copyright (c) 2011 Conformal Systems LLC <info@conformal.com>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate$
+.Dt CYPHERTITE.CONF 5 
+.Os
+.Sh NAME
+.Nm cyphertite.conf
+.Nd Cyphertite configuration file 
+.Sh DESCRIPTION
+The
+.Nm
+file contains configuration information for
+.Xr cyphertite 8 ,
+the client that provides a privacy-driven encrypted remote
+archive. 
+.Sh CONFIGURATION
+There are a few settings that affect the operation of the
+.Xr cyphertite 8
+daemon.
+.Pp
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic allow_uncompressed_writes =
+.Pq Ic 0 Ns \&| Ns Ic 1
+.Xc
+Specify if
+.Xr cyphertite 8
+will allow uncompressed writes.
+The default is 0 (no).
+.Pp
+.It Ic cache_db = Ar file
+Specify the location of the cache database.
+If not set, caching will be disabled.
+.Pp 
+.It Ic ca_cert = Ar file
+Specify the path to the certificate authority file.
+.Pp
+.It Ic cert = Ar file
+Specify the path to the client certificate file.
+.Pp
+.It Ic crypto_password = Ar password
+Specify the password of your crypto_secrets file.
+.Pp
+.It Ic crypto_secrets = Ar file
+Specify the file that will hold your secrets.
+.Pp
+.It Ic host = Ar hostname 
+Specify the hostname to connect to.
+.Pp
+.It Ic hostport = portnum
+Specify the port to connect to.
+.Pp
+.It Ic key = Ar file
+Specify the path to the client certificate key file.
+.Pp
+.It Ic password = Ar string
+Specify the password to authenticate with.
+.Pp
+.It Xo
+.Ic polltype =
+.Pq Ic kqueue Ns \&| Ns Ic poll Ns \&| Ns Ic select
+.Xc
+Specify polling method used by
+.Xr event 3 .
+.Pp
+.It Ic queue_depth = Ar value
+Specify the queue depth.
+The default and maximum value is 100.
+.Pp
+.It Xo
+.Ic session_compression =
+.Pq Ic lzo Ns \&| Ns Ic lzw Ns \&| Ns Ic lzma
+.Xc
+Specify the negotiated compression for the session.
+.Pp
+.It Ic username = Ar string
+Specify the username to authenticate with.
+.Pp
+.El
+.Sh FILES
+.Bl -tag -width "cyphertite" -compact
+.It Pa /etc/cyphertite/cyphertite.conf
+Default configuration file.
+.It Pa ~/.cyphertite.conf
+User configuration file.
+.El
+.Sh SEE ALSO
+.Xr cyphertite 8
+.Sh AUTHORS
+The Cyphertite suite was written by
+.An Conformal Systems, LLC. Aq info@conformal.com .

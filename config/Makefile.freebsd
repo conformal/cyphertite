@@ -1,0 +1,10 @@
+# $cyphertite$
+
+MANDIR=${LOCALBASE}/man/man
+NO_PIC=
+NO_OBJ=
+
+CFLAGS+= -fdiagnostics-show-option -fno-strict-aliasing
+CFLAGS+= -DNEED_LIBCLENS
+CFLAGS+= -I${INCDIR}/clens
+LDADD+= -L ${LIBDIR} -lclens
