@@ -23,6 +23,7 @@
 #include <xmlsd.h>
 
 #include <ctutil.h>
+#include <ct_xml.h>
 
 #include "ct.h"
 
@@ -40,62 +41,11 @@ time_t				md_mtime;
 void ct_xml_file_open(const char *mfile, int);
 void ct_xml_file_close(void);
 
-struct xmlsd_v_attr		xa_cr_md_list_attr[] = {
-	{ "version" },
-	{ "test" },
-	{ NULL }
-};
-
-struct xmlsd_v_attr		xa_cr_md_file_attr[] = {
-	{ "name" },
-	{ NULL }
-};
-
-struct xmlsd_v_elem             xe_cr_md_list[] = {
-	{ "cr_md_list",		"",		xa_cr_md_list_attr },
-	{ "file",	"file.cr_md_list",	xa_cr_md_file_attr },
-	{ NULL,		NULL,			NULL}
-};
-struct xmlsd_v_elem             xe_cr_md_open_create[] = {
-	{ "cr_md_list",		"",		xa_cr_md_list_attr },
-	{ "file",	"file.cr_md_open_create",	xa_cr_md_file_attr },
-	{ NULL,		NULL,			NULL}
-};
-
-struct xmlsd_v_elem             xe_cr_md_open_read[] = {
-	{ "cr_md_list",		"",		xa_cr_md_list_attr },
-	{ "file",	"file.cr_md_open_read",	xa_cr_md_file_attr },
-	{ NULL,		NULL,			NULL}
-};
-
-struct xmlsd_v_attr             xa_cr_md_open_attr[] = {
-	{ "file" },
-	{ NULL }
-};
-
-struct xmlsd_v_elem             xe_cr_md_open_reply[] = {
-	{ "cr_md_open_read",		"",		xa_cr_md_list_attr },
-	{ "cr_md_open_create",		"",		xa_cr_md_list_attr },
-	{ NULL,		NULL,			NULL}
-};
-
-struct xmlsd_v_attr		xa_cr_md_delete_attr[] = {
-	{ "version" },
-	{ "test" },
-	{ NULL }
-};
-
-struct xmlsd_v_elem             xe_cr_md_delete[] = {
-	{ "cr_md_delete","",	xa_cr_md_delete_attr },
-	{ "file",		"file.cr_md_delete", xa_cr_md_file_attr },
-	{ NULL,		NULL,			NULL}
-};
-
-struct xmlsd_v_elements cr_xml_cmds[] = {
-	{ "cr_md_list", xe_cr_md_list },
-	{ "cr_md_open_read", xe_cr_md_open_read },
-	{ "cr_md_open_create", xe_cr_md_open_create },
-	{ "cr_md_delete", xe_cr_md_delete },
+struct xmlsd_v_elements ct_xml_cmds[] = {
+	{ "ct_md_list", xe_ct_md_list },
+	{ "ct_md_open_read", xe_ct_md_open_read },
+	{ "ct_md_open_create", xe_ct_md_open_create },
+	{ "ct_md_delete", xe_ct_md_delete },
 	{ NULL, NULL }
 };
 
@@ -745,7 +695,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 			CDBG("\t%s = %s", xa->name, xa->value);
 	}
 
-	r = xmlsd_validate(&xl, cr_xml_cmds);
+	r = xmlsd_validate(&xl, ct_xml_cmds);
 	if (r) {
 		CDBG("validate of '%s' FAILED! (%d)", body, r);
 		goto done;

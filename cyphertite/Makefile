@@ -8,11 +8,12 @@ SYSTEM != uname -s
 LOCALBASE?=/usr/local
 BINDIR?=${LOCALBASE}/bin
 INCDIR?=${LOCALBASE}/include
+.PATH: ${.CURDIR}/../ctutil
 
 PROG= cyphertite
 SRCS= ct_main.c ct_files.c ct_util.c ct_queue.c ct_event.c
 SRCS+= ct_aes_xts.c ct_crypto.c ct_match.c ct_metadata.c
-SRCS+= ct_db.c ct_xdr.c
+SRCS+= ct_db.c ct_xdr.c ct_xml.c
 MAN= cyphertite.conf.5 cyphertite.8
 
 .if exists(${.CURDIR}/../ctutil/obj)
