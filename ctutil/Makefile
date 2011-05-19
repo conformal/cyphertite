@@ -12,7 +12,7 @@ INCDIR=${LOCALBASE}/include
 
 #WANTLINT=
 LIB= ctutil
-SRCS= ctutil.c ct_socket.c ct_core.c
+SRCS= ctutil.c ct_socket.c ct_core.c ct_ssl.c ct_compress.c
 HDRS= ctutil.h ct_socket.h
 
 CFLAGS+= -O2
