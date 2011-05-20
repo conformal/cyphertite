@@ -221,11 +221,10 @@ ct_xml_file_open(const char *file, int mode)
 	struct ct_trans		*trans;
 	char			*xml_ptr = NULL;
 	char			*xml_head = NULL;
-	char			*version, *test;
+	char			*version;
 	int			xml_len = 0, slen, rem;
 
 	version = "1.0";
-	test	= "false";
 
 	trans = ct_trans_alloc();
 
@@ -240,9 +239,9 @@ for_real:
 	CDBG("setting up XML header");
 	slen += snprintf(xml_ptr, rem,
             "<?xml version=\"1.0\"?>\r\n"
-            "<cr_md_open_%s version=\"%s\" test=\"%s\">\r\n",
+            "<cr_md_open_%s version=\"%s\" >\r\n",
 	    (mode ? "create" : "read"),
-	    version, test);
+	    version);
 
 	xml_ptr = xml_head ? (xml_head + slen) : NULL;
 	rem = xml_head ? xml_len - (xml_ptr - xml_head) : 0;
@@ -291,11 +290,10 @@ ct_xml_file_close(void)
 	struct ct_trans		*trans;
 	char			*xml_ptr = NULL;
 	char			*xml_head = NULL;
-	char			*version, *test;
+	char			*version;
 	int			xml_len = 0, slen, rem;
 
 	version = "1.0";
-	test	= "false";
 
 	trans = ct_trans_alloc();
 
@@ -310,8 +308,8 @@ for_real:
 	CDBG("setting up XML header");
 	slen += snprintf(xml_ptr, rem,
             "<?xml version=\"1.0\"?>\r\n"
-            "<cr_md_close version=\"%s\" test=\"%s\">\r\n",
-	    version, test);
+            "<cr_md_close version=\"%s\" >\r\n",
+	    version);
 
 	CDBG("setting up XML tail");
 	xml_ptr = xml_head ? (xml_head + slen) : NULL;
@@ -542,7 +540,7 @@ ct_md_list(const char *mfile, char **pat)
 	struct ct_trans		*trans;
 	char			*xml_ptr = NULL;
 	char			*xml_head = NULL;
-	char			*version, *test;
+	char			*version;
 	int			xml_len = 0, slen, rem;
 	int			rv;
 
@@ -553,7 +551,6 @@ ct_md_list(const char *mfile, char **pat)
 	trans = ct_trans_alloc();
 	
 	version = "1.0";
-	test	= "false";
 
 	CDBG("setting up XML");
 for_real:
@@ -566,8 +563,8 @@ for_real:
 	CDBG("setting up XML header");
 	slen += snprintf(xml_ptr, rem,
             "<?xml version=\"1.0\"?>\r\n"
-            "<cr_md_list version=\"%s\" test=\"%s\">\r\n",
-	    version, test);
+            "<cr_md_list version=\"%s\" >\r\n",
+	    version);
 
 	/* XXX - pat */
 #if 0
@@ -629,7 +626,7 @@ ct_md_delete(const char *md, char **arg)
 {
 	static const char *ct_delete_md = 
             "<?xml version=\"1.0\"?>\r\n"
-            "<cr_md_delete version=\"1.0\" test=\"no\">\r\n"
+            "<cr_md_delete version=\"1.0\" >\r\n"
 	    "<file name=\"%s\"/>\r\n"
 	    "</cr_md_delete>\r\n";
 	struct ct_header *hdr;
