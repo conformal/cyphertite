@@ -299,7 +299,6 @@ main(int argc, char **argv)
 void
 ct_load_config(struct ct_settings *settings)
 {
-	int		config_found = 0;
 	char		*config_path = NULL;
 	int		config_try = 0;
 
@@ -311,7 +310,7 @@ ct_load_config(struct ct_settings *settings)
 		}
 		return;
 	}
-	while (config_found == 0) {
+	for (;;) {
 		if (config_path != NULL)
 			e_free(&config_path);
 
@@ -326,8 +325,6 @@ ct_load_config(struct ct_settings *settings)
 			CFATAL("unable to locate config file");
 		}
 		if (ct_config_parse(settings, config_path) == 0) {
-			config_found = 1;
-
 			if (config_path != NULL)
 				e_free(&config_path);
 			break;
