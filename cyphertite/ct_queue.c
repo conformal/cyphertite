@@ -521,7 +521,7 @@ ct_body_free(void *vctx, void *body, struct ct_header *hdr)
 void
 ct_compute_sha(void *vctx)
 {
-	struct ct_trans		*trans = TAILQ_FIRST(&ct_state->ct_sha_queue);
+	struct ct_trans		*trans;
 	char			shat[SHA_DIGEST_STRING_LENGTH];
 	int			slot;
 
@@ -942,9 +942,6 @@ ct_wakeup_write(void)
 		ct_state->ct_queued_qlen++;
 
 		ct_assl_write_op(ct_assl_ctx, hdr, data);
-
-		/* continue to next transaction */
-		trans = TAILQ_FIRST(&ct_state->ct_write_queue);
 	}
 }
 
