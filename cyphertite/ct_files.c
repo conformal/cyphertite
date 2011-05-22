@@ -200,8 +200,6 @@ ct_process_file(void *vctx)
 	if (fl_curnode == NULL)
 		goto done;
 loop:
-	new_file = 0;
-
 	CDBG("file %s state %d", fl_curnode->fl_sname, fl_curnode->fl_state);
 	new_file = (fl_curnode->fl_state == CT_FILE_START);
 
