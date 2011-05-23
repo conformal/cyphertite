@@ -39,8 +39,8 @@ DEBUG += -g
 CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(DEBUG)
 LDFLAGS += -L/usr/local/ssl/lib
 LDFLAGS += -L../ctutil/obj -L../ctutil -lctutil -lassl -lclog -levent -lexude
-LDFLAGS += -lshrink -lsqlite3 -llzma -llzo2 -lz -lclens -lbsd -Wl,-Bstatic -lssl -lcrypto
-LDFLAGS += -Wl,-Bdynamic -ldl
+LDFLAGS += -lshrink -lxmlsd -lexpat -lsqlite3 -llzma -llzo2 -lz -lclens -lbsd
+LDFLAGS += -Wl,-Bstatic -lssl -lcrypto -Wl,-Bdynamic -ldl
 
 BIN.NAME = cyphertite
 BIN.SRCS = ct_main.c ct_metadata.c ct_files.c ct_util.c ct_queue.c ct_event.c
