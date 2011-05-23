@@ -33,6 +33,16 @@ for pkg in $CT_PKGS; do
 		error "failed to checkout $pkg source via cvs."
 done
 
+# get and patch openssl
+OPENSSL_PKG="openssl-1.0.0d"
+ftp "ftp://ftp.openssl.org/source/$OPENSSL_PKG.tar.gz"
+tar zxf "$OPENSSL_PKG.tar.gz"
+rm "$OPENSSL_PKG.tar.gz"
+cd "$OPENSSL_PKG"
+patch -p1 < ../ecdsa_no_const_time.patch
+cd ..
+mv "$OPENSSL_PKG" "$OPENSSL_PKG-with-ec-patch"
+
 # release directory
 mv cyphertite/scripts/ct_install.sh .
 find . -depth -name CVS -exec rm -rf {} \;
