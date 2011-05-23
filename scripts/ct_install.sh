@@ -104,14 +104,19 @@ check_external_libs()
 	fi
 }
 
-check_ssl_ecdsa()
-{
-	#TODO: Test ssl for ciphers
-	echo "stub" >/dev/null 2>&1
-}
-
 ct_build_and_install()
 {
+	# build and install openssl source with ECDSA base system package
+        # doesn't have it.
+	pkg="openssl-1.0.0d-with-ec-patch"
+	if ! openssl ciphers | grep ECDSA >/dev/null 2>&1; then
+		cd "$pkg"
+		./config || report_err "config script failed for '$pkg'."
+		make || report_err "Make filed for '$pkg'."
+		make install || report_err "Install failed for '$pkg'."
+		cd ..
+	fi
+
 	# build and install packages in dependency order
 	CT_PKGS="clens clog assl xmlsd shrink exude cyphertite"
 	for pkg in $CT_PKGS; do
@@ -144,7 +149,6 @@ ct_setup_conf()
 check_root_perms
 check_utils
 check_external_libs
-check_ssl_ecdsa
 ct_build_and_install
 ct_setup_conf
 
