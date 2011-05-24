@@ -70,7 +70,10 @@ Preserve user and group ID as well as file mode regardless of the
 current
 .Xr umask 2 .
 .It Fl r
-Enable regex matching.
+Enable
+.Xr regex 2
+matching.  The default is to use
+.Xr glob 2 .
 .It Fl t
 List contents of an archive. 
 If any files are named on the command line, only those files will be
