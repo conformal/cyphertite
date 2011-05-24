@@ -32,5 +32,6 @@ CLEANFILES= cyphertite.conf.cat5 cyphertite.cat8
 CFLAGS+= -I${.CURDIR}/../libshrink -I.
 
 LINKS=${BINDIR}/cyphertite ${BINDIR}/ct
+MLINKS=cyphertite.8 ct.8
 
 .include <bsd.prog.mk>
