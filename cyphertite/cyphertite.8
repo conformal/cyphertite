@@ -38,7 +38,9 @@ solutions provided by Cyphertite (http://www.cyphertite.com).
 The options are as follows:
 .Bl -tag -width Ds
 .It Fl B Ar archive 
-Specify basis backup archive. 
+Specify the archive to be used as the basis of a differential backup. 
+Files with a modification time (mtime) newer than the previous backup
+will be archived.  
 .It Fl C Ar directory
 Set the current working directory.  When extracting, files will be
 extracted into the specified directory; when creating, the specified
@@ -92,7 +94,7 @@ Create an archive named
 containing the directory
 .Pa /data/accounting/2010 :
 .Pp
-.Dl $ cyphertite -cf accounting-2010.md /data/accounting/2010
+.Dl $ ct -cf accounting-2010.md /data/accounting/2010
 .Pp
 Verbosely create an archive named
 .Pa pictures.md ,
@@ -101,14 +103,25 @@ of all files matching
 pattern
 .Pa *.jpg :
 .Pp
-.Dl $ cyphertite -rcvf pictures.md *.jpg
+.Dl $ ct -rcvf pictures.md *.jpg
+.Pp
+Perform a differential backup of an archive named
+.Pa htdocs-201104.md .
+Files in
+.Pa /var/www/htdocs
+whose modification times (mtime) are newer than in previous
+backup
+.Pa htdocs-201104.md
+will be archived.
+.Pp
+.Dl $ ct -B htdocs-201104.md -cf htdocs-201105.md /var/www/htdocs
 .Pp
 Extract files from archive
 .Pa backup.md
 into directory
 .Pa restore .
 .Pp
-.Dl $ cyphertite -C restore -xf backup.md
+.Dl $ ct -C restore -xf backup.md
 .El
 .Sh FILES
 .Bl -tag -width "cyphertite" -compact
