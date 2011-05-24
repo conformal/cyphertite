@@ -38,7 +38,7 @@ The options are as follows:
 .Bl -tag -width Ds
 .It Fl B Ar archive 
 Specify basis backup archive. 
-.It Fl C
+.It Fl C Ar directory
 Set the current working directory.  When extracting, files will be
 extracted into the specified directory; when creating, the specified
 files will be matched from the directory.
@@ -57,7 +57,7 @@ The option prevents
 .Nm
 from descending into directories that have a different device number
 than the file from which the descent began.
-.It Fl b
+.It Fl b Ar blocksize
 Specify maximum block size.
 .It Fl c
 Create new archive or overwrite an existing archive. 
