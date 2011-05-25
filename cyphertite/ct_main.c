@@ -57,7 +57,7 @@ unsigned char		ct_crypto_key[CT_KEY_LEN];
 
 /* config */
 int			ct_max_trans;
-int			ct_max_block_size = 128 * 1024 ;
+int			ct_max_block_size = 128 * 1024;
 char			*ct_host;
 char			*ct_hostport;
 char			*ct_localdb;
@@ -125,7 +125,7 @@ main(int argc, char **argv)
 		errx(1, "illegal clog flags");
 
 	ct_debug = debug = 0;
-	while ((c = getopt(argc, argv, "B:C:DF:I:PRXab:cdef:mprtvx")) != -1) {
+	while ((c = getopt(argc, argv, "B:C:DF:I:PRXa:cdef:mprtvx")) != -1) {
 		switch (c) {
 		case 'B':
 			ct_basisbackup = optarg;
@@ -155,9 +155,6 @@ main(int argc, char **argv)
 			break;
 		case 'a':
 			ct_multilevel_allfiles = 1;
-			break;
-		case 'b':
-			ct_max_block_size = atoi(optarg);
 			break;
 		case 'c':
 			if (ct_action)

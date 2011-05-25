@@ -27,7 +27,6 @@
 .Op Fl B Ar dir
 .Op Fl C Ar tmpdir
 .Op Fl F Ar conffile  
-.Op Fl b Ar max_block_size
 .Op Fl f Ar mdfile
 .El
 .Sh DESCRIPTION
@@ -61,8 +60,6 @@ The option prevents
 .Nm
 from descending into directories that have a different device number
 than the file from which the descent began.
-.It Fl b Ar blocksize
-Specify maximum block size.
 .It Fl c
 Create new archive or overwrite an existing archive. 
 .It Fl d
