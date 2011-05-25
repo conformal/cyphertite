@@ -206,15 +206,10 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if (ct_mfile == NULL && !(ct_metadata && ct_action == CT_A_LIST)) {
-		CFATALX("archive file is required");
-	}
-
 	ct_load_config(settings);
 
 	if (ct_crypto_secrets) {
 		if (stat(ct_crypto_secrets, &sb) == -1) {
-			/* XXX do something special if db already exists */
 			fprintf(stderr, "No crypto secrets file. Creating\n");
 			if (ct_create_secrets(ct_crypto_password,
 			    ct_crypto_secrets))
@@ -230,9 +225,7 @@ main(int argc, char **argv)
 		    sizeof ct_iv))
 			CFATALX("can't unlock secrets");
 		ct_got_secrets = 1; /* XXX do we need this? */
-
 		ct_encrypt_enabled = 1;
-
 	}
 
 	if (ct_compression_type == NULL) {
@@ -250,6 +243,12 @@ main(int argc, char **argv)
 	if (ct_compress_enabled != 0) {
 		ct_init_compression(ct_compress_enabled);
 		ct_cur_compress_mode = ct_compress_enabled;
+	}
+
+	if (ct_mfile == NULL && !(ct_metadata && ct_action == CT_A_LIST)) {
+		CWARNX("archive file is required");
+		usage();
+		return (1);
 	}
 
 	if (!foreground)
