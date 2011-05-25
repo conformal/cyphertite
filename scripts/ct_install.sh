@@ -129,27 +129,10 @@ ct_build_and_install()
 	done
 }
 
-ct_setup_conf()
-{
-	# setup cyphertite conf skeleton
-	CT_CONF_DIR=/etc/cyphertite
-	CT_CONF_PRIV_DIR="$CT_CONF_DIR/private"
-	CT_CONF_FILE="cyphertite.conf" 
-	CT_SAMPLE_CONF_FILE="cyphertite/cyphertite/$CT_CONF_FILE"
-	install -d -m 700 "$CT_CONF_PRIV_DIR/" || 
-		report_err "Unable to create $CT_CONF_PRIV_DIR" 
-	if [ ! -e "$CT_CONF_DIR/$CT_CONF_FILE" ]; then
-		install -m 600 "$CT_SAMPLE_CONF_FILE" "$CT_CONF_DIR/" || 
-			report_err "Unable to install $CT_CONF_FILE" 
-	fi
-}
-
 
 # main execution starts here
 check_root_perms
 check_utils
 check_external_libs
 ct_build_and_install
-ct_setup_conf
 
-# TODO: Success message / instructions
