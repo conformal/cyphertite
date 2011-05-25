@@ -299,13 +299,12 @@ ct_load_config(struct ct_settings *settings)
 	int		config_try = 0;
 
 	if (ct_configfile) {
-		if (ct_config_parse(settings, ct_configfile) == 0) {
-		} else {
+		if (ct_config_parse(settings, ct_configfile))
 			CFATALX("Unable to open specified config file %s",
 			   ct_configfile);
-		}
 		return;
 	}
+
 	for (;;) {
 		if (config_path != NULL)
 			e_free(&config_path);
@@ -318,7 +317,8 @@ ct_load_config(struct ct_settings *settings)
 			config_path = ct_system_config();
 			break;
 		default:
-			CFATAL("unable to locate config file");
+			config_path = ct_create_config();
+			break;
 		}
 		if (ct_config_parse(settings, config_path) == 0) {
 			if (config_path != NULL)

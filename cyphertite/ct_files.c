@@ -35,6 +35,8 @@
 
 #include "ct.h"
 
+int		ct_get_answer(char *, char *, char *, char *, size_t);
+
 struct flist_head	fl_list_head = TAILQ_HEAD_INITIALIZER(fl_list_head);
 struct flist		*fl_curnode;
 
@@ -828,5 +830,150 @@ ct_user_config(void)
 		CFATALX("invalid user %d", getuid());
 
 	e_asprintf(&conf, "%s/.cyphertite.conf", pwd->pw_dir);
+	return (conf);
+}
+
+int
+ct_get_answer(char *prompt, char *a1, char *a2, char *answer, size_t answer_len)
+{
+	char			*p;
+
+	for (;;) {
+		printf("%s", prompt);
+		fgets(answer, answer_len, stdin);
+		if (feof(stdin) || ferror(stdin))
+			CFATAL("fgets");
+		if ((p = strchr(answer, '\n')) == NULL) {
+			printf("invalid answer\n");
+			continue;
+		}
+		*p = '\0';
+
+		if (a1 == NULL && a2 == NULL)
+			return (0); /* just get the string */
+
+		/* check for proper answer */
+		if (a1 && !strcasecmp(answer, a1))
+			return (1);
+		if (a2 && !strcasecmp(answer, a2))
+			return (2);
+		printf("please answer %s or %s\n", a1, a2);
+	}
+
+	return (-1);
+}
+
+char *
+ct_create_config(void)
+{
+	char			answer[1024];
+	char			*conf = NULL, *dir = "~";
+	char			*user = NULL, *password = NULL;
+	char			*crypto_password = NULL;
+	int			global, rv, fd;
+	FILE			*f = NULL;
+
+	/* help user create config file */
+	if (ct_get_answer("config file not found, create one? ",
+	    "yes", "no", answer, sizeof answer) != 1)
+		CFATALX("%s requires a config file", __progname);
+
+	rv = ct_get_answer("create a system or user config file? ",
+	    "system", "user", answer, sizeof answer);
+	if (rv == 1) {
+		global = 1;
+		conf = ct_system_config();
+		if (conf == NULL)
+			CFATALX("invalid system config file");
+		if (getuid() != 0)
+			CFATALX("must be root to create system config file");
+	} else if (rv == 2) {
+		global = 0;
+		conf = ct_user_config();
+		if (conf == NULL)
+			CFATALX("invalid user config file");
+	} else
+		CFATALX("must select config file type");
+
+	while (user == NULL) {
+		if (ct_get_answer("username? ",
+		    NULL, NULL, answer, sizeof answer)) {
+			printf("must supply username\n");
+			continue;
+		}
+		if (strlen(answer) < 3) {
+			printf("invalid username length\n");
+			continue;
+		}
+		user = strdup(answer);
+		if (user == NULL)
+			CFATALX("strdup");
+	}
+
+	if (ct_get_answer("password? (enter to skip) ", NULL, NULL, answer,
+	    sizeof answer))
+		CFATALX("password");
+	else {
+		if (strlen(answer)) {
+			password = strdup(answer);
+			if (password == NULL)
+				CFATALX("strdup");
+		}
+	}
+
+	if (ct_get_answer("crypto passphrase? (enter to skip) ", NULL, NULL, answer,
+	    sizeof answer))
+		CFATALX("crypto passphrase");
+	else {
+		if (strlen(answer)) {
+			crypto_password = strdup(answer);
+			if (crypto_password == NULL)
+				CFATALX("strdup");
+		}
+	}
+
+	if ((fd = open(conf, O_RDWR | O_CREAT, 0400)) == -1)
+		CFATAL("open");
+	if ((f = fdopen(fd, "r+")) == NULL)
+		CFATAL("fdopen");
+
+	fprintf(f, "username\t\t\t= %s\n", user);
+	if (password)
+		fprintf(f, "password\t\t\t= %s\n", password);
+	else
+		fprintf(f, "#password\t\t\t=\n");
+	if (crypto_password)
+		fprintf(f, "crypto_password\t\t\t= %s\n", crypto_password);
+	else
+		fprintf(f, "#crypto_password\t\t=\n");
+
+	fprintf(f, "max_chunk_size\t\t\t= 262144\n");
+	fprintf(f, "queue_depth\t\t\t= 100\n");
+	fprintf(f, "cache_db\t\t\t= ~/.cyphertite.db\n");
+	fprintf(f, "session_compression\t\t= lzo\n");
+	fprintf(f, "host\t\t\t\t= beta.cyphertite.com\n");
+	fprintf(f, "hostport\t\t\t= 31337\n");
+	fprintf(f, "crypto_secrets\t\t\t= ~/.cyphertite.crypto\n");
+
+	if (global)
+		dir = "/etc";
+
+	fprintf(f, "ca_cert\t\t\t\t= %s/cyphertite/ct_ca.crt\n", dir);
+	fprintf(f, "cert\t\t\t\t= %s/cyphertite/ct_%s.crt\n", dir, user);
+	fprintf(f, "key\t\t\t\t= %s/cyphertite/private/ct_%s.key\n", dir, user);
+
+	if (user)
+		free(user);
+	if (password) {
+		bzero(password, strlen(password));
+		free(password);
+	}
+	if (crypto_password) {
+		bzero(crypto_password, strlen(crypto_password));
+		free(crypto_password);
+	}
+	if (f)
+		fclose(f);
+
 	return (conf);
 }

@@ -44,6 +44,7 @@ extern int		ct_metadata;
 extern time_t		ct_prev_backup_time;
 extern int		ct_trans_id;
 extern int		md_backup_fd;
+extern char *		__progname;
 
 /* crypto */
 #define CT_KEY_LEN		(256>>3)
@@ -435,6 +436,7 @@ void ct_file_extract_write(uint8_t *buf, size_t size);
 void ct_file_extract_close(struct flist *fnode);
 void ct_file_extract_special(struct flist *fnode);
 void ct_file_extract_fixup(void);
+char *ct_create_config(void);
 char *ct_system_config(void);
 char *ct_user_config(void);
 
