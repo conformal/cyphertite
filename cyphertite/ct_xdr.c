@@ -318,8 +318,6 @@ next_file:
 	ret = ct_read_header(&hdr);
 
 	while (ret == 0 && hdr.cmh_beacon != CT_HDR_EOF) {
-		sha_cnt = 0;
-
 		doprint = (ct_all_files || !ct_match(ct_match_mode, hdr.cmh_filename));
 		ct_populate_fnode(fnode, &hdr, &state);
 
@@ -341,6 +339,8 @@ next_file:
 						ret = ct_xdr_dedup_sha(&xdr,
 						    sha);
 					}
+					if (ret)
+						CFATALX("error deduping sha");
 					ct_sha1_encode(sha, shat);
 					printf(" sha %s\n", shat);
 				}
@@ -354,6 +354,8 @@ next_file:
 						ret = ct_xdr_dedup_sha(&xdr,
 						    sha);
 					}
+					if (ret)
+						CFATALX("error deduping sha");
 					pos1 = ftello(xdr_f);
 					sha_size = pos1 - pos0;
 					sha_cnt--;
@@ -381,6 +383,8 @@ skipped:
 			e_free(&fnode->fl_hlname);
 
 		ret = ct_read_header(&hdr);
+		if (ret)
+			CFATALX("error reading MD header");
 	}
 
 	ct_metadata_close(xdr_f);
@@ -611,7 +615,8 @@ ct_process_md(void *vctx)
 		CDBG("shacnt %" PRId64, ct_num_shas);
 		if (ct_num_shas == -1) {
 			/* read header */
-			ret = ct_read_header(&hdr);
+			if (ct_read_header(&hdr))
+				CFATALX("failure reading header");
 
 			switch (hdr.cmh_beacon) {
 			case CT_HDR_BEACON:
@@ -712,6 +717,8 @@ ct_process_md(void *vctx)
 				ret = ct_xdr_dedup_sha(&xdr,
 				    trans->tr_sha);
 			}
+			if (ret)
+				CFATALX("error deduping sha");
 			if (ct_doextract == 0) {
 				ct_trans_free(trans);
 				continue;
