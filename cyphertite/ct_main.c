@@ -107,6 +107,7 @@ usage(void)
 int
 main(int argc, char **argv)
 {
+	char		pwd[PASS_MAX];
 	struct stat	sb;
 	int		c;
 	int		cflags;
@@ -204,6 +205,15 @@ main(int argc, char **argv)
 	argv += optind;
 
 	ct_load_config(settings);
+
+	if (ct_password == NULL) {
+		if (ct_get_password(pwd, sizeof pwd, "Login password: ", 0))
+			CFATALX("invalid password");
+		ct_password = strdup(pwd);
+		if (ct_password == NULL)
+			CFATAL("ct_password");
+		bzero(pwd, sizeof pwd);
+	}
 
 	if (ct_crypto_secrets) {
 		if (stat(ct_crypto_secrets, &sb) == -1) {
