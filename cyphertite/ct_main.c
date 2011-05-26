@@ -56,8 +56,8 @@ unsigned char		ct_iv[CT_IV_LEN];
 unsigned char		ct_crypto_key[CT_KEY_LEN];
 
 /* config */
-int			ct_max_trans;
-int			ct_max_block_size = 128 * 1024;
+int			ct_max_trans = 100;
+int			ct_max_block_size = 256 * 1024;
 char			*ct_host;
 char			*ct_hostport;
 char			*ct_localdb;
@@ -116,9 +116,6 @@ main(int argc, char **argv)
 	int		ret;
 
 	ct_savecore();
-
-	/* XXX */
-	ct_max_trans = 50;
 
 	clog_init(1);
 	cflags = CLOG_F_ENABLE | CLOG_F_STDERR;
