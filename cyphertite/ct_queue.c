@@ -222,6 +222,7 @@ skip_csha:
 	case TR_S_EX_SPECIAL:
 	case TR_S_EX_FILE_END:
 	case TR_S_EX_DONE:
+	case TR_S_XML_CLOSE:
 		RB_INSERT(ct_trans_lookup, &ct_state->ct_complete, trans);
 		ct_state->ct_complete_rblen++;
 
@@ -374,15 +375,8 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 	/* else */
 	    /* handle request */
 
-	if (hdr->c_opcode & 1) {
-		/* not all replies have bodies preallocated */
-		switch(hdr->c_opcode) {
-		case C_HDR_O_XML_REPLY:
-			break;
-		default:
-			lookup_body = 1;
-		}
-	}
+	if (hdr->c_opcode & 1)
+		lookup_body = 1;
 	if (lookup_body) {
 		CDBG("handle message iotrans %u opcode %u status %u",
 		    hdr->c_tag, hdr->c_opcode, hdr->c_status);
@@ -447,15 +441,13 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 	case C_HDR_O_EXISTS:
 	case C_HDR_O_WRITE:
 	case C_HDR_O_READ:
+	case C_HDR_O_XML:
 		trans = (struct ct_trans *)hdr; /* cast to parent struct */
 		TAILQ_REMOVE(&ct_state->ct_queued, trans, tr_next);
 		RB_INSERT(ct_iotrans_lookup, &ct_state->ct_inflight, trans);
 		ct_state->ct_queued_qlen--;
 		ct_state->ct_inflight_rblen++;
 		/* no need to free body */
-		break;
-	case C_HDR_O_XML:
-		e_free(&vbody);
 		break;
 	default:
 		CWARNX("freeing body for hdr opcode %u tag %u trans %" PRIu64,
@@ -1016,7 +1008,7 @@ ct_handle_read_reply(struct ct_trans *trans, struct ct_header *hdr,
 		CDBG("c_flags on reply %x", hdr->c_flags);
 		if (hdr->c_flags & C_HDR_F_METADATA) {
 			/* FAIL on metadata read is 'eof' */
-			trans->tr_state = TR_S_EX_DONE;
+			trans->tr_state = TR_S_XML_CLOSE;
 		} else {
 			ct_sha1_encode(trans->tr_sha, shat);
 			CFATALX("Data missing on server return %u shat %s",

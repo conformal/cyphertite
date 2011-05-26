@@ -33,12 +33,15 @@ void md_extract_chunk(void *);
 const char			*md_filename;
 int				md_backup_fd;
 int				md_block_no = 0;
+int				md_is_open = 0;
+int				md_open_inflight = 0;
 size_t				md_size, md_offset;
 time_t				md_mtime;
 
+
 #define MD_O_READ	0
 #define MD_O_WRITE	1
-void ct_xml_file_open(const char *mfile, int);
+void ct_xml_file_open(struct ct_trans *, const char *, int);
 void ct_xml_file_close(void);
 
 struct xmlsd_v_elements ct_xml_cmds[] = {
@@ -46,6 +49,7 @@ struct xmlsd_v_elements ct_xml_cmds[] = {
 	{ "ct_md_open_read", xe_ct_md_open_read },
 	{ "ct_md_open_create", xe_ct_md_open_create },
 	{ "ct_md_delete", xe_ct_md_delete },
+	{ "ct_md_close", xe_ct_md_close },
 	{ NULL, NULL }
 };
 
@@ -93,8 +97,6 @@ ct_md_archive(const char *mfile, char **pat)
 	ct_setup_wakeup_complete(ct_state, ct_process_complete);
 
 
-	ct_xml_file_open(mfile, MD_O_WRITE);
-
 	/* poke file into action */
 	ct_wakeup_file();
 
@@ -114,6 +116,11 @@ ct_md_fileio(void *unused)
 	struct ct_trans		*ct_trans;
 	int			error;
 
+#if 0
+	if (md_opened) {
+		ct_set_file_state(CT_S_WAITING_TRANS);
+	}
+#endif
 	CDBG("md_fileio entered for block %d", md_block_no);
 loop:
 	ct_trans = ct_trans_alloc();
@@ -121,6 +128,19 @@ loop:
 		/* system busy, return */
 		CDBG("ran out of transactions, waiting");
 		ct_set_file_state(CT_S_WAITING_TRANS);
+		return;
+	}
+
+	if (md_is_open == 0) {
+		if (md_open_inflight) {
+			CDBG("waiting on md open");
+			ct_trans_free(ct_trans);
+			ct_set_file_state(CT_S_WAITING_TRANS);
+			return;
+		}
+
+		ct_xml_file_open(ct_trans, md_filename, MD_O_WRITE);
+		md_open_inflight = 1;
 		return;
 	}
 
@@ -135,6 +155,7 @@ loop:
 		ct_trans->tr_trans_id = ct_trans_id++;
 		ct_trans->hdr.c_flags = C_HDR_F_METADATA;
 		ct_queue_transfer(ct_trans);
+		/* Queue md close */
 		return;
 	}
 	CDBG("rsz %zd max %d", rsz, ct_max_block_size);
@@ -215,22 +236,19 @@ loop:
 }
 
 void
-ct_xml_file_open(const char *file, int mode)
+ct_xml_file_open(struct ct_trans *trans, const char *file, int mode)
 {
 	struct ct_header	*hdr = NULL;
-	struct ct_trans		*trans;
 	char			*xml_ptr = NULL;
 	char			*xml_head = NULL;
 	char			*version;
 	int			xml_len = 0, slen, rem;
 
 	version = "1.0";
-
-	trans = ct_trans_alloc();
+	trans->tr_trans_id = ct_trans_id++;
 
 	CDBG("setting up XML");
 for_real:
-	xml_ptr = xml_head;
 	slen = 0;
 
 	xml_ptr = xml_head ? (xml_head + slen) : NULL;
@@ -239,7 +257,7 @@ for_real:
 	CDBG("setting up XML header");
 	slen += snprintf(xml_ptr, rem,
             "<?xml version=\"1.0\"?>\r\n"
-            "<cr_md_open_%s version=\"%s\" >\r\n",
+            "<ct_md_open_%s version=\"%s\" >\r\n",
 	    (mode ? "create" : "read"),
 	    version);
 
@@ -253,7 +271,7 @@ for_real:
 	rem = xml_head ? xml_len - (xml_ptr - xml_head) : 0;
 
 	slen += snprintf(xml_ptr, rem,
-	    "</cr_md_open_%s>\r\n\r\n", mode ? "create" : "read");
+	    "</ct_md_open_%s>\r\n\r\n", mode ? "create" : "read");
 
 	if (xml_head == NULL) {
 		CDBG("setting up XML body");
@@ -280,6 +298,9 @@ for_real:
 		    xml_len, slen);
 	}
 
+	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
+	ct_state->ct_queued_qlen++;
+
 	ct_assl_write_op(ct_assl_ctx, hdr, xml_head);
 }
 
@@ -289,59 +310,55 @@ ct_xml_file_close(void)
 	struct ct_header	*hdr = NULL;
 	struct ct_trans		*trans;
 	char			*xml_ptr = NULL;
-	char			*xml_head = NULL;
 	char			*version;
-	int			xml_len = 0, slen, rem;
+	int			slen, rem;
 
 	version = "1.0";
 
 	trans = ct_trans_alloc();
 
-	CDBG("setting up XML");
-for_real:
-	xml_ptr = xml_head;
-	slen = 0;
+	trans->tr_trans_id = ct_trans_id++;
 
-	xml_ptr = xml_head ? (xml_head + slen) : NULL;
-	rem = xml_ptr ? xml_len - (xml_ptr - xml_head) : 0;
+	CDBG("setting up XML");
+	slen = 0;
+	rem = 0;
+for_real:
 
 	CDBG("setting up XML header");
-	slen += snprintf(xml_ptr, rem,
+	slen = snprintf(xml_ptr, rem,
             "<?xml version=\"1.0\"?>\r\n"
-            "<cr_md_close version=\"%s\" >\r\n",
-	    version);
+            "<ct_md_close version=\"%s\" />\r\n",
+	    CT_MD_CLOSE_VERSION);
+	slen++; /* for NUL */
 
-	CDBG("setting up XML tail");
-	xml_ptr = xml_head ? (xml_head + slen) : NULL;
-	rem = xml_head ? xml_len - (xml_ptr - xml_head) : 0;
-
-	slen += snprintf(xml_ptr, rem,
-	    "</cr_md_close>\r\n\r\n");
-
-	if (xml_head == NULL) {
+	if (xml_ptr == NULL) {
 		CDBG("setting up XML body");
-		xml_len = slen;
+		rem = slen;
 		hdr = &trans->hdr;
 		hdr->c_version = C_HDR_VERSION;
 		hdr->c_opcode = C_HDR_O_XML;
-		hdr->c_size = xml_len+1;
+		hdr->c_size = slen;
 
 		/*
 		 * XXX - yes I think this should be seperate
 		 * so that xml size is independant of chunk size
 		 */
-		xml_head = (char *)ct_body_alloc(NULL, hdr);
-		CDBG("got body %p", xml_head);
+		xml_ptr = (char *)ct_body_alloc(NULL, hdr);
+		CDBG("got body %p", xml_ptr);
 		goto for_real;
 	}
 
-	CDBG("setting up XML done with body %s", xml_head);
-	if (xml_len != slen) {
+	CDBG("setting up XML done with body %s", xml_ptr);
+	if (slen != rem) {
 		CFATALX("xml list transaction len did not match %d %d",
-		    xml_len, slen);
+		    slen, rem);
 	}
 
-	ct_assl_write_op(ct_assl_ctx, hdr, xml_head);
+	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
+	ct_state->ct_queued_qlen++;
+
+
+	ct_assl_write_op(ct_assl_ctx, hdr, xml_ptr);
 }
 
 int
@@ -363,14 +380,14 @@ ct_md_extract(const char *mfile, char **pat)
 	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
 	ct_setup_wakeup_complete(ct_state, ct_process_complete);
 
-	 /*XXX -chmod when done */
+	/* XXX -chmod when done */
 	md_backup_fd = open(mfile, O_WRONLY|O_TRUNC|O_CREAT, 0600);
 	if (md_backup_fd == -1) {
 		CWARNX("unable to open file %s", mfile);
 		return -1;
 	}
 
-	ct_xml_file_open(mfile, MD_O_READ);
+	md_filename = mfile;
 
 	/* poke file into action */
 	ct_wakeup_file();
@@ -396,6 +413,18 @@ md_extract_chunk(void *unused)
 		/* system busy, return */
 		CDBG("ran out of transactions, waiting");
 		ct_set_file_state(CT_S_WAITING_TRANS);
+		return;
+	}
+	if (md_is_open == 0) {
+		if (md_open_inflight) {
+			CDBG("waiting on md open");
+			ct_trans_free(trans);
+			ct_set_file_state(CT_S_WAITING_TRANS);
+			return;
+		}
+
+		ct_xml_file_open(trans, md_filename, MD_O_READ);
+		md_open_inflight = 1;
 		return;
 	}
 
@@ -513,8 +542,11 @@ ct_md_wfile(void *vctx)
 			break;
 #if 0
 		case TR_S_XML_OPEN: /* XXX ? */
-		case TR_S_XML_CLOSE: /* XXX ? */
 #endif
+		case TR_S_XML_CLOSE:
+			ct_xml_file_close();
+			break;
+
 		default:
 			CFATALX("unexpected tr state in md_wfile %d",
 			    trans->tr_state);
@@ -549,12 +581,13 @@ ct_md_list(const char *mfile, char **pat)
 	ct_setup_assl();
 
 	trans = ct_trans_alloc();
+
+	trans->tr_trans_id = ct_trans_id++;
 	
 	version = "1.0";
 
 	CDBG("setting up XML");
 for_real:
-	xml_ptr = xml_head;
 	slen = 0;
 
 	xml_ptr = xml_head ? (xml_head + slen) : NULL;
@@ -563,7 +596,7 @@ for_real:
 	CDBG("setting up XML header");
 	slen += snprintf(xml_ptr, rem,
             "<?xml version=\"1.0\"?>\r\n"
-            "<cr_md_list version=\"%s\" >\r\n",
+            "<ct_md_list version=\"%s\" >\r\n",
 	    version);
 
 	/* XXX - pat */
@@ -586,7 +619,7 @@ for_real:
 	rem = xml_head ? xml_len - (xml_ptr - xml_head) : 0;
 
 	slen += snprintf(xml_ptr, rem,
-	    "</cr_md_list>\r\n");
+	    "</ct_md_list>\r\n");
 
 	if (xml_head == NULL) {
 		CDBG("setting up XML body");
@@ -611,6 +644,9 @@ for_real:
 		    xml_len, slen);
 	}
 
+	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
+	ct_state->ct_queued_qlen++;
+
 	ct_assl_write_op(ct_assl_ctx, hdr, xml_head);
 
 	/* start turning crank */
@@ -626,9 +662,9 @@ ct_md_delete(const char *md, char **arg)
 {
 	static const char *ct_delete_md = 
             "<?xml version=\"1.0\"?>\r\n"
-            "<cr_md_delete version=\"1.0\" >\r\n"
+            "<ct_md_delete version=\"1.0\" >\r\n"
 	    "<file name=\"%s\"/>\r\n"
-	    "</cr_md_delete>\r\n";
+	    "</ct_md_delete>\r\n";
 	struct ct_header *hdr;
 	struct ct_trans *trans;
 	char *cmd, *body = NULL;
@@ -642,6 +678,7 @@ ct_md_delete(const char *md, char **arg)
 	ct_setup_assl();
 
 	trans = ct_trans_alloc();
+	trans->tr_trans_id = ct_trans_id++;
 	hdr = &trans->hdr;
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
@@ -650,6 +687,9 @@ ct_md_delete(const char *md, char **arg)
 	body = ct_body_alloc(NULL, hdr);
 	bcopy(cmd, body, strlen(cmd)+1);
 	free(cmd);
+
+	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
+	ct_state->ct_queued_qlen++;
 
 	ct_assl_write_op(ct_assl_ctx, hdr, body);
 
@@ -704,7 +744,28 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 	}
 
 	xe = TAILQ_FIRST(&xl);
-	if (strcmp(xe->name, "cr_md_list") == 0) {
+	if (strncmp(xe->name, "ct_md_open", strlen("ct_md_open")) == 0) {
+		int die = 1;
+
+		TAILQ_FOREACH(xe, &xl, entry) {
+			if (strcmp(xe->name, "file") == 0) {
+				filename = xmlsd_get_attr(xe, "name");
+				if (filename)
+					CWARNX("%s opened\n", filename);
+				die = 0;
+				md_open_inflight = 0;
+				md_is_open = 1;
+				ct_wakeup_file();
+			}
+		}
+		if (die) {
+			CWARNX("couldn't open md file");
+			ct_shutdown();
+		}
+	} else if (strcmp(xe->name, "ct_md_close") == 0) {
+		trans->tr_state = TR_S_EX_DONE;
+		ct_queue_transfer(trans);
+	} else if (strcmp(xe->name, "ct_md_list") == 0) {
 		TAILQ_FOREACH(xe, &xl, entry) {
 			if (strcmp(xe->name, "file") == 0) {
 				filename =xmlsd_get_attr(xe, "name");
@@ -713,8 +774,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 			}
 		}
 		ct_shutdown();
-	}
-	if (strcmp(xe->name, "cr_md_delete") == 0) {
+	} else  if (strcmp(xe->name, "ct_md_delete") == 0) {
 		TAILQ_FOREACH(xe, &xl, entry) {
 			if (strcmp(xe->name, "file") == 0) {
 				filename =xmlsd_get_attr(xe, "name");
@@ -726,5 +786,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 	}
 
 done:
+	// this is needed, turns out
+	ct_header_free(NULL, hdr);
 	xmlsd_unwind(&xl);
 }
