@@ -69,9 +69,9 @@ ct_setup_assl(void)
 	gettimeofday(&ct_stats->st_time_start, NULL);
 
 	ct_assl_ctx = ct_ssl_connect(0);
-	if (ct_assl_negotiate_poll(ct_assl_ctx)) {
+	if (ct_assl_negotiate_poll(ct_assl_ctx))
 		CFATALX("negotiate failed");
-	}
+
 	CDBG("assl data: as bits %d, protocol [%s]", ct_assl_ctx->c->as_bits,
 	    ct_assl_ctx->c->as_protocol);
 
@@ -349,11 +349,8 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *ct_assl_ctx)
 
 	if (hdr.c_version == C_HDR_VERSION &&
 	    hdr.c_opcode == C_HDR_O_LOGIN_REPLY) {
-		if (hdr.c_status != C_HDR_S_OK) {
-			/* XXX - nicer error reporting */
-			CWARNX("login failed");
-			goto done;
-		}
+		if (hdr.c_status != C_HDR_S_OK)
+			CFATALX("login failed");
 	} else {
 		CWARNX("login: invalid server reply");
 		goto done;
