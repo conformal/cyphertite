@@ -339,7 +339,7 @@ next_file:
 						ret = ct_xdr_dedup_sha(&xdr,
 						    sha);
 					}
-					if (ret)
+					if (ret == FALSE)
 						CFATALX("error deduping sha");
 					ct_sha1_encode(sha, shat);
 					printf(" sha %s\n", shat);
@@ -354,7 +354,7 @@ next_file:
 						ret = ct_xdr_dedup_sha(&xdr,
 						    sha);
 					}
-					if (ret)
+					if (ret == FALSE)
 						CFATALX("error deduping sha");
 					pos1 = ftello(xdr_f);
 					sha_size = pos1 - pos0;
@@ -383,8 +383,6 @@ skipped:
 			e_free(&fnode->fl_hlname);
 
 		ret = ct_read_header(&hdr);
-		if (ret)
-			CFATALX("error reading MD header");
 	}
 
 	ct_metadata_close(xdr_f);
@@ -717,7 +715,7 @@ ct_process_md(void *vctx)
 				ret = ct_xdr_dedup_sha(&xdr,
 				    trans->tr_sha);
 			}
-			if (ret)
+			if (ret == FALSE)
 				CFATALX("error deduping sha");
 			if (ct_doextract == 0) {
 				ct_trans_free(trans);
