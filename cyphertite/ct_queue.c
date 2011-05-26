@@ -724,8 +724,11 @@ ct_write_md(struct ct_trans *trans)
 		if (ct_write_header(trans, trans->tr_fl_node->fl_sname))
 			CWARNX("header write failed");
 
-		if (ct_verbose)
+		if (ct_verbose) {
 			printf("%s", trans->tr_fl_node->fl_sname);
+			fflush(stdout);
+		}
+
 		if (trans->tr_eof == 1 || trans->tr_fl_node->fl_skip_file) {
 			ct_write_md_eof(trans);
 			ct_stats->st_files_completed++;
