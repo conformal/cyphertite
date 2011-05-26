@@ -19,10 +19,6 @@
 #include <clens.h>
 #endif
 
-#include <stdio.h>
-#include <pwd.h>
-#include <readpassphrase.h>
-
 #ifndef NO_UTIL_H
 #include <util.h>
 #endif
@@ -31,9 +27,6 @@
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 #include <openssl/buffer.h>
-
-#include <netinet/in.h>
-#include <arpa/inet.h>
 
 #include <clog.h>
 

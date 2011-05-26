@@ -19,21 +19,13 @@
 #include <clens.h>
 #endif
 
-#include <stdio.h>
-#include <pwd.h>
-#include <readpassphrase.h>
-
 #ifndef NO_UTIL_H
 #include <util.h>
 #endif
 
-#include <netinet/in.h>
-#include <arpa/inet.h>
-
 #include <clog.h>
 
 #include "ctutil.h"
-
 
 int
 ct_init_compression(uint16_t comp_type)
