@@ -29,13 +29,14 @@
 #include <fts.h>
 #include <pwd.h>
 #include <limits.h>
+#include <readpassphrase.h>
 
 #include <clog.h>
 #include <exude.h>
 
 #include "ct.h"
 
-int		ct_get_answer(char *, char *, char *, char *, size_t);
+int		ct_get_answer(char *, char *, char *, char *, size_t, int);
 
 struct flist_head	fl_list_head = TAILQ_HEAD_INITIALIZER(fl_list_head);
 struct flist		*fl_curnode;
@@ -834,20 +835,19 @@ ct_user_config(void)
 }
 
 int
-ct_get_answer(char *prompt, char *a1, char *a2, char *answer, size_t answer_len)
+ct_get_answer(char *prompt, char *a1, char *a2, char *answer,
+    size_t answer_len, int secret)
 {
 	char			*p;
 
+	if (answer == NULL)
+		return (-1);
+
 	for (;;) {
-		printf("%s", prompt);
-		fgets(answer, answer_len, stdin);
-		if (feof(stdin) || ferror(stdin))
-			CFATAL("fgets");
-		if ((p = strchr(answer, '\n')) == NULL) {
-			printf("invalid answer\n");
-			continue;
-		}
-		*p = '\0';
+		p = readpassphrase(prompt, answer, answer_len,
+		    secret ? RPP_ECHO_OFF : RPP_ECHO_ON);
+		if (p == NULL)
+			CFATAL("readpassphrase");
 
 		if (a1 == NULL && a2 == NULL)
 			return (0); /* just get the string */
@@ -875,11 +875,11 @@ ct_create_config(void)
 
 	/* help user create config file */
 	if (ct_get_answer("config file not found, create one? ",
-	    "yes", "no", answer, sizeof answer) != 1)
+	    "yes", "no", answer, sizeof answer, 0) != 1)
 		CFATALX("%s requires a config file", __progname);
 
 	rv = ct_get_answer("create a system or user config file? ",
-	    "system", "user", answer, sizeof answer);
+	    "system", "user", answer, sizeof answer, 0);
 	if (rv == 1) {
 		global = 1;
 		conf = ct_system_config();
@@ -897,7 +897,7 @@ ct_create_config(void)
 
 	while (user == NULL) {
 		if (ct_get_answer("username? ",
-		    NULL, NULL, answer, sizeof answer)) {
+		    NULL, NULL, answer, sizeof answer, 0)) {
 			printf("must supply username\n");
 			continue;
 		}
@@ -910,8 +910,8 @@ ct_create_config(void)
 			CFATALX("strdup");
 	}
 
-	if (ct_get_answer("password? (enter to skip) ", NULL, NULL, answer,
-	    sizeof answer))
+	if (ct_get_answer("password? [enter to skip] ", NULL, NULL, answer,
+	    sizeof answer, 1))
 		CFATALX("password");
 	else {
 		if (strlen(answer)) {
@@ -921,8 +921,8 @@ ct_create_config(void)
 		}
 	}
 
-	if (ct_get_answer("crypto passphrase? (enter to skip) ", NULL, NULL, answer,
-	    sizeof answer))
+	if (ct_get_answer("crypto passphrase? [enter to skip] ", NULL, NULL, answer,
+	    sizeof answer, 1))
 		CFATALX("crypto passphrase");
 	else {
 		if (strlen(answer)) {
