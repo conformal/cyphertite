@@ -112,7 +112,7 @@ ct_build_and_install()
 	if ! openssl ciphers | grep ECDSA >/dev/null 2>&1; then
 		cd "$pkg"
 		./config || report_err "config script failed for '$pkg'."
-		make || report_err "Make filed for '$pkg'."
+		make || report_err "Make failed for '$pkg'."
 		make install || report_err "Install failed for '$pkg'."
 		cd ..
 	fi
