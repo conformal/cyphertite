@@ -962,9 +962,9 @@ ct_create_config(void)
 
 			if (strlen(answer) == 1 &&answer[0] == 'g') {
 				arc4random_buf(answer2, sizeof answer2);
-				ct_sha512(answer2, ad, sizeof answer2);
+				ct_sha512((uint8_t *)answer2, ad, sizeof answer2);
 				if (ct_base64_encode(CT_B64_ENCODE, ad,
-				    sizeof ad, b64d, sizeof b64d))
+				    sizeof ad, (uint8_t *)b64d, sizeof b64d))
 					CFATALX("can't base64 encode "
 					"crypto passphrase");
 
