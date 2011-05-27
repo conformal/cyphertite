@@ -33,11 +33,11 @@ endif
 
 # Compiler and linker flags.
 CPPFLAGS += -DNEED_LIBCLENS
-INCFLAGS += -I ../ctutil -I $(INCDIR)/clens
+INCFLAGS += -I../ctutil -I$(INCDIR)/clens -I$(LOCALBASE)/ssl/include
 WARNFLAGS ?= -Wall -Werror
 DEBUG += -g
 CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(DEBUG)
-LDFLAGS += -L/usr/local/ssl/lib
+LDFLAGS += -L$(LOCALBASE)/ssl/lib
 LDFLAGS += -L../ctutil/obj -L../ctutil -lctutil -lassl -lclog -levent -lexude
 LDFLAGS += -lshrink -lxmlsd -lexpat -lsqlite3 -llzma -llzo2 -lz -lclens -lbsd
 LDFLAGS += -Wl,-Bstatic -lssl -lcrypto -Wl,-Bdynamic -ldl

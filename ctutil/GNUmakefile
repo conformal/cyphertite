@@ -29,7 +29,7 @@ RM ?= rm -f
 
 # Compiler and linker flags.
 CPPFLAGS += -DNEED_LIBCLENS -D_PASSWORD_LEN=128
-INCFLAGS += -I. -I$(INCDIR)/clens
+INCFLAGS += -I. -I$(INCDIR)/clens -I$(LOCALBASE)/ssl/include
 WARNFLAGS ?= -Wall -Werror
 DEBUG += -g
 CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(DEBUG)
