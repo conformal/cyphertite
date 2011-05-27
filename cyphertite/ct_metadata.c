@@ -239,69 +239,42 @@ void
 ct_xml_file_open(struct ct_trans *trans, const char *file, int mode)
 {
 	struct ct_header	*hdr = NULL;
-	char			*xml_ptr = NULL;
-	char			*xml_head = NULL;
-	char			*version;
-	int			xml_len = 0, slen, rem;
+	char			*body = NULL;
+	char			*buf = NULL;
+	int			sz;
 
-	version = "1.0";
 	trans->tr_trans_id = ct_trans_id++;
 
 	CDBG("setting up XML");
-for_real:
-	slen = 0;
 
-	xml_ptr = xml_head ? (xml_head + slen) : NULL;
-	rem = xml_ptr ? xml_len - (xml_ptr - xml_head) : 0;
+	if (mode)
+		sz = asprintf(&buf, ct_md_open_create_fmt, file);
+	else
+		sz = asprintf(&buf, ct_md_open_read_fmt, file);
+	if (sz == -1)
+		CFATALX("cannot allocate memory");
+	sz += 1;	/* include null */
+		    
+	hdr = &trans->hdr;
+	hdr->c_version = C_HDR_VERSION;
+	hdr->c_opcode = C_HDR_O_XML;
+	hdr->c_size = sz;
 
-	CDBG("setting up XML header");
-	slen += snprintf(xml_ptr, rem,
-            "<?xml version=\"1.0\"?>\r\n"
-            "<ct_md_open_%s version=\"%s\" >\r\n",
-	    (mode ? "create" : "read"),
-	    version);
-
-	xml_ptr = xml_head ? (xml_head + slen) : NULL;
-	rem = xml_head ? xml_len - (xml_ptr - xml_head) : 0;
-	slen += snprintf(xml_ptr, rem,
-	    "<file name=\"%s\"/>\r\n", file);
-
-	CDBG("setting up XML tail");
-	xml_ptr = xml_head ? (xml_head + slen) : NULL;
-	rem = xml_head ? xml_len - (xml_ptr - xml_head) : 0;
-
-	slen += snprintf(xml_ptr, rem,
-	    "</ct_md_open_%s>\r\n\r\n", mode ? "create" : "read");
-
-	if (xml_head == NULL) {
-		CDBG("setting up XML body");
-		xml_len = slen;
-		hdr = &trans->hdr;
-		hdr->c_version = C_HDR_VERSION;
-		hdr->c_opcode = C_HDR_O_XML;
-		hdr->c_size = xml_len+1;
-
-		/*
-		 * XXX - yes I think this should be seperate
-		 * so that xml size is independant of chunk size
-		 */
-		xml_head = (char *)ct_body_alloc(NULL, hdr);
-		CDBG("got body %p", xml_head);
-		goto for_real;
-	}
+	/*
+	 * XXX - yes I think this should be seperate
+	 * so that xml size is independant of chunk size
+	 */
+	body = (char *)ct_body_alloc(NULL, hdr);
+	CDBG("got body %p", body);
+	bcopy(buf, body, sz);
+	free(buf);
 
 	CDBG("open trans %"PRIu64, trans->tr_trans_id);
-
-	CDBG("setting up XML done with body %s", xml_head);
-	if (xml_len != slen) {
-		CFATALX("xml list transaction len did not match %d %d",
-		    xml_len, slen);
-	}
 
 	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
 	ct_state->ct_queued_qlen++;
 
-	ct_assl_write_op(ct_assl_ctx, hdr, xml_head);
+	ct_assl_write_op(ct_assl_ctx, hdr, body);
 }
 
 void
@@ -309,56 +282,39 @@ ct_xml_file_close(void)
 {
 	struct ct_header	*hdr = NULL;
 	struct ct_trans		*trans;
-	char			*xml_ptr = NULL;
-	char			*version;
-	int			slen, rem;
-
-	version = "1.0";
+	char			*buf = NULL;
+	char			*body = NULL;
+	int			sz;
 
 	trans = ct_trans_alloc();
 
 	trans->tr_trans_id = ct_trans_id++;
 
 	CDBG("setting up XML");
-	slen = 0;
-	rem = 0;
-for_real:
 
-	CDBG("setting up XML header");
-	slen = snprintf(xml_ptr, rem,
-            "<?xml version=\"1.0\"?>\r\n"
-            "<ct_md_close version=\"%s\" />\r\n",
-	    CT_MD_CLOSE_VERSION);
-	slen++; /* for NUL */
+	sz = asprintf(&buf, ct_md_close_fmt);
+	if (sz == -1)
+		CFATALX("cannot allocate memory");
+	sz += 1;	/* include null */
 
-	if (xml_ptr == NULL) {
-		CDBG("setting up XML body");
-		rem = slen;
-		hdr = &trans->hdr;
-		hdr->c_version = C_HDR_VERSION;
-		hdr->c_opcode = C_HDR_O_XML;
-		hdr->c_size = slen;
+	hdr = &trans->hdr;
+	hdr->c_version = C_HDR_VERSION;
+	hdr->c_opcode = C_HDR_O_XML;
+	hdr->c_size = sz;
 
-		/*
-		 * XXX - yes I think this should be seperate
-		 * so that xml size is independant of chunk size
-		 */
-		xml_ptr = (char *)ct_body_alloc(NULL, hdr);
-		CDBG("got body %p", xml_ptr);
-		goto for_real;
-	}
-
-	CDBG("setting up XML done with body %s", xml_ptr);
-	if (slen != rem) {
-		CFATALX("xml list transaction len did not match %d %d",
-		    slen, rem);
-	}
+	/*
+	 * XXX - yes I think this should be seperate
+	 * so that xml size is independant of chunk size
+	 */
+	body = (char *)ct_body_alloc(NULL, hdr);
+	CDBG("got body %p", body);
+	bcopy(buf, body, sz);
+	free(buf);
 
 	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
 	ct_state->ct_queued_qlen++;
 
-
-	ct_assl_write_op(ct_assl_ctx, hdr, xml_ptr);
+	ct_assl_write_op(ct_assl_ctx, hdr, body);
 }
 
 int
@@ -570,11 +526,9 @@ ct_md_list(const char *mfile, char **pat)
 	/* XXX - does mfile make sense for md list */
 	struct ct_header	*hdr;
 	struct ct_trans		*trans;
-	char			*xml_ptr = NULL;
-	char			*xml_head = NULL;
-	char			*version;
-	int			xml_len = 0, slen, rem;
-	int			rv;
+	char			*body = NULL;
+	char			*buf = NULL;
+	int			rv, sz;
 
 	ct_event_init();
 
@@ -584,70 +538,32 @@ ct_md_list(const char *mfile, char **pat)
 
 	trans->tr_trans_id = ct_trans_id++;
 	
-	version = "1.0";
-
 	CDBG("setting up XML");
-for_real:
-	slen = 0;
-
-	xml_ptr = xml_head ? (xml_head + slen) : NULL;
-	rem = xml_ptr ? xml_len - (xml_ptr - xml_head) : 0;
-
-	CDBG("setting up XML header");
-	slen += snprintf(xml_ptr, rem,
-            "<?xml version=\"1.0\"?>\r\n"
-            "<ct_md_list version=\"%s\" >\r\n",
-	    version);
 
 	/* XXX - pat */
-#if 0
-	type = "regex";
-	type = "glob";
-	/* XXX !!!! must be able to go thru this twice!!! */
-	for (... pat ...) {
-		xml_ptr = xml_head ? (xml_head + slen) : NULL;
-		rem = xml_head ? xml_len - (xml_ptr - xml_head) : 0;
+	sz = asprintf(&buf, ct_md_list_fmt, ""); 
+	if (sz == -1)
+		CFATALX("cannot allocate memory");
+	sz += 1;	/* include null */
 
-		slen += snprintf(xml_ptr, rem,
-		    "<%s>%s</%s>\r\n",
-		    type, pat[n], type);
-	}
-#endif
+	hdr = &trans->hdr;
+	hdr->c_version = C_HDR_VERSION;
+	hdr->c_opcode = C_HDR_O_XML;
+	hdr->c_size = sz;
 
-	CDBG("setting up XML tail");
-	xml_ptr = xml_head ? (xml_head + slen) : NULL;
-	rem = xml_head ? xml_len - (xml_ptr - xml_head) : 0;
-
-	slen += snprintf(xml_ptr, rem,
-	    "</ct_md_list>\r\n");
-
-	if (xml_head == NULL) {
-		CDBG("setting up XML body");
-		xml_len = slen;
-		hdr = &trans->hdr;
-		hdr->c_version = C_HDR_VERSION;
-		hdr->c_opcode = C_HDR_O_XML;
-		hdr->c_size = xml_len+1;
-
-		/*
-		 * XXX - yes I think this should be seperate
-		 * so that xml size is independant of chunk size
-		 */
-		xml_head = (char *)ct_body_alloc(NULL, hdr);
-		CDBG("got body %p", xml_head);
-		goto for_real;
-	}
+	/*
+	 * XXX - yes I think this should be seperate
+	 * so that xml size is independant of chunk size
+	 */
+	body = (char *)ct_body_alloc(NULL, hdr);
+	CDBG("got body %p", body);
+	bcopy(buf, body, sz);
+	free(buf);
 	
-	CDBG("setting up XML done with body %s", xml_head);
-	if (xml_len != slen) {
-		CFATALX("xml list transaction len did not match %d %d",
-		    xml_len, slen);
-	}
-
 	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
 	ct_state->ct_queued_qlen++;
 
-	ct_assl_write_op(ct_assl_ctx, hdr, xml_head);
+	ct_assl_write_op(ct_assl_ctx, hdr, body);
 
 	/* start turning crank */
 	rv = ct_event_dispatch();
@@ -660,19 +576,17 @@ for_real:
 int
 ct_md_delete(const char *md, char **arg)
 {
-	static const char *ct_delete_md = 
-            "<?xml version=\"1.0\"?>\r\n"
-            "<ct_md_delete version=\"1.0\" >\r\n"
-	    "<file name=\"%s\"/>\r\n"
-	    "</ct_md_delete>\r\n";
 	struct ct_header *hdr;
 	struct ct_trans *trans;
-	char *cmd, *body = NULL;
-	int rv;
+	char *buf, *body = NULL;
+	int rv, sz;
 
-	CDBG("ct_md_delete");
+	CDBG("setting up XML");
 
-	asprintf(&cmd, ct_delete_md, md);
+	sz = asprintf(&buf, ct_md_delete_fmt, md);
+	if (sz == -1)
+		CFATALX("cannot allocate memory");
+	sz += 1;	/* include null */
 
 	ct_event_init();
 	ct_setup_assl();
@@ -682,11 +596,11 @@ ct_md_delete(const char *md, char **arg)
 	hdr = &trans->hdr;
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
-	hdr->c_size = strlen(cmd) + 1;
+	hdr->c_size = sz;
 
 	body = ct_body_alloc(NULL, hdr);
-	bcopy(cmd, body, strlen(cmd)+1);
-	free(cmd);
+	bcopy(buf, body, sz);
+	free(buf);
 
 	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
 	ct_state->ct_queued_qlen++;
@@ -770,7 +684,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 			if (strcmp(xe->name, "file") == 0) {
 				filename =xmlsd_get_attr(xe, "name");
 				if (filename)
-					printf("%s uploaded\n", filename);
+					printf("%s\n", filename);
 			}
 		}
 		ct_shutdown();
