@@ -360,7 +360,7 @@ typedef struct dedup_digest dedup_digest;	/* ugh typedef, blame XDR */
 /* XDR for metadata global hader */
 struct ct_md_gheader {
 	int			cmg_beacon;	/* magic marker */
-#define CT_MD_BEACON		(0x48505943)
+#define CT_MD_BEACON		(0x43595048)
 	int			cmg_version;	/* version of the archive */
 #define CT_MD_VERSION		(1)
 	int			cmg_chunk_size;	/* chunk size */
