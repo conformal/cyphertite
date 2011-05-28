@@ -292,7 +292,10 @@ ct_xml_file_close(void)
 
 	CDBG("setting up XML");
 
-	sz = asprintf(&buf, ct_md_close_fmt);
+	// XXX: Some flavors of gcc don't like externed strings with no
+	// arguments to printf style functions since the format specifiers
+	// can't be checked at compile time.
+	sz = asprintf(&buf, "%s", ct_md_close_fmt);
 	if (sz == -1)
 		CFATALX("cannot allocate memory");
 	sz += 1;	/* include null */
