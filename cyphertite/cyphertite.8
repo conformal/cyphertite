@@ -23,23 +23,150 @@
 .Sh SYNOPSIS
 .Nm cyphertite
 .Bk -words
-.Op Fl PRXcdrptvx
-.Op Fl B Ar dir
+.Op Fl PRXcdmprtvx
+.Op Fl B Ar mdfile
 .Op Fl C Ar tmpdir
 .Op Fl F Ar conffile  
 .Op Fl f Ar mdfile
+.Op Ar file ...
 .El
 .Sh DESCRIPTION
+The
 .Nm
-is a client that provides privacy-driven encrypted remote archive
-solutions provided by Cyphertite (http://www.cyphertite.com).
+command creates, lists or extracts files using a metadata 
+archive file and remotely stored blocks of data, called
+.Dq chunks .
+A
+.Dq chunk
+is defined as a portion of a file on disk that is less than 256
+KB in size, where a file that is larger than 256 KB would be
+split into several 256 KB chunks and one chunk that is less than
+256 KB.
+It strives to be tar-like but has several modern features
+built-in:
 .Pp
-The options are as follows:
+DEDUPLICATION
+.Bd -filled -offset 3n
+DEDUPLICATION is the process whereby data that appears multiple
+times, in the case of
+.Nm
+meaning chunks, is stored only once and successive instances of
+that data are stored with a reference to the data already stored.
+This is effected through the metadata files which reference
+chunks stored on a remote server.
+Each chunk is identified by its SHA1 hash and stored only once
+but many metadata files may reference the same chunk.
+.Ed
+.Pp
+COMPRESSION
+.Bd -filled -offset 3n
+After files are split into chunks, those chunks are then compressed
+using the LZO, LZW or LZMA algorithm, depending on settings in the
+configuration file.
+The default compression algorithm is LZO because it is the fastest
+of 3 algorithms available.
+If a chunk is compressed and it increases in size, the uncompressed
+chunk is used.
+.Ed
+.Pp
+ENCRYPTION
+.Bd -filled -offset 3n
+.Nm
+encrypts each chunk after compressing it using 256-bit AES-XTS
+with a variation on the usual disk encryption method suggested
+in IEEE 1619-2007: the 256-bit tweak key, K2, is normally taken
+as the sector number on a hard drive, here it is generated as an
+HMAC SHA1 of the chunk itself using a separate 256-bit key.
+
+All metadata that is stored locally is unencrypted.
+The process of storing metadata on a remote machine encrypts the
+metadata file using the standard version of AES-XTS, where the
+tweak is taken as the chunk number.
+
+Network traffic is encrypted using per-user certificates signed
+by a 521-bit ECDSA CA key and a corresponding per-user 521-bit
+ECDSA key.
+These certificates and keys are used to setup a 256-bit AES
+session key for SSL.
+The relevant client certificates and key are provided by the
+remote server administrator.
+
+The keys used to perform all the chunk-level encryption are
+stored in the file ~/.cyphertite.crypto by default.
+The AES-XTS and IV keys are stored protected by pbkdf2 with a
+default of 256,000 rounds and a 128-byte salt.
+The password to unlock the AES-XTS and IV keys is stored as
+crypto_password in
+.Xr cyphertite.conf 5 .
+.Ed
+.Pp
+REALM DEDUPLICATION
+.Bd -filled -offset 3n
+If multiple machines share
+.Xr cyphertite.conf 5
+and cyphertite.crypto files in common, deduplication can be
+achieved across several machines in a realm.
+These machines must share an account to obtain the benefit
+of deduplication. 
+.Ed
+.Pp
+In all cases except those involving metadata (
+.Fl m
+), the metadata file path is required:
 .Bl -tag -width Ds
-.It Fl B Ar archive 
+.It Fl f Ar metadata
+Filename where the metadata is stored.
+For list and extract commands this is the existing metadata file
+to extract from and for create commands it is the metadata file
+to create.
+.El
+.Pp
+One of the following flags must be present:
+.Bl -tag -width Ds
+.It Fl c
+Create new archive or overwrite an existing archive.
+.It Fl t
+List contents of an archive.
+If any files are named on the command line, only those files will
+be listed. The
+.Ar file
+arguments may be specified as glob patterns (see
+.Xr glob 3
+for more information), in which case
+.Nm
+will list all archive members that match that pattern.
+Also works with regex patterns (see
+.Xr regex 3
+for more information) when using the
+.Fl r
+option.
+.It Fl x
+Extract files from archive.
+If any files are named on the command line, only those files will
+be extracted from the achive.
+The
+.Ar file
+arguments may be specified as glob patterns (see
+.Xr glob 3
+for more information), in which case
+.Nm
+will extract all archive members that match that pattern.
+Also works with regex patterns (see
+.Xr regex 3
+for more information) when using the
+.Fl r
+option.
+.El
+.Pp
+In addition to the flags mentioned above, the follow flags may be
+used:
+.Bl -tag -width Ds
+.It Fl B Ar mdfile
 Specify the archive to be used as the basis of a differential backup. 
 Files with a modification time (mtime) newer than the previous backup
-will be archived.  
+will be archived.
+The behavior is dump-like and helps limit the size of the metadata
+file and the backup window.
 .It Fl C Ar directory
 Set the current working directory.  When extracting, files will be
 extracted into the specified directory; when creating, the specified
@@ -60,12 +187,8 @@ The option prevents
 .Nm
 from descending into directories that have a different device number
 than the file from which the descent began.
-.It Fl c
-Create new archive or overwrite an existing archive. 
 .It Fl d
 Run in debug mode.
-.It Fl f Ar archive 
-Filename where the archive is stored. 
 .It Fl p
 Preserve user and group ID as well as file mode regardless of the
 current
@@ -75,15 +198,8 @@ Enable
 .Xr regex 2
 matching.  The default is to use
 .Xr glob 2 .
-.It Fl t
-List contents of an archive. 
-If any files are named on the command line, only those files will be
-listed.
 .It Fl v
 Turn on verbose output.
-.It Fl x
-Extract files from archive.  If any files are named on the command
-line, only those files will be extract from the achive.
 .El
 .Sh EXAMPLES
 Create an archive named 
@@ -136,6 +252,24 @@ Default crypto secrets file.
 was written by
 .An Conformal Systems, LLC. Aq info@conformal.com .
 .Sh CAVEATS
+.Pp
 .Nm
 is currently in beta testing.  Some of the above options
 may change before official release.
+
+When running the first backup on a system,
+.Nm
+prompts the user for the information needed to setup the
+account as follows:
+
+.Dl $ ct -cf backup.md /usr/local/bin
+.Dl config file not found, create one: yes
+.Dl create a system or user config file: user
+.Dl username: testuser
+.Dl password [enter to skip]: 
+.Dl reenter password: 
+.Dl crypto passphrase [enter to skip, g to generate]:
+
+Using the built-in configuration file generator simplifies
+the install substantially.
+
