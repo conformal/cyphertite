@@ -292,7 +292,7 @@ ct_xml_file_close(void)
 
 	CDBG("setting up XML");
 
-	sz = asprintf(&buf, "ct_md_close_fmt");
+	sz = asprintf(&buf, ct_md_close_fmt);
 	if (sz == -1)
 		CFATALX("cannot allocate memory");
 	sz += 1;	/* include null */
