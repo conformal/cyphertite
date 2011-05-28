@@ -451,7 +451,7 @@ ct_read_header(struct ct_md_header *hdr)
 	CDBG("header beacon 0x%08x 0x%08x shas %" PRIu64 " name %s", hdr->cmh_beacon,
 	    CT_HDR_BEACON, hdr->cmh_nr_shas, hdr->cmh_filename);
 
-	if (hdr->cmh_beacon != CT_HDR_BEACON)
+	if (hdr->cmh_beacon != CT_HDR_BEACON && hdr->cmh_beacon != CT_HDR_EOF)
 		return 1;
 
 	return 0;
