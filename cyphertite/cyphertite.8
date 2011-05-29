@@ -207,7 +207,7 @@ Create an archive named
 containing the directory
 .Pa /data/accounting/2010 :
 .Pp
-.Dl $ ct -cf accounting-2010.md /data/accounting/2010
+.Dl $ cyphertite -cf accounting-2010.md /data/accounting/2010
 .Pp
 Verbosely create an archive named
 .Pa pictures.md ,
@@ -216,7 +216,7 @@ of all files matching
 pattern
 .Pa *.jpg :
 .Pp
-.Dl $ ct -rcvf pictures.md *.jpg
+.Dl $ cyphertite -rcvf pictures.md *.jpg
 .Pp
 Perform a differential backup of an archive named
 .Pa htdocs-201104.md .
@@ -227,14 +227,14 @@ backup
 .Pa htdocs-201104.md
 will be archived.
 .Pp
-.Dl $ ct -B htdocs-201104.md -cf htdocs-201105.md /var/www/htdocs
+.Dl $ cyphertite -B htdocs-201104.md -cf htdocs-201105.md /var/www/htdocs
 .Pp
 Extract files from archive
 .Pa backup.md
 into directory
 .Pa restore .
 .Pp
-.Dl $ ct -C restore -xf backup.md
+.Dl $ cyphertite -C restore -xf backup.md
 .El
 .Sh FILES
 .Bl -tag -width "cyphertite" -compact
@@ -262,7 +262,7 @@ When running the first backup on a system,
 prompts the user for the information needed to setup the
 account as follows:
 
-.Dl $ ct -cf backup.md /usr/local/bin
+.Dl $ cyphertite -cf backup.md /usr/local/bin
 .Dl config file not found, create one: yes
 .Dl create a system or user config file: user
 .Dl username: testuser
