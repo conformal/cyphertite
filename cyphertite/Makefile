@@ -27,6 +27,7 @@ CFLAGS+= -Wall -Werror -ggdb3
 LDADD+= -L${LOCALBASE}/lib
 LDADD+=	-lassl -lclog -lcrypto -levent -lexpat -lexude -lshrink
 LDADD+=	-lsqlite3 -lssl -lutil -lxmlsd -lctutil
+LDADD+= ${LDADDSSL}
 CLEANFILES= cyphertite.conf.cat5 cyphertite.cat8
 
 CFLAGS+= -I${.CURDIR}/../libshrink -I.

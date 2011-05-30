@@ -6,5 +6,7 @@ NO_OBJ=
 
 CFLAGS+= -fdiagnostics-show-option -fno-strict-aliasing
 CFLAGS+= -DNEED_LIBCLENS
-CFLAGS+= -I${INCDIR}/clens
-LDADD+= -L ${LIBDIR} -lclens
+CFLAGS+= -I${INCDIR}/clens -I${LOCALBASE}/ssl/include
+LDFLAGS+= -L${LOCALBASE}/ssl/lib -L${LIBDIR}
+LDADD+= -lclens
+LDADDSSL+= -Wl,-Bstatic -lssl -lcrypto -Wl,-Bdynamic
