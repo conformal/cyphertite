@@ -368,7 +368,7 @@ ct_shutdown()
 	if (ct_mdf != NULL)
 		ct_metadata_close(ct_mdf);
 	ctdb_shutdown();
-	exit(0);
+	event_loopbreak();
 }
 
 void

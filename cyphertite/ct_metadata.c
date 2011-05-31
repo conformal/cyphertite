@@ -58,7 +58,7 @@ int
 ct_md_archive(const char *mfile, char **pat)
 {
 	struct stat		sb;
-	int error, rv;
+	int			error, rv;
 
 	/* XXX - pattern is ignored */
 	CDBG("opening md file for archive %s", mfile);
@@ -112,7 +112,7 @@ void
 ct_md_fileio(void *unused)
 {
 	struct stat		sb;
-	size_t                  rsz, rlen;
+	ssize_t			rsz, rlen;
 	struct ct_trans		*ct_trans;
 	int			error;
 
@@ -144,10 +144,11 @@ loop:
 		return;
 	}
 
-	/* perform read */
-	rsz = md_size - md_offset;
-
-	if (rsz == 0) {
+	/* Are we done here? */
+	if (md_size == md_offset) {
+		CDBG("setting eof on trans %" PRIu64, ct_trans->tr_trans_id);
+		close(md_backup_fd);
+		md_backup_fd = -1;
 		ct_set_file_state(CT_S_FINISHED);
 		ct_trans->tr_fl_node = NULL;
 		ct_trans->tr_state = TR_S_DONE;
@@ -155,9 +156,11 @@ loop:
 		ct_trans->tr_trans_id = ct_trans_id++;
 		ct_trans->hdr.c_flags = C_HDR_F_METADATA;
 		ct_queue_transfer(ct_trans);
-		/* Queue md close */
 		return;
 	}
+	/* perform read */
+	rsz = md_size - md_offset;
+
 	CDBG("rsz %zd max %d", rsz, ct_max_block_size);
 	if (rsz > ct_max_block_size) {
 		rsz = ct_max_block_size;
@@ -200,11 +203,9 @@ loop:
 
 	CDBG("sizes rlen %zd offset %zd size %zd", rlen, md_offset, md_size);
 
-	if (rsz != rlen || rlen == 0 ||
-	    ((rlen + md_offset) == md_size)) {
+	if (rsz != rlen || (rlen + md_offset) == md_size) {
+		/* short read, file truncated or EOF */
 		CDBG("DONE");
-		/* short read, file truncated, or end of file */
-		/* restat file for modifications */
 		error = fstat(md_backup_fd, &sb);
 		if (error) {
 			CWARNX("file stat error %s %d %s",
@@ -217,22 +218,16 @@ loop:
 			 * to pad archive file to right number of chunks
 			 */
 		}
-		CDBG("done with md sending");
-		CDBG("setting eof on trans %" PRIu64, ct_trans->tr_trans_id);
-		close(md_backup_fd);
-		md_backup_fd = -1;
-		ct_trans->tr_eof = 1;
-		ct_queue_transfer(ct_trans);
-
+		/*
+		 * we don't set eof here because the next go round
+		 * will hit the state done case above
+		 */
 		md_offset = md_size;
 	} else {
 		md_offset += rlen;
 	}
-	if (md_backup_fd != -1) {
-		/* if -1, is sent above */
-		ct_queue_transfer(ct_trans);
-		goto loop;
-	}
+	ct_queue_transfer(ct_trans);
+	goto loop;
 }
 
 void
@@ -244,6 +239,7 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode)
 	int			sz;
 
 	trans->tr_trans_id = ct_trans_id++;
+	trans->tr_state = TR_S_XML_OPEN;
 
 	CDBG("setting up XML");
 
@@ -289,6 +285,7 @@ ct_xml_file_close(void)
 	trans = ct_trans_alloc();
 
 	trans->tr_trans_id = ct_trans_id++;
+	trans->tr_state = TR_S_XML_CLOSING;
 
 	CDBG("setting up XML");
 
@@ -443,8 +440,10 @@ ct_md_wmd(void *vctx)
 
 		ct_md_packet_id++;
 		if (trans->tr_eof == 1) {
-			close(md_backup_fd);
-			ct_shutdown();
+			if (md_backup_fd != -1)
+				CWARNX("eof and file still open");
+			CDBG("eof reached, closing file");
+			ct_xml_file_close();
 		}
 
 		ct_trans_free(trans);
@@ -499,9 +498,8 @@ ct_md_wfile(void *vctx)
 			ct_file_extract_fixup();
 			ct_shutdown();
 			break;
-#if 0
-		case TR_S_XML_OPEN: /* XXX ? */
-#endif
+		case TR_S_XML_OPEN:
+			break;
 		case TR_S_XML_CLOSE:
 			ct_xml_file_close();
 			break;
@@ -540,6 +538,7 @@ ct_md_list(const char *mfile, char **pat)
 	trans = ct_trans_alloc();
 
 	trans->tr_trans_id = ct_trans_id++;
+	trans->tr_state = TR_S_XML_LIST;
 	
 	CDBG("setting up XML");
 
@@ -596,6 +595,7 @@ ct_md_delete(const char *md, char **arg)
 
 	trans = ct_trans_alloc();
 	trans->tr_trans_id = ct_trans_id++;
+	trans->tr_state = TR_S_XML_DELETE;
 	hdr = &trans->hdr;
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
@@ -680,8 +680,12 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 			ct_shutdown();
 		}
 	} else if (strcmp(xe->name, "ct_md_close") == 0) {
-		trans->tr_state = TR_S_EX_DONE;
-		ct_queue_transfer(trans);
+		if (ct_action == CT_A_EXTRACT) {
+			trans->tr_state = TR_S_EX_DONE;
+		} else {
+			/* we're done here, break out of event loop */
+			ct_shutdown();
+		}
 	} else if (strcmp(xe->name, "ct_md_list") == 0) {
 		TAILQ_FOREACH(xe, &xl, entry) {
 			if (strcmp(xe->name, "file") == 0) {
@@ -703,7 +707,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 	}
 
 done:
-	// this is needed, turns out
+	ct_queue_transfer(trans);
 	ct_header_free(NULL, hdr);
 	xmlsd_unwind(&xl);
 }

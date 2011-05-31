@@ -222,7 +222,11 @@ skip_csha:
 	case TR_S_EX_SPECIAL:
 	case TR_S_EX_FILE_END:
 	case TR_S_EX_DONE:
+	case TR_S_XML_OPEN:
 	case TR_S_XML_CLOSE:
+	case TR_S_XML_CLOSING:
+	case TR_S_XML_LIST:
+	case TR_S_XML_DELETE:
 		RB_INSERT(ct_trans_lookup, &ct_state->ct_complete, trans);
 		ct_state->ct_complete_rblen++;
 

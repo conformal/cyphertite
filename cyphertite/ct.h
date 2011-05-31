@@ -198,7 +198,11 @@ struct ct_trans {
 #define TR_S_EX_SPECIAL		(20)
 #define TR_S_EX_FILE_END	(21)
 #define TR_S_EX_DONE		(22)
-#define TR_S_XML_CLOSE		(23)
+#define TR_S_XML_OPEN		(23)
+#define TR_S_XML_CLOSE		(24)
+#define TR_S_XML_CLOSING	(25)
+#define TR_S_XML_LIST		(26)
+#define TR_S_XML_DELETE		(27)
 
 	char			tr_dataslot;
 	char			tr_eof;
