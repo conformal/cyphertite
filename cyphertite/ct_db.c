@@ -240,6 +240,7 @@ ctdb_cleanup(sqlite3 *db)
 
 	CDBG("cleaning up ctdb");
 	if (ctdb_in_transaction) {
+		ctdb_in_transaction = 0;
 		if (sqlite3_exec(db, "commit", NULL, 0, &errmsg))
 			CFATALX("can't commit %s", errmsg);
 	}
