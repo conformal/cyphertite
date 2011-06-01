@@ -18,6 +18,8 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <libgen.h>
+#include <fnmatch.h>
+#include <regex.h>
 #include <vis.h>
 
 #include <assl.h>
@@ -34,6 +36,7 @@ void ct_md_fileio(void *);
 void md_extract_chunk(void *);
 
 const char			*md_filename;
+char				**ct_md_listfiles;
 int				md_backup_fd;
 int				md_block_no = 0;
 int				md_is_open = 0;
@@ -546,7 +549,7 @@ ct_md_wfile(void *vctx)
 	}
 }
 
-int
+char **
 ct_md_list(char **pat)
 {
 	/* XXX - does mfile make sense for md list */
@@ -554,7 +557,10 @@ ct_md_list(char **pat)
 	struct ct_trans		*trans;
 	char			*body = NULL;
 	char			*buf = NULL;
-	int			rv, sz;
+	regex_t			*re = NULL;
+	char			error[1024];
+	char			**str, **matchedlist, *curstr;
+	int			rv, sz, nfiles, i, match;
 
 	ct_event_init();
 
@@ -594,10 +600,79 @@ ct_md_list(char **pat)
 
 	/* start turning crank */
 	rv = ct_event_dispatch();
-	if (rv != 0)
+	if (rv != 0) {
 		CWARNX("event_dispatch returned, %d %s", errno,
 		    strerror(errno));
-	return rv;
+		return (NULL);
+	}
+
+	if (ct_md_listfiles == NULL)
+		return (NULL);
+
+	if (ct_match_mode == CT_MATCH_REGEX && *pat) {
+		re = e_malloc(sizeof(*re), E_MEM_CLEAR);
+		if ((rv = regcomp(re, *pat,
+		    REG_EXTENDED | REG_NOSUB)) != 0) {
+			regerror(rv, re, error, sizeof(error) - 1);
+			CFATALX("%s: regcomp failed: %s", __func__, error);
+		}
+	}
+
+
+	str = ct_md_listfiles;
+	nfiles = 0;
+	while (*(str++) != NULL)
+		nfiles++;
+
+	matchedlist = e_malloc((nfiles + 1) * sizeof(*ct_md_listfiles),
+	    E_MEM_CLEAR);
+
+	str = ct_md_listfiles;
+	i = 0;
+	while ((curstr = *(str++)) != NULL) {
+		match = 0;
+		if (*pat == NULL) {
+			match = 1;
+		} else if (ct_match_mode == CT_MATCH_REGEX) {
+			if (regexec(re, curstr, 0, NULL, 0) == 0)
+				match = 1;
+		} else {
+			if (fnmatch(*pat, curstr, 0) == 0)
+				match = 1;
+		}
+		if (match) {
+			matchedlist[i++] = curstr;
+		} else {
+			e_free(&curstr);
+		}
+	}
+	matchedlist[i] = NULL;
+	e_free(&ct_md_listfiles); /* sets md_listfiles to NULL, too */
+	if (ct_match_mode == CT_MATCH_REGEX && *pat) {
+		regfree(re);
+		e_free(&re);
+	}
+	
+	return (matchedlist);
+}
+
+int
+ct_md_list_print(char **pat)
+{
+	char	**results, **str, *curstr;
+
+	results = ct_md_list(pat);
+	if (results == NULL)
+		return (1);
+
+	str = results;
+	while ((curstr = *(str++)) != NULL) {
+		printf("%s\n", curstr);
+		e_free(&curstr);
+	}
+	e_free(&results);
+
+	return (0);
 }
 
 int
@@ -712,13 +787,27 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 			ct_shutdown();
 		}
 	} else if (strcmp(xe->name, "ct_md_list") == 0) {
+		int nfiles = 0;
+
+		TAILQ_FOREACH(xe, &xl, entry) {
+			if (strcmp(xe->name, "file") == 0)
+				nfiles++;
+		}
+		/* array is NULL terminated */
+		ct_md_listfiles = e_malloc((nfiles + 1) *
+		    sizeof(*ct_md_listfiles), E_MEM_CLEAR);
+		nfiles = 0;
 		TAILQ_FOREACH(xe, &xl, entry) {
 			if (strcmp(xe->name, "file") == 0) {
-				filename =xmlsd_get_attr(xe, "name");
-				if (filename)
-					printf("%s\n", filename);
+				filename = xmlsd_get_attr(xe, "name");
+				if (filename) {
+					ct_md_listfiles[nfiles] =
+					    e_strdup(filename);
+					nfiles++;
+				}
 			}
 		}
+		ct_md_listfiles[nfiles] = NULL;
 		ct_shutdown();
 	} else  if (strcmp(xe->name, "ct_md_delete") == 0) {
 		TAILQ_FOREACH(xe, &xl, entry) {
