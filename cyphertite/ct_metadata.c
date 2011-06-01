@@ -16,6 +16,9 @@
  */
 
 #include <inttypes.h>
+#include <stdlib.h>
+#include <libgen.h>
+#include <vis.h>
 
 #include <assl.h>
 #include <clog.h>
@@ -30,7 +33,7 @@
 void ct_md_fileio(void *);
 void md_extract_chunk(void *);
 
-const char			*md_filename;
+char				*md_filename;
 int				md_backup_fd;
 int				md_block_no = 0;
 int				md_is_open = 0;
@@ -53,6 +56,27 @@ struct xmlsd_v_elements ct_xml_cmds[] = {
 	{ NULL, NULL }
 };
 
+static char *
+cook_md_filename(const char *path)
+{
+	char	*bname, *fname;
+
+	fname = calloc(1, CT_MAX_MD_FILENAME);
+	if (fname == NULL)
+		CFATALX("can't allocate space for filename");
+
+	bname = basename(path);
+	if (bname == NULL)
+		CFATAL("can't basename md path");
+	if (bname[0] == '/')
+		CFATALX("invalid md filename");
+
+	if (strnvis(fname, bname, CT_MAX_MD_FILENAME, VIS_GLOB |
+	    VIS_WHITE | VIS_SAFE) >= CT_MAX_MD_FILENAME)
+		CFATALX("md filename too long");
+	return (fname);
+}
+
 struct flist			*md_node;
 int
 ct_md_archive(const char *mfile, char **pat)
@@ -70,7 +94,7 @@ ct_md_archive(const char *mfile, char **pat)
 		CWARNX("unable to open file %s", mfile);
 		return -1;
 	}
-	md_filename = mfile;
+	md_filename = cook_md_filename(mfile);
 	md_node = e_malloc(sizeof(*md_node), E_MEM_CLEAR);
 	CDBG("mdnode %p", md_node);
 
@@ -105,6 +129,8 @@ ct_md_archive(const char *mfile, char **pat)
 	if (rv != 0)
 		CWARNX("event_dispatch returned, %d %s", errno,
 		    strerror(errno));
+	free(md_filename); /* XXX sodding typesystems */
+	md_filename = NULL;
 	return (rv);
 }
 
@@ -343,7 +369,7 @@ ct_md_extract(const char *mfile, char **pat)
 		return -1;
 	}
 
-	md_filename = mfile;
+	md_filename = cook_md_filename(mfile);
 
 	/* poke file into action */
 	ct_wakeup_file();
@@ -353,6 +379,8 @@ ct_md_extract(const char *mfile, char **pat)
 	if (rv != 0)
 		CWARNX("event_dispatch returned, %d %s", errno,
 		    strerror(errno));
+	free(md_filename);
+	md_filename = NULL;
 	return 0;
 }
 int extract_id;

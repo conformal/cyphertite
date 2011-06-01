@@ -212,4 +212,7 @@ void		ct_dump_block(uint8_t *p, size_t sz);
 
 int		ct_base64_encode(int, uint8_t *, size_t, uint8_t *, size_t);
 
+/* Metadata */
+#define CT_MAX_MD_FILENAME	(256)
+
 #endif /* CTUTIL_H */
