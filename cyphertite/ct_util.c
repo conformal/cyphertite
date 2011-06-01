@@ -365,8 +365,10 @@ done:
 void
 ct_shutdown()
 {
-	if (ct_mdf != NULL)
+	if (ct_mdf != NULL) {
 		ct_metadata_close(ct_mdf);
+		ct_mdf = NULL;
+	}
 	ctdb_shutdown();
 	event_loopbreak();
 }
