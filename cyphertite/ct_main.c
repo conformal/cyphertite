@@ -71,6 +71,8 @@ char			*ct_crypto_password;
 int			ct_allow_uncompressed_writes;
 char			*ct_compression_type;
 char			*ct_polltype;
+char			*ct_mdmode_str;
+int			ct_md_mode = CT_MDMODE_LOCAL;
 int			ct_compress_enabled;
 int			ct_encrypt_enabled;
 int			ct_multilevel_allfiles;
@@ -93,6 +95,7 @@ struct ct_settings	settings[] = {
 	{ "session_compression", CT_S_STR, NULL, &ct_compression_type, NULL,
 	    NULL },
 	{ "polltype", CT_S_STR, NULL, &ct_polltype, NULL, NULL },
+	{ "md_mode", CT_S_STR, NULL, &ct_mdmode_str, NULL, NULL },
 	{ NULL, 0, NULL, NULL, NULL,  NULL }
 };
 
@@ -108,6 +111,7 @@ int
 main(int argc, char **argv)
 {
 	char		pwd[PASS_MAX];
+	char		*ct_mdname = NULL;
 	struct stat	sb;
 	int		c;
 	int		cflags;
@@ -266,26 +270,69 @@ main(int argc, char **argv)
 
 	/* set polltype used by libevent */
 	ct_polltype_setup(ct_polltype);
+	ct_mdmode_setup(ct_mdmode_str);
+
+	if (ct_metadata || ct_md_mode == CT_MDMODE_REMOTE) {
+		switch (ct_action) {
+		case CT_A_ARCHIVE:
+		case CT_A_EXTRACT:
+		case CT_A_ERASE:
+			ct_mdname = ct_md_cook_filename(ct_mfile);
+			if (ct_mdname == NULL)
+				CFATALX("invalid metadata name");
+			break;
+		case CT_A_LIST:
+		default:
+			break;
+		}
+		if (ct_md_mode == CT_MDMODE_REMOTE) {
+			/* modify pathname to point to cache. */
+		}
+	}
 
 	if (ct_metadata) {
 		if (ct_action == CT_A_ARCHIVE) {
-			ret = ct_md_archive(ct_mfile, argv);
+			ret = ct_md_archive(ct_mfile, ct_mdname);
 		} else if (ct_action == CT_A_EXTRACT) {
-			ret = ct_md_extract(ct_mfile, argv);
+			ret = ct_md_extract(ct_mfile, ct_mdname);
 		} else if (ct_action == CT_A_LIST) {
-			ret = ct_md_list(ct_mfile, argv);
+			ret = ct_md_list(argv);
 		} else if (ct_action == CT_A_ERASE) {
-			ret = ct_md_delete(ct_mfile, argv);
+			ret = ct_md_delete(ct_mdname);
 		} else {
 			CWARNX("must specify action");
 			usage();
 			ret = 1;
 		}
+		if (ct_mdname)
+			free(ct_mdname);
 		return (ret);
 	}
 
+	if (ct_md_mode == CT_MDMODE_REMOTE) {
+		/*
+		 * XXX modify path name to put in cache with name as
+		 * YYYYMMDD-HHMMSS.strnvis(mname)
+		 */
+
+		ct_metadata = 1; /* XXX this horrible hack must die */
+		if (ct_action == CT_A_EXTRACT || ct_action == CT_A_LIST) {
+			/* XXX Check in cache to see if we have a local copy. */
+
+			/* else grab it to the cache. XXX differentials */
+			if ((ret = ct_md_extract(ct_mfile, ct_mdname)) != 0)
+				return (ret);
+		}
+		ct_metadata = 0;
+	}
+		
 	if (ct_action == CT_A_ARCHIVE) {
 		ret = ct_archive(ct_mfile, argv, ct_basisbackup);
+		if (ret == 0 && ct_md_mode == CT_MDMODE_REMOTE) {
+			ct_metadata = 1; /* XXX this horrible hack must die */
+			ret = ct_md_archive(ct_mfile, ct_mdname);
+			ct_metadata = 0;
+		}
 	} else if (ct_action == CT_A_EXTRACT) {
 		ret = ct_extract(ct_mfile, argv);
 	} else if (ct_action == CT_A_LIST) {
@@ -295,6 +342,8 @@ main(int argc, char **argv)
 		usage();
 		ret = 1;
 	}
+	if (ct_mdname)
+		free(ct_mdname);
 
 	return (ret);
 }

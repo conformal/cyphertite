@@ -33,7 +33,7 @@
 void ct_md_fileio(void *);
 void md_extract_chunk(void *);
 
-char				*md_filename;
+const char			*md_filename;
 int				md_backup_fd;
 int				md_block_no = 0;
 int				md_is_open = 0;
@@ -56,8 +56,8 @@ struct xmlsd_v_elements ct_xml_cmds[] = {
 	{ NULL, NULL }
 };
 
-static char *
-cook_md_filename(const char *path)
+char *
+ct_md_cook_filename(const char *path)
 {
 	char	*bname, *fname;
 
@@ -79,12 +79,11 @@ cook_md_filename(const char *path)
 
 struct flist			*md_node;
 int
-ct_md_archive(const char *mfile, char **pat)
+ct_md_archive(const char *mfile, const char *mdname)
 {
 	struct stat		sb;
 	int			error, rv;
 
-	/* XXX - pattern is ignored */
 	CDBG("opening md file for archive %s", mfile);
 
 	md_backup_fd = open(mfile, O_RDONLY);
@@ -94,7 +93,7 @@ ct_md_archive(const char *mfile, char **pat)
 		CWARNX("unable to open file %s", mfile);
 		return -1;
 	}
-	md_filename = cook_md_filename(mfile);
+	md_filename = mdname;
 	md_node = e_malloc(sizeof(*md_node), E_MEM_CLEAR);
 	CDBG("mdnode %p", md_node);
 
@@ -129,7 +128,6 @@ ct_md_archive(const char *mfile, char **pat)
 	if (rv != 0)
 		CWARNX("event_dispatch returned, %d %s", errno,
 		    strerror(errno));
-	free(md_filename); /* XXX sodding typesystems */
 	md_filename = NULL;
 	return (rv);
 }
@@ -344,7 +342,7 @@ ct_xml_file_close(void)
 }
 
 int
-ct_md_extract(const char *mfile, char **pat)
+ct_md_extract(const char *mfile, const char *mdname)
 {
 	int rv;
 
@@ -369,7 +367,7 @@ ct_md_extract(const char *mfile, char **pat)
 		return -1;
 	}
 
-	md_filename = cook_md_filename(mfile);
+	md_filename = mdname;
 
 	/* poke file into action */
 	ct_wakeup_file();
@@ -379,7 +377,6 @@ ct_md_extract(const char *mfile, char **pat)
 	if (rv != 0)
 		CWARNX("event_dispatch returned, %d %s", errno,
 		    strerror(errno));
-	free(md_filename);
 	md_filename = NULL;
 	return 0;
 }
@@ -550,7 +547,7 @@ ct_md_wfile(void *vctx)
 }
 
 int
-ct_md_list(const char *mfile, char **pat)
+ct_md_list(char **pat)
 {
 	/* XXX - does mfile make sense for md list */
 	struct ct_header	*hdr;
@@ -604,7 +601,7 @@ ct_md_list(const char *mfile, char **pat)
 }
 
 int
-ct_md_delete(const char *md, char **arg)
+ct_md_delete(const char *md)
 {
 	struct ct_header *hdr;
 	struct ct_trans *trans;
@@ -738,4 +735,19 @@ done:
 	ct_queue_transfer(trans);
 	ct_header_free(NULL, hdr);
 	xmlsd_unwind(&xl);
+}
+
+void
+ct_mdmode_setup(char *mdmode)
+{
+	CWARNX("mdmode setup %s", mdmode ? mdmode : "");
+	if (mdmode == NULL)
+		return;
+
+	if (strcmp(mdmode, "remote") == 0)
+		ct_md_mode = CT_MDMODE_REMOTE;
+	else if (strcmp(mdmode, "local") == 0)
+		ct_md_mode = CT_MDMODE_LOCAL;
+	else
+		CFATALX("invalid md mode specified");
 }

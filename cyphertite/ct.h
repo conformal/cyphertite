@@ -44,6 +44,7 @@ extern int		ct_metadata;
 extern time_t		ct_prev_backup_time;
 extern int		ct_trans_id;
 extern int		md_backup_fd;
+extern int		ct_md_mode;
 extern char *		__progname;
 
 /* crypto */
@@ -251,10 +252,10 @@ struct ct_assl_io_ctx	*ct_assl_ctx;
 int			ct_archive(const char *, char **, const char *);
 int			ct_extract(const char *, char **);
 int			ct_list(const char *, char **);
-int			ct_md_archive(const char *, char **);
-int			ct_md_extract(const char *, char **);
-int			ct_md_list(const char *, char **);
-int			ct_md_delete(const char *, char **);
+int			ct_md_archive(const char *, const char *);
+int			ct_md_extract(const char *, const char *);
+int			ct_md_list(char **);
+int			ct_md_delete(const char *);
 
 /* CT context state */
 
@@ -497,3 +498,10 @@ int			ct_match_regex(char *file);
 void			ct_match_compile(int, char **);
 int			ct_match(int, char *);
 void			ct_match_unwind(int);
+
+/* MD mode handling */
+#define CT_MDMODE_LOCAL		(0)
+#define CT_MDMODE_REMOTE	(1)
+
+char			*ct_md_cook_filename(const char *);
+void			 ct_mdmode_setup(char *);
