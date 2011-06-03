@@ -16,6 +16,7 @@
  */
 
 #include <stdio.h>
+#include <inttypes.h>
 #include <clog.h>
 #include <assl.h>
 #include "ct.h"
