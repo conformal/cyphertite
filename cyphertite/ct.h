@@ -227,6 +227,7 @@ void			ct_queue_transfer(struct ct_trans *);
 /* config */
 extern int		ct_max_trans;
 extern int		ct_max_block_size;
+extern int		ct_io_bw_limit;
 extern char		*ct_host;
 extern char		*ct_hostport;
 extern char		*ct_localdb;
@@ -499,6 +500,8 @@ int			ct_match_regex(char *file);
 void			ct_match_compile(int, char **);
 int			ct_match(int, char *);
 void			ct_match_unwind(int);
+
+void			ct_ssl_init_bw_lim(struct ct_assl_io_ctx *);
 
 /* MD mode handling */
 #define CT_MDMODE_LOCAL		(0)

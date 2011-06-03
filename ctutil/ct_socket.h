@@ -25,6 +25,12 @@ typedef void (eventcb_ty)(int, short, void *);
 
 typedef void (msgdeliver_ty)(void *, struct ct_header *, void *);
 typedef void (msgcomplete_ty)(void *, struct ct_header *, void *, int);
+typedef void (limitio_ty)(void *, size_t);
+
+struct ct_assl_io_ctx;
+
+typedef void (ct_assl_io_over_bw_check_func) (void *,
+		struct ct_assl_io_ctx *);
 
 struct ct_io_queue {
 	TAILQ_ENTRY(ct_io_queue) io_next;
@@ -94,7 +100,10 @@ struct ct_assl_io_ctx {
 	ct_body_free_func		*io_body_free;
 	ct_ioctx_alloc_func		*io_ioctx_alloc;
 	ct_ioctx_free_func		*io_ioctx_free;
+	ct_assl_io_over_bw_check_func   *io_over_bw_check;
 	TAILQ_HEAD(,ct_io_queue)	io_o_q;
+
+	int				io_max_transfer;
 
 	int				io_i_state;
 	int				io_i_resid;
@@ -147,6 +156,12 @@ void			ct_assl_io_block_writes(struct ct_assl_io_ctx *);
 void			ct_assl_io_resume_writes(struct ct_assl_io_ctx *);
 void			ct_io_block_writes(struct ct_io_ctx *);
 void			ct_io_resume_writes(struct ct_io_ctx *);
+
+/* limit write size on assl sockets */
+void			ct_assl_io_ctx_set_maxtrans(struct ct_assl_io_ctx *,
+			    size_t);
+void			ct_assl_io_ctx_set_over_bw_func(struct ct_assl_io_ctx *,
+			    ct_assl_io_over_bw_check_func *);
 
 /* bypass queues and events - use with caution */
 size_t			ct_assl_io_write_poll(struct ct_assl_io_ctx *, void *,

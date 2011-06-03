@@ -23,6 +23,7 @@
 #include <util.h>
 #endif
 
+
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,6 +35,7 @@
 #include <exude.h>
 
 #include "ct.h"
+#include "ct_socket.h"
 
 #ifndef MIN
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
@@ -158,6 +160,7 @@ ct_load_certs(struct assl_context *c)
 		    ct_cert, ct_key);
 }
 
+
 struct ct_assl_io_ctx *
 ct_ssl_connect(int nonfatal)
 {
@@ -187,6 +190,9 @@ ct_ssl_connect(int nonfatal)
 		} else
 			assl_fatalx("server connect failed");
 	}
+	if (ct_io_bw_limit && ctx != NULL)
+		ct_ssl_init_bw_lim(ctx);
+
 	return ctx;
 }
 

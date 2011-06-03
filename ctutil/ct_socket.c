@@ -112,6 +112,10 @@ ct_event_assl_write(int fd_notused, short events, void *arg)
 			body_len = iov[index].iov_len;
 		}
 		wlen = body_len - ioctx->io_o_off;
+		if (ioctx->io_max_transfer != 0 &&
+		    wlen > ioctx->io_max_transfer)
+			wlen = ioctx->io_max_transfer;
+
 		len = assl_write(c, body + ioctx->io_o_off, wlen);
 		s_errno = errno;
 		CDBG("pid %d wlen1 %d len %zd", c_pid, wlen, len);
@@ -175,6 +179,8 @@ ct_event_assl_write(int fd_notused, short events, void *arg)
 			assl_event_disable_write(c);
 		}
 	}
+	if (ioctx->io_over_bw_check != NULL)
+		ioctx->io_over_bw_check(ioctx->io_cb_arg, ioctx);
 done:
 	return;
 }
@@ -800,6 +806,20 @@ ct_assl_disconnect(struct ct_assl_io_ctx *ioctx)
 }
 
 void
+ct_assl_io_ctx_set_maxtrans(struct ct_assl_io_ctx *ctx, size_t newmax)
+{
+	CINFO("setting max to %zd", newmax);
+	ctx->io_max_transfer = newmax;
+}
+
+void
+ct_assl_io_ctx_set_over_bw_func(struct ct_assl_io_ctx *ctx,
+    ct_assl_io_over_bw_check_func *func)
+{
+	ctx->io_over_bw_check = func;
+}
+
+void
 ct_assl_io_ctx_init(struct ct_assl_io_ctx *ctx, struct assl_context *c,
     msgdeliver_ty *rd_cb, msgcomplete_ty *wrcomplete_cb, void *cb_arg,
     ct_header_alloc_func *io_header_alloc, ct_header_free_func *io_header_free,
@@ -820,12 +840,15 @@ ct_assl_io_ctx_init(struct ct_assl_io_ctx *ctx, struct assl_context *c,
 	ctx->io_header_alloc = io_header_alloc;
 	ctx->io_header_free = io_header_free;
 	ctx->io_body_alloc = io_body_alloc;
-	ctx->io_body_free =io_body_free;
+	ctx->io_body_free = io_body_free;
 	ctx->io_ioctx_alloc = io_ioctx_alloc;
-	ctx->io_ioctx_free =io_ioctx_free;
+	ctx->io_ioctx_free = io_ioctx_free;
+	ctx->io_cb_arg = NULL;
+	ctx->io_max_transfer = 0; /* 0 means no limit */
 
 	ctx->io_write_io_enabled = 1;
 }
+
 
 void
 ct_io_ctx_init(struct ct_io_ctx *ctx, msgdeliver_ty *rd_cb,

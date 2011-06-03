@@ -13,7 +13,7 @@ INCDIR?=${LOCALBASE}/include
 PROG= cyphertite
 SRCS= ct_main.c ct_files.c ct_util.c ct_queue.c ct_event.c
 SRCS+= ct_aes_xts.c ct_crypto.c ct_match.c ct_metadata.c
-SRCS+= ct_db.c ct_xdr.c ct_xml.c
+SRCS+= ct_db.c ct_xdr.c ct_xml.c ct_bw_lim.c
 MAN= cyphertite.conf.5 cyphertite.8
 
 .if exists(${.CURDIR}/../ctutil/obj)
