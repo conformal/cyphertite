@@ -62,13 +62,16 @@ struct xmlsd_v_elements ct_xml_cmds[] = {
 char *
 ct_md_cook_filename(const char *path)
 {
-	char	*bname, *fname;
+	char	*bname, *fname, *pdup;
 
 	fname = calloc(1, CT_MAX_MD_FILENAME);
 	if (fname == NULL)
 		CFATALX("can't allocate space for filename");
 
-	bname = basename(path);
+
+	pdup = e_strdup(path);
+	bname = basename(pdup);
+	e_free(&pdup);
 	if (bname == NULL)
 		CFATAL("can't basename md path");
 	if (bname[0] == '/')
