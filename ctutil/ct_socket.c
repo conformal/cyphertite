@@ -843,7 +843,6 @@ ct_assl_io_ctx_init(struct ct_assl_io_ctx *ctx, struct assl_context *c,
 	ctx->io_body_free = io_body_free;
 	ctx->io_ioctx_alloc = io_ioctx_alloc;
 	ctx->io_ioctx_free = io_ioctx_free;
-	ctx->io_cb_arg = NULL;
 	ctx->io_max_transfer = 0; /* 0 means no limit */
 
 	ctx->io_write_io_enabled = 1;
