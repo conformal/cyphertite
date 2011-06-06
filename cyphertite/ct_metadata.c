@@ -863,10 +863,12 @@ ct_md_is_full_mdname(const char *mdname)
 }
 
 
+#define			TIMEDATA_LEN	17	/* including NUL */
 int
 strcompare(const void *a, const void *b)
 {
-	return (strcmp(a, b));
+	/* sort purely based on date */
+	return (strncmp(*(char **)b, *(char **)a, TIMEDATA_LEN - 1));
 }
 
 /*
@@ -936,7 +938,6 @@ ct_find_md_for_extract(const char *mdname)
 	return (best);
 }
 
-#define			TIMEDATA_LEN	17	/* including NUL */
 char *
 ct_find_md_for_archive(const char *mdname)
 {
