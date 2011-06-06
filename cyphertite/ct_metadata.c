@@ -570,6 +570,7 @@ ct_md_list(char **pat, int match_mode)
 	ct_event_init();
 
 	ct_setup_assl();
+	ct_setup_wakeup_complete(ct_state, ct_process_complete);
 
 	trans = ct_trans_alloc();
 
