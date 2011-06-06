@@ -526,7 +526,7 @@ ct_md_wfile(void *vctx)
 
 		case TR_S_EX_DONE:
 			if (ct_verbose_ratios)
-				ct_dump_stats();
+				ct_dump_stats(stdout);
 
 			ct_file_extract_fixup();
 			ct_shutdown();

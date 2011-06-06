@@ -315,7 +315,7 @@ void ct_wakeup_filewrite(void);
 void ct_wakeup_complete(void);
 
 void ct_display_queues(void);
-void ct_display_assl_stats(void);
+void ct_display_assl_stats(FILE *);
 
 typedef void (ct_func_cb)(void *);
 
@@ -479,7 +479,7 @@ struct ct_stat {
 	uint64_t		st_files_completed;
 } ;
 
-void			ct_dump_stats(void);
+void			ct_dump_stats(FILE *);
 struct ct_assl_io_ctx	*ct_ssl_connect(int);
 void			ct_reconnect(int, short, void *);
 void			ct_load_certs(struct assl_context *);

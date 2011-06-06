@@ -56,7 +56,8 @@ int			ct_all_files;
 void ct_setup_assl(void);
 struct ct_io_queue	*ct_ioctx_alloc(void);
 void			ct_ioctx_free(struct ct_io_queue *);
-void			ct_print_scaled_stat(const char *, long long, long long);
+void			ct_print_scaled_stat(FILE *, const char *, long long,
+			    long long);
 
 
 void
@@ -323,7 +324,8 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *ct_assl_ctx)
 	body = e_malloc(payload_sz, E_MEM_CLEAR);
 
 	strlcpy((char *)body, ct_username, payload_sz);
-	strlcpy((char *)body + user_len + 1, b64_digest, payload_sz - user_len - 1);
+	strlcpy((char *)body + user_len + 1, b64_digest,
+	    payload_sz - user_len - 1);
 
 	/* login in polled mode */
 	bzero (&hdr, sizeof hdr);
@@ -392,9 +394,9 @@ ct_process_input(void *vctx)
 }
 
 
-void print_time_scaled(char *s, struct timeval *t);
+void print_time_scaled(FILE *, char *s, struct timeval *t);
 void
-print_time_scaled(char *s, struct timeval *t)
+print_time_scaled(FILE *outfh, char *s, struct timeval *t)
 {
 	int			f = 3;
 	double			te;
@@ -410,17 +412,18 @@ print_time_scaled(char *s, struct timeval *t)
 		scale = "s";
 	}
 
-	printf("%s%12.*f%-2s\n", s, f, te, scale);
+	fprintf(outfh, "%s%12.*f%-2s\n", s, f, te, scale);
 }
 
 void
-ct_print_scaled_stat(const char *label, long long val, long long sec)
+ct_print_scaled_stat(FILE *outfh, const char *label, long long val,
+    long long sec)
 {
 	char rslt[FMT_SCALED_STRSIZE];
 
-	printf("%s%10lld", label, val);
+	fprintf(outfh, "%s%10lld", label, val);
 	if (val == 0 || sec == 0) {
-		printf("\n");
+		fprintf(outfh, "\n");
 		return;
 	}
 
@@ -428,11 +431,11 @@ ct_print_scaled_stat(const char *label, long long val, long long sec)
 	rslt[0] = '?';
 
 	fmt_scaled(val / sec, rslt);
-	printf("\t(%sB/sec)\n", rslt);
+	fprintf(outfh, "\t(%sB/sec)\n", rslt);
 }
 
 void
-ct_dump_stats()
+ct_dump_stats(FILE *outfh)
 {
 	struct timeval time_end, scan_delta, time_delta;
 	long long sec;
@@ -444,48 +447,64 @@ ct_dump_stats()
 	timersub(&ct_stats->st_time_scan_end, &ct_stats->st_time_start,
 		    &scan_delta);
 
-	printf("Files scanned\t\t\t%10" PRIu64 "\n", ct_stats->st_files_scanned);
+	fprintf(outfh, "Files scanned\t\t\t%10" PRIu64 "\n",
+	    ct_stats->st_files_scanned);
 
-	ct_print_scaled_stat("Total bytes\t\t\t",
+	ct_print_scaled_stat(outfh, "Total bytes\t\t\t",
 	    (long long)ct_stats->st_bytes_tot, sec);
 
-	printf("Total chunks\t\t\t%10" PRIu64 "\n", ct_stats->st_chunks_tot);
+	fprintf(outfh, "Total chunks\t\t\t%10" PRIu64 "\n",
+	    ct_stats->st_chunks_tot);
 
-	ct_print_scaled_stat("Bytes read\t\t\t",
+	ct_print_scaled_stat(outfh, "Bytes read\t\t\t",
 	    (long long)ct_stats->st_bytes_read, sec);
 
-	ct_print_scaled_stat("Bytes written\t\t\t",
+	ct_print_scaled_stat(outfh, "Bytes written\t\t\t",
 	    (long long)ct_stats->st_bytes_written, sec);
 
-	ct_print_scaled_stat("Bytes compressed\t\t",
+	ct_print_scaled_stat(outfh, "Bytes compressed\t\t",
 	    (long long)ct_stats->st_bytes_compressed, sec);
 
-	printf("Bytes crypted\t\t\t%10" PRIu64 "\n", ct_stats->st_bytes_crypted);
-	printf("Bytes dbexists\t\t\t%10" PRIu64 "\n", ct_stats->st_bytes_dbexists);
-	printf("Bytes sent\t\t\t%10" PRIu64 "\n", ct_stats->st_bytes_sent);
-	printf("Chunks completed\t\t%10" PRIu64 "\n", ct_stats->st_chunks_completed);
-	printf("Bytes sha\t\t\t%10" PRIu64 "\n", ct_stats->st_bytes_sha);
-	printf("Bytes crypt\t\t\t%10" PRIu64 "\n", ct_stats->st_bytes_crypt);
-	printf("Bytes csha\t\t\t%10" PRIu64 "\n", ct_stats->st_bytes_csha);
-	printf("Files completed\t\t\t%10" PRIu64 "\n", ct_stats->st_files_completed);
+	fprintf(outfh, "Bytes crypted\t\t\t%10" PRIu64 "\n",
+	    ct_stats->st_bytes_crypted);
+	fprintf(outfh, "Bytes dbexists\t\t\t%10" PRIu64 "\n",
+	    ct_stats->st_bytes_dbexists);
+	fprintf(outfh, "Bytes sent\t\t\t%10" PRIu64 "\n",
+	    ct_stats->st_bytes_sent);
+	fprintf(outfh, "Chunks completed\t\t%10" PRIu64 "\n",
+	    ct_stats->st_chunks_completed);
+	fprintf(outfh, "Bytes sha\t\t\t%10" PRIu64 "\n",
+	    ct_stats->st_bytes_sha);
+	fprintf(outfh, "Bytes crypt\t\t\t%10" PRIu64 "\n",
+	    ct_stats->st_bytes_crypt);
+	fprintf(outfh, "Bytes csha\t\t\t%10" PRIu64 "\n",
+	    ct_stats->st_bytes_csha);
+	fprintf(outfh, "Files completed\t\t\t%10" PRIu64 "\n",
+	    ct_stats->st_files_completed);
 	if (ct_action == CT_A_ARCHIVE)
-		print_time_scaled("Scan Time\t\t\t",  &scan_delta);
+		print_time_scaled(outfh, "Scan Time\t\t\t",  &scan_delta);
 
-	print_time_scaled("Total Time\t\t\t",  &time_delta);
-	ct_display_assl_stats();
+	print_time_scaled(outfh, "Total Time\t\t\t",  &time_delta);
+	ct_display_assl_stats(outfh);
 }
 
 void
-ct_display_assl_stats()
+ct_display_assl_stats(FILE *outfh)
 {
-	printf("ssl bytes written %" PRIu64 "\n", ct_assl_ctx->io_write_bytes);
-	printf("ssl writes        %" PRIu64 "\n", ct_assl_ctx->io_write_count);
-	printf("avg write len     %lld\n", ct_assl_ctx->io_write_count == 0 ?
-	    0LL : ct_assl_ctx->io_write_bytes / ct_assl_ctx->io_write_count);
-	printf("ssl bytes read    %" PRIu64 "\n", ct_assl_ctx->io_read_bytes);
-	printf("ssl reads         %" PRIu64 "\n", ct_assl_ctx->io_read_count);
-	printf("avg read len      %lld\n", ct_assl_ctx->io_read_count == 0 ?
-	    0LL : ct_assl_ctx->io_read_bytes / ct_assl_ctx->io_read_count);
+	fprintf(outfh, "ssl bytes written %" PRIu64 "\n",
+	    ct_assl_ctx->io_write_bytes);
+	fprintf(outfh, "ssl writes        %" PRIu64 "\n",
+	    ct_assl_ctx->io_write_count);
+	fprintf(outfh, "avg write len     %lld\n",
+	    ct_assl_ctx->io_write_count == 0 ?  0LL :
+	    ct_assl_ctx->io_write_bytes / ct_assl_ctx->io_write_count);
+	fprintf(outfh, "ssl bytes read    %" PRIu64 "\n",
+	    ct_assl_ctx->io_read_bytes);
+	fprintf(outfh, "ssl reads         %" PRIu64 "\n",
+	    ct_assl_ctx->io_read_count);
+	fprintf(outfh, "avg read len      %lld\n",
+	    ct_assl_ctx->io_read_count == 0 ?  0LL :
+	    ct_assl_ctx->io_read_bytes / ct_assl_ctx->io_read_count);
 }
 
 void

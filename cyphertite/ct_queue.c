@@ -709,7 +709,7 @@ ct_write_md(struct ct_trans *trans)
 	switch (trans->tr_state) {
 	case TR_S_DONE:
 		if (ct_verbose_ratios)
-			ct_dump_stats();
+			ct_dump_stats(stdout);
 		ct_unload_config();
 		ct_trans_cleanup();
 		ct_match_unwind(ct_match_mode);
@@ -832,7 +832,7 @@ ct_write_file(struct ct_trans *trans)
 		break;
 	case TR_S_EX_DONE:
 		if (ct_verbose_ratios)
-			ct_dump_stats();
+			ct_dump_stats(stdout);
 
 		ct_file_extract_fixup();
 		ct_shutdown();
@@ -1245,14 +1245,14 @@ ct_display_queues(void)
 {
 	/* XXX - looks at queues without locks */
 
-	printf("Sha      queue len %d\n", ct_state->ct_sha_qlen);
-	printf("Comp     queue len %d\n", ct_state->ct_comp_qlen);
-	printf("Crypt    queue len %d\n", ct_state->ct_crypt_qlen);
-	printf("Csha     queue len %d\n", ct_state->ct_csha_qlen);
-	printf("Write    queue len %d\n", ct_state->ct_write_qlen);
-	printf("CRqueued queue len %d\n", ct_state->ct_queued_qlen);
-	printf("Inflight queue len %d\n", ct_state->ct_inflight_rblen);
-	printf("Complete queue len %d\n", ct_state->ct_complete_rblen);
-	printf("Free     queue len %d\n", c_trans_free);
-	ct_dump_stats();
+	fprintf(stderr, "Sha      queue len %d\n", ct_state->ct_sha_qlen);
+	fprintf(stderr, "Comp     queue len %d\n", ct_state->ct_comp_qlen);
+	fprintf(stderr, "Crypt    queue len %d\n", ct_state->ct_crypt_qlen);
+	fprintf(stderr, "Csha     queue len %d\n", ct_state->ct_csha_qlen);
+	fprintf(stderr, "Write    queue len %d\n", ct_state->ct_write_qlen);
+	fprintf(stderr, "CRqueued queue len %d\n", ct_state->ct_queued_qlen);
+	fprintf(stderr, "Inflight queue len %d\n", ct_state->ct_inflight_rblen);
+	fprintf(stderr, "Complete queue len %d\n", ct_state->ct_complete_rblen);
+	fprintf(stderr, "Free     queue len %d\n", c_trans_free);
+	ct_dump_stats(stderr);
 }
