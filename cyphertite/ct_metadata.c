@@ -555,7 +555,7 @@ ct_md_wfile(void *vctx)
 }
 
 char **
-ct_md_list(char **pat)
+ct_md_list(char **pat, int match_mode)
 {
 	/* XXX - does mfile make sense for md list */
 	struct ct_header	*hdr;
@@ -614,7 +614,7 @@ ct_md_list(char **pat)
 	if (ct_md_listfiles == NULL)
 		return (NULL);
 
-	if (ct_match_mode == CT_MATCH_REGEX && *pat) {
+	if (match_mode == CT_MATCH_REGEX && *pat) {
 		re = e_malloc(sizeof(*re), E_MEM_CLEAR);
 		if ((rv = regcomp(re, *pat,
 		    REG_EXTENDED | REG_NOSUB)) != 0) {
@@ -638,7 +638,7 @@ ct_md_list(char **pat)
 		match = 0;
 		if (*pat == NULL) {
 			match = 1;
-		} else if (ct_match_mode == CT_MATCH_REGEX) {
+		} else if (match_mode == CT_MATCH_REGEX) {
 			if (regexec(re, curstr, 0, NULL, 0) == 0)
 				match = 1;
 		} else {
@@ -653,7 +653,7 @@ ct_md_list(char **pat)
 	}
 	matchedlist[i] = NULL;
 	e_free(&ct_md_listfiles); /* sets md_listfiles to NULL, too */
-	if (ct_match_mode == CT_MATCH_REGEX && *pat) {
+	if (match_mode == CT_MATCH_REGEX && *pat) {
 		regfree(re);
 		e_free(&re);
 	}
@@ -662,11 +662,11 @@ ct_md_list(char **pat)
 }
 
 int
-ct_md_list_print(char **pat)
+ct_md_list_print(char **pat, int match_mode)
 {
 	char	**results, **str, *curstr;
 
-	results = ct_md_list(pat);
+	results = ct_md_list(pat, match_mode);
 	if (results == NULL)
 		return (1);
 
@@ -897,7 +897,7 @@ ct_find_md_for_extract(const char *mdname)
 	bufp = buf;
 	bufpp = &bufp;
 	ct_metadata = 1;
-	if ((result = ct_md_list(bufpp)) == NULL)
+	if ((result = ct_md_list(bufpp, CT_MATCH_GLOB)) == NULL)
 		CFATALX("unable to list md files");
 	ct_metadata = 0;
 	tmp = result;

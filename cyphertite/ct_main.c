@@ -311,7 +311,7 @@ main(int argc, char **argv)
 		} else if (ct_action == CT_A_EXTRACT) {
 			ret = ct_md_extract(ct_mfile, ct_mdname);
 		} else if (ct_action == CT_A_LIST) {
-			ret = ct_md_list_print(argv);
+			ret = ct_md_list_print(argv, ct_match_mode);
 		} else if (ct_action == CT_A_ERASE) {
 			ret = ct_md_delete(ct_mdname);
 		} else {

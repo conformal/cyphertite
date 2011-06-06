@@ -255,8 +255,8 @@ int			ct_extract(const char *, char **);
 int			ct_list(const char *, char **);
 int			ct_md_archive(const char *, const char *);
 int			ct_md_extract(const char *, const char *);
-char			**ct_md_list(char **);
-int			ct_md_list_print(char **);
+char			**ct_md_list(char **, int);
+int			ct_md_list_print(char **, int);
 int			ct_md_delete(const char *);
 
 /* CT context state */
