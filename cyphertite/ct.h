@@ -509,3 +509,6 @@ void			ct_ssl_init_bw_lim(struct ct_assl_io_ctx *);
 
 char			*ct_md_cook_filename(const char *);
 void			 ct_mdmode_setup(char *);
+char			*ct_find_md_for_extract(const char *);
+char                    *ct_find_md_for_archive(const char *);
+int			 md_is_in_cache(const char *);

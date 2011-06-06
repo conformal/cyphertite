@@ -48,8 +48,9 @@ uint64_t			ct_md_packet_id;
 
 #define MD_O_READ	0
 #define MD_O_WRITE	1
-void ct_xml_file_open(struct ct_trans *, const char *, int);
-void ct_xml_file_close(void);
+void	ct_xml_file_open(struct ct_trans *, const char *, int);
+void	ct_xml_file_close(void);
+int	strcompare(const void *, const void *);
 
 struct xmlsd_v_elements ct_xml_cmds[] = {
 	{ "ct_md_list", xe_ct_md_list },
@@ -843,4 +844,121 @@ ct_mdmode_setup(char *mdmode)
 		ct_md_mode = CT_MDMODE_LOCAL;
 	else
 		CFATALX("invalid md mode specified");
+}
+
+int
+md_is_in_cache(const char *mdfile)
+{
+	return 0;
+}
+
+/*
+ * returns boolean 1/0 whether or not the mdname in question is the full tag
+ * with date/time or not.
+ */
+int
+ct_md_is_full_mdname(const char *mdname)
+{
+	return 0;
+}
+
+
+int
+strcompare(const void *a, const void *b)
+{
+	return (strcmp(a, b));
+}
+
+/*
+ * filenames passed in remote mode are opaque tags for the md.
+ * the are stored on the server and in remote mode in the form
+ * YYYYMMDD-HHMMSS-<strnvis(mname)>
+ */
+char *
+ct_find_md_for_extract(const char *mdname)
+{
+	char	**result, **tmp;
+	char	 buf[CT_MAX_MD_FILENAME], *best, *bufp, **bufpp;
+	int	 nresults = 0, ret;
+
+	/* cook the mdname so we only search for the actual tag */
+	mdname = ct_md_cook_filename(mdname);
+
+	/* XXX this should probably be a regex */
+	buf[0] = '*';
+	strlcat(buf, mdname, sizeof(buf));
+	CINFO("buf = %s", buf);
+	/*
+	 * get the list of md matching this tag from the server.
+	 * ct_md_list returns an emptry list if it found
+	 * nothing and NULL upon failure.
+	 */
+
+	bufp = buf;
+	bufpp = &bufp;
+	ct_metadata = 1;
+	if ((result = ct_md_list(bufpp)) == NULL)
+		CFATALX("unable to list md files");
+	ct_metadata = 0;
+	tmp = result;
+	while (*(tmp++) != NULL)
+		nresults++;
+		
+	if (nresults == 0)
+		CFATALX("unable to find metadata tagged %s", mdname);
+		
+	/* sort and calculate newest */
+	/* strcmp should give us the right sort order */
+	qsort(result, nresults, sizeof(*result), strcompare);
+	/* pick the newest one */
+	best = e_strdup(result[0]);
+	CINFO("backup file is %s", best);
+
+	tmp = result;
+	while (*tmp != NULL) {
+		e_free(tmp);
+		tmp++;
+	}
+	e_free(&result);
+
+	/* XXX Check in cache to see if we have a local copy. */
+	if (!md_is_in_cache(best)) {
+		/* else grab it to the cache. XXX differentials? */
+		/* XXX filename should include cachedir */
+		ct_metadata = 1;
+		if ((ret = ct_md_extract(best, best)) != 0)
+			CFATALX("can't download md file");
+		ct_metadata = 0;
+	}
+
+	e_free(&mdname);
+	/* return filename of file in cache. */
+	return (best);
+}
+
+#define			TIMEDATA_LEN	17	/* including NUL */
+char *
+ct_find_md_for_archive(const char *mdname)
+{
+	char	 buf[TIMEDATA_LEN], *fullname;
+	time_t	 now;
+
+	/* cook the mdname so we only search for the actual tag */
+	mdname = ct_md_cook_filename(mdname);
+
+	if (ct_md_is_full_mdname(mdname) != 0)
+		CFATALX("mdname with data tag already filled in");
+
+	now = time(NULL);
+	if (strftime(buf, TIMEDATA_LEN, "%Y%m%d-%H%M%S",
+	    localtime(&now)) == 0)
+		CFATALX("can't format time");
+	e_asprintf(&fullname, "%s-%s", buf, mdname);
+	CINFO("backup file is %s", fullname);
+
+	/* XXX check it isn't already in the cache */
+
+	e_free(&mdname);
+
+	return (fullname);
 }
