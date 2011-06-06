@@ -44,6 +44,7 @@ int				md_open_inflight = 0;
 size_t				md_size, md_offset;
 time_t				md_mtime;
 
+uint64_t			ct_md_packet_id;
 
 #define MD_O_READ	0
 #define MD_O_WRITE	1
@@ -270,6 +271,7 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode)
 
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_state = TR_S_XML_OPEN;
+	ct_md_packet_id = trans->tr_trans_id;
 
 	CDBG("setting up XML");
 
@@ -452,7 +454,6 @@ md_extract_chunk(void *unused)
 	ct_assl_write_op(ct_assl_ctx, hdr, data);
 }
 
-uint64_t ct_md_packet_id;
 void
 ct_md_wmd(void *vctx)
 {
