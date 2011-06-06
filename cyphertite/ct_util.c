@@ -421,7 +421,7 @@ ct_print_scaled_stat(FILE *outfh, const char *label, long long val,
 {
 	char rslt[FMT_SCALED_STRSIZE];
 
-	fprintf(outfh, "%s%10lld", label, val);
+	fprintf(outfh, "%s%12lld", label, val);
 	if (val == 0 || sec == 0) {
 		fprintf(outfh, "\n");
 		return;
@@ -447,13 +447,13 @@ ct_dump_stats(FILE *outfh)
 	timersub(&ct_stats->st_time_scan_end, &ct_stats->st_time_start,
 		    &scan_delta);
 
-	fprintf(outfh, "Files scanned\t\t\t%10" PRIu64 "\n",
+	fprintf(outfh, "Files scanned\t\t\t%12" PRIu64 "\n",
 	    ct_stats->st_files_scanned);
 
 	ct_print_scaled_stat(outfh, "Total bytes\t\t\t",
 	    (long long)ct_stats->st_bytes_tot, sec);
 
-	fprintf(outfh, "Total chunks\t\t\t%10" PRIu64 "\n",
+	fprintf(outfh, "Total chunks\t\t\t%12" PRIu64 "\n",
 	    ct_stats->st_chunks_tot);
 
 	ct_print_scaled_stat(outfh, "Bytes read\t\t\t",
@@ -465,26 +465,26 @@ ct_dump_stats(FILE *outfh)
 	ct_print_scaled_stat(outfh, "Bytes compressed\t\t",
 	    (long long)ct_stats->st_bytes_compressed, sec);
 
-	fprintf(outfh, "Bytes crypted\t\t\t%10" PRIu64 "\n",
+	fprintf(outfh, "Bytes crypted\t\t\t%12" PRIu64 "\n",
 	    ct_stats->st_bytes_crypted);
-	fprintf(outfh, "Bytes dbexists\t\t\t%10" PRIu64 "\n",
+	fprintf(outfh, "Bytes dbexists\t\t\t%12" PRIu64 "\n",
 	    ct_stats->st_bytes_dbexists);
-	fprintf(outfh, "Bytes sent\t\t\t%10" PRIu64 "\n",
+	fprintf(outfh, "Bytes sent\t\t\t%12" PRIu64 "\n",
 	    ct_stats->st_bytes_sent);
-	fprintf(outfh, "Chunks completed\t\t%10" PRIu64 "\n",
+	fprintf(outfh, "Chunks completed\t\t%12" PRIu64 "\n",
 	    ct_stats->st_chunks_completed);
-	fprintf(outfh, "Bytes sha\t\t\t%10" PRIu64 "\n",
+	fprintf(outfh, "Bytes sha\t\t\t%12" PRIu64 "\n",
 	    ct_stats->st_bytes_sha);
-	fprintf(outfh, "Bytes crypt\t\t\t%10" PRIu64 "\n",
+	fprintf(outfh, "Bytes crypt\t\t\t%12" PRIu64 "\n",
 	    ct_stats->st_bytes_crypt);
-	fprintf(outfh, "Bytes csha\t\t\t%10" PRIu64 "\n",
+	fprintf(outfh, "Bytes csha\t\t\t%12" PRIu64 "\n",
 	    ct_stats->st_bytes_csha);
-	fprintf(outfh, "Files completed\t\t\t%10" PRIu64 "\n",
+	fprintf(outfh, "Files completed\t\t\t%12" PRIu64 "\n",
 	    ct_stats->st_files_completed);
 	if (ct_action == CT_A_ARCHIVE)
-		print_time_scaled(outfh, "Scan Time\t\t\t",  &scan_delta);
+		print_time_scaled(outfh, "Scan Time\t\t\t    ",  &scan_delta);
 
-	print_time_scaled(outfh, "Total Time\t\t\t",  &time_delta);
+	print_time_scaled(outfh, "Total Time\t\t\t    ",  &time_delta);
 	if (ct_verbose > 2)
 		ct_display_assl_stats(outfh);
 }
