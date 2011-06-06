@@ -64,7 +64,7 @@ ct_md_cook_filename(const char *path)
 {
 	char	*bname, *fname, *pdup;
 
-	fname = calloc(1, CT_MAX_MD_FILENAME);
+	fname = e_malloc(CT_MAX_MD_FILENAME, E_MEM_CLEAR);
 	if (fname == NULL)
 		CFATALX("can't allocate space for filename");
 

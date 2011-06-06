@@ -307,7 +307,7 @@ main(int argc, char **argv)
 			ret = 1;
 		}
 		if (ct_mdname)
-			free(ct_mdname);
+			e_free(&ct_mdname);
 		return (ret);
 	}
 
@@ -345,7 +345,7 @@ main(int argc, char **argv)
 		ret = 1;
 	}
 	if (ct_mdname)
-		free(ct_mdname);
+		e_free(&ct_mdname);
 
 	return (ret);
 }
