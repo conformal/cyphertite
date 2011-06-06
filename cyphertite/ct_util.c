@@ -485,7 +485,8 @@ ct_dump_stats(FILE *outfh)
 		print_time_scaled(outfh, "Scan Time\t\t\t",  &scan_delta);
 
 	print_time_scaled(outfh, "Total Time\t\t\t",  &time_delta);
-	ct_display_assl_stats(outfh);
+	if (ct_verbose > 2)
+		ct_display_assl_stats(outfh);
 }
 
 void
