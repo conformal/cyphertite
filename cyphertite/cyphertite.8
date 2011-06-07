@@ -221,6 +221,33 @@ commands now operate on the remote metadata store.
 Additionally
 .Fl e
 may be used to delete remote metadata from the server.
+.Sh METADATA OPERATION MODES
+Two different metadata modes are supported by
+.Nm :
+.Em local
+and
+.Em remote .
+In
+.Em local
+mode,
+.Nm operates similarly to
+.Xr tar 1
+with the metadata files operating analgously to the tar files.
+.Pp
+In
+.Em remote
+mode,
+.Nm
+will instead operate on metadata stored on the remote server.
+In this case the names provided by
+.Fl f
+are used as tags to the metadata.
+They are stored on the remote server with the form:
+YYYYMMDD-HHMMSS-tag .
+Extract commands will operate on the newest metadata file on the server unless
+the full metadata name is provided.
+The cache directory defined in the configuration file will be used to store
+local copies of the metadata files.
 .Sh EXAMPLES
 Create an archive named 
 .Pa accounting-2010.md
