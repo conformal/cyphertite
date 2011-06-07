@@ -42,6 +42,13 @@ Specify if
 will allow uncompressed writes.
 The default is 0 (no).
 .Pp
+.It Ic bandwidth = Ar number
+Limit the upload bandwidth used by
+.Nm cyphertite .
+The amount of data per second sent to the server will be limited by
+this value, specified in kilobytes per second (KB/s).
+If not set, the default is to not limit upload speed.
+.Pp
 .It Ic cache_db = Ar file
 Specify the location of the cache database.
 If not set, caching will be disabled.
