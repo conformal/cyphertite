@@ -189,6 +189,11 @@ from descending into directories that have a different device number
 than the file from which the descent began.
 .It Fl d
 Run in debug mode.
+.It Fl m
+run in metadata mode.
+See
+.Sc METADATA MODE
+for an explanation.
 .It Fl p
 Preserve user and group ID as well as file mode regardless of the
 current
@@ -201,6 +206,21 @@ matching.  The default is to use
 .It Fl v
 Turn on verbose output.
 .El
+.Sh METADATA MODE
+If
+.Fl m
+is provided on the command mode then 
+.Nm
+will operate in metadata mode.
+The
+.Fl x ,
+.Fl c
+and
+.Fl t
+commands now operate on the remote metadata store.
+Additionally
+.Fl e
+may be used to delete remote metadata from the server.
 .Sh EXAMPLES
 Create an archive named 
 .Pa accounting-2010.md
