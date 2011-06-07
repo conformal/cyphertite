@@ -165,7 +165,7 @@ main(int argc, char **argv)
 			break;
 		case 'c':
 			if (ct_action)
-				CFATALX("cannot mix operations, -c -t -x");
+				CFATALX("cannot mix operations, -c -e -t -x");
 			ct_action = CT_A_ARCHIVE;
 			break;
 		case 'd':
@@ -174,6 +174,8 @@ main(int argc, char **argv)
 			    CLOG_F_LINE | CLOG_F_DTIME;
 			break;
 		case 'e':
+			if (ct_action)
+				CFATALX("cannot mix operations, -c -e -t -x");
 			ct_action = CT_A_ERASE;
 			break;
 		case 'f': /* metadata file */
@@ -190,7 +192,7 @@ main(int argc, char **argv)
 			break;
 		case 't':
 			if (ct_action)
-				CFATALX("cannot mix operations, -c -t -x");
+				CFATALX("cannot mix operations, -c -e -t -x");
 			ct_action = CT_A_LIST;
 			break;
 		case 'v':	/* verbose */
@@ -198,7 +200,7 @@ main(int argc, char **argv)
 			break;
 		case 'x':
 			if (ct_action)
-				CFATALX("cannot mix operations, -c -t -x");
+				CFATALX("cannot mix operations, -c -e -t -x");
 			ct_action = CT_A_EXTRACT;
 			break;
 		default:
