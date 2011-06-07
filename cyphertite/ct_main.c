@@ -345,11 +345,8 @@ main(int argc, char **argv)
 
 	if (ct_action == CT_A_ARCHIVE) {
 		ret = ct_archive(ct_mfile, argv, ct_basisbackup);
-		if (ret == 0 && ct_md_mode == CT_MDMODE_REMOTE) {
-			ct_metadata = 1; /* XXX this horrible hack must die */
+		if (ret == 0 && ct_md_mode == CT_MDMODE_REMOTE)
 			ret = ct_md_archive(ct_mfile, ct_mdname);
-			ct_metadata = 0;
-		}
 	} else if (ct_action == CT_A_EXTRACT) {
 		ret = ct_extract(ct_mfile, argv);
 	} else if (ct_action == CT_A_LIST) {
