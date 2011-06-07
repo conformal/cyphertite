@@ -973,9 +973,7 @@ ct_find_md_for_extract(const char *mdname)
 	cachename = ct_md_get_cachename(best);
 	if (!md_is_in_cache(best)) {
 		/* else grab it to the cache. XXX differentials? */
-		/* XXX filename should include cachedir */
 		ct_metadata = 1;
-		if ((ret = ct_md_extract(best, best)) != 0)
 		if ((ret = ct_md_extract(cachename, best)) != 0)
 			CFATALX("can't download md file");
 		ct_metadata = 0;
