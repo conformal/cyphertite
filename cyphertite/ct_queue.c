@@ -562,7 +562,7 @@ ct_compute_sha(void *vctx)
 			    trans->tr_trans_id, shat, trans->tr_size[slot]);
 		}
 		if (ctdb_exists(trans)) {
-			ct_stats->st_bytes_dbexists += trans->tr_size[slot];
+			ct_stats->st_bytes_exists += trans->tr_size[slot];
 			trans->tr_state = TR_S_WMD_READY;
 		} else {
 			trans->tr_state = TR_S_UNCOMPSHA_ED;
@@ -974,6 +974,8 @@ ct_handle_exists_reply(struct ct_trans *trans, struct ct_header *hdr,
 	case C_HDR_S_EXISTS:
 		/* enter shas into local db */
 		trans->tr_state = TR_S_EXISTS;
+		slot = trans->tr_dataslot;
+		ct_stats->st_bytes_exists += trans->tr_size[slot];
 		ct_queue_transfer(trans);
 		break;
 	case C_HDR_S_DOESNTEXIST:
@@ -1260,14 +1262,24 @@ ct_display_queues(void)
 {
 	/* XXX - looks at queues without locks */
 
-	fprintf(stderr, "Sha      queue len %d\n", ct_state->ct_sha_qlen);
-	fprintf(stderr, "Comp     queue len %d\n", ct_state->ct_comp_qlen);
-	fprintf(stderr, "Crypt    queue len %d\n", ct_state->ct_crypt_qlen);
-	fprintf(stderr, "Csha     queue len %d\n", ct_state->ct_csha_qlen);
-	fprintf(stderr, "Write    queue len %d\n", ct_state->ct_write_qlen);
-	fprintf(stderr, "CRqueued queue len %d\n", ct_state->ct_queued_qlen);
-	fprintf(stderr, "Inflight queue len %d\n", ct_state->ct_inflight_rblen);
-	fprintf(stderr, "Complete queue len %d\n", ct_state->ct_complete_rblen);
-	fprintf(stderr, "Free     queue len %d\n", c_trans_free);
+	if (ct_verbose > 1) {
+		fprintf(stderr, "Sha      queue len %d\n",
+		    ct_state->ct_sha_qlen);
+		fprintf(stderr, "Comp     queue len %d\n",
+		    ct_state->ct_comp_qlen);
+		fprintf(stderr, "Crypt    queue len %d\n",
+		    ct_state->ct_crypt_qlen);
+		fprintf(stderr, "Csha     queue len %d\n",
+		    ct_state->ct_csha_qlen);
+		fprintf(stderr, "Write    queue len %d\n",
+		    ct_state->ct_write_qlen);
+		fprintf(stderr, "CRqueued queue len %d\n",
+		    ct_state->ct_queued_qlen);
+		fprintf(stderr, "Inflight queue len %d\n",
+		    ct_state->ct_inflight_rblen);
+		fprintf(stderr, "Complete queue len %d\n",
+		    ct_state->ct_complete_rblen);
+		fprintf(stderr, "Free     queue len %d\n", c_trans_free);
+	}
 	ct_dump_stats(stderr);
 }

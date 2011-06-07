@@ -472,7 +472,7 @@ struct ct_stat {
 	uint64_t		st_bytes_written;
 	uint64_t		st_bytes_compressed;
 	uint64_t		st_bytes_crypted;
-	uint64_t		st_bytes_dbexists;
+	uint64_t		st_bytes_exists;
 	uint64_t		st_bytes_sent;
 	uint64_t		st_chunks_completed;
 
