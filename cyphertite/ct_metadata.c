@@ -881,38 +881,35 @@ char *
 ct_find_md_for_extract(const char *mdname)
 {
 	char	**result, **tmp;
-	char	 buf[CT_MAX_MD_FILENAME], *best, *bufp, **bufpp;
+	char	 *buf, *best; 
 	int	 nresults = 0, ret;
 
 	/* cook the mdname so we only search for the actual tag */
 	mdname = ct_md_cook_filename(mdname);
 
-	/* XXX this should probably be a regex */
-	buf[0] = '*';
-	strlcat(buf, mdname, sizeof(buf));
-	CINFO("buf = %s", buf);
+	e_asprintf(&buf, "^[[:digit:]]{8}-[[:digit:]]{6}-%s$", mdname);
+
 	/*
 	 * get the list of md matching this tag from the server.
-	 * ct_md_list returns an emptry list if it found
+	 * ct_md_list returns an empty list if it found
 	 * nothing and NULL upon failure.
 	 */
-
-	bufp = buf;
-	bufpp = &bufp;
 	ct_metadata = 1;
-	if ((result = ct_md_list(bufpp, CT_MATCH_GLOB)) == NULL)
+	if ((result = ct_md_list(&buf, CT_MATCH_REGEX)) == NULL)
 		CFATALX("unable to list md files");
 	ct_metadata = 0;
+
+	e_free(&buf);
+
 	tmp = result;
 	while (*(tmp++) != NULL)
 		nresults++;
-		
 	if (nresults == 0)
 		CFATALX("unable to find metadata tagged %s", mdname);
 		
 	/* sort and calculate newest */
-	/* strcmp should give us the right sort order */
 	qsort(result, nresults, sizeof(*result), strcompare);
+
 	/* pick the newest one */
 	best = e_strdup(result[0]);
 	CINFO("backup file is %s", best);
