@@ -99,7 +99,7 @@ struct ct_settings	settings[] = {
 	    NULL },
 	{ "polltype", CT_S_STR, NULL, &ct_polltype, NULL, NULL },
 	{ "md_mode", CT_S_STR, NULL, &ct_mdmode_str, NULL, NULL },
-	{ "md_cachedir", CT_S_STR, NULL, &ct_mdmode_str, NULL, NULL },
+	{ "md_cachedir", CT_S_STR, NULL, &ct_md_cachedir, NULL, NULL },
 	{ NULL, 0, NULL, NULL, NULL,  NULL }
 };
 
@@ -116,6 +116,7 @@ main(int argc, char **argv)
 {
 	char		pwd[PASS_MAX];
 	char		*ct_mdname = NULL;
+	char		ct_fullcachedir[PATH_MAX];
 	struct stat	sb;
 	int		c;
 	int		cflags;
@@ -278,10 +279,21 @@ main(int argc, char **argv)
 
 	if (ct_metadata || ct_md_mode == CT_MDMODE_REMOTE) {
 		if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
-#if 0
 			if (ct_md_cachedir == NULL)
 				CFATALX("remote mode needs a cachedir set");
-#endif
+			if (ct_md_cachedir[strlen(ct_md_cachedir) - 1] != '/') {
+				int rv;
+
+				if ((rv = snprintf(ct_fullcachedir,
+				    sizeof(ct_fullcachedir),
+				    "%s/", ct_md_cachedir)) == -1 || rv >
+				    PATH_MAX)
+					CFATALX("invalid md pathname");
+				ct_md_cachedir = ct_fullcachedir;
+			}
+				
+			if (ct_make_full_path(ct_md_cachedir, 0700) != 0)
+				CFATALX("can't create MD cachedir");
 
 			if (ct_action == CT_A_EXTRACT) {
 				/* Do we need to do this for erase or list? */

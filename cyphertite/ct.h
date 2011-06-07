@@ -45,6 +45,7 @@ extern time_t		ct_prev_backup_time;
 extern int		ct_trans_id;
 extern int		md_backup_fd;
 extern int		ct_md_mode;
+extern char		*ct_md_cachedir;
 extern char *		__progname;
 
 /* crypto */

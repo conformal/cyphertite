@@ -17,6 +17,7 @@
 
 #include <inttypes.h>
 #include <stdlib.h>
+#include <dirent.h>
 #include <libgen.h>
 #include <fnmatch.h>
 #include <regex.h>
@@ -850,7 +851,36 @@ ct_mdmode_setup(char *mdmode)
 int
 md_is_in_cache(const char *mdfile)
 {
-	return 0;
+	struct dirent	*dp;
+	DIR		*dirp;
+	int		 found = 0;
+
+	if ((dirp = opendir(ct_md_cachedir)) == NULL)
+		CFATALX("can't open md cache dir");
+	while ((dp = readdir(dirp)) != NULL) {
+		if (strcmp(dp->d_name, mdfile) == 0) {
+			CINFO("found in cachedir");
+			found = 1;
+			break;
+		}
+	}
+	closedir(dirp);
+
+	return (found);
+}
+
+/*
+ * return the filename in the cache directory that a mdfile would have
+ * if it extisted.
+ */
+char *
+ct_md_get_cachename(const char *mdfile)
+{
+	char	*cachename;
+
+	/* ct_md_cachedir was made sure to terminate with / earlier */
+	e_asprintf(&cachename, "%s%s", ct_md_cachedir, mdfile);
+	return cachename;
 }
 
 /*
@@ -893,7 +923,7 @@ char *
 ct_find_md_for_extract(const char *mdname)
 {
 	char	**result, **tmp;
-	char	 *buf, *best; 
+	char	 *buf, *best, *cachename; 
 	int	 nresults = 0, ret;
 
 	/* cook the mdname so we only search for the actual tag */
@@ -940,25 +970,28 @@ ct_find_md_for_extract(const char *mdname)
 	}
 	e_free(&result);
 
-	/* XXX Check in cache to see if we have a local copy. */
+	cachename = ct_md_get_cachename(best);
 	if (!md_is_in_cache(best)) {
 		/* else grab it to the cache. XXX differentials? */
 		/* XXX filename should include cachedir */
 		ct_metadata = 1;
 		if ((ret = ct_md_extract(best, best)) != 0)
+		if ((ret = ct_md_extract(cachename, best)) != 0)
 			CFATALX("can't download md file");
 		ct_metadata = 0;
 	}
 
 	e_free(&mdname);
+	e_free(&best);
+
 	/* return filename of file in cache. */
-	return (best);
+	return (cachename);
 }
 
 char *
 ct_find_md_for_archive(const char *mdname)
 {
-	char	 buf[TIMEDATA_LEN], *fullname;
+	char	 buf[TIMEDATA_LEN], *fullname, *cachename; 
 	time_t	 now;
 
 	/* cook the mdname so we only search for the actual tag */
@@ -974,9 +1007,13 @@ ct_find_md_for_archive(const char *mdname)
 	e_asprintf(&fullname, "%s-%s", buf, mdname);
 	CINFO("backup file is %s", fullname);
 
-	/* XXX check it isn't already in the cache */
+	/* check it isn't already in the cache */
+	cachename = ct_md_get_cachename(fullname);
+	if (md_is_in_cache(fullname))
+		CFATALX("generated mdname is already in cache dir");
 
 	e_free(&mdname);
+	e_free(&fullname);
 
-	return (fullname);
+	return (cachename);
 }
