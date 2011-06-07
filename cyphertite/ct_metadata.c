@@ -860,7 +860,19 @@ md_is_in_cache(const char *mdfile)
 int
 ct_md_is_full_mdname(const char *mdname)
 {
-	return 0;
+	char			*pattern = "^[[:digit:]]{8}-[[:digit:]]{6}-";
+	char			error[1024];
+	regex_t			re;
+	int			match = 0, rv;
+	if ((rv = regcomp(&re, pattern, REG_EXTENDED | REG_NOSUB)) != 0) {
+		regerror(rv, &re, error, sizeof(error) - 1);
+		CFATALX("%s: regcomp failed: %s", __func__, error);
+	}
+	if (regexec(&re, mdname, 0, NULL, 0) == 0)
+		match = 1;
+
+	regfree(&re);
+	return match;
 }
 
 
@@ -887,19 +899,26 @@ ct_find_md_for_extract(const char *mdname)
 	/* cook the mdname so we only search for the actual tag */
 	mdname = ct_md_cook_filename(mdname);
 
-	e_asprintf(&buf, "^[[:digit:]]{8}-[[:digit:]]{6}-%s$", mdname);
+	if (ct_md_is_full_mdname(mdname)) {
+		/* use md_list as stat() for now */
+		buf = (char *)mdname;
+		if ((result = ct_md_list(&buf, CT_MATCH_GLOB)) == NULL)
+			CFATALX("unable to list md files");
+	} else {
+		e_asprintf(&buf, "^[[:digit:]]{8}-[[:digit:]]{6}-%s$", mdname);
 
-	/*
-	 * get the list of md matching this tag from the server.
-	 * ct_md_list returns an empty list if it found
-	 * nothing and NULL upon failure.
-	 */
-	ct_metadata = 1;
-	if ((result = ct_md_list(&buf, CT_MATCH_REGEX)) == NULL)
-		CFATALX("unable to list md files");
-	ct_metadata = 0;
+		/*
+		 * get the list of md matching this tag from the server.
+		 * ct_md_list returns an empty list if it found
+		 * nothing and NULL upon failure.
+		 */
+		ct_metadata = 1;
+		if ((result = ct_md_list(&buf, CT_MATCH_REGEX)) == NULL)
+			CFATALX("unable to list md files");
+		ct_metadata = 0;
 
-	e_free(&buf);
+		e_free(&buf);
+	}
 
 	tmp = result;
 	while (*(tmp++) != NULL)
