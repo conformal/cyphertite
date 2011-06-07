@@ -214,6 +214,11 @@ main(int argc, char **argv)
 
 	ct_load_config(settings);
 
+	/* XXX - scale bandwith limiting until the algorithm is improved */
+	if (ct_io_bw_limit) {
+		ct_io_bw_limit = ct_io_bw_limit * 10 / 7;
+	}
+
 	if (ct_password == NULL) {
 		if (ct_get_password(pwd, sizeof pwd, "Login password: ", 0))
 			CFATALX("invalid password");
