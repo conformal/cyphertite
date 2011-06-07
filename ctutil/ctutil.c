@@ -23,6 +23,8 @@
 #include <pwd.h>
 #include <readpassphrase.h>
 
+#include <sys/stat.h>
+
 #ifndef NO_UTIL_H
 #include <util.h>
 #endif
@@ -345,4 +347,37 @@ ct_polltype_setup(const char *type)
 		CFATALX("unknown poll type %s", type);
 
 	CDBG("polltype: %s\n", type);
+}
+
+/*
+ * make all directories in the full path provided in ``path'' if they don't
+ * exist.
+ * returns 0 on success.
+ */
+int
+ct_make_full_path(char *path, mode_t mode)
+{
+	char		*nxt = path;
+	struct stat	 st;
+
+	/* deal with full paths */
+	if (*nxt == '/')
+		nxt++;
+	for (;;) {
+		if ((nxt = strchr(nxt, '/')) == NULL)
+			break;
+		*nxt = '\0';
+
+		if (lstat(path, &st) == 0) {
+			*(nxt++) = '/';
+			continue;
+		}
+
+		if (mkdir(path, mode) == -1)
+			return (1);
+		*(nxt++) = '/';
+		/* XXX stupid umask? */
+	}
+
+	return (0);
 }

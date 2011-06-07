@@ -577,34 +577,6 @@ s_to_e_type(int mode)
 	return (rv);
 }
 
-int
-make_full_path(char *path)
-{
-	char		*nxt = path;
-	struct stat	 st;
-
-	/* deal with full paths */
-	if (*nxt == '/')
-		nxt++;
-	for (;;) {
-		if ((nxt = strchr(nxt, '/')) == NULL)
-			break;
-		*nxt = '\0';
-
-		if (lstat(path, &st) == 0) {
-			*(nxt++) = '/';
-			continue;
-		}
-
-		if (mkdir(path, 0777) == -1)
-			return (-1);
-		*(nxt++) = '/';
-		/* XXX stupid umask? */
-	}
-
-	return (open(path, O_WRONLY|O_CREAT|O_TRUNC, 0600));
-}
-
 void
 ct_file_extract_open(struct flist *fnode)
 {
@@ -628,8 +600,9 @@ ct_file_extract_open(struct flist *fnode)
 		 * lacking one of the path elements, so try to recursively
 		 * create the directory.
 		 */
-		if (errno == ENOENT &&
-		    (ct_extract_fd = make_full_path(tpath)) > 0)
+		if (errno == ENOENT && ct_make_full_path(tpath, 0777) == 0 &&
+		    (ct_extract_fd = open(tpath,
+		    O_WRONLY|O_CREAT|O_TRUNC, 0600)) != -1)
 			return;
 		CFATAL("unable to open file for writing %s", tpath);
 	}

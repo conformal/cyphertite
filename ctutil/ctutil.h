@@ -215,4 +215,7 @@ int		ct_base64_encode(int, uint8_t *, size_t, uint8_t *, size_t);
 /* Metadata */
 #define CT_MAX_MD_FILENAME	(256)
 
+/* directory handling */
+int     ct_make_full_path(char *, mode_t);
+
 #endif /* CTUTIL_H */
