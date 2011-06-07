@@ -97,6 +97,20 @@ Specify the negotiated compression for the session.
 .It Ic username = Ar string
 Specify the username to authenticate with.
 .Pp
+.It Xo
+.Ic Ic md_mode =
+.Pq Ic local Ns \&| Ns Ic remote
+.Xc
+Specify whether to operate in local or remote metadata mode.
+The default is local.
+If this is set then
+.Op md_dircache
+is required.
+.Pp
+.It Ic md_dircache =  Ar string
+Specify the path to the directory to be used to cache metadata files in
+remote mode.
+.Pp
 .El
 .Sh FILES
 .Bl -tag -width "cyphertite" -compact
