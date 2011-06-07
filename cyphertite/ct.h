@@ -40,7 +40,6 @@ extern int		ct_cur_compress_mode;
 extern struct ct_stat	*ct_stats;
 extern int		ct_no_cross_mounts;
 extern int		ct_all_files;
-extern int		ct_metadata;
 extern time_t		ct_prev_backup_time;
 extern int		ct_trans_id;
 extern int		md_backup_fd;
@@ -69,11 +68,10 @@ void ct_compute_sha(void *vctx);
 void ct_compute_compress(void *vctx);
 void ct_compute_encrypt(void *vctx);
 void ct_compute_csha(void *vctx);
-void ct_process_complete(void *vctx);
+void ct_free_complete(void *vctx);
 void ct_process_wmd(void *vctx);
 void ct_process_wfile(void *vctx);
 void ct_md_wmd(void *vctx);
-void ct_md_wfile(void *vctx);
 
 struct flist;
 
@@ -344,6 +342,11 @@ ct_body_free_func		ct_body_free;
 
 void				ct_handle_xml_reply(struct ct_trans *trans,
 				    struct ct_header *hdr, void *vbody);
+void				ct_xml_file_open(struct ct_trans *,
+				    const char *, int);
+#define MD_O_READ	0
+#define MD_O_WRITE	1
+void				ct_xml_file_close(void);
 
 /* db external interface */
 void				ctdb_setup(const char *, int);
@@ -513,3 +516,4 @@ void			 ct_mdmode_setup(char *);
 char			*ct_find_md_for_extract(const char *);
 char                    *ct_find_md_for_archive(const char *);
 int			 md_is_in_cache(const char *);
+void			 ct_write_mdfile(struct ct_trans *);

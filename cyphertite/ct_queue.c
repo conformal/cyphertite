@@ -67,8 +67,7 @@ TAILQ_HEAD(,ct_trans)ct_trans_free_head;
 int ct_numalloc = 0;
 int ct_alloc_block_size;
 int ct_cur_compress_mode = 0;
-uint64_t	ct_file_packet_id = 0;
-uint64_t	ct_md_packet_id = 0;
+uint64_t	ct_packet_id = 0;
 
 int ct_disconnected = 0;
 
@@ -762,28 +761,35 @@ ct_process_wmd(void *vctx)
 
 	trans = RB_MIN(ct_trans_lookup, &ct_state->ct_complete);
 
-	while (trans != NULL && trans->tr_trans_id == ct_md_packet_id) {
+	while (trans != NULL && trans->tr_trans_id == ct_packet_id) {
 		RB_REMOVE(ct_trans_lookup, &ct_state->ct_complete, trans);
 		ct_state->ct_complete_rblen--;
 
 		CDBG("writing md trans %" PRIu64 " eof %d", trans->tr_trans_id,
 			trans->tr_eof);
 
-		ct_md_packet_id++;
+		ct_packet_id++;
 
-		if ((trans->hdr.c_flags & C_HDR_F_METADATA) == 0)
+		if ((trans->hdr.c_flags & C_HDR_F_METADATA) == 0) {
 			ct_write_md(trans);
+		} else if (trans->tr_eof == 1) {
+			if (md_backup_fd != -1)
+				CWARNX("eof and file still open");
+			CDBG("eof reached, closing file");
+			ct_xml_file_close();
+		}
+
 		ct_trans_free(trans);
 
 		trans = RB_MIN(ct_trans_lookup, &ct_state->ct_complete);
 	}
-	if (trans != NULL && trans->tr_trans_id < ct_md_packet_id) {
+	if (trans != NULL && trans->tr_trans_id < ct_packet_id) {
 		CFATALX("old transaction found in completion queue %" PRIu64 " %" PRIu64,
-		    trans->tr_trans_id, ct_md_packet_id);
+		    trans->tr_trans_id, ct_packet_id);
 	} else if (trans != NULL) {
 		CDBG("waiting for transaction %" PRIu64","
 		    " next avail is %" PRIu64,
-		    ct_md_packet_id, trans->tr_trans_id);
+		    ct_packet_id, trans->tr_trans_id);
 	}
 }
 
@@ -849,23 +855,32 @@ ct_process_wfile(void *vctx)
 
 	trans = RB_MIN(ct_trans_lookup, &ct_state->ct_complete);
 
-	while (trans != NULL && trans->tr_trans_id == ct_file_packet_id) {
+	while (trans != NULL && trans->tr_trans_id == ct_packet_id) {
 		RB_REMOVE(ct_trans_lookup, &ct_state->ct_complete, trans);
 		ct_state->ct_complete_rblen--;
 
 		CDBG("writing file trans %" PRIu64 " eof %d", trans->tr_trans_id,
 			trans->tr_eof);
 
-		ct_file_packet_id++;
+		ct_packet_id++;
 
-		ct_write_file(trans);
+		if (trans->hdr.c_flags & C_HDR_F_METADATA) {
+			ct_write_mdfile(trans);
+		} else {
+			ct_write_file(trans);
+		}
 		ct_trans_free(trans);
+
+		/* XXX is this needed? */
+		if (ct_state->ct_file_state != CT_S_FINISHED)
+			ct_wakeup_file();
+
 
 		trans = RB_MIN(ct_trans_lookup, &ct_state->ct_complete);
 	}
-	if (trans != NULL && trans->tr_trans_id < ct_file_packet_id) {
+	if (trans != NULL && trans->tr_trans_id < ct_packet_id) {
 		CFATALX("old transaction found in completion queue %" PRIu64 " %" PRIu64,
-		    trans->tr_trans_id, ct_file_packet_id);
+		    trans->tr_trans_id, ct_packet_id);
 	}
 }
 

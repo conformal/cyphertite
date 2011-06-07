@@ -104,12 +104,12 @@ ct_archive(const char *mfile, char **filelist, const char *basisbackup)
 	ct_traverse(filelist);
 
 	/* setup wakeup channels */
-	ct_setup_wakeup_file(ct_state, ct_process_input);
+	ct_setup_wakeup_file(ct_state, ct_process_file);
 	ct_setup_wakeup_sha(ct_state, ct_compute_sha);
 	ct_setup_wakeup_compress(ct_state, ct_compute_compress);
 	ct_setup_wakeup_csha(ct_state, ct_compute_csha);
 	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
-	ct_setup_wakeup_complete(ct_state, ct_process_complete);
+	ct_setup_wakeup_complete(ct_state, ct_process_wmd);
 
 	/* poke file into action */
 	ct_wakeup_file();
@@ -133,12 +133,12 @@ ct_extract(const char *mfile, char **filelist)
 	ct_setup_assl();
 
 	/* setup wakeup channels */
-	ct_setup_wakeup_file(ct_state, ct_process_input);
+	ct_setup_wakeup_file(ct_state, ct_process_md);
 	ct_setup_wakeup_sha(ct_state, ct_compute_sha);
 	ct_setup_wakeup_compress(ct_state, ct_compute_compress);
 	ct_setup_wakeup_csha(ct_state, ct_compute_csha);
 	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
-	ct_setup_wakeup_complete(ct_state, ct_process_complete);
+	ct_setup_wakeup_complete(ct_state, ct_process_wfile);
 
 	ct_extract_setup(mfile);
 
@@ -373,26 +373,16 @@ done:
 void
 ct_shutdown()
 {
+	extern uint64_t	ct_packet_id;
 	if (ct_mdf != NULL) {
 		ct_metadata_close(ct_mdf);
 		ct_mdf = NULL;
 	}
+	/* XXX this is a huge hack */
+	ct_packet_id = ct_trans_id;
 	ctdb_shutdown();
 	event_loopbreak();
 }
-
-void
-ct_process_input(void *vctx)
-{
-	if (ct_action == CT_A_EXTRACT) {
-		ct_process_md(vctx);
-	} else if  (ct_action == CT_A_ARCHIVE) {
-		ct_process_file(vctx);
-	} else {
-		CFATALX("Unknown mode %d", ct_action);
-	}
-}
-
 
 void print_time_scaled(FILE *, char *s, struct timeval *t);
 void
@@ -508,31 +498,34 @@ ct_display_assl_stats(FILE *outfh)
 	    ct_assl_ctx->io_read_bytes / ct_assl_ctx->io_read_count);
 }
 
+/*
+ * Used for standalone operations (md close and md list) where no processing
+ * is necessary on complete transactions other than freeing them.
+ */
 void
-ct_process_complete(void *vctx)
+ct_free_complete(void *vctx)
 {
-	if (ct_metadata) {
-	CDBG("yo");
-		if (ct_action == CT_A_EXTRACT) {
-			ct_md_wfile(vctx);
-		} else if  (ct_action == CT_A_ARCHIVE) {
-			ct_md_wmd(vctx);
-		} else {
-			CFATALX("Unknown mode %d (process_complete md)",
-			    ct_action);
-		}
-	} else {
-		if (ct_action == CT_A_EXTRACT) {
-			ct_process_wfile(vctx);
-		} else if  (ct_action == CT_A_ARCHIVE) {
-			ct_process_wmd(vctx);
-		} else {
-			CFATALX("Unknown mode %d (process_complete)",
-			    ct_action);
-		}
+#ifdef notyet
+	extern uint64_t	 ct_packet_id;
+#endif
+	struct ct_trans	*trans;
+
+	while ((trans = RB_MIN(ct_trans_lookup,
+	    &ct_state->ct_complete)) != NULL) {
+#ifdef notyet
+	    trans->tr_trans_id == ct_packet_id) {
+#endif
+		RB_REMOVE(ct_trans_lookup, &ct_state->ct_complete, trans);
+		ct_state->ct_complete_rblen--;
+
+		CDBG("freeing trans %" PRIu64 "", trans->tr_trans_id);
+#ifdef notyet
+		ct_packet_id++;
+#endif
+
+		ct_trans_free(trans);
 	}
 }
-
 
 void
 ct_pr_fmt_file(struct flist *fnode)

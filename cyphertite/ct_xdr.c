@@ -41,7 +41,6 @@ time_t				ct_prev_backup_time;
 int				md_dir = -1;
 int64_t				ct_num_shas = -1;
 struct flist			*fl_ex_node;
-int				ct_ex_trans_id = 0;
 int				ct_doextract;
 
 
@@ -632,7 +631,7 @@ ct_process_md(void *vctx)
 					ct_wakeup_file();
 				} else {
 					trans->tr_state = TR_S_EX_DONE;
-					trans->tr_trans_id = ct_ex_trans_id++;
+					trans->tr_trans_id = ct_trans_id++;
 					ct_queue_transfer(trans);
 					ct_set_file_state(CT_S_FINISHED);
 				}
@@ -674,7 +673,7 @@ ct_process_md(void *vctx)
 			CDBG("file %s numshas %" PRId64, fnode->fl_sname,
 			    ct_num_shas);
 
-			trans->tr_trans_id = ct_ex_trans_id++;
+			trans->tr_trans_id = ct_trans_id++;
 			ct_queue_transfer(trans);
 		} else if (ct_num_shas == 0) {
 			ct_num_shas--;
@@ -690,7 +689,7 @@ ct_process_md(void *vctx)
 			    sizeof(trans->tr_sha));
 			trans->tr_state = TR_S_EX_FILE_END;
 			trans->tr_fl_node->fl_size = trl.cmt_orig_size;
-			trans->tr_trans_id = ct_ex_trans_id++;
+			trans->tr_trans_id = ct_trans_id++;
 			ct_queue_transfer(trans);
 		} else {
 			trans->tr_fl_node = fl_ex_node;
@@ -727,7 +726,7 @@ ct_process_md(void *vctx)
 			}
 			trans->tr_state = TR_S_EX_SHA;
 			trans->tr_dataslot = 0;
-			trans->tr_trans_id = ct_ex_trans_id++;
+			trans->tr_trans_id = ct_trans_id++;
 			ct_queue_transfer(trans);
 		}
 	}

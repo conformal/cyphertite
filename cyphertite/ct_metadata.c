@@ -45,12 +45,6 @@ int				md_open_inflight = 0;
 size_t				md_size, md_offset;
 time_t				md_mtime;
 
-uint64_t			ct_md_packet_id;
-
-#define MD_O_READ	0
-#define MD_O_WRITE	1
-void	ct_xml_file_open(struct ct_trans *, const char *, int);
-void	ct_xml_file_close(void);
 int	strcompare(const void *, const void *);
 
 struct xmlsd_v_elements ct_xml_cmds[] = {
@@ -126,7 +120,7 @@ ct_md_archive(const char *mfile, const char *mdname)
 	ct_setup_wakeup_compress(ct_state, ct_compute_compress);
 	ct_setup_wakeup_csha(ct_state, ct_compute_csha);
 	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
-	ct_setup_wakeup_complete(ct_state, ct_process_complete);
+	ct_setup_wakeup_complete(ct_state, ct_process_wmd);
 
 
 	/* poke file into action */
@@ -149,11 +143,6 @@ ct_md_fileio(void *unused)
 	struct ct_trans		*ct_trans;
 	int			error;
 
-#if 0
-	if (md_opened) {
-		ct_set_file_state(CT_S_WAITING_TRANS);
-	}
-#endif
 	CDBG("md_fileio entered for block %d", md_block_no);
 loop:
 	ct_trans = ct_trans_alloc();
@@ -266,6 +255,7 @@ loop:
 void
 ct_xml_file_open(struct ct_trans *trans, const char *file, int mode)
 {
+	extern uint64_t		 ct_packet_id;
 	struct ct_header	*hdr = NULL;
 	char			*body = NULL;
 	char			*buf = NULL;
@@ -273,7 +263,7 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode)
 
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_state = TR_S_XML_OPEN;
-	ct_md_packet_id = trans->tr_trans_id;
+	ct_packet_id = trans->tr_trans_id;
 
 	CDBG("setting up XML");
 
@@ -288,6 +278,7 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode)
 	hdr = &trans->hdr;
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
+	hdr->c_flags = C_HDR_F_METADATA;
 	hdr->c_size = sz;
 
 	/*
@@ -317,6 +308,12 @@ ct_xml_file_close(void)
 	int			sz;
 
 	trans = ct_trans_alloc();
+	if (trans == NULL) {
+		/* system busy, return */
+		CDBG("ran out of transactions, waiting");
+		ct_set_file_state(CT_S_WAITING_TRANS);
+		return;
+	}
 
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_state = TR_S_XML_CLOSING;
@@ -334,6 +331,7 @@ ct_xml_file_close(void)
 	hdr = &trans->hdr;
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
+	hdr->c_flags = C_HDR_F_METADATA;
 	hdr->c_size = sz;
 
 	/*
@@ -368,7 +366,7 @@ ct_md_extract(const char *mfile, const char *mdname)
 	ct_setup_wakeup_compress(ct_state, ct_compute_compress);
 	ct_setup_wakeup_csha(ct_state, ct_compute_csha);
 	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
-	ct_setup_wakeup_complete(ct_state, ct_process_complete);
+	ct_setup_wakeup_complete(ct_state, ct_process_wfile);
 
 	/* XXX -chmod when done */
 	md_backup_fd = open(mfile, O_WRONLY|O_TRUNC|O_CREAT, 0600);
@@ -424,7 +422,6 @@ md_extract_chunk(void *unused)
 	trans->tr_type = TR_T_READ_CHUNK;
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_eof = 0;
-	trans->hdr.c_flags = C_HDR_F_METADATA;
 
 	hdr = &trans->hdr;
 
@@ -457,101 +454,45 @@ md_extract_chunk(void *unused)
 }
 
 void
-ct_md_wmd(void *vctx)
+ct_write_mdfile(struct ct_trans *trans)
 {
-	struct ct_trans *trans;
-
-	/* this probably is not the right activity for md upload complete... */
-
-	trans = RB_MIN(ct_trans_lookup, &ct_state->ct_complete);
-
-	while (trans != NULL && trans->tr_trans_id == ct_md_packet_id) {
-		RB_REMOVE(ct_trans_lookup, &ct_state->ct_complete, trans);
-		ct_state->ct_complete_rblen--;
-
-		CDBG("writing md type %d trans %" PRIu64 " eof %d",
-		    trans->hdr.c_opcode, trans->tr_trans_id, trans->tr_eof);
-
-		ct_md_packet_id++;
-		if (trans->tr_eof == 1) {
-			if (md_backup_fd != -1)
-				CWARNX("eof and file still open");
-			CDBG("eof reached, closing file");
-			ct_xml_file_close();
-		}
-
-		ct_trans_free(trans);
-
-		trans = RB_MIN(ct_trans_lookup, &ct_state->ct_complete);
-	}
-	if (trans != NULL && trans->tr_trans_id < ct_md_packet_id) {
-		CFATALX("old transaction found in completion queue %" PRIu64 " %" PRIu64,
-		    trans->tr_trans_id, ct_md_packet_id);
-	}
-}
-
-void
-ct_md_wfile(void *vctx)
-{
-	struct ct_trans		*trans;
 	ssize_t			wlen;
 	int			slot;
 
-	trans = RB_MIN(ct_trans_lookup, &ct_state->ct_complete);
-
-	while (trans != NULL && trans->tr_trans_id == ct_md_packet_id) {
-		RB_REMOVE(ct_trans_lookup, &ct_state->ct_complete, trans);
-		ct_state->ct_complete_rblen--;
-
-		CDBG("writing file trans %" PRIu64 " eof %d", trans->tr_trans_id,
-			trans->tr_eof);
-
-		ct_md_packet_id++;
-
-		switch(trans->tr_state) {
-		case TR_S_EX_READ:
-		case TR_S_EX_DECRYPTED:
-		case TR_S_EX_UNCOMPRESSED:
-			if (trans->hdr.c_status == C_HDR_S_OK) {
-				slot = trans->tr_dataslot;
-				CDBG("writing packet sz %d",
-				    trans->tr_size[slot]);
-				wlen = write(md_backup_fd, trans->tr_data[slot],
-				    trans->tr_size[slot]);
-				if (wlen != trans->tr_size[slot])
-					CWARN("unable to write to md file");
-			} else {
-				ct_state->ct_file_state = CT_S_FINISHED;
-			}
-			break;
-
-		case TR_S_EX_DONE:
-			if (ct_verbose_ratios)
-				ct_dump_stats(stdout);
-
-			ct_file_extract_fixup();
-			ct_shutdown();
-			break;
-		case TR_S_XML_OPEN:
-			break;
-		case TR_S_XML_CLOSE:
-			ct_xml_file_close();
-			break;
-
-		default:
-			CFATALX("unexpected tr state in md_wfile %d",
-			    trans->tr_state);
+	switch(trans->tr_state) {
+	case TR_S_EX_READ:
+	case TR_S_EX_DECRYPTED:
+	case TR_S_EX_UNCOMPRESSED:
+		if (trans->hdr.c_status == C_HDR_S_OK) {
+			slot = trans->tr_dataslot;
+			CDBG("writing packet sz %d",
+			    trans->tr_size[slot]);
+			wlen = write(md_backup_fd, trans->tr_data[slot],
+			    trans->tr_size[slot]);
+			if (wlen != trans->tr_size[slot])
+				CWARN("unable to write to md file");
+		} else {
+			ct_state->ct_file_state = CT_S_FINISHED;
 		}
-		ct_trans_free(trans);
+		break;
 
-		if (ct_state->ct_file_state != CT_S_FINISHED)
-			ct_wakeup_file();
+	case TR_S_EX_DONE:
+		if (ct_verbose_ratios)
+			ct_dump_stats(stdout);
 
-		trans = RB_MIN(ct_trans_lookup, &ct_state->ct_complete);
-	}
-	if (trans != NULL && trans->tr_trans_id < ct_md_packet_id) {
-		CFATALX("old transaction found in completion queue %" PRIu64 " %" PRIu64,
-		    trans->tr_trans_id, ct_md_packet_id);
+		ct_file_extract_fixup();
+		ct_shutdown();
+		break;
+	case TR_S_XML_OPEN:
+	case TR_S_XML_CLOSING:
+		break;
+	case TR_S_XML_CLOSE:
+		ct_xml_file_close();
+		break;
+
+	default:
+		CFATALX("unexpected tr state in %s %d", __func__,
+		    trans->tr_state);
 	}
 }
 
@@ -571,7 +512,8 @@ ct_md_list(char **pat, int match_mode)
 	ct_event_init();
 
 	ct_setup_assl();
-	ct_setup_wakeup_complete(ct_state, ct_process_complete);
+	ct_setup_wakeup_complete(ct_state, ct_free_complete);
+	ct_set_file_state(CT_S_FINISHED);
 
 	trans = ct_trans_alloc();
 
@@ -589,6 +531,7 @@ ct_md_list(char **pat, int match_mode)
 	hdr = &trans->hdr;
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
+	hdr->c_flags = C_HDR_F_METADATA;
 	hdr->c_size = sz;
 
 	/*
@@ -699,6 +642,7 @@ ct_md_delete(const char *md)
 
 	ct_event_init();
 	ct_setup_assl();
+	ct_setup_wakeup_complete(ct_state, ct_free_complete);
 
 	trans = ct_trans_alloc();
 	trans->tr_trans_id = ct_trans_id++;
@@ -707,6 +651,7 @@ ct_md_delete(const char *md)
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
 	hdr->c_size = sz;
+	hdr->c_flags = C_HDR_F_METADATA;
 
 	body = ct_body_alloc(NULL, hdr);
 	bcopy(buf, body, sz);
@@ -942,10 +887,8 @@ ct_find_md_for_extract(const char *mdname)
 		 * ct_md_list returns an empty list if it found
 		 * nothing and NULL upon failure.
 		 */
-		ct_metadata = 1;
 		if ((result = ct_md_list(&buf, CT_MATCH_REGEX)) == NULL)
 			CFATALX("unable to list md files");
-		ct_metadata = 0;
 
 		e_free(&buf);
 	}
@@ -973,10 +916,8 @@ ct_find_md_for_extract(const char *mdname)
 	cachename = ct_md_get_cachename(best);
 	if (!md_is_in_cache(best)) {
 		/* else grab it to the cache. XXX differentials? */
-		ct_metadata = 1;
 		if ((ret = ct_md_extract(cachename, best)) != 0)
 			CFATALX("can't download md file");
-		ct_metadata = 0;
 	}
 
 	e_free(&mdname);

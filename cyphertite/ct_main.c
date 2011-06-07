@@ -42,7 +42,6 @@ int			ct_strip_slash = 1;
 int			ct_verbose_ratios;
 int			ct_no_cross_mounts;
 char			*ct_mfile;
-int			ct_metadata;
 int			ct_verbose;
 char			*ct_basisbackup;
 char			*ct_configfile;
@@ -117,6 +116,7 @@ main(int argc, char **argv)
 	char		pwd[PASS_MAX];
 	char		*ct_mdname = NULL;
 	char		ct_fullcachedir[PATH_MAX];
+	int		ct_metadata = 0;
 	struct stat	sb;
 	int		c;
 	int		cflags;
