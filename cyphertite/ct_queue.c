@@ -178,7 +178,6 @@ skip_csha:
 
 	case TR_S_FILE_START:
 	case TR_S_SPECIAL:
-	case TR_S_SHORTREAD:
 	case TR_S_WMD_READY:
 		RB_INSERT(ct_trans_lookup, &ct_state->ct_complete, trans);
 		ct_state->ct_complete_rblen++;
@@ -748,8 +747,6 @@ ct_complete_normal(struct ct_trans *trans)
 		}
 		if (trans->tr_eof == 1)
 			ct_write_md_eof(trans);
-		break;
-	case TR_S_SHORTREAD:
 		break;
 	case TR_S_EX_FILE_START:
 		ct_sha1_setup(&trans->tr_fl_node->fl_shactx);
