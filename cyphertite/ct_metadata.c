@@ -723,7 +723,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 			if (strcmp(xe->name, "file") == 0) {
 				filename = xmlsd_get_attr(xe, "name");
 				if (filename)
-					CWARNX("%s opened\n", filename);
+					CDBG("%s opened\n", filename);
 				die = 0;
 				md_open_inflight = 0;
 				md_is_open = 1;
