@@ -779,7 +779,7 @@ done:
 void
 ct_mdmode_setup(char *mdmode)
 {
-	CWARNX("mdmode setup %s", mdmode ? mdmode : "");
+	CDBG("mdmode setup %s", mdmode ? mdmode : "");
 	if (mdmode == NULL)
 		return;
 
