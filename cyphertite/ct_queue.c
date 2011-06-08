@@ -29,10 +29,9 @@ void ct_handle_exists_reply(struct ct_trans *, struct ct_header *, void *);
 void ct_handle_write_reply(struct ct_trans *, struct ct_header *, void *);
 void ct_handle_read_reply(struct ct_trans *, struct ct_header *, void *);
 
-void ct_write_md(struct ct_trans *);
 void ct_write_md_special(struct ct_trans *);
-void ct_write_md_eof(struct ct_trans *trans);
-void ct_write_file(struct ct_trans *trans);
+void ct_write_md_eof(struct ct_trans *);
+void ct_complete_normal(struct ct_trans *);
 
 /* ct flags - these are named wrongly, should come from config */
 
@@ -129,7 +128,6 @@ ct_queue_transfer(struct ct_trans *trans)
 		TAILQ_INSERT_TAIL(&ct_state->ct_sha_queue, trans, tr_next);
 		ct_wakeup_sha();
 		break;
-	break;
 	case TR_S_UNCOMPSHA_ED:
 skip_sha:	/* metadata skips shas */
 		/* try to compress trans body, if compression enabled */
@@ -182,7 +180,6 @@ skip_csha:
 	case TR_S_SPECIAL:
 	case TR_S_SHORTREAD:
 	case TR_S_WMD_READY:
-	case TR_S_DONE:
 		RB_INSERT(ct_trans_lookup, &ct_state->ct_complete, trans);
 		ct_state->ct_complete_rblen++;
 
@@ -220,7 +217,7 @@ skip_csha:
 	case TR_S_EX_FILE_START:
 	case TR_S_EX_SPECIAL:
 	case TR_S_EX_FILE_END:
-	case TR_S_EX_DONE:
+	case TR_S_DONE:
 	case TR_S_XML_OPEN:
 	case TR_S_XML_CLOSE:
 	case TR_S_XML_CLOSING:
@@ -702,9 +699,12 @@ ct_write_md_eof(struct ct_trans *trans)
 		printf("\n");
 }
 
+/* completion handler for states for non-metadata actions. */
 void
-ct_write_md(struct ct_trans *trans)
+ct_complete_normal(struct ct_trans *trans)
 {
+	int			slot;
+
 	switch (trans->tr_state) {
 	case TR_S_DONE:
 		if (ct_verbose_ratios)
@@ -712,7 +712,9 @@ ct_write_md(struct ct_trans *trans)
 		ct_unload_config();
 		ct_trans_cleanup();
 		ct_match_unwind(ct_match_mode);
+		ct_file_extract_fixup();
 		ct_shutdown();
+		break;
 		break;
 	case TR_S_SPECIAL:
 		if (ct_verbose)
@@ -749,56 +751,6 @@ ct_write_md(struct ct_trans *trans)
 		break;
 	case TR_S_SHORTREAD:
 		break;
-	default:
-		CFATALX("ct_write_md with invalid state %d", trans->tr_state);
-	}
-}
-
-void
-ct_process_wmd(void *vctx)
-{
-	struct ct_trans *trans;
-
-	trans = RB_MIN(ct_trans_lookup, &ct_state->ct_complete);
-
-	while (trans != NULL && trans->tr_trans_id == ct_packet_id) {
-		RB_REMOVE(ct_trans_lookup, &ct_state->ct_complete, trans);
-		ct_state->ct_complete_rblen--;
-
-		CDBG("writing md trans %" PRIu64 " eof %d", trans->tr_trans_id,
-			trans->tr_eof);
-
-		ct_packet_id++;
-
-		if ((trans->hdr.c_flags & C_HDR_F_METADATA) == 0) {
-			ct_write_md(trans);
-		} else if (trans->tr_eof == 1) {
-			if (md_backup_fd != -1)
-				CWARNX("eof and file still open");
-			CDBG("eof reached, closing file");
-			ct_xml_file_close();
-		}
-
-		ct_trans_free(trans);
-
-		trans = RB_MIN(ct_trans_lookup, &ct_state->ct_complete);
-	}
-	if (trans != NULL && trans->tr_trans_id < ct_packet_id) {
-		CFATALX("old transaction found in completion queue %" PRIu64 " %" PRIu64,
-		    trans->tr_trans_id, ct_packet_id);
-	} else if (trans != NULL) {
-		CDBG("waiting for transaction %" PRIu64","
-		    " next avail is %" PRIu64,
-		    ct_packet_id, trans->tr_trans_id);
-	}
-}
-
-void
-ct_write_file(struct ct_trans *trans)
-{
-	int			slot;
-
-	switch(trans->tr_state) {
 	case TR_S_EX_FILE_START:
 		ct_sha1_setup(&trans->tr_fl_node->fl_shactx);
 		ct_file_extract_open(trans->tr_fl_node);
@@ -836,24 +788,20 @@ ct_write_file(struct ct_trans *trans)
 			printf("\n");
 		}
 		break;
-	case TR_S_EX_DONE:
-		if (ct_verbose_ratios)
-			ct_dump_stats(stdout);
-
-		ct_file_extract_fixup();
-		ct_shutdown();
-		break;
 	default:
-		CFATALX("write_file unexpected state %d", trans->tr_state);
+		CFATALX("process_normal unexpected state %d", trans->tr_state);
 	}
 }
 
 void
-ct_process_wfile(void *vctx)
+ct_process_completions(void *vctx)
 {
 	struct ct_trans *trans;
 
 	trans = RB_MIN(ct_trans_lookup, &ct_state->ct_complete);
+	if (trans)
+		CDBG("completing trans %" PRIu64 " pkt id: %" PRIu64"",
+		    trans->tr_trans_id, ct_packet_id);
 
 	while (trans != NULL && trans->tr_trans_id == ct_packet_id) {
 		RB_REMOVE(ct_trans_lookup, &ct_state->ct_complete, trans);
@@ -865,9 +813,9 @@ ct_process_wfile(void *vctx)
 		ct_packet_id++;
 
 		if (trans->hdr.c_flags & C_HDR_F_METADATA) {
-			ct_write_mdfile(trans);
+			ct_complete_metadata(trans);
 		} else {
-			ct_write_file(trans);
+			ct_complete_normal(trans);
 		}
 		ct_trans_free(trans);
 
@@ -1032,6 +980,7 @@ ct_handle_read_reply(struct ct_trans *trans, struct ct_header *hdr,
 		CDBG("c_flags on reply %x", hdr->c_flags);
 		if (hdr->c_flags & C_HDR_F_METADATA) {
 			/* FAIL on metadata read is 'eof' */
+			ct_set_file_state(CT_S_FINISHED);
 			trans->tr_state = TR_S_XML_CLOSE;
 		} else {
 			ct_sha1_encode(trans->tr_sha, shat);

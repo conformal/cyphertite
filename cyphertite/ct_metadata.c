@@ -120,7 +120,7 @@ ct_md_archive(const char *mfile, const char *mdname)
 	ct_setup_wakeup_compress(ct_state, ct_compute_compress);
 	ct_setup_wakeup_csha(ct_state, ct_compute_csha);
 	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
-	ct_setup_wakeup_complete(ct_state, ct_process_wmd);
+	ct_setup_wakeup_complete(ct_state, ct_process_completions);
 
 
 	/* poke file into action */
@@ -168,14 +168,12 @@ loop:
 
 	/* Are we done here? */
 	if (md_size == md_offset) {
-		CDBG("setting eof on trans %" PRIu64, ct_trans->tr_trans_id);
-		close(md_backup_fd);
-		md_backup_fd = -1;
 		ct_set_file_state(CT_S_FINISHED);
 		ct_trans->tr_fl_node = NULL;
-		ct_trans->tr_state = TR_S_DONE;
+		ct_trans->tr_state = TR_S_XML_CLOSE;
 		ct_trans->tr_eof = 1;
 		ct_trans->tr_trans_id = ct_trans_id++;
+		CDBG("setting eof on trans %" PRIu64, ct_trans->tr_trans_id);
 		ct_trans->hdr.c_flags = C_HDR_F_METADATA;
 		ct_queue_transfer(ct_trans);
 		return;
@@ -255,7 +253,6 @@ loop:
 void
 ct_xml_file_open(struct ct_trans *trans, const char *file, int mode)
 {
-	extern uint64_t		 ct_packet_id;
 	struct ct_header	*hdr = NULL;
 	char			*body = NULL;
 	char			*buf = NULL;
@@ -263,7 +260,6 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode)
 
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_state = TR_S_XML_OPEN;
-	ct_packet_id = trans->tr_trans_id;
 
 	CDBG("setting up XML");
 
@@ -366,7 +362,7 @@ ct_md_extract(const char *mfile, const char *mdname)
 	ct_setup_wakeup_compress(ct_state, ct_compute_compress);
 	ct_setup_wakeup_csha(ct_state, ct_compute_csha);
 	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
-	ct_setup_wakeup_complete(ct_state, ct_process_wfile);
+	ct_setup_wakeup_complete(ct_state, ct_process_completions);
 
 	/* XXX -chmod when done */
 	md_backup_fd = open(mfile, O_WRONLY|O_TRUNC|O_CREAT, 0600);
@@ -454,7 +450,7 @@ md_extract_chunk(void *unused)
 }
 
 void
-ct_write_mdfile(struct ct_trans *trans)
+ct_complete_metadata(struct ct_trans *trans)
 {
 	ssize_t			wlen;
 	int			slot;
@@ -476,7 +472,7 @@ ct_write_mdfile(struct ct_trans *trans)
 		}
 		break;
 
-	case TR_S_EX_DONE:
+	case TR_S_DONE:
 		if (ct_verbose_ratios)
 			ct_dump_stats(stdout);
 
@@ -485,8 +481,14 @@ ct_write_mdfile(struct ct_trans *trans)
 		break;
 	case TR_S_XML_OPEN:
 	case TR_S_XML_CLOSING:
+	case TR_S_READ:
 		break;
 	case TR_S_XML_CLOSE:
+		CDBG("eof reached, closing file");
+		if (md_backup_fd != -1) {
+			close(md_backup_fd);
+			md_backup_fd = -1;
+		}
 		ct_xml_file_close();
 		break;
 
@@ -512,7 +514,7 @@ ct_md_list(char **pat, int match_mode)
 	ct_event_init();
 
 	ct_setup_assl();
-	ct_setup_wakeup_complete(ct_state, ct_free_complete);
+	ct_setup_wakeup_complete(ct_state, ct_process_completions);
 	ct_set_file_state(CT_S_FINISHED);
 
 	trans = ct_trans_alloc();
@@ -642,7 +644,7 @@ ct_md_delete(const char *md)
 
 	ct_event_init();
 	ct_setup_assl();
-	ct_setup_wakeup_complete(ct_state, ct_free_complete);
+	ct_setup_wakeup_complete(ct_state, ct_process_completions);
 
 	trans = ct_trans_alloc();
 	trans->tr_trans_id = ct_trans_id++;
@@ -732,12 +734,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 			ct_shutdown();
 		}
 	} else if (strcmp(xe->name, "ct_md_close") == 0) {
-		if (ct_action == CT_A_EXTRACT) {
-			trans->tr_state = TR_S_EX_DONE;
-		} else {
-			/* we're done here, break out of event loop */
-			ct_shutdown();
-		}
+		trans->tr_state = TR_S_DONE;
 	} else if (strcmp(xe->name, "ct_md_list") == 0) {
 		int nfiles = 0;
 
@@ -760,16 +757,16 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 			}
 		}
 		ct_md_listfiles[nfiles] = NULL;
-		ct_shutdown();
+		trans->tr_state = TR_S_DONE;
 	} else  if (strcmp(xe->name, "ct_md_delete") == 0) {
 		TAILQ_FOREACH(xe, &xl, entry) {
 			if (strcmp(xe->name, "file") == 0) {
-				filename =xmlsd_get_attr(xe, "name");
+				filename = xmlsd_get_attr(xe, "name");
 				if (filename)
 					printf("%s deleted\n", filename);
 			}
 		}
-		ct_shutdown();
+		trans->tr_state = TR_S_DONE;
 	}
 
 done:

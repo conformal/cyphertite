@@ -630,7 +630,7 @@ ct_process_md(void *vctx)
 					/* poke file into action */
 					ct_wakeup_file();
 				} else {
-					trans->tr_state = TR_S_EX_DONE;
+					trans->tr_state = TR_S_DONE;
 					trans->tr_trans_id = ct_trans_id++;
 					ct_queue_transfer(trans);
 					ct_set_file_state(CT_S_FINISHED);

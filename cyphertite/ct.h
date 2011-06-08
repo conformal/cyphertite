@@ -68,10 +68,7 @@ void ct_compute_sha(void *vctx);
 void ct_compute_compress(void *vctx);
 void ct_compute_encrypt(void *vctx);
 void ct_compute_csha(void *vctx);
-void ct_free_complete(void *vctx);
-void ct_process_wmd(void *vctx);
-void ct_process_wfile(void *vctx);
-void ct_md_wmd(void *vctx);
+void ct_process_completions(void *vctx);
 
 struct flist;
 
@@ -197,12 +194,11 @@ struct ct_trans {
 #define TR_S_EX_FILE_START	(19)
 #define TR_S_EX_SPECIAL		(20)
 #define TR_S_EX_FILE_END	(21)
-#define TR_S_EX_DONE		(22)
-#define TR_S_XML_OPEN		(23)
-#define TR_S_XML_CLOSE		(24)
-#define TR_S_XML_CLOSING	(25)
-#define TR_S_XML_LIST		(26)
-#define TR_S_XML_DELETE		(27)
+#define TR_S_XML_OPEN		(22)
+#define TR_S_XML_CLOSE		(23)
+#define TR_S_XML_CLOSING	(24)
+#define TR_S_XML_LIST		(25)
+#define TR_S_XML_DELETE		(26)
 
 	char			tr_dataslot;
 	char			tr_eof;
@@ -516,4 +512,4 @@ void			 ct_mdmode_setup(char *);
 char			*ct_find_md_for_extract(const char *);
 char                    *ct_find_md_for_archive(const char *);
 int			 md_is_in_cache(const char *);
-void			 ct_write_mdfile(struct ct_trans *);
+void			 ct_complete_metadata(struct ct_trans *);
