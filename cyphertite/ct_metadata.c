@@ -479,6 +479,7 @@ ct_complete_metadata(struct ct_trans *trans)
 		ct_file_extract_fixup();
 		ct_shutdown();
 		break;
+	case TR_S_WMD_READY:
 	case TR_S_XML_OPEN:
 	case TR_S_XML_CLOSING:
 	case TR_S_READ:
