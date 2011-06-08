@@ -23,7 +23,7 @@
 .Sh SYNOPSIS
 .Nm cyphertite
 .Bk -words
-.Op Fl PRXcdmprtvx
+.Op Fl PRXcdemprtvx
 .Op Fl B Ar mdfile
 .Op Fl C Ar tmpdir
 .Op Fl F Ar conffile  
@@ -189,6 +189,9 @@ from descending into directories that have a different device number
 than the file from which the descent began.
 .It Fl d
 Run in debug mode.
+.It Fl e
+Deletes remotely stored metadata file.  The option is used in
+conjunction with -m.
 .It Fl m
 run in metadata mode.
 See
