@@ -94,7 +94,8 @@ ct_ssl_over_bw_wakeup(int fd_unused, short reason, void *varg)
 	curdbg->bw_total = 0;
 	curdbg->sleeping = -1;
 
-	assl_event_enable_write(ctx->c);
+	if (!TAILQ_EMPTY(&ctx->io_o_q))
+		assl_event_enable_write(ctx->c);
 }
 
 void
