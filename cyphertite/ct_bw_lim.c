@@ -59,7 +59,7 @@ ct_ssl_init_bw_lim(struct ct_assl_io_ctx *ctx)
 
 	/* 1/4 of the number of bytes to send per timeslot */
 	packet_len = ((ct_io_bw_limit * 1024) / (US_PER_SEC/BW_TIMESLOT))/4;
-	CINFO("packet_len %d",  packet_len);
+	CDBG("packet_len %d",  packet_len);
 	ct_assl_io_ctx_set_maxtrans(ctx, packet_len);
 	ct_assl_io_ctx_set_over_bw_func(ctx, ct_ssl_over_bw_func);
 	evtimer_set(&wakeuptimer_ev, ct_ssl_over_bw_wakeup, ctx);
@@ -68,7 +68,7 @@ ct_ssl_init_bw_lim(struct ct_assl_io_ctx *ctx)
 	single_slot_time.tv_usec = BW_TIMESLOT;
 
 	slot_max =  ((ct_io_bw_limit * 1024) / (US_PER_SEC/BW_TIMESLOT));
-	CINFO("slottime %d max_bw_total %d",
+	CDBG("slottime %d max_bw_total %d",
 	    BW_TIMESLOT, slot_max);
 }
 

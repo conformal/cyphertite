@@ -808,7 +808,7 @@ ct_assl_disconnect(struct ct_assl_io_ctx *ioctx)
 void
 ct_assl_io_ctx_set_maxtrans(struct ct_assl_io_ctx *ctx, size_t newmax)
 {
-	CINFO("setting max to %zd", newmax);
+	CDBG("setting max to %zd", newmax);
 	ctx->io_max_transfer = newmax;
 }
 
