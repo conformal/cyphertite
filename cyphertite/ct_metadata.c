@@ -801,7 +801,7 @@ md_is_in_cache(const char *mdfile)
 		CFATALX("can't open md cache dir");
 	while ((dp = readdir(dirp)) != NULL) {
 		if (strcmp(dp->d_name, mdfile) == 0) {
-			CINFO("found in cachedir");
+			CDBG("found in cachedir");
 			found = 1;
 			break;
 		}
@@ -901,7 +901,7 @@ ct_find_md_for_extract(const char *mdname)
 
 	/* pick the newest one */
 	best = e_strdup(result[0]);
-	CINFO("backup file is %s", best);
+	CDBG("backup file is %s", best);
 
 	tmp = result;
 	while (*tmp != NULL) {
@@ -941,7 +941,7 @@ ct_find_md_for_archive(const char *mdname)
 	    localtime(&now)) == 0)
 		CFATALX("can't format time");
 	e_asprintf(&fullname, "%s-%s", buf, mdname);
-	CINFO("backup file is %s", fullname);
+	CDBG("backup file is %s", fullname);
 
 	/* check it isn't already in the cache */
 	cachename = ct_md_get_cachename(fullname);
