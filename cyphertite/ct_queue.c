@@ -969,10 +969,10 @@ ct_handle_read_reply(struct ct_trans *trans, struct ct_header *hdr,
 	char			shat[SHA_DIGEST_STRING_LENGTH];
 	int			slot;
 
+	/* data was written to the 'alternate slot' so switch it */
 	slot = trans->tr_dataslot = !(trans->tr_dataslot);
 	if (hdr->c_status == C_HDR_S_OK) {
 		trans->tr_state = TR_S_EX_READ;
-		/* data was written to the 'alternate slot' so switch it */
 	} else {
 		CDBG("c_flags on reply %x", hdr->c_flags);
 		if (hdr->c_flags & C_HDR_F_METADATA) {
