@@ -777,7 +777,7 @@ done:
 }
 
 void
-ct_mdmode_setup(char *mdmode)
+ct_mdmode_setup(const char *mdmode)
 {
 	CDBG("mdmode setup %s", mdmode ? mdmode : "");
 	if (mdmode == NULL)
