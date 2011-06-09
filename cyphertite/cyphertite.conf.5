@@ -74,6 +74,25 @@ Specify the port to connect to.
 .It Ic key = Ar file
 Specify the path to the client certificate key file.
 .Pp
+.It Xo
+.Ic Ic md_mode =
+.Pq Ic local Ns \&| Ns Ic remote
+.Xc
+Specify whether to operate in local or remote metadata mode.
+The default is local.
+If
+.Em remote
+mode is set then the
+.Op md_dircache
+option is required.
+See
+.Xr cyphertite 8
+for a description of the different metadata modes.
+.Pp
+.It Ic md_dircache =  Ar string
+Specify the path to the directory to be used to cache metadata files in
+remote mode.
+.Pp
 .It Ic password = Ar string
 Specify the password to authenticate with.
 .Pp
@@ -96,26 +115,6 @@ Specify the negotiated compression for the session.
 .Pp
 .It Ic username = Ar string
 Specify the username to authenticate with.
-.Pp
-.It Xo
-.Ic Ic md_mode =
-.Pq Ic local Ns \&| Ns Ic remote
-.Xc
-Specify whether to operate in local or remote metadata mode.
-The default is local.
-If
-.Em remote
-mode is set then the 
-.Op md_dircache
-option is required.
-See
-.Xr cyphertite 8
-for a description of the different metadata modes.
-.Pp
-.It Ic md_dircache =  Ar string
-Specify the path to the directory to be used to cache metadata files in
-remote mode.
-.Pp
 .El
 .Sh FILES
 .Bl -tag -width "cyphertite" -compact
