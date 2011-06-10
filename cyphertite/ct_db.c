@@ -244,12 +244,16 @@ ctdb_cleanup(sqlite3 *db)
 		if (sqlite3_exec(db, "commit", NULL, 0, &errmsg))
 			CFATALX("can't commit %s", errmsg);
 	}
-	if (ctdb_stmt_lookup != NULL)
+	if (ctdb_stmt_lookup != NULL) {
 		if (sqlite3_finalize(ctdb_stmt_lookup))
-				CFATALX("can't finalize lookup");
-	if (ctdb_stmt_insert != NULL)
+			CFATALX("can't finalize lookup");
+		ctdb_stmt_lookup = NULL;
+	}
+	if (ctdb_stmt_insert != NULL) {
 		if (sqlite3_finalize(ctdb_stmt_insert))
-				CFATALX("can't finalize insert");
+			CFATALX("can't finalize insert");
+		ctdb_stmt_insert = NULL;
+	}
 
 	sqlite3_close(db);
 }
