@@ -1000,7 +1000,6 @@ ct_create_config(void)
 	else
 		fprintf(f, "#crypto_password\t\t=\n");
 
-	fprintf(f, "max_chunk_size\t\t\t= 262144\n");
 	fprintf(f, "queue_depth\t\t\t= 100\n");
 	fprintf(f, "cache_db\t\t\t= ~/.cyphertite.db\n");
 	fprintf(f, "session_compression\t\t= lzo\n");

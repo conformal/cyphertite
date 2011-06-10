@@ -79,7 +79,6 @@ int			ct_encrypt_enabled;
 int			ct_multilevel_allfiles;
 
 struct ct_settings	settings[] = {
-	{ "max_chunk_size", CT_S_INT, &ct_max_block_size, NULL, NULL, NULL },
 	{ "queue_depth", CT_S_INT, &ct_max_trans, NULL, NULL, NULL },
 	{ "bandwidth", CT_S_INT, &ct_io_bw_limit, NULL, NULL, NULL },
 	{ "host", CT_S_STR, NULL, &ct_host, NULL, NULL },
