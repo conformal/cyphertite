@@ -8,7 +8,7 @@ SYSTEM != uname -s
 LOCALBASE?=/usr/local
 BINDIR?=${LOCALBASE}/bin
 LIBDIR?=${LOCALBASE}/lib
-INCDIR=${LOCALBASE}/include/cyphertite
+INCDIR=${LOCALBASE}/include
 
 #WANTLINT=
 LIB= ctutil
@@ -21,19 +21,19 @@ CFLAGS+= -Wall -Werror
 CFLAGS+= -ggdb3
 
 afterinstall:
-	mkdir -p  ${DESTDIR}${INCDIR}/
+	mkdir -p  ${DESTDIR}${INCDIR}/cyphertite
 	@cd ${.CURDIR}; for i in ${HDRS}; do \
-	cmp -s $$i ${INCDIR}/$$i || \
-	${INSTALL} ${INSTALL_COPY} -m 444 -o $(BINOWN) -g $(BINGRP) $$i ${DESTDIR}${INCDIR}/; \
-	echo ${INSTALL} ${INSTALL_COPY} -m 444 -o $(BINOWN) -g $(BINGRP) $$i ${DESTDIR}${INCDIR}/; \
+	cmp -s $$i ${INCDIR}/cyphertite/$$i || \
+	${INSTALL} ${INSTALL_COPY} -m 444 -o $(BINOWN) -g $(BINGRP) $$i ${DESTDIR}${INCDIR}/cyphertite/; \
+	echo ${INSTALL} ${INSTALL_COPY} -m 444 -o $(BINOWN) -g $(BINGRP) $$i ${DESTDIR}${INCDIR}/cyphertite/; \
 	done
 
 uninstall:
 	@for i in ${HDRS}; do \
-	echo rm -f ${INCDIR}/$$i; \
-	rm -f ${INCDIR}/$$i; \
+	echo rm -f ${INCDIR}/cyphertite/$$i; \
+	rm -f ${INCDIR}/cyphertite/$$i; \
 	done
-	rmdir ${INCDIR}
+	rmdir ${INCDIR}/cyphertite
 
 	@for i in ${_LIBS}; do \
 	echo rm -f ${LIBDIR}/$$i; \
