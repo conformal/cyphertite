@@ -10,7 +10,7 @@ OSNAME := $(shell echo $(OSNAME) | tr A-Z a-z)
 LOCALBASE ?= /usr/local
 BINDIR ?= ${LOCALBASE}/bin
 LIBDIR ?= ${LOCALBASE}/lib
-INCDIR ?= ${LOCALBASE}/include
+INCDIR ?= ${LOCALBASE}/include/cyphertite
 
 # Use obj directory if it exists.
 OBJPREFIX ?= obj/
@@ -62,6 +62,7 @@ depend:
 
 install:
 	$(INSTALL) -m 0644 $(OBJPREFIX)$(LIB.STATIC) $(LIBDIR)/
+	mkdir -p $(INCDIR)
 	$(INSTALL) -m 0644 $(LIB.HEADERS) $(INCDIR)/
 	
 uninstall:
