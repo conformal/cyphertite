@@ -175,7 +175,8 @@ ct_sched_backup_file(struct stat *sb, char *filename)
 		CDBG("found %s as hardlink of %s", fnode->fl_sname,
 		    fnode_exists->fl_sname);
 	} else {
-		ct_stats->st_bytes_tot += fnode->fl_size;
+		if (C_ISREG(fnode->fl_type))
+			ct_stats->st_bytes_tot += fnode->fl_size;
 	}
 	ct_stats->st_files_scanned++;
 
