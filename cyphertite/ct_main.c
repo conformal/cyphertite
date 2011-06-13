@@ -68,7 +68,6 @@ char			*ct_cert;
 char			*ct_key;
 char			*ct_crypto_secrets;
 char			*ct_crypto_password;
-int			ct_allow_uncompressed_writes;
 char			*ct_compression_type;
 char			*ct_polltype;
 char			*ct_mdmode_str;
@@ -91,8 +90,6 @@ struct ct_settings	settings[] = {
 	{ "key", CT_S_DIR, NULL, &ct_key, NULL, NULL },
 	{ "crypto_secrets", CT_S_DIR, NULL, &ct_crypto_secrets, NULL, NULL },
 	{ "crypto_password", CT_S_STR, NULL, &ct_crypto_password, NULL, NULL },
-	{ "allow_uncompressed_writes", CT_S_INT, &ct_allow_uncompressed_writes,
-	    NULL, NULL, NULL },
 	{ "session_compression", CT_S_STR, NULL, &ct_compression_type, NULL,
 	    NULL },
 	{ "polltype", CT_S_STR, NULL, &ct_polltype, NULL, NULL },
