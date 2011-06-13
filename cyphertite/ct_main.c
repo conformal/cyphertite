@@ -210,6 +210,9 @@ main(int argc, char **argv)
 
 	ct_load_config(settings);
 
+	/* Run with restricted umask as we create numerous sensitive files. */
+	umask(S_IRWXG|S_IRWXO);
+
 	/* XXX - scale bandwith limiting until the algorithm is improved */
 	if (ct_io_bw_limit) {
 		ct_io_bw_limit = ct_io_bw_limit * 10 / 7;
