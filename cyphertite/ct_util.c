@@ -488,6 +488,9 @@ ct_dump_stats(FILE *outfh)
 void
 ct_display_assl_stats(FILE *outfh)
 {
+	if (ct_assl_ctx == NULL)
+		return;
+
 	fprintf(outfh, "ssl bytes written %" PRIu64 "\n",
 	    ct_assl_ctx->io_write_bytes);
 	fprintf(outfh, "ssl writes        %" PRIu64 "\n",
