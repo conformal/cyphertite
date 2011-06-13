@@ -558,7 +558,7 @@ ct_compute_sha(void *vctx)
 			    trans->tr_trans_id, shat, trans->tr_size[slot]);
 		}
 		if (ctdb_exists(trans)) {
-			ct_stats->st_bytes_exists += trans->tr_size[slot];
+			ct_stats->st_bytes_exists += trans->tr_chsize;
 			trans->tr_state = TR_S_WMD_READY;
 		} else {
 			trans->tr_state = TR_S_UNCOMPSHA_ED;
@@ -920,7 +920,7 @@ ct_handle_exists_reply(struct ct_trans *trans, struct ct_header *hdr,
 		/* enter shas into local db */
 		trans->tr_state = TR_S_EXISTS;
 		slot = trans->tr_dataslot;
-		ct_stats->st_bytes_exists += trans->tr_size[slot];
+		ct_stats->st_bytes_exists += trans->tr_chsize;
 		ct_queue_transfer(trans);
 		break;
 	case C_HDR_S_DOESNTEXIST:
@@ -1071,6 +1071,7 @@ ct_compute_compress(void *vctx)
 			if (rv == 0)
 				trans->hdr.c_flags |= ncompmode;
 			ct_stats->st_bytes_compressed += newlen;
+			ct_stats->st_bytes_uncompressed += trans->tr_chsize;
 		} else {
 			newlen = ct_max_block_size;
 			rv = ct_uncompress(src, dst, len, &newlen);

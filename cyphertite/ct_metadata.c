@@ -194,7 +194,7 @@ loop:
 	ct_stats->st_bytes_read += rlen;
 
 	ct_trans->tr_fl_node = md_node;
-	ct_trans->tr_size[0] = rlen;
+	ct_trans->tr_chsize = ct_trans->tr_size[0] = rlen;
 	ct_trans->tr_state = TR_S_READ;
 	ct_trans->tr_type = TR_T_WRITE_CHUNK;
 	ct_trans->tr_trans_id = ct_trans_id++;

@@ -207,6 +207,7 @@ struct ct_trans {
 	uint8_t			tr_iv[E_IV_LEN];
 
 
+	int			tr_chsize;
 	int			tr_size[2];
 
 	uint8_t			*tr_data[2];
@@ -466,6 +467,7 @@ struct ct_stat {
 	uint64_t		st_bytes_read;
 	uint64_t		st_bytes_written;
 	uint64_t		st_bytes_compressed;
+	uint64_t		st_bytes_uncompressed;
 	uint64_t		st_bytes_crypted;
 	uint64_t		st_bytes_exists;
 	uint64_t		st_bytes_sent;

@@ -57,7 +57,7 @@ void ct_setup_assl(void);
 struct ct_io_queue	*ct_ioctx_alloc(void);
 void			ct_ioctx_free(struct ct_io_queue *);
 void			ct_print_scaled_stat(FILE *, const char *, long long,
-			    long long);
+			    long long, int);
 
 
 void
@@ -404,13 +404,14 @@ print_time_scaled(FILE *outfh, char *s, struct timeval *t)
 
 void
 ct_print_scaled_stat(FILE *outfh, const char *label, long long val,
-    long long sec)
+    long long sec, int newline)
 {
 	char rslt[FMT_SCALED_STRSIZE];
 
 	fprintf(outfh, "%s%12lld", label, val);
 	if (val == 0 || sec == 0) {
-		fprintf(outfh, "\n");
+		if (newline)
+			fprintf(outfh, "\n");
 		return;
 	}
 
@@ -418,7 +419,7 @@ ct_print_scaled_stat(FILE *outfh, const char *label, long long val,
 	rslt[0] = '?';
 
 	fmt_scaled(val / sec, rslt);
-	fprintf(outfh, "\t(%sB/sec)\n", rslt);
+	fprintf(outfh, "\t(%sB/sec)%s", rslt, newline ? "\n": "");
 }
 
 void
@@ -439,23 +440,31 @@ ct_dump_stats(FILE *outfh)
 		    ct_stats->st_files_scanned);
 
 		ct_print_scaled_stat(outfh, "Total bytes\t\t\t",
-		    (long long)ct_stats->st_bytes_tot, sec);
+		    (long long)ct_stats->st_bytes_tot, sec, 1);
 	}
 
 	if (ct_action == CT_A_ARCHIVE)
 		ct_print_scaled_stat(outfh, "Bytes read\t\t\t",
-		    (long long)ct_stats->st_bytes_read, sec);
+		    (long long)ct_stats->st_bytes_read, sec, 1);
 
 	if (ct_action == CT_A_EXTRACT)
 		ct_print_scaled_stat(outfh, "Bytes written\t\t\t",
-		    (long long)ct_stats->st_bytes_written, sec);
+		    (long long)ct_stats->st_bytes_written, sec, 1);
 
 	if (ct_action == CT_A_ARCHIVE) {
 		ct_print_scaled_stat(outfh, "Bytes compressed\t\t",
-		    (long long)ct_stats->st_bytes_compressed, sec);
+		    (long long)ct_stats->st_bytes_compressed, sec, 0);
+		fprintf(outfh, "\t(%lld%%)\n",
+		    (ct_stats->st_bytes_uncompressed == 0) ? 0LL :
+		    (long long)(ct_stats->st_bytes_compressed * 100 /
+		    ct_stats->st_bytes_uncompressed));
 
-		fprintf(outfh, "Bytes exists\t\t\t%12" PRIu64 "\n",
-		    ct_stats->st_bytes_exists);
+		fprintf(outfh, "Bytes exists\t\t\t%12" PRIu64 "\t(%lld%%)\n",
+		    ct_stats->st_bytes_exists,
+		    (ct_stats->st_bytes_exists == 0) ? 0LL :
+		    (long long)(ct_stats->st_bytes_exists * 100 /
+		    ct_stats->st_bytes_tot));
+
 		fprintf(outfh, "Bytes sent\t\t\t%12" PRIu64 "\n",
 		    ct_stats->st_bytes_sent);
 	}
