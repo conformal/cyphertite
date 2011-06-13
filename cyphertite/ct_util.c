@@ -443,7 +443,8 @@ ct_dump_stats(FILE *outfh)
 		    (long long)ct_stats->st_bytes_tot, sec, 1);
 	}
 
-	if (ct_action == CT_A_ARCHIVE)
+	if (ct_action == CT_A_ARCHIVE &&
+	    ct_stats->st_bytes_tot != ct_stats->st_bytes_read)
 		ct_print_scaled_stat(outfh, "Bytes read\t\t\t",
 		    (long long)ct_stats->st_bytes_read, sec, 1);
 
