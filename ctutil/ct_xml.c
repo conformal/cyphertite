@@ -18,6 +18,8 @@
 #include <xmlsd.h>
 #include <ct_xml.h>
 
+__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
+
 /* Cyphertite MD commands */
 
 struct xmlsd_v_attr		ct_cmd_attr[] = {

@@ -31,6 +31,8 @@
 #include "ct.h"
 #include "ct_xdr.h"
 
+__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
+
 int ct_populate_fnode(struct flist *, struct ct_md_header *, int *);
 FILE *ct_extract_setup_queue(const char *);
 FILE *ct_metadata_open_next(void);

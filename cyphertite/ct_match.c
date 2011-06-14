@@ -27,6 +27,8 @@
 
 #include "ct.h"
 
+__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
+
 void		ct_regex_comp(regex_t *, char **);
 int		ct_regex_match(regex_t *, char *);
 void		ct_regex_unwind(regex_t *);

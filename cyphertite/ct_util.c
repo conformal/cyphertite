@@ -41,6 +41,8 @@
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 #endif
 
+__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
+
 /* metadata file */
 FILE	*ct_mdf;
 

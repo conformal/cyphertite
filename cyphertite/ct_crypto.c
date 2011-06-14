@@ -33,6 +33,8 @@
 #include "ct_crypto.h"
 #include "ct.h"
 
+__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
+
 #ifdef __linux__
 #ifndef PASS_MAX
 #define PASS_MAX 1024

@@ -25,6 +25,12 @@
 #include <ctutil.h>
 #include <ct_socket.h>
 
+/* versioning */
+#define CT_VERSION_MAJOR	0
+#define CT_VERSION_MINOR	1
+#define CT_VERSION_PATCH	3
+#define CT_VERSION		"0.1.3"
+
 extern int		ct_debug;
 extern int		ct_compress_enabled;
 extern int		ct_encrypt_enabled;

@@ -27,6 +27,8 @@
 
 #include "ctutil.h"
 
+__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
+
 int
 ct_init_compression(uint16_t comp_type)
 {

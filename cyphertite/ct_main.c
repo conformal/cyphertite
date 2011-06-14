@@ -15,6 +15,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef NEED_LIBCLENS
+#include <clens.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <err.h>
@@ -22,11 +26,16 @@
 #include <assl.h>
 #include <clog.h>
 #include <exude.h>
+#include <shrink.h>
+#include <xmlsd.h>
 
 #include <ctutil.h>
 
 #include "ct.h"
 #include "ct_crypto.h"
+
+__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
+__attribute__((__unused__)) static const char *vertag = "version: " CT_VERSION;
 
 void			ct_load_config(struct ct_settings *);
 void			usage(void);
@@ -101,9 +110,34 @@ struct ct_settings	settings[] = {
 void
 usage(void)
 {
-	fprintf(stderr, "%s {-ctx} [-BCDFPRXabdpv] -f <archive> [filelist]\n",
+	fprintf(stderr, "%s {-ctxV} [-BCDFPRXabdpv] -f <archive> [filelist]\n",
 	    __progname);
 	exit(0);
+}
+
+void
+show_version(void)
+{
+	int major, minor, patch;
+
+	fprintf(stderr, "%s version %u.%u.%u\n", __progname, CT_VERSION_MAJOR,
+	    CT_VERSION_MINOR, CT_VERSION_PATCH);
+
+	fprintf(stderr, "Run-time versions:\n");
+	assl_version(&major, &minor, &patch);
+	fprintf(stderr, " %s: %u.%u.%u\n", "assl", major, minor, patch);
+#ifdef NEED_LIBCLENS
+	clens_version(&major, &minor, &patch);
+	fprintf(stderr, " %s: %u.%u.%u\n", "clens", major, minor, patch);
+#endif /* NEED_LIBCLENS */
+	clog_version(&major, &minor, &patch);
+	fprintf(stderr, " %s: %u.%u.%u\n", "clog", major, minor, patch);
+	exude_version(&major, &minor, &patch);
+	fprintf(stderr, " %s: %u.%u.%u\n", "exude", major, minor, patch);
+	shrink_version(&major, &minor, &patch);
+	fprintf(stderr, " %s: %u.%u.%u\n", "shrink", major, minor, patch);
+	xmlsd_version(&major, &minor, &patch);
+	fprintf(stderr, " %s: %u.%u.%u\n", "xmlsd", major, minor, patch);
 }
 
 int
@@ -128,7 +162,7 @@ main(int argc, char **argv)
 		errx(1, "illegal clog flags");
 
 	ct_debug = debug = 0;
-	while ((c = getopt(argc, argv, "B:C:DF:I:PRXa:cdef:mprtvx")) != -1) {
+	while ((c = getopt(argc, argv, "B:C:DF:I:PRVXa:cdef:mprtvx")) != -1) {
 		switch (c) {
 		case 'B':
 			ct_basisbackup = optarg;
@@ -152,6 +186,10 @@ main(int argc, char **argv)
 			break;
 		case 'R':
 			ct_verbose_ratios = 1;
+			break;
+		case 'V':
+			show_version();
+			exit(0);
 			break;
 		case 'X':
 			ct_no_cross_mounts = 1;

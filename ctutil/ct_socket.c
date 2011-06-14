@@ -32,6 +32,8 @@
 #define CDBG(a...) do { } while(0)
 #endif
 
+__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
+
 /* XXX */
 void ct_wire_header(struct ct_header *h);
 void ct_unwire_header(struct ct_header *h);

@@ -23,6 +23,8 @@
 
 #include "ct_db.h"
 
+__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
+
 int		ctdb_verbose = 1;
 int		ctdb_crypt = 0;
 

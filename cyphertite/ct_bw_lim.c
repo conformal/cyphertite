@@ -21,6 +21,8 @@
 #include <assl.h>
 #include "ct.h"
 
+__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
+
 struct bw_debug {
 	struct timeval	io_time;
 	struct timeval	prev_time;

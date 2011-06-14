@@ -33,6 +33,8 @@
 
 #include "ct.h"
 
+__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
+
 void ct_md_fileio(void *);
 void md_extract_chunk(void *);
 

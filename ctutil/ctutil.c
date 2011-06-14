@@ -36,6 +36,8 @@
 
 #include "ctutil.h"
 
+__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
+
 
 int			ct_settings_add(struct ct_settings *, char *, char *);
 uint8_t			ct_getbyteval(char);

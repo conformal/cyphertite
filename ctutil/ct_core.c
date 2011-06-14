@@ -42,6 +42,7 @@
 
 #include <time.h>
 
+__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
 extern char *__progname;
 

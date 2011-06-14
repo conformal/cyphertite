@@ -36,6 +36,8 @@
 
 #include "ct.h"
 
+__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
+
 int		ct_get_answer(char *, char *, char *, char *, size_t, int);
 
 struct flist_head	fl_list_head = TAILQ_HEAD_INITIALIZER(fl_list_head);
