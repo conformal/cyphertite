@@ -26,7 +26,13 @@ The
 file contains configuration information for
 .Xr cyphertite 8 ,
 the client that provides a privacy-driven encrypted remote
-archive. 
+archive.
+.Pp
+Configuration settings consist of a configuration item name, an equal
+sign, and the value to assign.
+Lines beginning with
+.Ql #
+are comments. Blank lines are ignored.
 .Sh CONFIGURATION
 There are a few settings that affect the operation of the
 .Xr cyphertite 8
@@ -42,7 +48,12 @@ If not set, the default is to not limit upload speed.
 .Pp
 .It Ic cache_db = Ar file
 Specify the location of the cache database.
-If not set, caching will be disabled.
+If not set, caching will be disabled. 
+(It is advantageous to run with caching enabled, except when running
+multiple concurent instances of 
+.Xr cyphertite 8 ,
+in which case caching should be disabled to prevent database 
+conflicts.)
 .Pp 
 .It Ic ca_cert = Ar file
 Specify the path to the certificate authority file.
@@ -66,7 +77,7 @@ Specify the port to connect to.
 Specify the path to the client certificate key file.
 .Pp
 .It Xo
-.Ic Ic md_mode =
+.Ic md_mode =
 .Pq Ic local Ns \&| Ns Ic remote
 .Xc
 Specify whether to operate in local or remote metadata mode.
@@ -85,7 +96,7 @@ Specify the path to the directory to be used to cache metadata files in
 remote mode.
 .Pp
 .It Ic password = Ar string
-Specify the password to authenticate with.
+Specify the password with which to authenticate.
 .Pp
 .It Xo
 .Ic polltype =
@@ -98,10 +109,12 @@ Specify polling method used by
 .Ic session_compression =
 .Pq Ic lzo Ns \&| Ns Ic lzw Ns \&| Ns Ic lzma
 .Xc
-Specify the negotiated compression for the session.
+Specify the compression algorithm to be used for writes. (On reads,
+.Nm
+will transparently handle any of the compression algorithms.)
 .Pp
 .It Ic username = Ar string
-Specify the username to authenticate with.
+Specify the username with which to authenticate.
 .El
 .Sh FILES
 .Bl -tag -width "cyphertite" -compact
