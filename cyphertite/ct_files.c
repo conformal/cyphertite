@@ -38,7 +38,8 @@
 
 __attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
-int		ct_get_answer(char *, char *, char *, char *, size_t, int);
+int		ct_get_answer(char *, char *, char *, char *, char *, size_t, int);
+int		ct_prompt_password(char *, char *, size_t, char *, size_t);
 
 struct flist_head	fl_list_head = TAILQ_HEAD_INITIALIZER(fl_list_head);
 struct flist		*fl_curnode;
@@ -812,8 +813,8 @@ ct_user_config(void)
 }
 
 int
-ct_get_answer(char *prompt, char *a1, char *a2, char *answer,
-    size_t answer_len, int secret)
+ct_get_answer(char *prompt, char *a1, char *a2, char *default_val,
+    char *answer, size_t answer_len, int secret)
 {
 	char			*p;
 
@@ -825,6 +826,10 @@ ct_get_answer(char *prompt, char *a1, char *a2, char *answer,
 		    secret ? RPP_ECHO_OFF : RPP_ECHO_ON);
 		if (p == NULL)
 			CFATAL("readpassphrase");
+
+		if (default_val && !strcmp(answer, "")) {
+			strlcpy(answer, default_val, answer_len);
+		}
 
 		if (a1 == NULL && a2 == NULL)
 			return (0); /* just get the string */
@@ -840,43 +845,88 @@ ct_get_answer(char *prompt, char *a1, char *a2, char *answer,
 	return (-1);
 }
 
+int
+ct_prompt_password(char *prompt, char *answer, size_t answer_len,
+    char *answer2, size_t answer2_len)
+{
+	int 			i;
+
+	if (answer == NULL || answer2 == NULL)
+		return (-1);
+
+	for (i = 0 ; i < 2;) {
+		switch (i) {
+		case 0:
+			if (ct_get_answer(prompt, NULL, NULL, NULL, answer,
+			    answer_len, 1))
+				CFATALX("password");
+
+			if (strlen(answer) != 0 && strlen(answer) < 7) {
+				printf("invalid password length\n");
+				continue;
+			}
+			i++;
+			break;
+		case 1:
+			if (ct_get_answer("confirm: ",
+			    NULL, NULL, NULL, answer2, answer2_len, 1))
+				CFATALX("password");
+
+			if (strlen(answer2) != 0 && strlen(answer2) < 7) {
+				printf("invalid password length\n");
+				continue;
+			}
+			if (strcmp(answer, answer2)) {
+				printf("passwords don't match\n");
+				i = 0;
+				continue;
+			}
+
+			i++;
+			break;
+		}
+	}
+	return (0);
+}
+
 char *
 ct_create_config(void)
 {
+	char			prompt[1024];
 	char			answer[1024], answer2[1024];
 	uint8_t			ad[SHA512_DIGEST_LENGTH];
 	char			b64d[128];
-	char			*conf = NULL, *dir = "~";
+	char			*conf_buf = NULL;
+	char			*conf = NULL, *dir = NULL;
 	char			*user = NULL, *password = NULL;
 	char			*crypto_password = NULL;
-	int			global, rv, fd, i;
+//	int			global, rv, fd, i;
+	int			rv, fd;
 	FILE			*f = NULL;
 
 	/* help user create config file */
-	if (ct_get_answer("config file not found, create one: ",
-	    "yes", "no", answer, sizeof answer, 0) != 1)
+	snprintf(prompt, sizeof prompt,
+	    "%s config file not found. Create one? [yes]: ", __progname);
+	if (ct_get_answer(prompt, "yes", "no", "yes", answer,
+	    sizeof answer, 0) != 1)
 		CFATALX("%s requires a config file", __progname);
 
-	rv = ct_get_answer("create a system or user config file: ",
-	    "system", "user", answer, sizeof answer, 0);
-	if (rv == 1) {
-		global = 1;
-		conf = ct_system_config();
-		if (conf == NULL)
-			CFATALX("invalid system config file");
-		if (getuid() != 0)
-			CFATALX("must be root to create system config file");
-	} else if (rv == 2) {
-		global = 0;
-		conf = ct_user_config();
-		if (conf == NULL)
-			CFATALX("invalid user config file");
-	} else
-		CFATALX("must select config file type");
+	conf_buf = ct_user_config();
+	snprintf(prompt, sizeof prompt,
+	    "Target conf file [%s]: ", conf_buf);
+	ct_get_answer(prompt, NULL, NULL, conf_buf, answer,
+	    sizeof answer, 0);
+	if (conf_buf != NULL)
+		e_free(&conf_buf);
+	conf = e_strdup(answer);
+	if (conf == NULL)
+		CFATALX("conf");
 
 	while (user == NULL) {
-		if (ct_get_answer("username: ",
-		    NULL, NULL, answer, sizeof answer, 0)) {
+		snprintf(prompt, sizeof prompt,
+		    "%s login username: ", __progname);
+		if (ct_get_answer(prompt,
+		    NULL, NULL, NULL, answer, sizeof answer, 0)) {
 			printf("must supply username\n");
 			continue;
 		}
@@ -889,105 +939,66 @@ ct_create_config(void)
 			CFATALX("strdup");
 	}
 
-	for (i = 0 ; i < 2;) {
-		switch (i) {
-		case 0:
-			if (ct_get_answer("password [enter to skip]: ",
-			    NULL, NULL, answer, sizeof answer, 1))
-				CFATALX("password");
+	snprintf(prompt, sizeof prompt,
+	    "Save %s login password to configuration file? [yes]: ",
+	    __progname);
+	rv = ct_get_answer(prompt, "yes", "no", "yes", answer,
+	    sizeof answer, 0);
 
-			if (strlen(answer) != 0 && strlen(answer) < 7) {
-				printf("invalid password length\n");
-				continue;
-			}
-			i++;
-			break;
-		case 1:
-			if (ct_get_answer("reenter password: ",
-			    NULL, NULL, answer2, sizeof answer2, 1))
-				CFATALX("password");
+	if (rv == 1) {
+		if (ct_prompt_password("login password: ", answer,
+		    sizeof answer, answer2, sizeof answer2)) 
+			CFATALX("password");
 
-			if (strlen(answer2) != 0 && strlen(answer2) < 7) {
-				printf("invalid password length\n");
-				continue;
-			}
-			if (strcmp(answer, answer2)) {
-				printf("passwords don't match\n");
-				i = 0;
-				continue;
-			}
-
-			if (strlen(answer)) {
-				password = strdup(answer);
-				if (password == NULL)
-					CFATALX("strdup");
-			}
-			i++;
-			break;
+		if (strlen(answer)) {
+			password = strdup(answer);
+			if (password == NULL)
+				CFATALX("strdup");
 		}
+			
+		bzero(answer, sizeof answer);
+		bzero(answer2, sizeof answer2);
 	}
-	bzero(answer, sizeof answer);
-	bzero(answer2, sizeof answer2);
 
-	for (i = 0 ; i < 2;) {
-		switch (i) {
-		case 0:
-			if (ct_get_answer("crypto passphrase [enter to skip, g"
-			    " to generate]: ", NULL, NULL, answer,
-			    sizeof answer, 1))
-				CFATALX("crypto passphrase");
+	snprintf(prompt, sizeof prompt,
+	    "Save %s crypto passphrase to configuration file? [yes]: ",
+	    __progname);
+	rv = ct_get_answer(prompt, "yes", "no", "yes", answer,
+	    sizeof answer, 0);
 
-			if (strlen(answer) == 1 &&answer[0] == 'g') {
-				arc4random_buf(answer2, sizeof answer2);
-				ct_sha512((uint8_t *)answer2, ad, sizeof answer2);
-				if (ct_base64_encode(CT_B64_ENCODE, ad,
-				    sizeof ad, (uint8_t *)b64d, sizeof b64d))
-					CFATALX("can't base64 encode "
-					"crypto passphrase");
+	if (rv == 1) {
+		snprintf(prompt, sizeof prompt,
+		    "Automatically generate crypto passphrase? [yes]: ");
+		rv = ct_get_answer(prompt, "yes", "no", "yes", answer,
+		    sizeof answer, 0);
 
-				crypto_password = strdup(b64d);
-				if (crypto_password == NULL)
-					CFATALX("strdup");
+		if (rv == 1) {
+			arc4random_buf(answer2, sizeof answer2);
+			ct_sha512((uint8_t *)answer2, ad, sizeof answer2);
+			if (ct_base64_encode(CT_B64_ENCODE, ad,
+			    sizeof ad, (uint8_t *)b64d, sizeof b64d))
+				CFATALX("can't base64 encode "
+				    "crypto passphrase");
 
-				i = 2;
-				break;
-			}
-			if (strlen(answer) != 0 && strlen(answer) < 7) {
-				printf("invalid crypto passphrase "
-				    "length\n");
-				continue;
-			}
-			i++;
-			break;
-		case 1:
-			if (ct_get_answer("reenter crypto passphrase: ",
-			    NULL, NULL, answer2,
-			    sizeof answer2, 1))
-				CFATALX("crypto passphrase");
-
-			if (strlen(answer2) != 0 && strlen(answer2) < 7) {
-				printf("invalid crypto passphrase "
-				    "length\n");
-				continue;
-			}
-			if (strcmp(answer, answer2)) {
-				printf("passwords don't match\n");
-				i = 0;
-				continue;
-			}
+			crypto_password = strdup(b64d);
+			if (crypto_password == NULL)
+				CFATALX("strdup");
+		}
+		else {
+			if (ct_prompt_password("crypto passphrase: ", answer,
+			    sizeof answer, answer2, sizeof answer2)) 
+				CFATALX("password");
 
 			if (strlen(answer)) {
 				crypto_password = strdup(answer);
-				if (crypto_password == NULL)
+				if (password == NULL)
 					CFATALX("strdup");
 			}
-
-			i++;
-			break;
 		}
+
+		bzero(answer, sizeof answer);
+		bzero(answer2, sizeof answer2);
 	}
-	bzero(answer, sizeof answer);
-	bzero(answer2, sizeof answer2);
 
 	if ((fd = open(conf, O_RDWR | O_CREAT, 0400)) == -1)
 		CFATAL("open");
@@ -1011,13 +1022,20 @@ ct_create_config(void)
 	fprintf(f, "hostport\t\t\t= 31337\n");
 	fprintf(f, "crypto_secrets\t\t\t= ~/.cyphertite.crypto\n");
 
-	if (global)
-		dir = "/etc";
+	
+	conf_buf = strdup(conf);
+	if (conf_buf == NULL)
+		CFATALX("strdup");
+	dir = dirname(conf_buf);
 
 	fprintf(f, "ca_cert\t\t\t\t= %s/cyphertite/ct_ca.crt\n", dir);
 	fprintf(f, "cert\t\t\t\t= %s/cyphertite/ct_%s.crt\n", dir, user);
 	fprintf(f, "key\t\t\t\t= %s/cyphertite/private/ct_%s.key\n", dir, user);
 
+	printf("Configuration file created.\n");
+
+	if (conf_buf)
+		free(conf_buf);
 	if (user)
 		free(user);
 	if (password) {
