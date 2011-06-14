@@ -598,18 +598,3 @@ ct_pr_fmt_file(struct flist *fnode)
 		}
 	}
 }
-
-void
-ct_build_regex(char **flist)
-{
-#if 0
-	/* if a proper search is computed, clear ct_all_files */
-	ct_all_files = 0;
-#endif
-}
-
-int
-ct_match_regex(char *file)
-{
-	return 1;
-}
