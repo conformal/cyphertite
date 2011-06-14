@@ -119,25 +119,26 @@ void
 show_version(void)
 {
 	int major, minor, patch;
+	const char *fmt = " %s: %u.%u.%u\n";
 
 	fprintf(stderr, "%s version %u.%u.%u\n", __progname, CT_VERSION_MAJOR,
 	    CT_VERSION_MINOR, CT_VERSION_PATCH);
 
 	fprintf(stderr, "Run-time versions:\n");
 	assl_version(&major, &minor, &patch);
-	fprintf(stderr, " %s: %u.%u.%u\n", "assl", major, minor, patch);
+	fprintf(stderr, fmt, "assl", major, minor, patch);
 #ifdef NEED_LIBCLENS
 	clens_version(&major, &minor, &patch);
-	fprintf(stderr, " %s: %u.%u.%u\n", "clens", major, minor, patch);
+	fprintf(stderr, fmt, "clens", major, minor, patch);
 #endif /* NEED_LIBCLENS */
 	clog_version(&major, &minor, &patch);
-	fprintf(stderr, " %s: %u.%u.%u\n", "clog", major, minor, patch);
+	fprintf(stderr, fmt, "clog", major, minor, patch);
 	exude_version(&major, &minor, &patch);
-	fprintf(stderr, " %s: %u.%u.%u\n", "exude", major, minor, patch);
+	fprintf(stderr, fmt, "exude", major, minor, patch);
 	shrink_version(&major, &minor, &patch);
-	fprintf(stderr, " %s: %u.%u.%u\n", "shrink", major, minor, patch);
+	fprintf(stderr, fmt, "shrink", major, minor, patch);
 	xmlsd_version(&major, &minor, &patch);
-	fprintf(stderr, " %s: %u.%u.%u\n", "xmlsd", major, minor, patch);
+	fprintf(stderr, fmt, "xmlsd", major, minor, patch);
 }
 
 int
