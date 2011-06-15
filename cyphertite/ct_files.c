@@ -293,7 +293,7 @@ loop:
 
 	/* perform read */
 	rsz = fl_curnode->fl_size - fl_curnode->fl_offset;
-	CDBG("rsz %zd max %d", rsz, ct_max_block_size);
+	CDBG("rsz %zu max %d", rsz, ct_max_block_size);
 	if (rsz > ct_max_block_size) {
 		rsz = ct_max_block_size;
 	}

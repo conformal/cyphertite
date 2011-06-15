@@ -1083,7 +1083,7 @@ ct_compute_compress(void *vctx)
 				    len);
 		}
 
-		CDBG("compress block of %d to %zd, rv %d", len, newlen, rv);
+		CDBG("compress block of %d to %zu, rv %d", len, newlen, rv);
 
 		/* if compression failed for whatever reason use input data */
 		if (rv == 0) {
