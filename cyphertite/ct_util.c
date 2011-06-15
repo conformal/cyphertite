@@ -421,7 +421,7 @@ ct_print_scaled_stat(FILE *outfh, const char *label, long long val,
 	rslt[0] = '?';
 
 	fmt_scaled(val / sec, rslt);
-	fprintf(outfh, "\t(%sB/sec)%s", rslt, newline ? "\n": "");
+	fprintf(outfh, "\t(%s/sec)%s", rslt, newline ? "\n": "");
 }
 
 void
