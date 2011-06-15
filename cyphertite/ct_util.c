@@ -470,6 +470,11 @@ ct_dump_stats(FILE *outfh)
 
 		fprintf(outfh, "Bytes sent\t\t\t%12" PRIu64 "\n",
 		    ct_stats->st_bytes_sent);
+
+		fprintf(outfh, "Reduction ratio\t\t\t\t%" PRIu64 "%%\n",
+		    (long long)((ct_stats->st_bytes_tot -
+		    ct_stats->st_bytes_sent) * 100 /
+		    ct_stats->st_bytes_tot));
 	}
 	print_time_scaled(outfh, "Total Time\t\t\t    ",  &time_delta);
 
