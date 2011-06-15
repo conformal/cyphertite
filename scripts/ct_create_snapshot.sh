@@ -12,7 +12,7 @@ fi
 VERSION=$1
 CT_SNAPSHOTS_DIR="ct_snapshots"
 CT_RELEASE_DIR="cyphertite-$VERSION"
-CT_RELEASE_TARBALL="cyphertite-$VERSION.tar.gz"
+CT_RELEASE_TARBALL="cyphertite-full-$VERSION.tar.gz"
 
 # error reporting
 function error {
