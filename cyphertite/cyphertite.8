@@ -29,59 +29,60 @@
 .Op Fl F Ar conffile  
 .Op Fl f Ar mdfile
 .Op Ar file ...
-.El
 .Sh DESCRIPTION
 The
 .Nm
-command creates, lists or extracts files using a metadata 
-archive file and remotely stored blocks of data, called
+command creates, lists, or extracts files using an archive metadata file
+and remotely stored blocks of data, called
 .Dq chunks .
 A
 .Dq chunk
-is defined as a portion of a file on disk that is less than 256
-KB in size, where a file that is larger than 256 KB would be
-split into several 256 KB chunks and one chunk that is less than
-256 KB.
-It strives to be tar-like but has several modern features
-built-in:
+is defined as a portion of a file on disk that is up to 256
+KB in size. (A file that is larger than 256 KB would be
+split into several 256 KB chunks and one chunk that might be less than
+256 KB.)
+.Pp
+The interface is designed to be familiar to users of tar while
+providing a number of additional features:
 .Pp
 DEDUPLICATION
 .Bd -filled -offset 3n
-DEDUPLICATION is the process whereby data that appears multiple
-times, in the case of
+Through the process of 
+DEDUPLICATION,
 .Nm
-meaning chunks, is stored only once and successive instances of
-that data are stored with a reference to the data already stored.
-This is effected through the metadata files which reference
-chunks stored on a remote server.
-Each chunk is identified by its SHA1 hash and stored only once
-but many metadata files may reference the same chunk.
+chunks 
+are stored only once and subsequent instances of
+the same data are stored as references to the existing data.
+Files (called "archive metadata files") reference the chunks needed to
+retrieve any archived file.
+Each chunk is identified by its SHA1 hash. 
+Many archive metadata files may reference the same chunk.
 .Ed
 .Pp
 COMPRESSION
 .Bd -filled -offset 3n
-After files are split into chunks, those chunks are then compressed
-using the LZO, LZW or LZMA algorithm, depending on settings in the
-configuration file.
+After files are split into chunks, those chunks are then compressed.
 The default compression algorithm is LZO because it is the fastest
-of 3 algorithms available.
-If a chunk is compressed and it increases in size, the uncompressed
+of the 3 algorithms available, but LZW or LZMA can be 
+configured in 
+.Xr cyphertite.conf 5 .
+If a chunk increases in size on compression, the uncompressed
 chunk is used.
 .Ed
 .Pp
 ENCRYPTION
 .Bd -filled -offset 3n
 .Nm
-encrypts each chunk after compressing it using 256-bit AES-XTS
+encrypts each chunk after compression. The encryption algorithm used
+is 256-bit AES-XTS
 with a variation on the usual disk encryption method suggested
 in IEEE 1619-2007: the 256-bit tweak key, K2, is normally taken
 as the sector number on a hard drive, here it is generated as an
 HMAC SHA1 of the chunk itself using a separate 256-bit key.
 
-All metadata that is stored locally is unencrypted.
-The process of storing metadata on a remote machine encrypts the
-metadata file using the standard version of AES-XTS, where the
-tweak is taken as the chunk number.
+All locally stored metadata is unencrypted. Metadata stored on
+a remote machine is encrypted using standard AES-XTS, with the 
+HMAC SHA1 of the chunk number used as the tweak key.
 
 Network traffic is encrypted using per-user certificates signed
 by a 521-bit ECDSA CA key and a corresponding per-user 521-bit
@@ -92,10 +93,12 @@ The relevant client certificates and key are provided by the
 remote server administrator.
 
 The keys used to perform all the chunk-level encryption are
-stored in the file ~/.cyphertite.crypto by default.
-The AES-XTS and IV keys are stored protected by pbkdf2 with a
+stored in the crypto_secrets file specified in 
+.Xr cyphertite.conf 5 .
+The file ~/.cyphertite.crypto is the default.
+The AES-XTS and IV keys are stored protected by PBKDF2 with a
 default of 256,000 rounds and a 128-byte salt.
-The password to unlock the AES-XTS and IV keys is stored as
+The password to unlock the AES-XTS and IV keys is specified as
 crypto_password in
 .Xr cyphertite.conf 5 .
 .Ed
@@ -112,62 +115,58 @@ of deduplication.
 .Pp
 In all cases except those involving metadata (
 .Fl m
-), the metadata file path is required:
+), the path to the archive metadata file is required:
 .Bl -tag -width Ds
 .It Fl f Ar metadata
-Filename where the metadata is stored.
-For list and extract commands this is the existing metadata file
-to extract from and for create commands it is the metadata file
-to create.
+Filename where the archive metadata is stored.
+For list and extract commands this is the existing archive metadata file
+to extract from. For create commands it is the archive metadata file to
+create.
 .El
 .Pp
 One of the following flags must be present:
 .Bl -tag -width Ds
 .It Fl c
-Create new archive or overwrite an existing archive.
+Create new archive or overwrite an existing archive metadata file.
 .It Fl t
 List contents of an archive.
 If any files are named on the command line, only those files will
 be listed. The
 .Ar file
-arguments may be specified as glob patterns (see
+arguments may be specified as
 .Xr glob 3
-for more information), in which case
+patterns (or, with the
+.Fl r
+option, 
+.Xr regex 3 
+patterns) and
 .Nm
 will list all archive members that match that pattern.
-Also works with regex patterns (see
-.Xr regex 3
-for more information) when using the
-.Fl r
-option.
 .It Fl x
 Extract files from archive.
 If any files are named on the command line, only those files will
 be extracted from the archive.
 The
 .Ar file
-arguments may be specified as glob patterns (see
+arguments may be specified as 
 .Xr glob 3
-for more information), in which case
+patterns (or, with the
+.Fl r
+option, 
+.Xr regex 3 
+patterns) and
 .Nm
 will extract all archive members that match that pattern.
-Also works with regex patterns (see
-.Xr regex 3
-for more information) when using the
-.Fl r
-option.
-.It Fl V
-Display version information.  All other options are ignored.
 .El
 .Pp
-In addition to the flags mentioned above, the follow flags may be
+In addition to the flags mentioned above, the following flags may be
 used:
 .Bl -tag -width Ds
 .It Fl B Ar mdfile
 Specify the archive to be used as the basis of a differential backup. 
 Files with a modification time (mtime) newer than the previous backup
 will be archived.
-The behavior is dump-like and helps limit the size of the metadata
+The behavior is dump-like and helps limit the size of the archive metadata
 file and the backup window.
 .It Fl C Ar directory
 Set the current working directory.  When extracting, files will be
@@ -192,12 +191,12 @@ than the file from which the descent began.
 .It Fl d
 Run in debug mode.
 .It Fl e
-Deletes remotely stored metadata file.  The option is used in
+Deletes a remotely stored archive metadata file.  The option is used in
 conjunction with -m.
 .It Fl m
 run in metadata mode.
 See
-.Sc METADATA MODE
+.Sx METADATA MODE
 for an explanation.
 .It Fl p
 Preserve user and group ID as well as file mode regardless of the
@@ -205,11 +204,13 @@ current
 .Xr umask 2 .
 .It Fl r
 Enable
-.Xr regex 2
+.Xr regex 3
 matching.  The default is to use
-.Xr glob 2 .
+.Xr glob 3 .
 .It Fl v
 Turn on verbose output.
+.It Fl V
+Display version information.  All other options are ignored.
 .El
 .Sh METADATA MODE
 If
@@ -222,7 +223,7 @@ The
 .Fl c
 and
 .Fl t
-commands now operate on the remote metadata store.
+commands now operate on the remote archive metadata store.
 Additionally
 .Fl e
 may be used to delete remote metadata from the server.
@@ -237,7 +238,8 @@ In
 mode,
 .Nm operates similarly to
 .Xr tar 1
-with the metadata files operating analgously to the tar files.
+with the archive metadata files operating analgously to the tar archive
+files.
 .Pp
 In
 .Em remote
@@ -249,10 +251,12 @@ In this case the names provided by
 are used as tags to the metadata.
 They are stored on the remote server with the form:
 YYYYMMDD-HHMMSS-tag .
-Extract commands will operate on the newest metadata file on the server unless
-the full metadata name is provided.
-The cache directory defined in the configuration file will be used to store
-local copies of the metadata files.
+Extract commands will operate on the newest archive metadata file on the
+server unless the full metadata name is provided.
+The cache directory defined in the 
+.Xr cyphertite.conf 5 
+configuration file will be used to store
+local copies of the archive metadata files.
 .Sh EXAMPLES
 Create an archive named 
 .Pa accounting-2010.md
@@ -287,7 +291,6 @@ into directory
 .Pa restore .
 .Pp
 .Dl $ cyphertite -C restore -xf backup.md
-.El
 .Sh FILES
 .Bl -tag -width "cyphertite" -compact
 .It Pa /etc/cyphertite/cyphertite.conf
@@ -298,7 +301,9 @@ User configuration file.
 Default crypto secrets file.
 .El
 .Sh SEE ALSO
-.Xr cyphertite.conf 5
+.Xr cyphertite.conf 5 ,
+.Xr glob 3 ,
+.Xr regex 3 
 .Sh AUTHORS
 .Nm
 was written by
@@ -308,12 +313,10 @@ was written by
 .Nm
 is currently in beta testing.  Some of the above options
 may change before official release.
-
 When running the first backup on a system,
 .Nm
 prompts the user for the information needed to setup the
 account as follows:
-
 .Dl $ cyphertite -cf backup.md /usr/local/bin
 .Dl config file not found, create one: yes
 .Dl create a system or user config file: user
@@ -321,7 +324,6 @@ account as follows:
 .Dl password [enter to skip]: 
 .Dl reenter password: 
 .Dl crypto passphrase [enter to skip, g to generate]:
-
+.Pp
 Using the built-in configuration file generator simplifies
 the install substantially.
-
