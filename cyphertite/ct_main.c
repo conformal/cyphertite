@@ -247,6 +247,10 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
+	/* please don't delete this line AGAIN! --mp */
+	if (clog_set_flags(cflags))
+		errx(1, "illegal clog flags");
+
 	ct_load_config(settings);
 
 	/* Run with restricted umask as we create numerous sensitive files. */
