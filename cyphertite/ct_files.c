@@ -38,7 +38,8 @@
 
 __attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
-int		ct_get_answer(char *, char *, char *, char *, char *, size_t, int);
+int		ct_get_answer(char *, char *, char *, char *, char *, size_t,
+		    int);
 int		ct_prompt_password(char *, char *, size_t, char *, size_t);
 
 struct flist_head	fl_list_head = TAILQ_HEAD_INITIALIZER(fl_list_head);
@@ -329,8 +330,8 @@ loop:
 			 */
 		}
 		CDBG("going to next file %s", fl_curnode->fl_sname);
-		CDBG("setting eof on trans %" PRIu64 " %s", ct_trans->tr_trans_id,
-		    fl_curnode->fl_sname);
+		CDBG("setting eof on trans %" PRIu64 " %s",
+		    ct_trans->tr_trans_id, fl_curnode->fl_sname);
 		close(current_fd);
 		current_fd = -1;
 		ct_trans->tr_eof = 1;
@@ -849,7 +850,7 @@ int
 ct_prompt_password(char *prompt, char *answer, size_t answer_len,
     char *answer2, size_t answer2_len)
 {
-	int 			i;
+	int			i;
 
 	if (answer == NULL || answer2 == NULL)
 		return (-1);
@@ -946,7 +947,7 @@ ct_create_config(void)
 
 	if (rv == 1) {
 		if (ct_prompt_password("login password: ", answer,
-		    sizeof answer, answer2, sizeof answer2)) 
+		    sizeof answer, answer2, sizeof answer2))
 			CFATALX("password");
 
 		if (strlen(answer)) {
