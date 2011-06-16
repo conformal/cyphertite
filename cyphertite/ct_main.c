@@ -336,18 +336,17 @@ main(int argc, char **argv)
 					CFATALX("invalid md pathname");
 				ct_md_cachedir = ct_fullcachedir;
 			}
-				
+
 			if (ct_make_full_path(ct_md_cachedir, 0700) != 0)
 				CFATALX("can't create MD cachedir");
 
 			if (ct_action == CT_A_EXTRACT) {
 				/* Do we need to do this for erase or list? */
-				ct_mfile = ct_find_md_for_extract(ct_mfile);	
+				ct_mfile = ct_find_md_for_extract(ct_mfile);
 			} else if (ct_action == CT_A_ARCHIVE) {
 				ct_mfile = ct_find_md_for_archive(ct_mfile);
 			}
 		}
-		
 		switch (ct_action) {
 		case CT_A_ARCHIVE:
 		case CT_A_EXTRACT:
