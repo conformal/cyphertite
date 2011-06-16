@@ -900,7 +900,6 @@ ct_create_config(void)
 	char			*conf = NULL, *dir = NULL;
 	char			*user = NULL, *password = NULL;
 	char			*crypto_password = NULL;
-//	int			global, rv, fd, i;
 	int			rv, fd;
 	FILE			*f = NULL;
 
@@ -955,7 +954,6 @@ ct_create_config(void)
 			if (password == NULL)
 				CFATALX("strdup");
 		}
-			
 		bzero(answer, sizeof answer);
 		bzero(answer2, sizeof answer2);
 	}
@@ -986,7 +984,7 @@ ct_create_config(void)
 		}
 		else {
 			if (ct_prompt_password("crypto passphrase: ", answer,
-			    sizeof answer, answer2, sizeof answer2)) 
+			    sizeof answer, answer2, sizeof answer2))
 				CFATALX("password");
 
 			if (strlen(answer)) {
@@ -1015,19 +1013,17 @@ ct_create_config(void)
 	else
 		fprintf(f, "#crypto_password\t\t=\n");
 
-	fprintf(f, "queue_depth\t\t\t= 100\n");
-	fprintf(f, "cache_db\t\t\t= ~/.cyphertite.db\n");
-	fprintf(f, "session_compression\t\t= lzo\n");
-	fprintf(f, "host\t\t\t\t= beta.cyphertite.com\n");
-	fprintf(f, "hostport\t\t\t= 31337\n");
-	fprintf(f, "crypto_secrets\t\t\t= ~/.cyphertite.crypto\n");
-
-	
 	conf_buf = strdup(conf);
 	if (conf_buf == NULL)
 		CFATALX("strdup");
 	dir = dirname(conf_buf);
 
+	fprintf(f, "queue_depth\t\t\t= 100\n");
+	fprintf(f, "cache_db\t\t\t= %s/.cyphertite.db\n", dir);
+	fprintf(f, "session_compression\t\t= lzo\n");
+	fprintf(f, "host\t\t\t\t= beta.cyphertite.com\n");
+	fprintf(f, "hostport\t\t\t= 31337\n");
+	fprintf(f, "crypto_secrets\t\t\t= %s/.cyphertite.crypto\n", dir);
 	fprintf(f, "ca_cert\t\t\t\t= %s/cyphertite/ct_ca.crt\n", dir);
 	fprintf(f, "cert\t\t\t\t= %s/cyphertite/ct_%s.crt\n", dir, user);
 	fprintf(f, "key\t\t\t\t= %s/cyphertite/private/ct_%s.key\n", dir, user);
