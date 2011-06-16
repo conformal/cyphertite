@@ -59,6 +59,8 @@ const EVP_CIPHER *EVP_aes_xts(void);
 #define C_F_MASKKEY_LEN		(strlen(C_F_MASKKEY))
 #define C_F_HMACMASKKEY		("hmac_maskkey = ")
 #define C_F_HMACMASKKEY_LEN	(strlen(C_F_HMACMASKKEY))
+#define C_F_DIGEST		("digest = ")
+#define C_F_DIGEST_LEN		(strlen(C_F_DIGEST))
 
 int	ct_crypto_init(EVP_CIPHER_CTX *, const EVP_CIPHER *, uint8_t *, size_t,
 	    uint8_t *, size_t, int);
@@ -302,10 +304,12 @@ ct_create_secrets(char *passphrase, char *filename)
 	uint8_t			e_ivkey[CT_IV_LEN + 16];
 	uint8_t			e_maskkey[C_PWDKEY_LEN + 16];
 	uint8_t			hmac_maskkey[SHA256_DIGEST_LENGTH];
+	uint8_t			digest[SHA512_DIGEST_LENGTH];
 	uint32_t		rounds;
 	uint32_t		rounds_save;
 	int			tot;
 	HMAC_CTX		hctx;
+	SHA512_CTX		ctx;
 	FILE			*f;
 	int			rv = -1;
 	int			fd;
@@ -333,6 +337,13 @@ ct_create_secrets(char *passphrase, char *filename)
 		CWARN("fdopen");
 		return (-1);
 	}
+
+
+	bzero(salt, sizeof salt);
+	bzero(e_aeskey, sizeof e_aeskey);
+	bzero(e_ivkey, sizeof e_ivkey);
+	bzero(e_maskkey, sizeof e_maskkey);
+	bzero(hmac_maskkey, sizeof hmac_maskkey);
 
 	/* step 0 */
 	rounds = C_ROUNDS;
@@ -386,6 +397,17 @@ ct_create_secrets(char *passphrase, char *filename)
 	HMAC_CTX_cleanup(&hctx);
 	ct_fprintfhex(f, C_F_HMACMASKKEY, hmac_maskkey, sizeof hmac_maskkey);
 
+	/* hash it all */
+	SHA512_Init(&ctx);
+	SHA512_Update(&ctx, &rounds, sizeof rounds);
+	SHA512_Update(&ctx, salt, sizeof salt);
+	SHA512_Update(&ctx, e_aeskey, sizeof e_aeskey);
+	SHA512_Update(&ctx, e_ivkey, sizeof e_ivkey);
+	SHA512_Update(&ctx, e_maskkey, sizeof e_maskkey);
+	SHA512_Update(&ctx, hmac_maskkey, sizeof hmac_maskkey);
+	SHA512_Final(digest, &ctx);
+	ct_fprintfhex(f, C_F_DIGEST, digest, sizeof digest);
+
 	rv = 0;
 done:
 	if (fchmod(fd, 0400) == -1)
@@ -429,13 +451,16 @@ ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
 	uint8_t			d_hmac_maskkey[SHA256_DIGEST_LENGTH];
 	uint8_t			key[C_PWDKEY_LEN], maskkey[C_PWDKEY_LEN];
 	uint8_t			aeskey[CT_KEY_LEN], ivkey[CT_IV_LEN + 16];
+	uint8_t			digest[SHA512_DIGEST_LENGTH];
+	uint8_t			digest_v[SHA512_DIGEST_LENGTH];
 	uint32_t		rounds = 0;
 	uint32_t		rounds_load = 0;
 	char			pwd[PASS_MAX], *p;
 	char			line[1024], *s;
 	FILE			*f;
 	HMAC_CTX		hctx;
-	int			tot, tot_aes, tot_iv, rv = -1;
+	SHA512_CTX		ctx;
+	int			tot, tot_aes, tot_iv, rv = -1, got_digest = 0;
 
 	if (filename == NULL) {
 		CDBG("no filename");
@@ -450,7 +475,7 @@ ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
 		p = pwd;
 	}
 
-	f = fopen(filename, "r");
+	f = fopen(filename, "r+");
 	if (f == NULL) {
 		CWARN("fopen");
 		return (-1);
@@ -501,6 +526,14 @@ ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
 				CDBG("invalid hmac_maskkey");
 				goto done;
 			}
+		} else if (!strncmp(line, C_F_DIGEST,
+		    C_F_DIGEST_LEN)) {
+			s = line + C_F_DIGEST_LEN;
+			if (ct_fscanfhex(s, digest, sizeof digest)) {
+				CDBG("invalid digest");
+				goto done;
+			}
+			got_digest = 1;
 		} else {
 			CWARNX("invalid entry");
 			goto done;
@@ -550,6 +583,28 @@ ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
 	if ((tot_aes = ct_passphrase_decrypt(maskkey, sizeof maskkey, e_aeskey,
 	    sizeof e_aeskey, aeskey, sizeof aeskey)) <= 0) {
 		CDBG("ct_passphrase_decrypt aeskey");
+		goto done;
+	}
+
+	/* hash it all */
+	SHA512_Init(&ctx);
+	SHA512_Update(&ctx, &rounds, sizeof rounds);
+	SHA512_Update(&ctx, salt, sizeof salt);
+	SHA512_Update(&ctx, e_aeskey, sizeof e_aeskey);
+	SHA512_Update(&ctx, e_ivkey, sizeof e_ivkey);
+	SHA512_Update(&ctx, e_maskkey, sizeof e_maskkey);
+	SHA512_Update(&ctx, hmac_maskkey, sizeof hmac_maskkey);
+	SHA512_Final(digest_v, &ctx);
+
+	/* update digest if we don't have it; this needs to go away over time */
+	if (got_digest == 0) {
+		bcopy(digest_v, digest, sizeof digest);
+		CDBG("adding digest to secrets file");
+		ct_fprintfhex(f, C_F_DIGEST, digest, sizeof digest);
+	}
+
+	if (bcmp(digest, digest_v, sizeof digest)) {
+		CWARNX("corrupt file");
 		goto done;
 	}
 
