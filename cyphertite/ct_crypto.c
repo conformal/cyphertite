@@ -461,6 +461,7 @@ ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
 	HMAC_CTX		hctx;
 	SHA512_CTX		ctx;
 	int			tot, tot_aes, tot_iv, rv = -1, got_digest = 0;
+	struct stat		sb;
 
 	if (filename == NULL) {
 		CDBG("no filename");
@@ -475,7 +476,7 @@ ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
 		p = pwd;
 	}
 
-	f = fopen(filename, "r+");
+	f = fopen(filename, "r");
 	if (f == NULL) {
 		CWARN("fopen");
 		return (-1);
@@ -547,6 +548,39 @@ ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
 		goto done;
 	}
 
+	/* hash it all */
+	SHA512_Init(&ctx);
+	SHA512_Update(&ctx, &rounds, sizeof rounds);
+	SHA512_Update(&ctx, salt, sizeof salt);
+	SHA512_Update(&ctx, e_aeskey, sizeof e_aeskey);
+	SHA512_Update(&ctx, e_ivkey, sizeof e_ivkey);
+	SHA512_Update(&ctx, e_maskkey, sizeof e_maskkey);
+	SHA512_Update(&ctx, hmac_maskkey, sizeof hmac_maskkey);
+	SHA512_Final(digest_v, &ctx);
+
+	/* update digest if we don't have it; this needs to go away over time */
+	if (got_digest == 0) {
+		bcopy(digest_v, digest, sizeof digest);
+		CDBG("adding digest to secrets file");
+		if (fstat(fileno(f), &sb) == -1)
+			CFATAL("stat");
+		if (fchmod(fileno(f), S_IRWXU) == -1)
+			CFATAL("fchmod");
+		/* the race can bite me, everything else is worse */
+		if (freopen(filename, "r+", f) == NULL)
+			CFATAL("freopen");
+		if (fseek(f, 0, SEEK_END) == -1)
+			CFATAL("fseek");
+		ct_fprintfhex(f, C_F_DIGEST, digest, sizeof digest);
+		if (fchmod(fileno(f), sb.st_mode) == -1)
+			CFATAL("fchmod");
+	}
+
+	if (bcmp(digest, digest_v, sizeof digest)) {
+		CWARNX("corrupt file");
+		goto done;
+	}
+
 	/* step 1 */
 	if (!PKCS5_PBKDF2_HMAC_SHA1(p, strlen(p), salt,
 	    sizeof(salt), rounds, sizeof key, key)) {
@@ -583,28 +617,6 @@ ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
 	if ((tot_aes = ct_passphrase_decrypt(maskkey, sizeof maskkey, e_aeskey,
 	    sizeof e_aeskey, aeskey, sizeof aeskey)) <= 0) {
 		CDBG("ct_passphrase_decrypt aeskey");
-		goto done;
-	}
-
-	/* hash it all */
-	SHA512_Init(&ctx);
-	SHA512_Update(&ctx, &rounds, sizeof rounds);
-	SHA512_Update(&ctx, salt, sizeof salt);
-	SHA512_Update(&ctx, e_aeskey, sizeof e_aeskey);
-	SHA512_Update(&ctx, e_ivkey, sizeof e_ivkey);
-	SHA512_Update(&ctx, e_maskkey, sizeof e_maskkey);
-	SHA512_Update(&ctx, hmac_maskkey, sizeof hmac_maskkey);
-	SHA512_Final(digest_v, &ctx);
-
-	/* update digest if we don't have it; this needs to go away over time */
-	if (got_digest == 0) {
-		bcopy(digest_v, digest, sizeof digest);
-		CDBG("adding digest to secrets file");
-		ct_fprintfhex(f, C_F_DIGEST, digest, sizeof digest);
-	}
-
-	if (bcmp(digest, digest_v, sizeof digest)) {
-		CWARNX("corrupt file");
 		goto done;
 	}
 
