@@ -171,7 +171,7 @@ ct_ssl_connect(int nonfatal)
 	struct assl_context *c;
 
 
-	ctx = e_malloc(sizeof (*ctx), E_MEM_CLEAR);
+	ctx = e_calloc(1, sizeof (*ctx));
 
 	c = assl_alloc_context(ASSL_M_TLSV1_CLIENT, 0);
 	if (c == NULL)
@@ -217,7 +217,7 @@ struct ct_io_queue *
 ct_ioctx_alloc(void)
 {
 	struct ct_io_queue *ioq;
-	ioq = e_malloc(sizeof(*ioq), E_MEM_CLEAR);
+	ioq = e_calloc(1, sizeof(*ioq));
 	return ioq;
 }
 
@@ -232,7 +232,7 @@ struct ct_header *
 ct_header_alloc(void *vctx)
 {
 	struct ct_header *hdr;
-	hdr = e_malloc(sizeof(*hdr), E_MEM_CLEAR);
+	hdr = e_calloc(1, sizeof(*hdr));
 	return hdr;
 }
 
@@ -323,7 +323,7 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *ct_assl_ctx)
 	user_len = strlen(ct_username);
 	payload_sz = user_len + 1 + strlen(b64_digest) + 1;
 
-	body = e_malloc(payload_sz, E_MEM_CLEAR);
+	body = e_calloc(1, payload_sz);
 
 	strlcpy((char *)body, ct_username, payload_sz);
 	strlcpy((char *)body + user_len + 1, b64_digest,

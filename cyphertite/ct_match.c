@@ -157,7 +157,7 @@ ct_rb_comp(char **flist)
 	for (i = 0; flist[i] != NULL; i++) {
 		if (flist[i] == NULL)
 			break;
-		n = e_malloc(sizeof(struct ct_match_node), E_MEM_CLEAR);
+		n = e_calloc(1, sizeof(struct ct_match_node));
 		n->cmn_string = e_strdup(flist[i]);
 		if (RB_INSERT(ct_match_tree, &ct_match_head, n)) {
 			/* pattern already exists free it */
@@ -208,7 +208,7 @@ ct_match_compile(int mode, char **flist)
 	switch (mode) {
 	case CT_MATCH_REGEX:
 		ct_match_unwind(mode);
-		regex = e_malloc(sizeof(regex_t), E_MEM_CLEAR);
+		regex = e_calloc(1, sizeof(regex_t));
 		ct_regex_comp(regex, flist);
 		break;
 	case CT_MATCH_RB:
@@ -223,7 +223,7 @@ ct_match_compile(int mode, char **flist)
 		if (i == 0)
 			return;
 		i++; /* extra NULL */
-		glob = e_malloc(sizeof(char *) * i, E_MEM_CLEAR);
+		glob = e_calloc(i, sizeof(char *));
 
 		for (i = 0; flist[i] != NULL; i++) {
 			if (flist[i] == NULL)

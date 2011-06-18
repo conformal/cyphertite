@@ -63,7 +63,7 @@ ct_md_cook_filename(const char *path)
 {
 	char	*bname, *fname, *pdup;
 
-	fname = e_malloc(CT_MAX_MD_FILENAME, E_MEM_CLEAR);
+	fname = e_calloc(1, CT_MAX_MD_FILENAME);
 	if (fname == NULL)
 		CFATALX("can't allocate space for filename");
 
@@ -99,7 +99,7 @@ ct_md_archive(const char *mfile, const char *mdname)
 		return -1;
 	}
 	md_filename = mdname;
-	md_node = e_malloc(sizeof(*md_node), E_MEM_CLEAR);
+	md_node = e_calloc(1, sizeof(*md_node));
 	CDBG("mdnode %p", md_node);
 
 	error = fstat(md_backup_fd, &sb);
@@ -565,7 +565,7 @@ ct_md_list(char **pat, int match_mode)
 		return (NULL);
 
 	if (match_mode == CT_MATCH_REGEX && *pat) {
-		re = e_malloc(sizeof(*re), E_MEM_CLEAR);
+		re = e_calloc(1, sizeof(*re));
 		if ((rv = regcomp(re, *pat,
 		    REG_EXTENDED | REG_NOSUB)) != 0) {
 			regerror(rv, re, error, sizeof(error) - 1);
@@ -579,8 +579,7 @@ ct_md_list(char **pat, int match_mode)
 	while (*(str++) != NULL)
 		nfiles++;
 
-	matchedlist = e_malloc((nfiles + 1) * sizeof(*ct_md_listfiles),
-	    E_MEM_CLEAR);
+	matchedlist = e_calloc(nfiles + 1, sizeof(*ct_md_listfiles));
 
 	str = ct_md_listfiles;
 	i = 0;
@@ -746,8 +745,8 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 				nfiles++;
 		}
 		/* array is NULL terminated */
-		ct_md_listfiles = e_malloc((nfiles + 1) *
-		    sizeof(*ct_md_listfiles), E_MEM_CLEAR);
+		ct_md_listfiles = e_calloc(nfiles + 1, 
+		    sizeof(*ct_md_listfiles));
 		nfiles = 0;
 		TAILQ_FOREACH(xe, &xl, entry) {
 			if (strcmp(xe->name, "file") == 0) {
