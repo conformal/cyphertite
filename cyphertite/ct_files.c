@@ -692,7 +692,7 @@ ct_file_extract_special(struct flist *fnode)
 		/* XXX - copy this data or just have pointer to fnode? */
 		struct dir_stat *ds;
 		ds = e_malloc(sizeof(struct dir_stat) +
-		    strlen(fnode->fl_sname) + 1, E_MEM_NOCLEAR);
+		    strlen(fnode->fl_sname) + 1);
 
 		ds->ds_name = (char *)ds + sizeof(struct dir_stat);
 		strlcpy(ds->ds_name, fnode->fl_sname,

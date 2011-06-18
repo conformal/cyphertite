@@ -503,7 +503,7 @@ ct_extract_setup(const char *file)
 		gh.cmg_prevlvl_filename = NULL;
 	}
 	if (gh.cmg_prevlvl_filename) {
-		nfile = e_malloc(sizeof(*nfile), E_MEM_NOCLEAR);
+		nfile = e_malloc(sizeof(*nfile));
 		nfile->filename = e_strdup(file);
 		TAILQ_INSERT_HEAD(&ct_file_extract_head, nfile, next);
 
@@ -545,7 +545,7 @@ ct_extract_setup_queue(const char *file)
 	if (gh.cmg_prevlvl_filename) {
 		printf("next [%s]\n", gh.cmg_prevlvl_filename);
 		/* need to nest another level deep.*/
-		nfile = e_malloc(sizeof(*nfile), E_MEM_NOCLEAR);
+		nfile = e_malloc(sizeof(*nfile));
 		nfile->filename = e_strdup(file);
 		ct_metadata_close(xdr_f);
 		if (ct_multilevel_allfiles)
@@ -556,7 +556,7 @@ ct_extract_setup_queue(const char *file)
 		free(gh.cmg_prevlvl_filename);
 	} else {
 		if (ct_multilevel_allfiles) {
-			nfile = e_malloc(sizeof(*nfile), E_MEM_NOCLEAR);
+			nfile = e_malloc(sizeof(*nfile));
 			nfile->filename = e_strdup(file);
 			TAILQ_INSERT_TAIL(&ct_file_extract_head, nfile, next);
 		}
