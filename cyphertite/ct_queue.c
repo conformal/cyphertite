@@ -268,8 +268,7 @@ ct_trans_alloc(void)
 
 		ct_alloc_block_size += ct_crypto_blocksz();
 
-		trans = e_malloc(sizeof(*trans)+(ct_alloc_block_size * 2),
-		    E_MEM_CLEAR);
+		trans = e_calloc(ct_alloc_block_size * 2, sizeof(*trans));
 		/* need to allocate body and compressed body */
 		trans->tr_data[0] = (uint8_t *)trans + sizeof(*trans);
 		trans->tr_data[1] = (uint8_t *)trans + sizeof(*trans)
@@ -491,7 +490,7 @@ ct_body_alloc(void *vctx, struct ct_header *hdr)
 		slot = !(trans->tr_dataslot); /* alternate slot */
 		body = trans->tr_data[slot];
 	} else {
-		body = e_malloc(hdr->c_size, E_MEM_CLEAR);
+		body = e_calloc(1, hdr->c_size);
 		CDBG("body allocated %p", body);
 	}
 

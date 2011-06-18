@@ -149,7 +149,7 @@ ct_sched_backup_file(struct stat *sb, char *filename)
 		return 0;
 	}
 
-	fnode = e_malloc(sizeof (*fnode), CT_ALLOC_CLEAR);
+	fnode = e_calloc(1, sizeof (*fnode));
 
 	fnode->fl_fname = e_strdup(filename);
 	fnode->fl_sname = e_strdup(safe);

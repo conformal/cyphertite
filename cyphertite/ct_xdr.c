@@ -655,7 +655,7 @@ ct_process_md(void *vctx)
 				}
 			}
 
-			fnode = e_malloc(sizeof(*fnode), CT_ALLOC_CLEAR);
+			fnode = e_calloc(1, sizeof(*fnode));
 			fl_ex_node = fnode;
 
 			trans->tr_fl_node = fnode;
