@@ -268,7 +268,7 @@ ct_trans_alloc(void)
 
 		ct_alloc_block_size += ct_crypto_blocksz();
 
-		trans = e_calloc(ct_alloc_block_size * 2, sizeof(*trans));
+		trans = e_calloc(1, ct_alloc_block_size * 2 + sizeof(*trans));
 		/* need to allocate body and compressed body */
 		trans->tr_data[0] = (uint8_t *)trans + sizeof(*trans);
 		trans->tr_data[1] = (uint8_t *)trans + sizeof(*trans)
