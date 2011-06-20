@@ -82,7 +82,7 @@ HMAC SHA1 of the chunk itself using a separate 256-bit key.
 
 All locally stored metadata is unencrypted. Metadata stored on
 a remote machine is encrypted using standard AES-XTS, with the 
-HMAC SHA1 of the chunk number used as the tweak key.
+chunk number used as the tweak key.
 
 Network traffic is encrypted using per-user certificates signed
 by a 521-bit ECDSA CA key and a corresponding per-user 521-bit
