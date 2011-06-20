@@ -236,7 +236,8 @@ and
 In
 .Em local
 mode,
-.Nm operates similarly to
+.Nm 
+operates similarly to
 .Xr tar 1
 with the archive metadata files operating analgously to the tar archive
 files.
@@ -318,12 +319,16 @@ When running the first backup on a system,
 prompts the user for the information needed to setup the
 account as follows:
 .Dl $ cyphertite -cf backup.md /usr/local/bin
-.Dl config file not found, create one: yes
-.Dl create a system or user config file: user
-.Dl username: testuser
-.Dl password [enter to skip]: 
-.Dl reenter password: 
-.Dl crypto passphrase [enter to skip, g to generate]:
+.Dl ct config file not found. Create one? [yes]: 
+.Dl Target conf file [/root/.cyphertite.conf]: 
+.Dl ct login username: mylogin
+.Dl Save ct login password to configuration file? [yes]: 
+.Dl login password: 
+.Dl confirm: 
+.Dl Save ct crypto passphrase to configuration file? [yes]: 
+.Dl Automatically generate crypto passphrase? [yes]: 
+.Dl Configuration file created.
+.Dl No crypto secrets file. Creating
 .Pp
 Using the built-in configuration file generator simplifies
 the install substantially.
