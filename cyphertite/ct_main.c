@@ -55,7 +55,6 @@ int			ct_verbose;
 char			*ct_basisbackup;
 char			*ct_configfile;
 int			ct_attr;
-int			ct_match_mode = CT_MATCH_GLOB;
 
 /* runtime */
 int			ct_got_secrets;
@@ -145,15 +144,15 @@ int
 main(int argc, char **argv)
 {
 	char		pwd[PASS_MAX];
-	char		*ct_mdname = NULL;
 	char		ct_fullcachedir[PATH_MAX];
 	int		ct_metadata = 0;
+	int		ct_match_mode = CT_MATCH_GLOB;
 	struct stat	sb;
 	int		c;
 	int		cflags;
 	int		debug;
 	int		foreground = 1;
-	int		ret;
+	int		ret = 0;
 
 	ct_savecore();
 
@@ -326,79 +325,125 @@ main(int argc, char **argv)
 	ct_polltype_setup(ct_polltype);
 	ct_mdmode_setup(ct_mdmode_str);
 
-	if (ct_metadata || ct_md_mode == CT_MDMODE_REMOTE) {
-		if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
-			if (ct_md_cachedir == NULL)
-				CFATALX("remote mode needs a cachedir set");
-			if (ct_md_cachedir[strlen(ct_md_cachedir) - 1] != '/') {
-				int rv;
+	if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
+		if (ct_md_cachedir == NULL)
+			CFATALX("remote mode needs a cachedir set");
+		if (ct_md_cachedir[strlen(ct_md_cachedir) - 1] != '/') {
+			int rv;
 
-				if ((rv = snprintf(ct_fullcachedir,
-				    sizeof(ct_fullcachedir),
-				    "%s/", ct_md_cachedir)) == -1 || rv >
-				    PATH_MAX)
-					CFATALX("invalid md pathname");
-				ct_md_cachedir = ct_fullcachedir;
-			}
-
-			if (ct_make_full_path(ct_md_cachedir, 0700) != 0)
-				CFATALX("can't create MD cachedir");
-
-			if (ct_action == CT_A_EXTRACT) {
-				/* Do we need to do this for erase or list? */
-				ct_mfile = ct_find_md_for_extract(ct_mfile);
-			} else if (ct_action == CT_A_ARCHIVE) {
-				ct_mfile = ct_find_md_for_archive(ct_mfile);
-			}
+			if ((rv = snprintf(ct_fullcachedir,
+			    sizeof(ct_fullcachedir),
+			    "%s/", ct_md_cachedir)) == -1 || rv >
+			    PATH_MAX)
+				CFATALX("invalid md pathname");
+			ct_md_cachedir = ct_fullcachedir;
 		}
-		switch (ct_action) {
-		case CT_A_ARCHIVE:
-		case CT_A_EXTRACT:
-		case CT_A_ERASE:
-			ct_mdname = ct_md_cook_filename(ct_mfile);
-			if (ct_mdname == NULL)
-				CFATALX("invalid metadata name");
-			break;
-		case CT_A_LIST:
-		default:
-			break;
+			
+		if (ct_make_full_path(ct_md_cachedir, 0700) != 0)
+			CFATALX("can't create MD cachedir");
+
+		if (ct_action == CT_A_ARCHIVE) {
+			ct_mfile = ct_find_md_for_archive(ct_mfile);
 		}
 	}
 
-	if (ct_metadata) {
-		if (ct_action == CT_A_ARCHIVE) {
-			ret = ct_md_archive(ct_mfile, ct_mdname);
-		} else if (ct_action == CT_A_EXTRACT) {
-			ret = ct_md_extract(ct_mfile, ct_mdname);
-		} else if (ct_action == CT_A_LIST) {
-			ret = ct_md_list_print(argv, ct_match_mode);
-		} else if (ct_action == CT_A_ERASE) {
-			ret = ct_md_delete(ct_mdname);
-		} else {
+	/* Don't bother starting a connection if just listing local files. */
+	if (ct_action == CT_A_LIST && ct_md_mode == CT_MDMODE_LOCAL &&
+	    ct_metadata == 0 ) {
+		ret = ct_list(ct_mfile, argv, ct_match_mode);
+		goto out;
+	}
+
+	ct_event_init();
+	ct_setup_assl();
+
+	ct_setup_wakeup_file(ct_state, ct_nextop);
+	ct_setup_wakeup_sha(ct_state, ct_compute_sha);
+	ct_setup_wakeup_compress(ct_state, ct_compute_compress);
+	ct_setup_wakeup_csha(ct_state, ct_compute_csha);
+	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
+	ct_setup_wakeup_complete(ct_state, ct_process_completions);
+
+
+
+	if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
+		switch (ct_action) {
+		case CT_A_EXTRACT:
+		case CT_A_LIST:
+			ct_add_operation(ct_find_md_for_extract,
+			    ct_find_md_for_extract_complete, ct_mfile,
+			    argv, NULL, ct_action, ct_match_mode);
+			break;
+		case CT_A_ARCHIVE:
+			ct_add_operation(ct_archive, NULL, ct_mfile, argv,
+			    ct_basisbackup, 0, 0);
+			ct_add_operation(ct_md_archive, NULL, ct_mfile,
+			    NULL, NULL, 0, 0);
+			break;
+		default:
+			CFATALX("invalid action");
+		}
+	} else if (ct_metadata != 0) {
+		switch (ct_action) {
+		case CT_A_ARCHIVE:
+			ct_add_operation(ct_md_archive, NULL,
+			    ct_mfile, NULL, NULL, 0, 0);
+			break;
+		case CT_A_EXTRACT:
+			ct_add_operation(ct_md_extract, NULL, ct_mfile,
+			    NULL, NULL, 0, 0);
+			break;
+		case CT_A_LIST:
+			ct_add_operation(ct_md_list_start, ct_md_list_print,
+			    argv, NULL, NULL, ct_match_mode, 0);
+			break;
+		case CT_A_ERASE:
+			ct_add_operation(ct_md_delete, NULL, ct_mfile,
+			    NULL, NULL, 0, 0);
+			break;
+		default:
 			CWARNX("must specify action");
 			usage();
 			ret = 1;
+			break;
 		}
-		if (ct_mdname)
-			e_free(&ct_mdname);
-		return (ret);
+	} else {
+		switch (ct_action) {
+		case CT_A_ARCHIVE:
+			ct_add_operation(ct_archive, NULL, ct_mfile, argv,
+			    ct_basisbackup, 0, 0);
+			break;
+		case CT_A_EXTRACT:
+			ct_add_operation(ct_extract, NULL, ct_mfile,
+			    argv, NULL, ct_match_mode, 0);
+			break;
+		case CT_A_LIST:
+			ret = ct_list(ct_mfile, argv, ct_match_mode);
+			goto out;
+			break;
+		case CT_A_ERASE:
+		default:
+			CWARNX("must specify action");
+			usage();
+			ret = 1;
+			break;
+		}
 	}
 
-	if (ct_action == CT_A_ARCHIVE) {
-		ret = ct_archive(ct_mfile, argv, ct_basisbackup);
-		if (ret == 0 && ct_md_mode == CT_MDMODE_REMOTE)
-			ret = ct_md_archive(ct_mfile, ct_mdname);
-	} else if (ct_action == CT_A_EXTRACT) {
-		ret = ct_extract(ct_mfile, argv);
-	} else if (ct_action == CT_A_LIST) {
-		ret = ct_list(ct_mfile, argv);
-	} else {
-		CWARNX("must specify action");
-		usage();
-		ret = 1;
-	}
-	if (ct_mdname)
-		e_free(&ct_mdname);
+	if (ret != 0)
+		goto out;
+
+	ct_wakeup_file();
+
+	ret = ct_event_dispatch();
+	if (ret != 0)
+		CWARNX("event_dispatch returned, %d %s", errno,
+		    strerror(errno));
+
+out:
+#ifdef notyet
+	e_check_memory();
+#endif
 
 	return (ret);
 }

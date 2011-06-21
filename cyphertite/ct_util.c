@@ -82,77 +82,57 @@ ct_setup_assl(void)
 
 }
 
-int
-ct_archive(const char *mfile, char **filelist, const char *basisbackup)
+void
+ct_add_operation(ct_op_cb *start, ct_op_cb *complete, void *arg1, void *arg2,
+    void *arg3, int arg4, int arg5)
 {
-	int rv;
+	struct ct_op	*op;
 
-	if (*filelist == NULL) {
-		CWARNX("no files specified");
-		return -1;
-	}
+	op = e_calloc(1, sizeof(*op));
+	op->op_start = start;
+	op->op_complete = complete;
+	op->op_arg1 = arg1;
+	op->op_arg2 = arg2;
+	op->op_arg3 = arg3;
+	op->op_arg4 = arg4;
+	op->op_arg5 = arg5;
 
-	if (basisbackup != NULL) {
-		ct_basis_setup(basisbackup);
-	}
-	ct_event_init();
+	TAILQ_INSERT_TAIL(&ct_state->ct_operations, op, op_link);
+}
 
-	ct_setup_assl();
+void
+ct_nextop(void *vctx)
+{
+	struct ct_op *op;
 
-	/* XXX - deal with stdin */
-	/* XXX - if basisbackup should the type change ? */
-	ct_setup_write_md(mfile, CT_MD_REGULAR);
+	op = TAILQ_FIRST(&ct_state->ct_operations);
+	if (op == NULL)
+		CFATALX("no operation in queue");
 
-	ct_traverse(filelist);
-
-	/* setup wakeup channels */
-	ct_setup_wakeup_file(ct_state, ct_process_file);
-	ct_setup_wakeup_sha(ct_state, ct_compute_sha);
-	ct_setup_wakeup_compress(ct_state, ct_compute_compress);
-	ct_setup_wakeup_csha(ct_state, ct_compute_csha);
-	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
-	ct_setup_wakeup_complete(ct_state, ct_process_completions);
-
-	/* poke file into action */
-	ct_wakeup_file();
-
-	/* start turning crank */
-	rv = ct_event_dispatch();
-	if (rv != 0)
-		CWARNX("event_dispatch returned, %d %s", errno,
-		    strerror(errno));
-	return (rv);
+	op->op_start(op);
 }
 
 int
-ct_extract(const char *mfile, char **filelist)
+ct_op_complete(void)
 {
-	int rv;
+	struct ct_op *op;
 
-	ct_match_compile(ct_match_mode, filelist);
-	ct_event_init();
+	op = TAILQ_FIRST(&ct_state->ct_operations);
+	if (op == NULL)
+		CFATALX("no operation in queue");
 
-	ct_setup_assl();
+	if (op->op_complete)
+		op->op_complete(op);
 
-	/* setup wakeup channels */
-	ct_setup_wakeup_file(ct_state, ct_process_md);
-	ct_setup_wakeup_sha(ct_state, ct_compute_sha);
-	ct_setup_wakeup_compress(ct_state, ct_compute_compress);
-	ct_setup_wakeup_csha(ct_state, ct_compute_csha);
-	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
-	ct_setup_wakeup_complete(ct_state, ct_process_completions);
+	TAILQ_REMOVE(&ct_state->ct_operations, op, op_link);
 
-	ct_extract_setup(mfile);
+	if (TAILQ_EMPTY(&ct_state->ct_operations))
+		return (1);
 
-	/* poke file into action */
+	/* set up for the next loop */
+	ct_set_file_state(CT_S_STARTING);
 	ct_wakeup_file();
-
-	/* start turning crank */
-	rv = ct_event_dispatch();
-	if (rv != 0)
-		CWARNX("event_dispatch returned, %d %s", errno,
-		    strerror(errno));
-	return (rv);
+	return (0);
 }
 
 void
@@ -210,8 +190,12 @@ ct_setup_write_md(const char *mfile, int infile)
 void
 ct_cleanup_md(void)
 {
-	ct_metadata_close(ct_mdf);
+	if (ct_mdf != NULL) {
+		ct_metadata_close(ct_mdf);
+		ct_mdf = NULL;
+	}
 }
+
 
 struct ct_io_queue *
 ct_ioctx_alloc(void)
@@ -375,10 +359,6 @@ done:
 void
 ct_shutdown()
 {
-	if (ct_mdf != NULL) {
-		ct_metadata_close(ct_mdf);
-		ct_mdf = NULL;
-	}
 	ctdb_shutdown();
 	event_loopbreak();
 }

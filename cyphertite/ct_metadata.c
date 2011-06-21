@@ -35,10 +35,6 @@
 
 __attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
-void ct_md_fileio(void *);
-void md_extract_chunk(void *);
-
-const char			*md_filename;
 char				**ct_md_listfiles;
 int				md_backup_fd;
 int				md_block_no = 0;
@@ -47,7 +43,8 @@ int				md_open_inflight = 0;
 size_t				md_size, md_offset;
 time_t				md_mtime;
 
-int	strcompare(const void *, const void *);
+int	 strcompare(const void *, const void *);
+char	**ct_md_list_complete(struct ct_op *);
 
 struct xmlsd_v_elements ct_xml_cmds[] = {
 	{ "ct_md_list", xe_ct_md_list },
@@ -82,70 +79,19 @@ ct_md_cook_filename(const char *path)
 	return (fname);
 }
 
-struct flist			*md_node;
-int
-ct_md_archive(const char *mfile, const char *mdname)
-{
-	struct stat		sb;
-	int			error, rv;
-
-	CDBG("opening md file for archive %s", mfile);
-
-	md_backup_fd = open(mfile, O_RDONLY);
-
-	md_offset = 0;
-	if (md_backup_fd == -1) {
-		CWARNX("unable to open file %s", mfile);
-		return -1;
-	}
-	md_filename = mdname;
-	md_node = e_calloc(1, sizeof(*md_node));
-	CDBG("mdnode %p", md_node);
-
-	error = fstat(md_backup_fd, &sb);
-	if (error) {
-		CWARNX("file stat error %s %d %s",
-		    mfile, errno, strerror(errno));
-		return -1;
-	} else {
-		md_size = sb.st_size;
-		md_mtime = sb.st_mtime;
-	}
-
-	ct_event_init();
-
-	ct_setup_assl();
-
-	/* setup wakeup channels */
-	ct_setup_wakeup_file(ct_state, ct_md_fileio);
-	ct_setup_wakeup_sha(ct_state, ct_compute_sha);
-	ct_setup_wakeup_compress(ct_state, ct_compute_compress);
-	ct_setup_wakeup_csha(ct_state, ct_compute_csha);
-	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
-	ct_setup_wakeup_complete(ct_state, ct_process_completions);
-
-
-	/* poke file into action */
-	ct_wakeup_file();
-
-	/* start turning crank */
-	rv = ct_event_dispatch();
-	if (rv != 0)
-		CWARNX("event_dispatch returned, %d %s", errno,
-		    strerror(errno));
-	md_filename = NULL;
-	return (rv);
-}
-
+struct flist *md_node;
 void
-ct_md_fileio(void *unused)
+ct_md_archive(struct ct_op *op)
 {
+	const char		*mfile = op->op_arg1;
+	const char		*mdname;
 	struct stat		sb;
 	ssize_t			rsz, rlen;
 	struct ct_trans		*ct_trans;
 	int			error;
 
 	CDBG("md_fileio entered for block %d", md_block_no);
+	ct_set_file_state(CT_S_RUNNING);
 loop:
 	ct_trans = ct_trans_alloc();
 	if (ct_trans == NULL) {
@@ -163,7 +109,26 @@ loop:
 			return;
 		}
 
-		ct_xml_file_open(ct_trans, md_filename, MD_O_WRITE);
+		CDBG("opening md file for archive %s", mfile);
+		md_backup_fd = open(mfile, O_RDONLY);
+		if (md_backup_fd == -1)
+			CFATAL("can't open %s for reading", mfile);
+
+		md_offset = 0;
+		md_node = e_calloc(1, sizeof(*md_node));
+		CDBG("mdnode %p", md_node);
+
+		error = fstat(md_backup_fd, &sb);
+		if (error) {
+			CFATAL("can't state backup file %s", mfile);
+		} else {
+			md_size = sb.st_size;
+			md_mtime = sb.st_mtime;
+		}
+
+		mdname = ct_md_cook_filename(mfile);
+		ct_xml_file_open(ct_trans, mdname, MD_O_WRITE);
+		e_free(&mdname);
 		md_open_inflight = 1;
 		return;
 	}
@@ -231,10 +196,10 @@ loop:
 		error = fstat(md_backup_fd, &sb);
 		if (error) {
 			CWARNX("file stat error %s %d %s",
-			    md_filename, errno, strerror(errno));
+			    mdname, errno, strerror(errno));
 		} else if (sb.st_size != md_size) {
 			CWARNX("file truncated during backup %s",
-			    md_filename);
+			    mdname);
 			/*
 			 * may need to perform special nop processing
 			 * to pad archive file to right number of chunks
@@ -347,53 +312,19 @@ ct_xml_file_close(void)
 	ct_assl_write_op(ct_assl_ctx, hdr, body);
 }
 
-int
-ct_md_extract(const char *mfile, const char *mdname)
-{
-	int rv;
-
-	CDBG("yo");
-	ct_event_init();
-
-	ct_setup_assl();
-
-	/* setup wakeup channels */
-	/* XXX - bet these are not the right functions for md_extract */
-	ct_setup_wakeup_file(ct_state, md_extract_chunk);
-	ct_setup_wakeup_sha(ct_state, ct_compute_sha);
-	ct_setup_wakeup_compress(ct_state, ct_compute_compress);
-	ct_setup_wakeup_csha(ct_state, ct_compute_csha);
-	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
-	ct_setup_wakeup_complete(ct_state, ct_process_completions);
-
-	/* XXX -chmod when done */
-	md_backup_fd = open(mfile, O_WRONLY|O_TRUNC|O_CREAT, 0600);
-	if (md_backup_fd == -1) {
-		CWARNX("unable to open file %s", mfile);
-		return -1;
-	}
-
-	md_filename = mdname;
-
-	/* poke file into action */
-	ct_wakeup_file();
-
-	/* start turning crank */
-	rv = ct_event_dispatch();
-	if (rv != 0)
-		CWARNX("event_dispatch returned, %d %s", errno,
-		    strerror(errno));
-	md_filename = NULL;
-	return 0;
-}
 int extract_id;
 
 void
-md_extract_chunk(void *unused)
+ct_md_extract(struct ct_op *op)
 {
+	const char		*mfile = op->op_arg1;
+	const char		*mdname = op->op_arg2;
 	struct ct_trans		*trans;
 	struct ct_header	*hdr;
 	void			*data;
+	int			 freemd = 0;
+
+	ct_set_file_state(CT_S_RUNNING);
 
 	trans = ct_trans_alloc();
 	if (trans == NULL) {
@@ -410,7 +341,18 @@ md_extract_chunk(void *unused)
 			return;
 		}
 
-		ct_xml_file_open(trans, md_filename, MD_O_READ);
+		/* XXX -chmod when done */
+		md_backup_fd = open(mfile, O_WRONLY|O_TRUNC|O_CREAT, 0600);
+		if (md_backup_fd == -1)
+			CFATALX("unable to open file %s", mfile);
+
+		if (mdname == NULL) {
+			mdname = ct_md_cook_filename(mfile);
+			freemd = 1;
+		}
+		ct_xml_file_open(trans, mdname, MD_O_READ);
+		if (freemd)
+			e_free(&mdname);
 		md_open_inflight = 1;
 		return;
 	}
@@ -475,6 +417,8 @@ ct_complete_metadata(struct ct_trans *trans)
 		break;
 
 	case TR_S_DONE:
+		if (ct_op_complete() == 0)
+			return;
 		if (ct_verbose_ratios)
 			ct_dump_stats(stdout);
 
@@ -501,23 +445,15 @@ ct_complete_metadata(struct ct_trans *trans)
 	}
 }
 
-char **
-ct_md_list(char **pat, int match_mode)
+void
+ct_md_list_start(struct ct_op *op)
 {
-	/* XXX - does mfile make sense for md list */
 	struct ct_header	*hdr;
 	struct ct_trans		*trans;
 	char			*body = NULL;
 	char			*buf = NULL;
-	regex_t			*re = NULL;
-	char			error[1024];
-	char			**str, **matchedlist, *curstr;
-	int			rv, sz, nfiles, i, match;
+	int			 sz;
 
-	ct_event_init();
-
-	ct_setup_assl();
-	ct_setup_wakeup_complete(ct_state, ct_process_completions);
 	ct_set_file_state(CT_S_FINISHED);
 
 	trans = ct_trans_alloc();
@@ -552,14 +488,17 @@ ct_md_list(char **pat, int match_mode)
 	ct_state->ct_queued_qlen++;
 
 	ct_assl_write_op(ct_assl_ctx, hdr, body);
+}
 
-	/* start turning crank */
-	rv = ct_event_dispatch();
-	if (rv != 0) {
-		CWARNX("event_dispatch returned, %d %s", errno,
-		    strerror(errno));
-		return (NULL);
-	}
+char **
+ct_md_list_complete(struct ct_op *op)
+{
+	char			**pat = op->op_arg1;
+	int			 match_mode = op->op_arg4;
+	regex_t			*re = NULL;
+	char			error[1024];
+	char			**str, **matchedlist, *curstr;
+	int			rv, nfiles, i, match;
 
 	if (ct_md_listfiles == NULL)
 		return (NULL);
@@ -610,14 +549,14 @@ ct_md_list(char **pat, int match_mode)
 	return (matchedlist);
 }
 
-int
-ct_md_list_print(char **pat, int match_mode)
+void
+ct_md_list_print(struct ct_op *op)
 {
 	char	**results, **str, *curstr;
 
-	results = ct_md_list(pat, match_mode);
+	results = ct_md_list_complete(op);
 	if (results == NULL)
-		return (1);
+		return; // (1);
 
 	str = results;
 	while ((curstr = *(str++)) != NULL) {
@@ -625,28 +564,26 @@ ct_md_list_print(char **pat, int match_mode)
 		e_free(&curstr);
 	}
 	e_free(&results);
-
-	return (0);
 }
 
-int
-ct_md_delete(const char *md)
+void
+ct_md_delete(struct ct_op *op)
 {
-	struct ct_header *hdr;
-	struct ct_trans *trans;
-	char *buf, *body = NULL;
-	int rv, sz;
+	const char		*md = op->op_arg1;
+	struct ct_header	*hdr;
+	struct ct_trans		*trans;
+	char			*buf, *body = NULL;
+	int			 sz;
 
 	CDBG("setting up XML");
 
+	md = ct_md_cook_filename(md);
 	sz = asprintf(&buf, ct_md_delete_fmt, md);
+	e_free(&md);
+
 	if (sz == -1)
 		CFATALX("cannot allocate memory");
 	sz += 1;	/* include null */
-
-	ct_event_init();
-	ct_setup_assl();
-	ct_setup_wakeup_complete(ct_state, ct_process_completions);
 
 	trans = ct_trans_alloc();
 	trans->tr_trans_id = ct_trans_id++;
@@ -665,14 +602,6 @@ ct_md_delete(const char *md)
 	ct_state->ct_queued_qlen++;
 
 	ct_assl_write_op(ct_assl_ctx, hdr, body);
-
-	/* start turning crank */
-	rv = ct_event_dispatch();
-	if (rv != 0)
-		CWARNX("event_dispatch returned, %d %s", errno,
-		    strerror(errno));
-
-	return rv;
 }
 
 void
@@ -863,34 +792,99 @@ strcompare(const void *a, const void *b)
  * the are stored on the server and in remote mode in the form
  * YYYYMMDD-HHMMSS-<strnvis(mname)>
  */
-char *
-ct_find_md_for_extract(const char *mdname)
+void
+ct_find_md_for_extract(struct ct_op *op)
 {
-	char	**result, **tmp;
-	char	 *buf, *best, *cachename; 
-	int	 nresults = 0, ret;
+	const char	*mdname = op->op_arg1;
+	struct ct_op	*list_fakeop;
+	char	 	**bufp;
+	int		 matchmode;
 
 	/* cook the mdname so we only search for the actual tag */
 	mdname = ct_md_cook_filename(mdname);
 
+	list_fakeop = e_calloc(1, sizeof(*list_fakeop));
+	bufp = e_malloc(sizeof(char **));
 	if (ct_md_is_full_mdname(mdname)) {
 		/* use md_list as stat() for now */
-		buf = (char *)mdname;
-		if ((result = ct_md_list(&buf, CT_MATCH_GLOB)) == NULL)
-			CFATALX("unable to list md files");
+		*bufp = e_strdup(mdname);
+		matchmode = CT_MATCH_GLOB;
 	} else {
-		e_asprintf(&buf, "^[[:digit:]]{8}-[[:digit:]]{6}-%s$", mdname);
+		e_asprintf(bufp, "^[[:digit:]]{8}-[[:digit:]]{6}-%s$", mdname);
 
+		matchmode = CT_MATCH_REGEX;
 		/*
 		 * get the list of md matching this tag from the server.
 		 * ct_md_list returns an empty list if it found
 		 * nothing and NULL upon failure.
 		 */
-		if ((result = ct_md_list(&buf, CT_MATCH_REGEX)) == NULL)
-			CFATALX("unable to list md files");
-
-		e_free(&buf);
 	}
+	e_free(&mdname);
+
+	list_fakeop->op_arg1 = bufp;
+	list_fakeop->op_arg4 = matchmode;
+
+	op->op_priv = list_fakeop;
+	ct_md_list_start(list_fakeop);
+}
+
+void
+ct_extract_free_mdname(struct ct_op *op)
+{
+	const char		*mfile = op->op_arg1;
+
+	if (mfile != NULL)
+		e_free(&mfile);
+}
+
+/*
+ * now the operation has completed we can kick off the next operation knowing
+ * that everything has been set up for it.
+ */
+void
+ct_md_extract_nextop(struct ct_op *op)
+{
+	const char		*mfile = op->op_arg1;
+	const char		*mdname = op->op_arg2;
+	char			**filelist = op->op_arg3;
+	int			 action = op->op_arg4;
+	int			 match_mode = op->op_arg5;
+
+	/* XXX if md is differential then set up the next md extract */
+
+	/* free remote mdname */
+	if (mdname != NULL)
+		e_free(&mdname);
+
+	/* XXX switch on action */
+	if (action == CT_A_EXTRACT) {
+		ct_add_operation(ct_extract, ct_extract_free_mdname,
+		    (char *)mfile, filelist, NULL, match_mode, 0); 
+	} else if (action == CT_A_LIST) {
+		ct_list(mfile, filelist, match_mode);
+		e_free(&mfile);
+	} else {
+		CFATALX("invalid action");
+	}
+
+}
+
+void
+ct_find_md_for_extract_complete(struct ct_op *op)
+{
+	const char	*mdname = op->op_arg1;
+	char		**filelist = op->op_arg2;
+	struct ct_op	*list_fakeop = op->op_priv;
+	char		**result, **tmp;
+	char	 	*best, *cachename; 
+	int		 nresults = 0;
+	int		 action = op->op_arg4;
+	int		 match_mode = op->op_arg5;
+
+	result = ct_md_list_complete(list_fakeop);
+	e_free(list_fakeop->op_arg1);
+	e_free(&list_fakeop->op_arg1);
+	e_free(&list_fakeop);
 
 	tmp = result;
 	while (*(tmp++) != NULL)
@@ -915,15 +909,21 @@ ct_find_md_for_extract(const char *mdname)
 	cachename = ct_md_get_cachename(best);
 	if (!md_is_in_cache(best)) {
 		/* else grab it to the cache. XXX differentials? */
-		if ((ret = ct_md_extract(cachename, best)) != 0)
-			CFATALX("can't download md file");
+		ct_add_operation(ct_md_extract, ct_md_extract_nextop,
+		    cachename, best, filelist, action, match_mode); 
+
+	} else if (action == CT_A_EXTRACT) {
+		e_free(&best);
+		// XXX switch on action 
+		ct_add_operation(ct_extract, ct_extract_free_mdname,
+		    cachename, filelist, NULL, match_mode, 0); 
+		// we can go right to the operation now 
+	} else if (action == CT_A_LIST) {
+		ct_list(cachename, filelist, match_mode);
+		e_free(&cachename);
+	} else {
+		CFATALX("invalid action");
 	}
-
-	e_free(&mdname);
-	e_free(&best);
-
-	/* return filename of file in cache. */
-	return (cachename);
 }
 
 char *

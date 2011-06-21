@@ -38,7 +38,6 @@ extern int		ct_multilevel_allfiles;
 extern char		*ct_basisbackup;
 extern char		*ct_tdir;
 extern int		ct_attr;
-extern int		ct_match_mode;
 extern int		ct_strip_slash;
 extern int		ct_verbose;
 extern int		ct_verbose_ratios;
@@ -147,9 +146,10 @@ extern struct flist_head	fl_list_head;
 
 /* FILE STATUS */
 
-#define CT_S_RUNNING		(0)
-#define CT_S_WAITING_TRANS	(1)
-#define CT_S_FINISHED		(2)
+#define CT_S_STARTING		(0)
+#define CT_S_RUNNING		(1)
+#define CT_S_WAITING_TRANS	(2)
+#define CT_S_FINISHED		(3)
 
 void				ct_set_file_state(int);
 
@@ -250,15 +250,16 @@ extern int		ct_action;
 void ct_setup_assl(void);
 struct ct_assl_io_ctx	*ct_assl_ctx;
 
+struct ct_op;
 
-int			ct_archive(const char *, char **, const char *);
-int			ct_extract(const char *, char **);
-int			ct_list(const char *, char **);
-int			ct_md_archive(const char *, const char *);
-int			ct_md_extract(const char *, const char *);
-char			**ct_md_list(char **, int);
-int			ct_md_list_print(char **, int);
-int			ct_md_delete(const char *);
+void			ct_archive(struct ct_op *);
+void			ct_extract(struct ct_op *);
+int			ct_list(const char *, char **, int);
+void			ct_md_archive(struct ct_op *);
+void			ct_md_extract(struct ct_op *);
+void			ct_md_list_start(struct ct_op *);
+void			ct_md_list_print(struct ct_op *);
+void			ct_md_delete(struct ct_op *);
 
 /* CT context state */
 
@@ -266,6 +267,25 @@ int			ct_md_delete(const char *);
 
 RB_HEAD(ct_trans_lookup, ct_trans);
 RB_HEAD(ct_iotrans_lookup, ct_trans);
+
+typedef void (ct_op_cb)(struct ct_op *);
+
+struct ct_op {
+	TAILQ_ENTRY(ct_op)	 op_link;
+	ct_op_cb		*op_start;
+	ct_op_cb		*op_complete;	
+	void			*op_arg1;
+	void			*op_arg2;
+	void			*op_arg3;
+	int			 op_arg4;
+	int			 op_arg5;
+	void			*op_priv;	/* operation private data */
+};
+
+void	ct_add_operation(ct_op_cb *, ct_op_cb *, void *, void *,
+	    void *, int, int);
+void	ct_nextop(void *);
+int	ct_op_complete(void);
 
 struct ct_global_state{
 	/* PADs? */
@@ -299,6 +319,7 @@ struct ct_global_state{
 	STR_PAD(7);
 	struct ct_trans_lookup		ct_complete;
 	int				ct_complete_rblen;
+	TAILQ_HEAD(ct_ops, ct_op)	ct_operations;
 };
 extern struct ct_global_state		*ct_state;
 
@@ -516,7 +537,8 @@ void			ct_ssl_init_bw_lim(struct ct_assl_io_ctx *);
 
 char			*ct_md_cook_filename(const char *);
 void			 ct_mdmode_setup(const char *);
-char			*ct_find_md_for_extract(const char *);
+void			 ct_find_md_for_extract(struct ct_op *);
+void			 ct_find_md_for_extract_complete(struct ct_op *);
 char                    *ct_find_md_for_archive(const char *);
 int			 md_is_in_cache(const char *);
 void			 ct_complete_metadata(struct ct_trans *);

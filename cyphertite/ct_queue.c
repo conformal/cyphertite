@@ -86,7 +86,7 @@ ct_setup_state(void)
 
 	ct_stats = &ct_int_stats;
 
-	ct_state->ct_file_state = CT_S_WAITING_TRANS;
+	ct_state->ct_file_state = CT_S_STARTING;
 	ct_state->ct_comp_state = CT_S_WAITING_TRANS;
 	ct_state->ct_crypt_state = CT_S_WAITING_TRANS;
 	ct_state->ct_write_state = CT_S_WAITING_TRANS;
@@ -99,6 +99,7 @@ ct_setup_state(void)
 	TAILQ_INIT(&ct_state->ct_queued);
 	RB_INIT(&ct_state->ct_inflight);
 	RB_INIT(&ct_state->ct_complete);
+	TAILQ_INIT(&ct_state->ct_operations);
 
 	ct_state->ct_sha_qlen = 0;
 	ct_state->ct_comp_qlen = 0;
@@ -707,14 +708,14 @@ ct_complete_normal(struct ct_trans *trans)
 
 	switch (trans->tr_state) {
 	case TR_S_DONE:
+		ct_cleanup_md(); /* XXX */
+		/* do we have more operations queued up? */
+		if (ct_op_complete() == 0)
+			return;
 		if (ct_verbose_ratios)
 			ct_dump_stats(stdout);
-		ct_unload_config();
-		ct_trans_cleanup();
-		ct_match_unwind(ct_match_mode);
 		ct_file_extract_fixup();
 		ct_shutdown();
-		break;
 		break;
 	case TR_S_SPECIAL:
 		if (ct_verbose)

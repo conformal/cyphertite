@@ -283,7 +283,7 @@ ct_write_sha_crypto(struct ct_trans *trans)
 }
 
 int
-ct_list(const char *file, char **flist)
+ct_list(const char *file, char **flist, int match_mode)
 {
 	FILE			*xdr_f;
 	struct ct_md_gheader	gh;
@@ -304,7 +304,7 @@ ct_list(const char *file, char **flist)
 	char			shat[SHA_DIGEST_STRING_LENGTH];
 	char			*ct_next_filename;
 
-	ct_match_compile(ct_match_mode, flist);
+	ct_match_compile(match_mode, flist);
 
 	ct_verbose++;	/* by default print something. */
 
@@ -319,7 +319,8 @@ next_file:
 	ret = ct_read_header(&hdr);
 
 	while (ret == 0 && hdr.cmh_beacon != CT_HDR_EOF) {
-		doprint = (ct_all_files || !ct_match(ct_match_mode, hdr.cmh_filename));
+		doprint = (ct_all_files ||
+		    !ct_match(match_mode, hdr.cmh_filename));
 		ct_populate_fnode(fnode, &hdr, &state);
 
 		if (doprint )
@@ -397,10 +398,8 @@ skipped:
 		}
 	}
 	ct_unload_config();
-	ct_match_unwind(ct_match_mode);
-	e_check_memory();
-
-	return 0;
+	ct_match_unwind(match_mode);
+	return (0);
 }
 
 FILE *
@@ -588,8 +587,11 @@ ct_metadata_open_next()
 }
 
 void
-ct_process_md(void *vctx)
+ct_extract(struct ct_op *op)
 {
+	const char		*mfile = op->op_arg1;
+	char			**filelist = op->op_arg2;
+	int			 match_mode = op->op_arg4;
 	struct flist		*fnode;
 	struct ct_md_header	hdr;
 	struct ct_md_trailer	trl;
@@ -598,7 +600,10 @@ ct_process_md(void *vctx)
 	char			shat[SHA_DIGEST_STRING_LENGTH];
 
 	CDBG("entry");
-	if (ct_state->ct_file_state == CT_S_FINISHED) {
+	if (ct_state->ct_file_state == CT_S_STARTING) {
+		ct_match_compile(match_mode, filelist);
+		ct_extract_setup(mfile);
+	} else if (ct_state->ct_file_state == CT_S_FINISHED) {
 		return;
 	}
 	ct_set_file_state(CT_S_RUNNING);
@@ -632,6 +637,7 @@ ct_process_md(void *vctx)
 					/* poke file into action */
 					ct_wakeup_file();
 				} else {
+					ct_match_unwind(match_mode);
 					trans->tr_state = TR_S_DONE;
 					trans->tr_trans_id = ct_trans_id++;
 					ct_queue_transfer(trans);
@@ -643,7 +649,7 @@ ct_process_md(void *vctx)
 			}
 
 			ct_doextract = (ct_all_files ||
-			    !ct_match(ct_match_mode, hdr.cmh_filename));
+			    !ct_match(match_mode, hdr.cmh_filename));
 
 			if (C_ISREG(hdr.cmh_type)) {
 				ct_num_shas = hdr.cmh_nr_shas;

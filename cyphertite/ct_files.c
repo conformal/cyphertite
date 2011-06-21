@@ -192,8 +192,11 @@ ct_sched_backup_file(struct stat *sb, char *filename)
 }
 
 void
-ct_process_file(void *vctx)
+ct_archive(struct ct_op *op)
 {
+	const char		*mfile = op->op_arg1;
+	char			**filelist = op->op_arg2;
+	const char		*basisbackup = op->op_arg3;
 	size_t			rsz, rlen;
 	struct stat		sb;
 	struct ct_trans		*ct_trans;
@@ -203,6 +206,21 @@ ct_process_file(void *vctx)
 
 	CDBG("processing");
 	/* XXX if state finished jump to done */
+	if (ct_state->ct_file_state == CT_S_STARTING) {
+		if (*filelist == NULL) {
+			CFATALX("no files specified");
+		}
+
+		if (basisbackup != NULL) {
+			ct_basis_setup(basisbackup);
+		}
+		/* XXX - deal with stdin */
+		/* XXX - if basisbackup should the type change ? */
+		ct_setup_write_md(mfile, CT_MD_REGULAR);
+
+		ct_traverse(filelist);
+	}
+
 	ct_set_file_state(CT_S_RUNNING);
 
 	if (fl_curnode == NULL)
