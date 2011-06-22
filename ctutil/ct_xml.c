@@ -53,7 +53,7 @@ const char * const ct_md_open_create_chunkno_fmt =
     "<ct_md_open_create version=\""
     "V2"					/* for backwards compat */
     "\">\r\n"
-    "<file name=\"%s\" chunkno=\"%s\"/>\r\n"
+    "<file name=\"%s\" chunkno=\"%u\"/>\r\n"
     "</ct_md_open_create>\r\n";
 
 struct xmlsd_v_elem             xe_ct_md_open_read[] = {
@@ -75,7 +75,7 @@ const char * const ct_md_open_read_chunkno_fmt =
     "<ct_md_open_read version=\""
     "V2"					/* for backwards compat */
     "\">\r\n"
-    "<file name=\"%s\" chunkno=\"%s\"/>\r\n"
+    "<file name=\"%s\" chunkno=\"%u\"/>\r\n"
     "</ct_md_open_read>\r\n";
 
 struct xmlsd_v_elem             xe_ct_md_close[] = {
