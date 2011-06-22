@@ -20,10 +20,12 @@
 #define CT_MD_OPEN_CREATE_VERSION	"V1"
 extern struct xmlsd_v_elem xe_ct_md_open_create[];
 extern const char * const ct_md_open_create_fmt;
+extern const char * const ct_md_open_create_chunkno_fmt;
 
 #define CT_MD_OPEN_READ_VERSION		"V1"
 extern struct xmlsd_v_elem xe_ct_md_open_read[];
 extern const char * const ct_md_open_read_fmt;
+extern const char * const ct_md_open_read_chunkno_fmt;
 
 #define CT_MD_CLOSE_VERSION		"V1"
 extern struct xmlsd_v_elem xe_ct_md_close[];

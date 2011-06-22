@@ -29,6 +29,7 @@ struct xmlsd_v_attr		ct_cmd_attr[] = {
 
 struct xmlsd_v_attr		xa_ct_md_file_attr[] = {
 	{ "name" },
+	{ "chunkno" },
 	{ NULL }
 };
  
@@ -46,6 +47,15 @@ const char * const ct_md_open_create_fmt =
     "<file name=\"%s\"/>\r\n"
     "</ct_md_open_create>\r\n";
 
+/* Poorly named, really this is open for write */
+const char * const ct_md_open_create_chunkno_fmt =
+    "<?xml version=\"1.0\"?>\r\n"
+    "<ct_md_open_create version=\""
+    "V2"					/* for backwards compat */
+    "\">\r\n"
+    "<file name=\"%s\" chunkno=\"%s\"/>\r\n"
+    "</ct_md_open_create>\r\n";
+
 struct xmlsd_v_elem             xe_ct_md_open_read[] = {
 	{ "ct_md_open_read","",	ct_cmd_attr },
 	{ "file",	"file.ct_md_open_read", xa_ct_md_file_attr },
@@ -58,6 +68,14 @@ const char * const ct_md_open_read_fmt =
     CT_MD_OPEN_READ_VERSION
     "\">\r\n"
     "<file name=\"%s\"/>\r\n"
+    "</ct_md_open_read>\r\n";
+
+const char * const ct_md_open_read_chunkno_fmt =
+    "<?xml version=\"1.0\"?>\r\n"
+    "<ct_md_open_read version=\""
+    "V2"					/* for backwards compat */
+    "\">\r\n"
+    "<file name=\"%s\" chunkno=\"%s\"/>\r\n"
     "</ct_md_open_read>\r\n";
 
 struct xmlsd_v_elem             xe_ct_md_close[] = {
