@@ -169,6 +169,11 @@ struct ct_write_reply {
 #define C_HDR_O_XML		(18)
 #define C_HDR_O_XML_REPLY	(19)
 
+struct ct_metadata_footer {
+	uint32_t	cmf_chunkno;
+	uint32_t	cmf_size;
+} __packed;
+
 /* stuff */
 int	ct_get_password(char *, size_t, char *, int);
 int	ct_savecore(void);
