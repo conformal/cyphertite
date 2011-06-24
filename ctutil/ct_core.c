@@ -64,15 +64,17 @@ ct_savecore(void)
 			char ncore[FILENAME_MAX+1];
 
 			snprintf(ncore, sizeof(ncore),
-			    "%s.%4.4d%2.2d%2.2d%2.2d%2.2d%2.2d", __progname,
-			    tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
-			    tm->tm_hour, tm->tm_min, tm->tm_sec);
+			    "%s.%4.4d%2.2d%2.2d%2.2d%2.2d%2.2d.core",
+			    __progname, tm->tm_year + 1900, tm->tm_mon + 1,
+			    tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
 
 			/* prevent core file from being overwritten */
-			if ((fd = open(ncore, O_CREAT | O_RDWR | O_EXCL, 0600)) == -1){
+			fd = open(ncore, O_CREAT | O_RDWR | O_EXCL, 0600);
+			if (fd == -1) {
 				warn("open");
 				return -1;
 			}
+
 			/* empty dest file exists, and it belongs to us now */
 			close(fd);
 
