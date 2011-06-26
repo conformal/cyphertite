@@ -23,7 +23,7 @@ CFLAGS+= -ggdb3
 afterinstall:
 	mkdir -p  ${DESTDIR}${INCDIR}/cyphertite
 	@cd ${.CURDIR}; for i in ${HDRS}; do \
-	cmp -s $$i ${INCDIR}/cyphertite/$$i || \
+	cmp -s $$i ${DESTDIR}${INCDIR}/cyphertite/$$i || \
 	${INSTALL} ${INSTALL_COPY} -m 444 -o $(BINOWN) -g $(BINGRP) $$i ${DESTDIR}${INCDIR}/cyphertite/; \
 	echo ${INSTALL} ${INSTALL_COPY} -m 444 -o $(BINOWN) -g $(BINGRP) $$i ${DESTDIR}${INCDIR}/cyphertite/; \
 	done
