@@ -24,7 +24,7 @@
 The
 .Nm
 file contains configuration information for
-.Xr cyphertite 8 ,
+.Xr cyphertite 1 ,
 the client that provides a privacy-driven encrypted remote
 archive.
 .Pp
@@ -35,7 +35,7 @@ Lines beginning with
 are comments. Blank lines are ignored.
 .Sh CONFIGURATION
 There are a few settings that affect the operation of the
-.Xr cyphertite 8
+.Xr cyphertite 1 
 daemon.
 .Pp
 .Bl -tag -width Ds -compact
@@ -51,7 +51,7 @@ Specify the location of the cache database.
 If not set, caching will be disabled. 
 (It is advantageous to run with caching enabled, except when running
 multiple concurent instances of 
-.Xr cyphertite 8 ,
+.Xr cyphertite 1 ,
 in which case caching should be disabled to prevent database 
 conflicts.)
 .Pp 
@@ -88,7 +88,7 @@ mode is set then the
 .Op md_cachedir
 option is required.
 See
-.Xr cyphertite 8
+.Xr cyphertite 1 
 for a description of the different metadata modes.
 .Pp
 .It Ic md_cachedir =  Ar string
@@ -124,7 +124,7 @@ Default configuration file.
 User configuration file.
 .El
 .Sh SEE ALSO
-.Xr cyphertite 8
+.Xr cyphertite 1
 .Sh AUTHORS
 The Cyphertite suite was written by
 .An Conformal Systems, LLC. Aq info@conformal.com .
