@@ -11,6 +11,7 @@ LOCALBASE ?= /usr/local
 BINDIR ?= ${LOCALBASE}/bin
 LIBDIR ?= ${LOCALBASE}/lib
 INCDIR ?= ${LOCALBASE}/include
+MANDIR ?= $(LOCALBASE)/share/man
 
 # Use obj directory if it exists.
 OBJPREFIX ?= obj/
@@ -46,9 +47,11 @@ BIN.NAME = cyphertite
 BIN.SRCS = ct_main.c ct_metadata.c ct_files.c ct_util.c ct_queue.c ct_event.c
 BIN.SRCS += ct_aes_xts.c ct_crypto.c ct_match.c
 BIN.SRCS += ct_db.c ct_xdr.c ct_bw_lim.c
+BIN.MANPAGES = cyphertite.1 cyphertite.conf.5
 BIN.OBJS = $(addprefix $(OBJPREFIX), $(BIN.SRCS:.c=.o))
 BIN.DEPS = $(addsuffix .depend, $(BIN.OBJS))
 BIN.LDFLAGS = $(LDFLAGS.EXTRA) $(LDFLAGS) $(LDADD)
+BIN.MDIRS = $(foreach page, $(BIN.MANPAGES), $(subst ., man, $(suffix $(page)))) 
 
 all: $(OBJPREFIX)$(BIN.NAME) 
 
@@ -70,9 +73,18 @@ depend:
 
 install:
 	$(INSTALL) -m 555 $(OBJPREFIX)$(BIN.NAME) $(BINDIR)/
+	$(INSTALL) -m 0755 -d $(addprefix $(MANDIR)/, $(BIN.MDIRS))
+	$(foreach page, $(BIN.MANPAGES), \
+		$(INSTALL) -m 0444 $(page) $(addprefix $(MANDIR)/, \
+		$(subst ., man, $(suffix $(page))))/; \
+	)
 	
 uninstall:
 	$(RM) $(BINDIR)/$(BIN.NAME)
+	$(foreach page, $(BIN.MANPAGES), \
+		$(RM) $(addprefix $(MANDIR)/, \
+		$(subst ., man, $(suffix $(page))))/$(page); \
+	)
 	
 clean:
 	$(RM) $(BIN.OBJS)
