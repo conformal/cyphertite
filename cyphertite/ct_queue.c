@@ -1002,13 +1002,29 @@ void
 ct_handle_read_reply(struct ct_trans *trans, struct ct_header *hdr,
     void *vbody)
 {
-	char			shat[SHA_DIGEST_STRING_LENGTH];
-	int			slot;
+	struct ct_metadata_footer	*cmf;
+	char				 shat[SHA_DIGEST_STRING_LENGTH];
+	int				 slot;
 
 	/* data was written to the 'alternate slot' so switch it */
 	slot = trans->tr_dataslot = !(trans->tr_dataslot);
 	if (hdr->c_status == C_HDR_S_OK) {
 		trans->tr_state = TR_S_EX_READ;
+		/* Check the chunk number for sanity */
+		if (hdr->c_flags & C_HDR_F_METADATA &&
+		    hdr->c_ex_status == 1) {
+			CDBG("checking footer");
+			cmf = (struct ct_metadata_footer *)
+			    (trans->tr_data[slot] + hdr->c_size - sizeof(*cmf));
+
+			if (cmf->cmf_size != hdr->c_size - sizeof(*cmf))
+				CFATALX("invalid chunkfile footer");
+			if (cmf->cmf_chunkno != trans->tr_md_chunkno)
+				CFATALX("invalid chunkno %u %u",
+				    cmf->cmf_chunkno, trans->tr_md_chunkno);
+			CDBG("footer ok");
+			hdr->c_size -= sizeof(*cmf);
+		}
 	} else {
 		CDBG("c_flags on reply %x", hdr->c_flags);
 		if (hdr->c_flags & C_HDR_F_METADATA) {

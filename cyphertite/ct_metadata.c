@@ -346,6 +346,7 @@ ct_md_extract(struct ct_op *op)
 		md_backup_fd = open(mfile, O_WRONLY|O_TRUNC|O_CREAT, 0600);
 		if (md_backup_fd == -1)
 			CFATALX("unable to open file %s", mfile);
+		md_block_no = 0;
 
 		if (mdname == NULL) {
 			mdname = ct_md_cook_filename(mfile);
@@ -363,11 +364,13 @@ ct_md_extract(struct ct_op *op)
 	trans->tr_type = TR_T_READ_CHUNK;
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_eof = 0;
+	trans->tr_md_chunkno = md_block_no;
 
 	hdr = &trans->hdr;
 
 	hdr->c_opcode = C_HDR_O_READ;
 	hdr->c_size = sizeof(trans->tr_sha);
+	hdr->c_ex_status = 1;
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_flags |= C_HDR_F_METADATA;
 
