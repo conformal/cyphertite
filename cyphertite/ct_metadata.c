@@ -29,7 +29,7 @@
 #include <xmlsd.h>
 
 #include <ctutil.h>
-#include <ct_xml.h>
+#include "ct_xml.h"
 
 #include "ct.h"
 
@@ -916,8 +916,35 @@ ct_extract_free_mdname(struct ct_op *op)
 {
 	const char		*mfile = op->op_arg1;
 
+	CDBG("extract_free_mdname %s", mfile);
 	if (mfile != NULL)
 		e_free(&mfile);
+}
+
+void ct_md_download_next(struct ct_op *op);
+void
+ct_md_download_next(struct ct_op *op)
+{
+	const char		*mfile = op->op_arg1;
+	//const char		*mcachename = op->op_arg2;
+	const char		*mfilename = op->op_arg3;
+	char			*md_prev;
+	char			*cachename;
+
+	CDBG("mfile %s", mfile);
+
+	md_prev = ct_metadata_check_prev(mfile);
+
+	if (md_prev && md_prev[0] != '\0') {
+		CDBG("prevfile %s", md_prev);
+		cachename = ct_md_get_cachename(md_prev);
+		ct_add_operation(ct_md_extract, ct_md_download_next,
+		    (char *)md_prev, cachename, md_prev, 0, 0); 
+	}
+	if (mfile == mfilename) {
+		e_free(&mfile);
+	}
+
 }
 
 /*
@@ -932,7 +959,12 @@ ct_md_extract_nextop(struct ct_op *op)
 	int			 action = op->op_arg4;
 	int			 match_mode = op->op_arg5;
 
-	/* XXX if md is differential then set up the next md extract */
+	md_is_open = 0;
+	/*
+	 * need to determine if this is a layered backup, if so, we need to
+	 * queue download of that file
+	 */
+	ct_md_download_next(op);
 
 	/* mdname if we set it will have been freed on transaction completion */
 

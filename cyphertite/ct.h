@@ -388,6 +388,7 @@ int				ctdb_insert(struct ct_trans *trans);
 int				ct_s_to_e_type(int);
 FILE				*ct_metadata_create(const char *, int);
 void				ct_metadata_close(FILE *);
+char				*ct_metadata_check_prev(const char *);
 
 struct dedup_digest {
 	char		dd_digest[SHA_DIGEST_LENGTH];

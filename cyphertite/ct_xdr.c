@@ -313,6 +313,9 @@ next_file:
 	xdr_f = ct_metadata_open(file,  &gh);
 	if (xdr_f == NULL)
 		CFATALX("failed to open %s", file);
+
+	if (gh.cmg_prevlvl_filename) 
+		CDBG("previous backup file %s\n", gh.cmg_prevlvl_filename);
 	bzero(&fnodestore, sizeof(fnodestore));
 	file = NULL;
 
@@ -572,7 +575,7 @@ ct_metadata_open_next()
 
 	if (!TAILQ_EMPTY(&ct_file_extract_head)) {
 		next = TAILQ_FIRST(&ct_file_extract_head);
-		CINFO("should start restoring [%s]", next->filename);
+		CDBG("should start restoring [%s]", next->filename);
 		TAILQ_REMOVE(&ct_file_extract_head, next, next);
 
 		xdr_f = ct_metadata_open(next->filename,  &gh);
@@ -641,6 +644,7 @@ ct_extract(struct ct_op *op)
 					trans->tr_state = TR_S_DONE;
 					trans->tr_trans_id = ct_trans_id++;
 					ct_queue_transfer(trans);
+					CDBG("extract finished");
 					ct_set_file_state(CT_S_FINISHED);
 				}
 				return;
@@ -795,4 +799,23 @@ ct_basis_setup(const char *basisbackup)
 	CINFO("prev backup time %s %s", ctime(&ct_prev_backup_time),
 	    basisbackup);
 	ct_metadata_close(xdr_f);
+}
+
+char *
+ct_metadata_check_prev(const char *mdname)
+{
+	FILE			*md_file;
+	struct ct_md_gheader	 gh;
+	char			 *ret = NULL;
+
+	md_file = ct_metadata_open(mdname, &gh);
+
+	if (md_file && gh.cmg_prevlvl_filename) {
+		ret = e_strdup(gh.cmg_prevlvl_filename);
+	}
+
+	if (md_file)
+		ct_metadata_close(md_file);
+
+	return ret;
 }
