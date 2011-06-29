@@ -84,7 +84,7 @@ void
 ct_md_archive(struct ct_op *op)
 {
 	const char		*mfile = op->op_arg1;
-	const char		*mdname;
+	const char		*mdname = op->op_arg2;
 	struct stat		sb;
 	ssize_t			rsz, rlen;
 	struct ct_trans		*ct_trans;
@@ -127,9 +127,11 @@ loop:
 			md_mtime = sb.st_mtime;
 		}
 
-		mdname = ct_md_cook_filename(mfile);
+		if (mdname == NULL) {
+			mdname = ct_md_cook_filename(mfile);
+			op->op_arg2 = (void *)mdname;
+		}
 		ct_xml_file_open(ct_trans, mdname, MD_O_WRITE);
-		e_free(&mdname);
 		md_open_inflight = 1;
 		return;
 	}
@@ -143,6 +145,7 @@ loop:
 		ct_trans->tr_trans_id = ct_trans_id++;
 		CDBG("setting eof on trans %" PRIu64, ct_trans->tr_trans_id);
 		ct_trans->hdr.c_flags = C_HDR_F_METADATA;
+		ct_trans->tr_md_name = mdname;
 		ct_queue_transfer(ct_trans);
 		return;
 	}
@@ -170,6 +173,7 @@ loop:
 	ct_trans->hdr.c_flags = C_HDR_F_METADATA;
 	ct_trans->hdr.c_ex_status = 1; /* we handle new metadata protocol */
 	ct_trans->tr_md_chunkno = md_block_no;
+	ct_trans->tr_md_name = mdname;
 
 	CDBG(" trans %"PRId64", read size %zd, into %p rlen %zd",
 	    ct_trans->tr_trans_id, rsz, ct_trans->tr_data[0], rlen);
@@ -323,7 +327,6 @@ ct_md_extract(struct ct_op *op)
 	struct ct_trans		*trans;
 	struct ct_header	*hdr;
 	void			*data;
-	int			 freemd = 0;
 
 	ct_set_file_state(CT_S_RUNNING);
 
@@ -350,11 +353,9 @@ ct_md_extract(struct ct_op *op)
 
 		if (mdname == NULL) {
 			mdname = ct_md_cook_filename(mfile);
-			freemd = 1;
+			op->op_arg2 = (void *)mdname;
 		}
 		ct_xml_file_open(trans, mdname, MD_O_READ);
-		if (freemd)
-			e_free(&mdname);
 		md_open_inflight = 1;
 		return;
 	}
@@ -365,6 +366,7 @@ ct_md_extract(struct ct_op *op)
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_eof = 0;
 	trans->tr_md_chunkno = md_block_no;
+	trans->tr_md_name = mdname;
 
 	hdr = &trans->hdr;
 
@@ -421,6 +423,11 @@ ct_complete_metadata(struct ct_trans *trans)
 		break;
 
 	case TR_S_DONE:
+		/* Clean up md reconnect name, shared between all trans */
+		if (trans->tr_md_name != NULL)
+			e_free(&trans->tr_md_name);
+
+		/* More operations to be done? */
 		if (ct_op_complete() == 0)
 			return;
 		if (ct_verbose_ratios)
@@ -843,18 +850,14 @@ void
 ct_md_extract_nextop(struct ct_op *op)
 {
 	const char		*mfile = op->op_arg1;
-	const char		*mdname = op->op_arg2;
 	char			**filelist = op->op_arg3;
 	int			 action = op->op_arg4;
 	int			 match_mode = op->op_arg5;
 
 	/* XXX if md is differential then set up the next md extract */
 
-	/* free remote mdname */
-	if (mdname != NULL)
-		e_free(&mdname);
+	/* mdname if we set it will have been freed on transaction completion */
 
-	/* XXX switch on action */
 	if (action == CT_A_EXTRACT) {
 		ct_add_operation(ct_extract, ct_extract_free_mdname,
 		    (char *)mfile, filelist, NULL, match_mode, 0); 

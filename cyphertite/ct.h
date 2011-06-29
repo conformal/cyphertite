@@ -218,6 +218,7 @@ struct ct_trans {
 
 	uint8_t			*tr_data[2];
 	uint32_t		tr_md_chunkno;
+	const char		*tr_md_name;
 };
 
 struct ct_trans		*ct_trans_alloc(void);
