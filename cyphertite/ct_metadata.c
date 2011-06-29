@@ -326,7 +326,6 @@ ct_md_extract(struct ct_op *op)
 	const char		*mdname = op->op_arg2;
 	struct ct_trans		*trans;
 	struct ct_header	*hdr;
-	void			*data;
 
 	ct_set_file_state(CT_S_RUNNING);
 
@@ -361,7 +360,7 @@ ct_md_extract(struct ct_op *op)
 	}
 
 	trans->tr_fl_node = md_node;
-	trans->tr_state = TR_S_EX_READ;
+	trans->tr_state = TR_S_EX_SHA;
 	trans->tr_type = TR_T_READ_CHUNK;
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_eof = 0;
@@ -369,11 +368,7 @@ ct_md_extract(struct ct_op *op)
 	trans->tr_md_name = mdname;
 
 	hdr = &trans->hdr;
-
-	hdr->c_opcode = C_HDR_O_READ;
-	hdr->c_size = sizeof(trans->tr_sha);
 	hdr->c_ex_status = 1;
-	hdr->c_version = C_HDR_VERSION;
 	hdr->c_flags |= C_HDR_F_METADATA;
 
 	bzero(trans->tr_sha, sizeof(trans->tr_sha));
@@ -390,13 +385,10 @@ ct_md_extract(struct ct_op *op)
 	trans->tr_iv[5] = (md_block_no >>  8) & 0xff;
 	trans->tr_iv[6] = (md_block_no >> 16) & 0xff;
 	trans->tr_iv[7] = (md_block_no >> 24) & 0xff;
-	data = trans->tr_sha;
-	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
-	ct_state->ct_queued_qlen++;
 
 	md_block_no++; /* next chunk on next pass */
 
-	ct_assl_write_op(ct_assl_ctx, hdr, data);
+	ct_queue_transfer(trans);
 }
 
 void
