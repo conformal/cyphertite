@@ -163,7 +163,8 @@ ct_ssl_connect(int nonfatal)
 	    ctx, ct_header_alloc, ct_header_free, ct_body_alloc,
 	    ct_body_free, ct_ioctx_alloc, ct_ioctx_free);
 
-	if (assl_event_connect(c, ct_host, ct_hostport, ASSL_F_NONBLOCK,
+	if (assl_event_connect(c, ct_host, ct_hostport,
+		ASSL_F_NONBLOCK|ASSL_F_KEEPALIVE|ASSL_F_THROUGHPUT,
 	    ct_event_assl_read, ct_event_assl_write, ctx)) {
 		if (nonfatal) {
 			CINFO("Reconnect failed");
