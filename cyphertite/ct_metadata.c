@@ -268,6 +268,82 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode)
 	ct_assl_write_op(ct_assl_ctx, hdr, body);
 }
 
+int
+ct_xml_file_open_polled(struct ct_assl_io_ctx *ct_assl_ctx,
+    const char *file, int mode, uint32_t chunkno)
+{
+#define ASSL_TIMEOUT 20
+	extern uint64_t		 ct_packet_id;
+	struct ct_header	 hdr;
+
+	char			*body = NULL;
+	int			 sz, rv = 1;
+
+	CDBG("setting up XML");
+
+	if (mode == MD_O_WRITE) {
+		sz = e_asprintf(&body, ct_md_open_create_fmt, file);
+	} else if (mode == MD_O_APPEND) {
+		sz = e_asprintf(&body, ct_md_open_create_chunkno_fmt,
+		    file, chunkno);
+	} else {
+		if (chunkno) {
+			sz = e_asprintf(&body, ct_md_open_read_chunkno_fmt,
+			    file, chunkno);
+		} else {
+			sz = e_asprintf(&body, ct_md_open_read_fmt, file);
+		}
+	}
+	if (sz == -1)
+		CFATALX("cannot allocate memory");
+	sz += 1;	/* include null */
+		    
+
+	hdr.c_version = C_HDR_VERSION;
+	hdr.c_opcode = C_HDR_O_XML;
+	hdr.c_flags = C_HDR_F_METADATA;
+	/* use previous packet id so it'll fit with the state machine */
+	hdr.c_tag = ct_packet_id - 1;
+	hdr.c_size = sz;
+
+	ct_wire_header(&hdr);
+	if (ct_assl_io_write_poll(ct_assl_ctx, &hdr, sizeof hdr, ASSL_TIMEOUT)
+	    != sizeof hdr) {
+		CWARNX("could not write header");
+		goto done;
+	}
+	if (ct_assl_io_write_poll(ct_assl_ctx, body, sz,  ASSL_TIMEOUT) != sz) {
+		CWARNX("could not write body");
+		goto done;
+	}
+	e_free(&body);
+
+	/* get server reply */
+	if (ct_assl_io_read_poll(ct_assl_ctx, &hdr, sizeof hdr, ASSL_TIMEOUT)
+	    != sizeof hdr) {
+		CWARNX("invalid header size");
+		goto done;
+	}
+	ct_unwire_header(&hdr);
+
+	if (hdr.c_status == C_HDR_S_OK && hdr.c_opcode == C_HDR_O_XML_REPLY)
+		rv = 0;
+
+	/* we know the open was ok or bad, just read the body and dump it */
+	body = e_calloc(1, hdr.c_size);
+	if (ct_assl_io_read_poll(ct_assl_ctx, body, hdr.c_size, ASSL_TIMEOUT)
+	    != hdr.c_size) {
+		rv = 1;
+	}
+	e_free(&body);
+
+done:
+	if (body)
+		e_free(&body);
+	return (rv);
+#undef ASSL_TIMEOUT
+}
+
 void
 ct_xml_file_close(void)
 {

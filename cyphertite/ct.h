@@ -369,8 +369,11 @@ void				ct_handle_xml_reply(struct ct_trans *trans,
 				    struct ct_header *hdr, void *vbody);
 void				ct_xml_file_open(struct ct_trans *,
 				    const char *, int);
+int				ct_xml_file_open_polled(struct ct_assl_io_ctx *,
+				    const char *, int, uint32_t);
 #define MD_O_READ	0
 #define MD_O_WRITE	1
+#define MD_O_APPEND	2
 void				ct_xml_file_close(void);
 
 /* db external interface */
