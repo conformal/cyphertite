@@ -79,7 +79,7 @@ ct_md_cook_filename(const char *path)
 	return (fname);
 }
 
-struct flist *md_node;
+struct flist	*md_node;
 void
 ct_md_archive(struct ct_op *op)
 {
@@ -115,6 +115,7 @@ loop:
 			CFATAL("can't open %s for reading", mfile);
 
 		md_offset = 0;
+		md_block_no = 0;
 		md_node = e_calloc(1, sizeof(*md_node));
 		CDBG("mdnode %p", md_node);
 
@@ -167,6 +168,8 @@ loop:
 	ct_trans->tr_trans_id = ct_trans_id++;
 	ct_trans->tr_eof = 0;
 	ct_trans->hdr.c_flags = C_HDR_F_METADATA;
+	ct_trans->hdr.c_ex_status = 1; /* we handle new metadata protocol */
+	ct_trans->tr_md_chunkno = md_block_no;
 
 	CDBG(" trans %"PRId64", read size %zd, into %p rlen %zd",
 	    ct_trans->tr_trans_id, rsz, ct_trans->tr_data[0], rlen);

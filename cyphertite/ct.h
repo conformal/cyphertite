@@ -217,6 +217,7 @@ struct ct_trans {
 	int			tr_size[2];
 
 	uint8_t			*tr_data[2];
+	uint32_t		tr_md_chunkno;
 };
 
 struct ct_trans		*ct_trans_alloc(void);

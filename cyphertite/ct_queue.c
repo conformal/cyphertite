@@ -418,7 +418,8 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 	/* the header is first in the structure for this reason */
 	struct ct_trans *trans = (struct ct_trans *)hdr;
 
-	if (cnt != 0)
+	if (cnt != 0 && (hdr->c_opcode != C_HDR_O_WRITE ||
+	    (hdr->c_flags & C_HDR_F_METADATA) == 0))
 		CFATALX("not expecting vbody");
 
 	CDBG("write done, trans %" PRIu64 " op %u", trans->tr_trans_id, hdr->c_opcode);
@@ -448,6 +449,17 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 		RB_INSERT(ct_iotrans_lookup, &ct_state->ct_inflight, trans);
 		ct_state->ct_queued_qlen--;
 		ct_state->ct_inflight_rblen++;
+		/* XXX no nice place to put this */
+		if (hdr->c_opcode == C_HDR_O_WRITE &&
+		    hdr->c_flags & C_HDR_F_METADATA &&
+		    hdr->c_ex_status == 1) {
+			/* free iovec and footer data */
+			struct ct_iovec	*iov = vbody;
+
+			e_free(&iov[1].iov_base);
+			/* real body was in iov[0] and is part of the trans */
+			e_free(&iov);
+		}
 		/* no need to free body */
 		break;
 	default:
@@ -901,6 +913,28 @@ ct_wakeup_write(void)
 		/* move transaction to pending RB tree */
 		TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
 		ct_state->ct_queued_qlen++;
+
+		/* XXX there really isn't a better place to do this */
+		if (hdr->c_opcode == C_HDR_O_WRITE &&
+		    (hdr->c_flags & C_HDR_F_METADATA) != 0 &&
+		    hdr->c_ex_status == 1) {
+			struct ct_metadata_footer	*cmf;
+			struct ct_iovec			*iov;
+
+			iov = e_calloc(2, sizeof(*iov));
+			cmf = e_calloc(1, sizeof(*cmf));
+			cmf->cmf_chunkno = trans->tr_md_chunkno;
+			cmf->cmf_size = hdr->c_size;
+			hdr->c_size += sizeof(*cmf);
+
+			iov[0].iov_base = data;
+			iov[0].iov_len = cmf->cmf_size;
+			iov[1].iov_base = cmf;
+			iov[1].iov_len = sizeof(*cmf);
+
+			ct_assl_writev_op(ct_assl_ctx, hdr, iov, 2);
+			continue;
+		}
 
 		ct_assl_write_op(ct_assl_ctx, hdr, data);
 	}
