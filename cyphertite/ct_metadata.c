@@ -131,7 +131,7 @@ loop:
 			mdname = ct_md_cook_filename(mfile);
 			op->op_arg2 = (void *)mdname;
 		}
-		ct_xml_file_open(ct_trans, mdname, MD_O_WRITE);
+		ct_xml_file_open(ct_trans, mdname, MD_O_WRITE, 0);
 		md_open_inflight = 1;
 		return;
 	}
@@ -225,7 +225,8 @@ loop:
 }
 
 void
-ct_xml_file_open(struct ct_trans *trans, const char *file, int mode)
+ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
+    uint32_t chunkno)
 {
 	struct ct_header	*hdr = NULL;
 	char			*body = NULL;
@@ -237,10 +238,19 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode)
 
 	CDBG("setting up XML");
 
-	if (mode)
+	if (mode == MD_O_WRITE) {
 		sz = asprintf(&buf, ct_md_open_create_fmt, file);
-	else
-		sz = asprintf(&buf, ct_md_open_read_fmt, file);
+	} else if (mode == MD_O_APPEND) {
+		sz = asprintf(&buf, ct_md_open_create_chunkno_fmt,
+		    file, chunkno);
+	} else {
+		if (chunkno) {
+			sz = asprintf(&buf, ct_md_open_read_chunkno_fmt,
+			    file, chunkno);
+		} else {
+			sz = asprintf(&buf, ct_md_open_read_fmt, file);
+		}
+	}
 	if (sz == -1)
 		CFATALX("cannot allocate memory");
 	sz += 1;	/* include null */
@@ -430,7 +440,7 @@ ct_md_extract(struct ct_op *op)
 			mdname = ct_md_cook_filename(mfile);
 			op->op_arg2 = (void *)mdname;
 		}
-		ct_xml_file_open(trans, mdname, MD_O_READ);
+		ct_xml_file_open(trans, mdname, MD_O_READ, 0);
 		md_open_inflight = 1;
 		return;
 	}

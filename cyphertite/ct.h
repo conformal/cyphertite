@@ -368,7 +368,7 @@ ct_body_free_func		ct_body_free;
 void				ct_handle_xml_reply(struct ct_trans *trans,
 				    struct ct_header *hdr, void *vbody);
 void				ct_xml_file_open(struct ct_trans *,
-				    const char *, int);
+				    const char *, int, uint32_t);
 int				ct_xml_file_open_polled(struct ct_assl_io_ctx *,
 				    const char *, int, uint32_t);
 #define MD_O_READ	0
