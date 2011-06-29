@@ -625,10 +625,8 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 	TAILQ_INIT(&xl);
 
 	r = xmlsd_parse_mem(body, hdr->c_size - 1, &xl);
-	if (r) {
-		CDBG("parse FAILED! (%d)", r);
-		goto done;
-	}
+	if (r)
+		CFATALX("XML parse failed! (%d)", r);
 
 	TAILQ_FOREACH(xe, &xl, entry) {
 		CDBG("%d %s = %s (parent = %s)",
@@ -639,15 +637,11 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 	}
 
 	r = xmlsd_validate(&xl, ct_xml_cmds);
-	if (r) {
-		CDBG("validate of '%s' FAILED! (%d)", body, r);
-		goto done;
-	}
+	if (r)
+		CFATALX("XML validate of '%s' failed! (%d)", body, r);
 
-	if (TAILQ_EMPTY(&xl)) {
-		CDBG("parse command: No XML");
-		goto done;
-	}
+	if (TAILQ_EMPTY(&xl))
+		CFATALX("parse command: No XML");
 
 	xe = TAILQ_FIRST(&xl);
 	if (strncmp(xe->name, "ct_md_open", strlen("ct_md_open")) == 0) {
@@ -656,12 +650,13 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 		TAILQ_FOREACH(xe, &xl, entry) {
 			if (strcmp(xe->name, "file") == 0) {
 				filename = xmlsd_get_attr(xe, "name");
-				if (filename)
+				if (filename && filename[0] != '\0') {
 					CDBG("%s opened\n", filename);
-				die = 0;
-				md_open_inflight = 0;
-				md_is_open = 1;
-				ct_wakeup_file();
+					die = 0;
+					md_open_inflight = 0;
+					md_is_open = 1;
+					ct_wakeup_file();
+				}
 			}
 		}
 		if (die) {
@@ -704,7 +699,6 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 		trans->tr_state = TR_S_DONE;
 	}
 
-done:
 	ct_queue_transfer(trans);
 	ct_header_free(NULL, hdr);
 	xmlsd_unwind(&xl);
