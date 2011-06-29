@@ -1029,8 +1029,16 @@ ct_handle_read_reply(struct ct_trans *trans, struct ct_header *hdr,
 		CDBG("c_flags on reply %x", hdr->c_flags);
 		if (hdr->c_flags & C_HDR_F_METADATA) {
 			/* FAIL on metadata read is 'eof' */
-			ct_set_file_state(CT_S_FINISHED);
-			trans->tr_state = TR_S_XML_CLOSE;
+			if (ct_state->ct_file_state != CT_S_FINISHED) {
+				ct_set_file_state(CT_S_FINISHED);
+				trans->tr_state = TR_S_XML_CLOSE;
+			} else {
+				/*
+				 * We had two ios in flight when we hit eof.
+				 * We're already closing so just carry on
+				 */
+				trans->tr_state = TR_S_XML_CLOSING;
+			}
 		} else {
 			ct_sha1_encode(trans->tr_sha, shat);
 			CFATALX("Data missing on server return %u shat %s",
