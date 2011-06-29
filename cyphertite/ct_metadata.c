@@ -315,8 +315,6 @@ ct_xml_file_close(void)
 	ct_assl_write_op(ct_assl_ctx, hdr, body);
 }
 
-int extract_id;
-
 void
 ct_md_extract(struct ct_op *op)
 {
@@ -374,24 +372,24 @@ ct_md_extract(struct ct_op *op)
 	hdr->c_flags |= C_HDR_F_METADATA;
 
 	bzero(trans->tr_sha, sizeof(trans->tr_sha));
-	trans->tr_sha[0] = (extract_id >>  0) & 0xff;
-	trans->tr_sha[1] = (extract_id >>  8) & 0xff;
-	trans->tr_sha[2] = (extract_id >> 16) & 0xff;
-	trans->tr_sha[3] = (extract_id >> 24) & 0xff;
+	trans->tr_sha[0] = (md_block_no >>  0) & 0xff;
+	trans->tr_sha[1] = (md_block_no >>  8) & 0xff;
+	trans->tr_sha[2] = (md_block_no >> 16) & 0xff;
+	trans->tr_sha[3] = (md_block_no >> 24) & 0xff;
 	bzero(trans->tr_iv, sizeof(trans->tr_iv));
-	trans->tr_iv[0] = (extract_id >>  0) & 0xff;
-	trans->tr_iv[1] = (extract_id >>  8) & 0xff;
-	trans->tr_iv[2] = (extract_id >> 16) & 0xff;
-	trans->tr_iv[3] = (extract_id >> 24) & 0xff;
-	trans->tr_iv[4] = (extract_id >>  0) & 0xff;
-	trans->tr_iv[5] = (extract_id >>  8) & 0xff;
-	trans->tr_iv[6] = (extract_id >> 16) & 0xff;
-	trans->tr_iv[7] = (extract_id >> 24) & 0xff;
+	trans->tr_iv[0] = (md_block_no >>  0) & 0xff;
+	trans->tr_iv[1] = (md_block_no >>  8) & 0xff;
+	trans->tr_iv[2] = (md_block_no >> 16) & 0xff;
+	trans->tr_iv[3] = (md_block_no >> 24) & 0xff;
+	trans->tr_iv[4] = (md_block_no >>  0) & 0xff;
+	trans->tr_iv[5] = (md_block_no >>  8) & 0xff;
+	trans->tr_iv[6] = (md_block_no >> 16) & 0xff;
+	trans->tr_iv[7] = (md_block_no >> 24) & 0xff;
 	data = trans->tr_sha;
 	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
 	ct_state->ct_queued_qlen++;
 
-	extract_id ++; /* next chunk on next pass */
+	md_block_no++; /* next chunk on next pass */
 
 	ct_assl_write_op(ct_assl_ctx, hdr, data);
 }
