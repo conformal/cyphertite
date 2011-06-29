@@ -313,6 +313,8 @@ ct_trans_cleanup(void)
 void
 ct_reconnect(int unused, short event, void *varg)
 {
+	struct ct_trans		*trans;
+
 	ct_assl_ctx = ct_ssl_connect(1);
 	if (ct_assl_ctx) {
 		if (ct_assl_negotiate_poll(ct_assl_ctx)) {
@@ -321,6 +323,81 @@ ct_reconnect(int unused, short event, void *varg)
 
 		ct_disconnected = 0;
 		CINFO("Reconnected");
+
+		TAILQ_FOREACH(trans, &ct_state->ct_write_queue, tr_next) {
+			if ((trans->hdr.c_flags & C_HDR_F_METADATA) == 0)
+				continue;
+
+			if (trans->hdr.c_opcode == C_HDR_O_XML) {
+				/*
+				 * Already an open first thing in the queue,
+				 * don't worry.
+				 */
+				if (trans->tr_state == TR_S_XML_OPEN) {
+					CINFO("found open in queue, ignoring");
+					break;
+				}
+				/*
+				 * Close without a read or write
+				 * restart will have closed it for us, so
+				 * just complete it and stop worrying
+				 */
+				if (trans->tr_state == TR_S_XML_CLOSING ||
+				    trans->tr_state == TR_S_XML_CLOSE) {
+					CINFO("found close in queue, completing");
+					/* Don't try and close again */
+					/* XXX should be S_DONE? */
+					trans->tr_state = TR_S_XML_CLOSING;
+					/* complete it and stop worrying */;
+					TAILQ_REMOVE(&ct_state->ct_write_queue,
+					    trans, tr_next);
+					ct_state->ct_write_qlen--;
+					RB_INSERT(ct_trans_lookup,
+					    &ct_state->ct_complete, trans);
+					ct_state->ct_complete_rblen++;
+					break;
+				}
+				/*
+				 * List or delete, we can let them go on
+				 * without further comment. Check for more
+				 */
+				continue;
+			} else if (trans->tr_state == TR_S_NEXISTS ||
+			    trans->tr_state == TR_S_COMPRESSED ||
+			    trans->tr_state == TR_S_ENCRYPTED ||
+			    trans->tr_state == TR_S_READ) {
+				CINFO("write in queue chunkno %d",
+				    trans->tr_md_chunkno);
+				/*
+				 * Reopen the file at the point we are.
+				 * we do this polled to prevent races with
+				 * messages hitting the server while the open
+				 * is still in progress (these will fail).
+				 * so it is less painful all around to
+				 * not have to worry about the transaction
+				 * queue being full and how much we have in
+				 * the queue after us and just do this polled.
+				 */
+				if (ct_xml_file_open_polled(ct_assl_ctx,
+				    trans->tr_md_name, MD_O_APPEND,
+				    trans->tr_md_chunkno))
+					CFATALX("can't reopen MD file");
+				break;
+			} else if (trans->tr_state == TR_S_EX_SHA) {
+				CINFO("read in queue chunkno %d",
+				    trans->tr_md_chunkno);
+				/*
+				 * We had a read in progress. reinject
+				 * the right open at chunkno
+				 * For how this works see above.
+				 */
+				if (ct_xml_file_open_polled(ct_assl_ctx,
+				    trans->tr_md_name, MD_O_READ,
+				    trans->tr_md_chunkno))
+					CFATALX("can't reopen MD file");
+				break;
+			}
+		}
 
 		/* XXX - wakeup everyone */
 		ct_wakeup_sha();
