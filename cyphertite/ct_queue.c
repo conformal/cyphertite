@@ -347,19 +347,17 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 		/* backend disconnected -exit */
 		CWARNX("Server disconnected, attempting to reconnect");
 		
-		if (md_backup_fd != -1)
-			close(md_backup_fd);
-
 		ct_disconnected = 1;
 		ct_assl_disconnect(ct_assl_ctx);
 		while(!RB_EMPTY(&ct_state->ct_inflight)) {
-			trans = RB_MIN(ct_iotrans_lookup,
+			trans = RB_MAX(ct_iotrans_lookup,
 			    &ct_state->ct_inflight);
 			CDBG("moving trans %" PRIu64 " back to queued",
 				trans->tr_trans_id);
 			RB_REMOVE(ct_iotrans_lookup, &ct_state->ct_inflight,
 			    trans);
-			TAILQ_INSERT_TAIL(&ct_state->ct_write_queue, trans,
+			/* put on the head so write queue is still ordered. */
+			TAILQ_INSERT_HEAD(&ct_state->ct_write_queue, trans,
 			    tr_next);
 			ct_state->ct_write_qlen++;
 			ct_state->ct_inflight_rblen--;
