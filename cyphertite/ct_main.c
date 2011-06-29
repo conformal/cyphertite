@@ -102,7 +102,7 @@ struct ct_settings	settings[] = {
 	    NULL },
 	{ "polltype", CT_S_STR, NULL, &ct_polltype, NULL, NULL },
 	{ "md_mode", CT_S_STR, NULL, &ct_mdmode_str, NULL, NULL },
-	{ "md_cachedir", CT_S_STR, NULL, &ct_md_cachedir, NULL, NULL },
+	{ "md_cachedir", CT_S_DIR, NULL, &ct_md_cachedir, NULL, NULL },
 	{ NULL, 0, NULL, NULL, NULL,  NULL }
 };
 
