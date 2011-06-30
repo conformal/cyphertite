@@ -23,7 +23,7 @@
 .Sh SYNOPSIS
 .Nm cyphertite
 .Bk -words
-.Op Fl PRVXcdemprtvx
+.Op Fl 0PRVXcdemprtvx
 .Op Fl B Ar mdfile
 .Op Fl C Ar tmpdir
 .Op Fl F Ar conffile  
@@ -164,7 +164,7 @@ used:
 .Bl -tag -width Ds
 .It Fl 0
 Generate a level 0 (full) backup. Only applicable to remote metadata archive
-mode."
+mode.
 .It Fl B Ar mdfile
 Specify the archive to be used as the basis of a differential backup. 
 Files with a modification time (mtime) newer than the previous backup
