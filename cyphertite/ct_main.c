@@ -84,6 +84,7 @@ int			ct_md_mode = CT_MDMODE_LOCAL;
 int			ct_compress_enabled;
 int			ct_encrypt_enabled;
 int			ct_multilevel_allfiles;
+int			ct_auto_differential;
 
 struct ct_settings	settings[] = {
 	{ "queue_depth", CT_S_INT, &ct_max_trans, NULL, NULL, NULL },
@@ -103,13 +104,15 @@ struct ct_settings	settings[] = {
 	{ "polltype", CT_S_STR, NULL, &ct_polltype, NULL, NULL },
 	{ "md_mode", CT_S_STR, NULL, &ct_mdmode_str, NULL, NULL },
 	{ "md_cachedir", CT_S_DIR, NULL, &ct_md_cachedir, NULL, NULL },
+	{ "md_remote_auto_differential" , CT_S_INT, &ct_auto_differential,
+	    NULL, NULL, NULL },
 	{ NULL, 0, NULL, NULL, NULL,  NULL }
 };
 
 void
 usage(void)
 {
-	fprintf(stderr, "%s {-ctxV} [-BCDFPRXabdpv] -f <archive> [filelist]\n",
+	fprintf(stderr, "%s {-ctxV} [-BCDFPRXabdpv0] -f <archive> [filelist]\n",
 	    __progname);
 	exit(0);
 }
@@ -153,6 +156,7 @@ main(int argc, char **argv)
 	int		debug;
 	int		foreground = 1;
 	int		ret = 0;
+	int		level0 = 0;
 
 	ct_savecore();
 
@@ -162,10 +166,10 @@ main(int argc, char **argv)
 		errx(1, "illegal clog flags");
 
 	ct_debug = debug = 0;
-	while ((c = getopt(argc, argv, "B:C:DF:I:PRVXa:cdef:mprtvx")) != -1) {
+	while ((c = getopt(argc, argv, "B:C:DF:I:PRVXa:cdef:mprtvx0")) != -1) {
 		switch (c) {
 		case 'B':
-			ct_basisbackup = optarg;
+			ct_basisbackup = e_strdup(optarg);
 			break;
 		case 'C':
 			ct_tdir = optarg;
@@ -236,6 +240,10 @@ main(int argc, char **argv)
 			if (ct_action)
 				CFATALX("cannot mix operations, -c -e -t -x");
 			ct_action = CT_A_EXTRACT;
+			break;
+		case '0':
+			level0 = 1;
+			ct_auto_differential = 0; /* force differential off */
 			break;
 		default:
 			usage();
@@ -321,6 +329,9 @@ main(int argc, char **argv)
 		if (daemon(1, debug) == -1)
 			errx(1, "failed to daemonize");
 
+	if (level0)
+		ct_auto_differential = 0; /* force differential off */
+
 	/* set polltype used by libevent */
 	ct_polltype_setup(ct_polltype);
 	ct_mdmode_setup(ct_mdmode_str);
@@ -343,7 +354,8 @@ main(int argc, char **argv)
 			CFATALX("can't create MD cachedir");
 
 		if (ct_action == CT_A_ARCHIVE) {
-			ct_mfile = ct_find_md_for_archive(ct_mfile);
+			if (!ct_auto_differential)
+				ct_mfile = ct_find_md_for_archive(ct_mfile);
 		}
 	}
 
@@ -375,10 +387,16 @@ main(int argc, char **argv)
 			    argv, NULL, ct_action, ct_match_mode);
 			break;
 		case CT_A_ARCHIVE:
-			ct_add_operation(ct_archive, NULL, ct_mfile, argv,
-			    ct_basisbackup, 0, 0);
-			ct_add_operation(ct_md_archive, NULL, ct_mfile,
-			    NULL, NULL, 0, 0);
+			if (ct_auto_differential)
+				ct_add_operation(ct_find_md_for_extract,
+				    ct_find_md_for_extract_complete, ct_mfile,
+				    argv, NULL, ct_action, ct_match_mode);
+			else   {
+				ct_add_operation(ct_archive, NULL, ct_mfile,
+				    argv, ct_basisbackup, 0, 0);
+				ct_add_operation(ct_md_archive, NULL, ct_mfile,
+				    NULL, NULL, 0, 0);
+			}
 			break;
 		default:
 			CFATALX("invalid action");

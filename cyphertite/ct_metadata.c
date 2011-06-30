@@ -904,6 +904,8 @@ ct_find_md_for_extract(struct ct_op *op)
 	}
 	e_free(&mdname);
 
+	CDBG("looking for %s", bufp[0]);
+
 	list_fakeop->op_arg1 = bufp;
 	list_fakeop->op_arg4 = matchmode;
 
@@ -954,8 +956,10 @@ ct_md_download_next(struct ct_op *op)
 void
 ct_md_extract_nextop(struct ct_op *op)
 {
+	extern char		*ct_mfile;
 	const char		*mfile = op->op_arg1;
 	char			**filelist = op->op_arg3;
+	char			*afile;
 	int			 action = op->op_arg4;
 	int			 match_mode = op->op_arg5;
 
@@ -964,7 +968,8 @@ ct_md_extract_nextop(struct ct_op *op)
 	 * need to determine if this is a layered backup, if so, we need to
 	 * queue download of that file
 	 */
-	ct_md_download_next(op);
+	if (action == CT_A_EXTRACT || action == CT_A_LIST)
+		ct_md_download_next(op);
 
 	/* mdname if we set it will have been freed on transaction completion */
 
@@ -974,6 +979,12 @@ ct_md_extract_nextop(struct ct_op *op)
 	} else if (action == CT_A_LIST) {
 		ct_list(mfile, filelist, match_mode);
 		e_free(&mfile);
+	} else if (action == CT_A_ARCHIVE) {
+		CDBG("starting archive %s %s", mfile, ct_basisbackup);
+		afile = ct_find_md_for_archive(ct_mfile);
+		ct_add_operation(ct_archive, NULL, afile, filelist,
+		    ct_basisbackup, 0, 0);
+		ct_add_operation(ct_md_archive, NULL, afile, NULL, NULL, 0, 0);
 	} else {
 		CFATALX("invalid action");
 	}
@@ -985,6 +996,7 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 {
 	const char	*mdname = op->op_arg1;
 	char		**filelist = op->op_arg2;
+	char		*mfile;
 	struct ct_op	*list_fakeop = op->op_priv;
 	char		**result, **tmp;
 	char	 	*best, *cachename; 
@@ -1000,8 +1012,17 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 	tmp = result;
 	while (*(tmp++) != NULL)
 		nresults++;
-	if (nresults == 0)
-		CFATALX("unable to find metadata tagged %s", mdname);
+	if (nresults == 0) {
+		if (action == CT_A_ARCHIVE) {
+			mfile = ct_find_md_for_archive(op->op_arg1);
+			ct_add_operation(ct_archive, NULL, mfile, filelist,
+			    ct_basisbackup, 0, 0);
+			ct_add_operation(ct_md_archive, NULL, mfile, NULL,
+			    NULL, 0, 0);
+			return;
+		} else 
+			CFATALX("unable to find metadata tagged %s", mdname);
+	}
 		
 	/* sort and calculate newest */
 	qsort(result, nresults, sizeof(*result), strcompare);
@@ -1019,7 +1040,8 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 
 	cachename = ct_md_get_cachename(best);
 	if (!md_is_in_cache(best)) {
-		/* else grab it to the cache. XXX differentials? */
+		if (action == CT_A_ARCHIVE)
+			ct_basisbackup = cachename;
 		ct_add_operation(ct_md_extract, ct_md_extract_nextop,
 		    cachename, best, filelist, action, match_mode); 
 
@@ -1032,6 +1054,14 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 	} else if (action == CT_A_LIST) {
 		ct_list(cachename, filelist, match_mode);
 		e_free(&cachename);
+	} else if (action == CT_A_ARCHIVE) {
+		e_free(&best);
+		CDBG("setting basisname %s", cachename);
+		mfile = ct_find_md_for_archive(op->op_arg1);
+		ct_basisbackup = cachename;
+		ct_add_operation(ct_archive, NULL, mfile, filelist,
+		    ct_basisbackup, 0, 0);
+		ct_add_operation(ct_md_archive, NULL, mfile, NULL, NULL, 0, 0);
 	} else {
 		CFATALX("invalid action");
 	}
