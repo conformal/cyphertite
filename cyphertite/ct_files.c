@@ -1037,7 +1037,6 @@ ct_create_config(void)
 		CFATALX("strdup");
 	dir = dirname(conf_buf);
 
-	fprintf(f, "queue_depth\t\t\t= 100\n");
 	fprintf(f, "cache_db\t\t\t= %s/.cyphertite.db\n", dir);
 	fprintf(f, "session_compression\t\t= lzo\n");
 	fprintf(f, "host\t\t\t\t= beta.cyphertite.com\n");
