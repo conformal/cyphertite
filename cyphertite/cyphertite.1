@@ -162,6 +162,9 @@ will extract all archive members that match that pattern.
 In addition to the flags mentioned above, the following flags may be
 used:
 .Bl -tag -width Ds
+.It Fl 0
+Generate a level 0 (full) backup. Only applicable to remote metadata archive
+mode."
 .It Fl B Ar mdfile
 Specify the archive to be used as the basis of a differential backup. 
 Files with a modification time (mtime) newer than the previous backup

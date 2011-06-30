@@ -76,6 +76,10 @@ Specify the port to connect to.
 .It Ic key = Ar file
 Specify the path to the client certificate key file.
 .Pp
+.It Ic md_cachedir =  Ar string
+Specify the path to the directory to be used to cache metadata files in
+remote mode.
+.Pp
 .It Xo
 .Ic md_mode =
 .Pq Ic local Ns \&| Ns Ic remote
@@ -91,9 +95,12 @@ See
 .Xr cyphertite 1 
 for a description of the different metadata modes.
 .Pp
-.It Ic md_cachedir =  Ar string
-Specify the path to the directory to be used to cache metadata files in
-remote mode.
+.It Xo
+.Ic md_remote_auto_differential =
+.Pq Ic 0 Ns \&| Ns Ic 1
+.Xc
+Specify if differentials should be generated for remote mode.
+This only applies for remote metadata mode.
 .Pp
 .It Ic password = Ar string
 Specify the password with which to authenticate.
