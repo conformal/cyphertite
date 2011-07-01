@@ -67,7 +67,6 @@ ct_md_cook_filename(const char *path)
 
 	pdup = e_strdup(path);
 	bname = basename(pdup);
-	e_free(&pdup);
 	if (bname == NULL)
 		CFATAL("can't basename md path");
 	if (bname[0] == '/')
@@ -76,6 +75,7 @@ ct_md_cook_filename(const char *path)
 	if (strnvis(fname, bname, CT_MAX_MD_FILENAME, VIS_GLOB |
 	    VIS_WHITE | VIS_SAFE) >= CT_MAX_MD_FILENAME)
 		CFATALX("md filename too long");
+	e_free(&pdup);
 	return (fname);
 }
 
