@@ -633,8 +633,6 @@ ct_extract(struct ct_op *op)
 				CDBG("Hit end of md");
 				ct_metadata_close(ct_xdr_f);
 				if (!TAILQ_EMPTY(&ct_file_extract_head)) {
-					ct_metadata_close(ct_xdr_f);
-
 					ct_xdr_f = ct_metadata_open_next();
 
 					/* poke file into action */
