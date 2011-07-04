@@ -7,6 +7,7 @@ OSNAME := $(shell echo $(OSNAME) | tr A-Z a-z)
 -include ../config/Makefile.$(OSNAME)
 
 # Default paths.
+DESTDIR ?=
 LOCALBASE ?= /usr/local
 BINDIR ?= ${LOCALBASE}/bin
 LIBDIR ?= ${LOCALBASE}/lib
@@ -61,14 +62,16 @@ depend:
 	@echo "Dependencies are automatically generated.  This target is not necessary."	
 
 install:
-	$(INSTALL) -m 0644 $(OBJPREFIX)$(LIB.STATIC) $(LIBDIR)/
-	mkdir -p $(INCDIR)/cyphertite
-	$(INSTALL) -m 0644 $(LIB.HEADERS) $(INCDIR)/cyphertite/
-	
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(LIBDIR)/
+	$(INSTALL) -m 0644 $(OBJPREFIX)$(LIB.STATIC) $(DESTDIR)$(LIBDIR)/
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(INCDIR)/cyphertite
+	$(INSTALL) -m 0644 $(LIB.HEADERS) $(DESTDIR)$(INCDIR)/cyphertite
+
 uninstall:
-	$(RM) $(LIBDIR)/$(LIB.STATIC)
-	(cd $(INCDIR)/ && $(RM) $(LIB.HEADERS))
-	
+	$(RM) $(DESTDIR)$(LIBDIR)/$(LIB.STATIC)
+	$(RM) $(addprefix $(DESTDIR)$(INCDIR)/cyphertite, $(LIB.HEADERS))
+	$(RMDIR) $(DESTDIR)$(INCDIR)/cyphertite
+
 clean:
 	$(RM) $(LIB.OBJS)
 	$(RM) $(OBJPREFIX)$(LIB.STATIC)

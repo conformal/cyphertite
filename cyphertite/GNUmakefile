@@ -7,6 +7,7 @@ OSNAME := $(shell echo $(OSNAME) | tr A-Z a-z)
 -include ../config/Makefile.$(OSNAME)
 
 # Default paths.
+DESTDIR ?=
 LOCALBASE ?= /usr/local
 BINDIR ?= ${LOCALBASE}/bin
 LIBDIR ?= ${LOCALBASE}/lib
@@ -72,20 +73,21 @@ depend:
 	@echo "Dependencies are automatically generated.  This target is not necessary."	
 
 install:
-	$(INSTALL) -m 555 $(OBJPREFIX)$(BIN.NAME) $(BINDIR)/
-	$(INSTALL) -m 0755 -d $(addprefix $(MANDIR)/, $(BIN.MDIRS))
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(BINDIR)/
+	$(INSTALL) -m 0755 $(OBJPREFIX)$(BIN.NAME) $(DESTDIR)$(BINDIR)/
+	$(INSTALL) -m 0755 -d $(addprefix $(DESTDIR)$(MANDIR)/, $(BIN.MDIRS))
 	$(foreach page, $(BIN.MANPAGES), \
-		$(INSTALL) -m 0444 $(page) $(addprefix $(MANDIR)/, \
+		$(INSTALL) -m 0444 $(page) $(addprefix $(DESTDIR)$(MANDIR)/, \
 		$(subst ., man, $(suffix $(page))))/; \
 	)
-	
+
 uninstall:
-	$(RM) $(BINDIR)/$(BIN.NAME)
+	$(RM) $(DESTDIR)$(BINDIR)/$(BIN.NAME)
 	$(foreach page, $(BIN.MANPAGES), \
-		$(RM) $(addprefix $(MANDIR)/, \
+		$(RM) $(addprefix $(DESTDIR)$(MANDIR)/, \
 		$(subst ., man, $(suffix $(page))))/$(page); \
 	)
-	
+
 clean:
 	$(RM) $(BIN.OBJS)
 	$(RM) $(OBJPREFIX)$(BIN.NAME)
