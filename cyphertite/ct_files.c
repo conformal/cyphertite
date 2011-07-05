@@ -919,6 +919,8 @@ ct_create_config(void)
 	char			*conf = NULL, *dir = NULL;
 	char			*user = NULL, *password = NULL;
 	char			*crypto_password = NULL;
+	char			*md_mode = NULL, *md_cachedir = NULL;
+	int			md_remote_diff = 0;
 	int			rv, fd;
 	FILE			*f = NULL;
 
@@ -1017,6 +1019,41 @@ ct_create_config(void)
 		bzero(answer2, sizeof answer2);
 	}
 
+	conf_buf = strdup(conf);
+	if (conf_buf == NULL)
+		CFATALX("strdup");
+	dir = dirname(conf_buf);
+	asprintf(&md_cachedir, "%s/.cyphertite_md_cachedir", dir);
+	if (md_cachedir == NULL)
+		CFATALX("default md_cachedir");
+
+	snprintf(prompt, sizeof prompt,
+	    "Choose a metadata operation mode (remote/local) [remote]: ");
+	rv = ct_get_answer(prompt, "remote", "local", "remote", answer,
+	    sizeof answer, 0);
+	md_mode = strdup(answer);
+	if (md_mode == NULL)
+		CFATALX("md_mode");
+
+	if (rv == 1) {
+		snprintf(prompt, sizeof prompt,
+		    "Target metadata cache directory [%s]: ", md_cachedir);
+		ct_get_answer(prompt, NULL, NULL, md_cachedir, answer,
+		    sizeof answer, 0);
+		if (md_cachedir != NULL)
+			free(md_cachedir);
+		md_cachedir = strdup(answer);
+		if (md_cachedir == NULL)
+			CFATALX("md_cachedir");
+
+		snprintf(prompt, sizeof prompt,
+		    "Use automatic remote differentials? [no]: ");
+		rv = ct_get_answer(prompt, "yes", "no", "no", answer,
+		    sizeof answer, 0);
+		if (rv == 1)
+			md_remote_diff = 1;
+	}
+
 	if ((fd = open(conf, O_RDWR | O_CREAT, 0400)) == -1)
 		CFATAL("open");
 	if ((f = fdopen(fd, "r+")) == NULL)
@@ -1032,11 +1069,6 @@ ct_create_config(void)
 	else
 		fprintf(f, "#crypto_password\t\t=\n");
 
-	conf_buf = strdup(conf);
-	if (conf_buf == NULL)
-		CFATALX("strdup");
-	dir = dirname(conf_buf);
-
 	fprintf(f, "cache_db\t\t\t= %s/.cyphertite.db\n", dir);
 	fprintf(f, "session_compression\t\t= lzo\n");
 	fprintf(f, "host\t\t\t\t= beta.cyphertite.com\n");
@@ -1045,6 +1077,18 @@ ct_create_config(void)
 	fprintf(f, "ca_cert\t\t\t\t= %s/cyphertite/ct_ca.crt\n", dir);
 	fprintf(f, "cert\t\t\t\t= %s/cyphertite/ct_%s.crt\n", dir, user);
 	fprintf(f, "key\t\t\t\t= %s/cyphertite/private/ct_%s.key\n", dir, user);
+
+	fprintf(f, "md_mode\t\t\t\t= %s\n", md_mode);
+	if (strcmp(md_mode, "remote") == 0) {
+		fprintf(f, "md_cachedir\t\t\t= %s\n", md_cachedir);
+		fprintf(f, "md_remote_auto_differential\t= %d", md_remote_diff);
+	}
+	else
+	{
+		fprintf(f, "#md_cachedir\t\t\t= %s\n", md_cachedir);
+		fprintf(f, "#md_remote_auto_differential\t= %d",
+		    md_remote_diff);
+	}
 
 	printf("Configuration file created.\n");
 
@@ -1060,6 +1104,10 @@ ct_create_config(void)
 		bzero(crypto_password, strlen(crypto_password));
 		free(crypto_password);
 	}
+	if (md_mode)
+		free(md_mode);
+	if (md_cachedir)
+		free(md_cachedir);
 	if (f)
 		fclose(f);
 
