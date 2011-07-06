@@ -459,7 +459,7 @@ ct_dump_stats(FILE *outfh)
 			    ct_stats->st_bytes_tot);
 		else
 			val = 0;
-		fprintf(outfh, "Reduction ratio\t\t\t\t%4" PRIu64 "%%\n", val);
+		fprintf(outfh, "Reduction ratio\t\t\t\t%4lld%%\n", val);
 	}
 	print_time_scaled(outfh, "Total Time\t\t\t    ",  &time_delta);
 
