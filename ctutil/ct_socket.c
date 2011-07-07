@@ -306,7 +306,6 @@ ct_event_io_write(int fd, short events, void *arg)
 	int			wlen;
 	int			write_complete = 0;
 	int			s_errno;
-	int a;
 
 	iob = TAILQ_FIRST(&ioctx->io_o_q);
 	hdr = iob->io_hdr;
@@ -358,16 +357,14 @@ write_next_iov:
 		if (iob->iovcnt == 0) {
 			body = iob->io_data;
 			body_len = hdr->c_size;
-			a = 0;
 		} else {
 			int index  = ioctx->io_o_state - 2;
 			const struct ct_iovec *iov = iob->io_data;
 			body = iov[index].iov_base;
 			body_len = iov[index].iov_len;
-			a = iob->iovcnt;
 		}
 	CDBG("writing body state %d sz %d count %d",
-	ioctx->io_o_state, body_len, a);
+	ioctx->io_o_state, body_len, iob->iovcnt);
 		wlen = body_len - ioctx->io_o_off;
 		len = write(fd, body + ioctx->io_o_off, wlen);
 		s_errno = errno;
