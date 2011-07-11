@@ -1,7 +1,11 @@
 # $cyphertite$
 
 NOPIC=
+.ifdef ROFF
 MANDIR=${LOCALBASE}/man/cat
+.else
+MANDIR=${LOCALBASE}/man/man
+.endif
 
 .if defined(${COMPILER_VERSION})  &&  ${COMPILER_VERSION:L} == "gcc4"
 CFLAGS+= -fdiagnostics-show-option
