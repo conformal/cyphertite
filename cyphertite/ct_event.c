@@ -60,7 +60,7 @@ ct_setup_wakeup(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb)
 	ctx->ctx_fn = func_cb;
 
 	if (pipe(ctx->ctx_pipe))
-		CFATALX("pipe create failed: %d %s", errno, strerror(errno));
+		CFATAL("pipe create failed");
 
 	/* make pipes nonblocking - both sides of pipe */
 	for (i= 0; i < 2; i++) {
@@ -136,7 +136,8 @@ ct_wakeup_file(void)
 	/* check state first? -- locks */
 	/* XXX - add code to prevent multiple pending wakeups */
 	wbuf = 'G';
-	write(ct_ctx_file.ctx_pipe[1], &wbuf, 1);
+	if (write(ct_ctx_file.ctx_pipe[1], &wbuf, 1) == -1)
+		CFATAL("file pipe write failed");
 }
 
 void
@@ -147,7 +148,8 @@ ct_wakeup_sha(void)
 	/* check state first? -- locks */
 	/* XXX - add code to prevent multiple pending wakeups */
 	wbuf = 'G';
-	write(ct_ctx_sha.ctx_pipe[1], &wbuf, 1);
+	if (write(ct_ctx_sha.ctx_pipe[1], &wbuf, 1) == -1)
+		CFATAL("sha pipe write failed");
 }
 
 void
@@ -158,7 +160,8 @@ ct_wakeup_compress(void)
 	/* check state first? -- locks */
 	/* XXX - add code to prevent multiple pending wakeups */
 	wbuf = 'G';
-	write(ct_ctx_compress.ctx_pipe[1], &wbuf, 1);
+	if (write(ct_ctx_compress.ctx_pipe[1], &wbuf, 1) == -1)
+		CFATAL("compress pipe write failed");
 }
 
 void
@@ -169,7 +172,8 @@ ct_wakeup_csha(void)
 	/* check state first? -- locks */
 	/* XXX - add code to prevent multiple pending wakeups */
 	wbuf = 'G';
-	write(ct_ctx_csha.ctx_pipe[1], &wbuf, 1);
+	if (write(ct_ctx_csha.ctx_pipe[1], &wbuf, 1) == -1)
+		CFATAL("csha pipe write failed");
 }
 
 void
@@ -180,7 +184,8 @@ ct_wakeup_encrypt(void)
 	/* check state first? -- locks */
 	/* XXX - add code to prevent multiple pending wakeups */
 	wbuf = 'G';
-	write(ct_ctx_encrypt.ctx_pipe[1], &wbuf, 1);
+	if (write(ct_ctx_encrypt.ctx_pipe[1], &wbuf, 1) == -1)
+		CFATAL("encrypt pipe write failed");
 }
 
 void
@@ -191,7 +196,8 @@ ct_wakeup_complete()
 	/* check state first? -- locks */
 	/* XXX - add code to prevent multiple pending wakeups */
 	wbuf = 'G';
-	write(ct_ctx_complete.ctx_pipe[1], &wbuf, 1);
+	if (write(ct_ctx_complete.ctx_pipe[1], &wbuf, 1) == -1)
+		CFATAL("complete pipe write failed");
 }
 
 void
