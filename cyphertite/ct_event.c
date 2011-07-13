@@ -136,8 +136,7 @@ ct_wakeup_file(void)
 	/* check state first? -- locks */
 	/* XXX - add code to prevent multiple pending wakeups */
 	wbuf = 'G';
-	if (write(ct_ctx_file.ctx_pipe[1], &wbuf, 1) == -1)
-		CFATAL("file pipe write failed");
+	if (write(ct_ctx_file.ctx_pipe[1], &wbuf, 1) == -1) { /* ignore */ }
 }
 
 void
@@ -148,8 +147,7 @@ ct_wakeup_sha(void)
 	/* check state first? -- locks */
 	/* XXX - add code to prevent multiple pending wakeups */
 	wbuf = 'G';
-	if (write(ct_ctx_sha.ctx_pipe[1], &wbuf, 1) == -1)
-		CFATAL("sha pipe write failed");
+	if (write(ct_ctx_sha.ctx_pipe[1], &wbuf, 1) == -1) { /* ignore */ }
 }
 
 void
@@ -160,8 +158,7 @@ ct_wakeup_compress(void)
 	/* check state first? -- locks */
 	/* XXX - add code to prevent multiple pending wakeups */
 	wbuf = 'G';
-	if (write(ct_ctx_compress.ctx_pipe[1], &wbuf, 1) == -1)
-		CFATAL("compress pipe write failed");
+	if (write(ct_ctx_compress.ctx_pipe[1], &wbuf, 1) == -1) { /* ignore */ }
 }
 
 void
@@ -172,8 +169,7 @@ ct_wakeup_csha(void)
 	/* check state first? -- locks */
 	/* XXX - add code to prevent multiple pending wakeups */
 	wbuf = 'G';
-	if (write(ct_ctx_csha.ctx_pipe[1], &wbuf, 1) == -1)
-		CFATAL("csha pipe write failed");
+	if (write(ct_ctx_csha.ctx_pipe[1], &wbuf, 1) == -1) { /* ignore */ }
 }
 
 void
@@ -184,8 +180,7 @@ ct_wakeup_encrypt(void)
 	/* check state first? -- locks */
 	/* XXX - add code to prevent multiple pending wakeups */
 	wbuf = 'G';
-	if (write(ct_ctx_encrypt.ctx_pipe[1], &wbuf, 1) == -1)
-		CFATAL("encrypt pipe write failed");
+	if (write(ct_ctx_encrypt.ctx_pipe[1], &wbuf, 1) == -1) { /* ignore */ }
 }
 
 void
@@ -196,8 +191,7 @@ ct_wakeup_complete()
 	/* check state first? -- locks */
 	/* XXX - add code to prevent multiple pending wakeups */
 	wbuf = 'G';
-	if (write(ct_ctx_complete.ctx_pipe[1], &wbuf, 1) == -1)
-		CFATAL("complete pipe write failed");
+	if (write(ct_ctx_complete.ctx_pipe[1], &wbuf, 1) == -1) { /* ignore */ }
 }
 
 void
