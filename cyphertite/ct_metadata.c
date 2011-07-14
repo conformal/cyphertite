@@ -787,6 +787,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 	ct_queue_transfer(trans);
 	ct_header_free(NULL, hdr);
 	xmlsd_unwind(&xl);
+	e_free(&vbody);
 }
 
 void

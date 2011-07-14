@@ -125,6 +125,11 @@ ct_op_complete(void)
 		op->op_complete(op);
 
 	TAILQ_REMOVE(&ct_state->ct_operations, op, op_link);
+	e_free(&op);
+
+	/* XXX - here? */
+	if (ct_basisbackup != NULL)
+		e_free(&ct_basisbackup);
 
 	if (TAILQ_EMPTY(&ct_state->ct_operations))
 		return (1);
@@ -144,14 +149,16 @@ ct_load_certs(struct assl_context *c)
 }
 
 
+struct ct_assl_io_ctx    *ct_ssl_ctx;
+
 struct ct_assl_io_ctx *
 ct_ssl_connect(int nonfatal)
 {
 	struct ct_assl_io_ctx    *ctx;
 	struct assl_context *c;
 
-
 	ctx = e_calloc(1, sizeof (*ctx));
+	ct_ssl_ctx = ctx;
 
 	c = assl_alloc_context(ASSL_M_TLSV1_CLIENT, 0);
 	if (c == NULL)
@@ -178,6 +185,13 @@ ct_ssl_connect(int nonfatal)
 		ct_ssl_init_bw_lim(ctx);
 
 	return ctx;
+}
+
+void
+ct_ssl_cleanup(void)
+{
+	assl_event_close(ct_ssl_ctx->c);
+	e_free(&ct_ssl_ctx);
 }
 
 void
@@ -340,6 +354,7 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *ct_assl_ctx)
 		CWARNX("invalid header size");
 		goto done;
 	}
+	e_free(&body);
 	ct_unwire_header(&hdr);
 
 	if (hdr.c_version == C_HDR_VERSION &&

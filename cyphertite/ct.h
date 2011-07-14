@@ -224,6 +224,8 @@ struct ct_trans {
 struct ct_trans		*ct_trans_alloc(void);
 void			ct_trans_free(struct ct_trans *trans);
 void			ct_trans_cleanup(void);
+void			ct_fnode_cleanup(void);
+void			ct_ssl_cleanup(void);
 
 void			ct_queue_transfer(struct ct_trans *);
 

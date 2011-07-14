@@ -64,7 +64,8 @@ ct_cmp_iotrans(struct ct_trans *c1, struct ct_trans *c2)
 /* structure to push data to next cache line - cache isolation */
 struct ct_global_state  ct_int_state;
 struct ct_stat ct_int_stats;
-TAILQ_HEAD(,ct_trans)ct_trans_free_head;
+TAILQ_HEAD(,ct_trans)ct_trans_free_head =
+    TAILQ_HEAD_INITIALIZER(ct_trans_free_head);;
 int ct_numalloc = 0;
 int ct_alloc_block_size;
 int ct_cur_compress_mode = 0;
@@ -301,13 +302,17 @@ void
 ct_trans_cleanup(void)
 {
 	struct ct_trans *trans;
+	int count = 0;
 
+	CDBG("trans num free  %d", c_trans_free);
 	/* free the transaction data block/or each element */
-	if (!TAILQ_EMPTY(&ct_trans_free_head)) {
+	while (!TAILQ_EMPTY(&ct_trans_free_head)) {
 		trans = TAILQ_FIRST(&ct_trans_free_head);
 		TAILQ_REMOVE(&ct_trans_free_head, trans, tr_next);
 		e_free(&trans);
+		count++;
 	}
+	CDBG("freed %d transactions", count);
 }
 
 void
@@ -602,6 +607,7 @@ void
 ct_compute_sha(void *vctx)
 {
 	struct ct_trans		*trans;
+	struct flist		*fnode;
 	char			shat[SHA_DIGEST_STRING_LENGTH];
 	int			slot;
 
@@ -610,6 +616,7 @@ ct_compute_sha(void *vctx)
 		trans = TAILQ_FIRST(&ct_state->ct_sha_queue);
 		TAILQ_REMOVE(&ct_state->ct_sha_queue, trans, tr_next);
 		ct_state->ct_sha_qlen--;
+		fnode = trans->tr_fl_node;
 
 		switch (trans->tr_state) {
 		case TR_S_READ:
@@ -636,7 +643,7 @@ ct_compute_sha(void *vctx)
 			trans->tr_trans_id, slot, trans->tr_size[slot]);
 		ct_sha1(trans->tr_data[slot], trans->tr_sha,
 		    trans->tr_size[slot]);
-		ct_sha1_add(trans->tr_data[slot], &trans->tr_fl_node->fl_shactx,
+		ct_sha1_add(trans->tr_data[slot], &fnode->fl_shactx,
 		    trans->tr_size[slot]);
 
 		ct_stats->st_bytes_sha += trans->tr_size[slot];
@@ -694,11 +701,11 @@ ct_write_md_special(struct ct_trans *trans)
 	int			ret;
 
 	if (C_ISDIR(type)) {
-		if (ct_write_header(trans, trans->tr_fl_node->fl_sname))
+		if (ct_write_header(trans, fnode->fl_sname))
 			CWARNX("header write failed");
-		CDBG("record dir %s", trans->tr_fl_node->fl_sname);
+		CDBG("record dir %s", fnode->fl_sname);
 	} else if (C_ISCHR(type) || C_ISBLK(type)) {
-		if (ct_write_header(trans, trans->tr_fl_node->fl_sname))
+		if (ct_write_header(trans, fnode->fl_sname))
 			CWARNX("header write failed");
 	} else if (C_ISFIFO(type)) {
 		CWARNX("fifo not supported");
@@ -716,12 +723,12 @@ ct_write_md_special(struct ct_trans *trans)
 			link[ret] = '\0';
 			plink = link;
 		}
-		if (trans->tr_fl_node->fl_sname == NULL &&
+		if (fnode->fl_sname == NULL &&
 		    plink == NULL) {
 			CWARNX("%slink with no name or dest",
 			    fnode->fl_hardlink ? "hard" : "sym");
 			return;
-		} else if (trans->tr_fl_node->fl_sname == NULL) {
+		} else if (fnode->fl_sname == NULL) {
 			CWARNX("%slink with no name",
 			    fnode->fl_hardlink ? "hard" : "sym");
 			return;
@@ -730,8 +737,8 @@ ct_write_md_special(struct ct_trans *trans)
 			    fnode->fl_hardlink ? "hard" : "sym");
 			return;
 		}
-		CDBG("link %s %s", trans->tr_fl_node->fl_sname, plink);
-		if (ct_write_header(trans, trans->tr_fl_node->fl_sname))
+		CDBG("link %s %s", fnode->fl_sname, plink);
+		if (ct_write_header(trans, fnode->fl_sname))
 			CWARNX("header write failed");
 
 		if (fnode->fl_hardlink) {
@@ -746,7 +753,7 @@ ct_write_md_special(struct ct_trans *trans)
 	} else if (C_ISSOCK(type)) {
 		CWARNX("cannot archive a socket %s", fnode->fl_sname);
 	} else {
-		CWARNX("invalid type on %s %d", trans->tr_fl_node->fl_sname,
+		CWARNX("invalid type on %s %d", fnode->fl_sname,
 		    type);
 	}
 }
@@ -758,16 +765,17 @@ ct_write_md_eof(struct ct_trans *trans)
 	struct flist		*fnode;
 	int			nrshas;
 
+	fnode = trans->tr_fl_node;
+
 	if ((ct_multilevel_allfiles == 0) &&
-	    trans->tr_fl_node->fl_skip_file)
+	    fnode->fl_skip_file)
 		return;
 
 	CDBG("trailer on trans %" PRIu64, trans->tr_trans_id);
 	CDBG("should write trans for %s",
-	    trans->tr_fl_node->fl_sname);
+	    fnode->fl_sname);
 	ct_write_trailer(trans);
 	if (ct_verbose > 1) {
-		fnode = trans->tr_fl_node;
 
 		if (fnode->fl_size == 0)
 			compression = 0;
@@ -792,6 +800,7 @@ void
 ct_complete_normal(struct ct_trans *trans)
 {
 	int			slot;
+	struct flist		*fnode = trans->tr_fl_node;
 
 	switch (trans->tr_state) {
 	case TR_S_DONE:
@@ -806,23 +815,23 @@ ct_complete_normal(struct ct_trans *trans)
 		break;
 	case TR_S_SPECIAL:
 		if (ct_verbose)
-			printf("%s\n", trans->tr_fl_node->fl_sname);
+			printf("%s\n", fnode->fl_sname);
 		ct_write_md_special(trans);
 		break;
 	case TR_S_FILE_START:
 		if ((ct_multilevel_allfiles == 0) &&
-		    trans->tr_fl_node->fl_skip_file)
+		    fnode->fl_skip_file)
 			break;
 
-		if (ct_write_header(trans, trans->tr_fl_node->fl_sname))
+		if (ct_write_header(trans, fnode->fl_sname))
 			CWARNX("header write failed");
 
 		if (ct_verbose) {
-			printf("%s", trans->tr_fl_node->fl_sname);
+			printf("%s", fnode->fl_sname);
 			fflush(stdout);
 		}
 
-		if (trans->tr_eof == 1 || trans->tr_fl_node->fl_skip_file) {
+		if (trans->tr_eof == 1 || fnode->fl_skip_file) {
 			ct_write_md_eof(trans);
 			ct_stats->st_files_completed++;
 		}
@@ -834,8 +843,10 @@ ct_complete_normal(struct ct_trans *trans)
 		} else {
 			ct_write_sha(trans);
 		}
-		if (trans->tr_eof == 1)
+		if (trans->tr_eof == 1) {
 			ct_write_md_eof(trans);
+		}
+		if (trans->tr_fl_node->fl_state == CT_FILE_FINISHED)
 		break;
 	case TR_S_EX_FILE_START:
 		ct_sha1_setup(&trans->tr_fl_node->fl_shactx);

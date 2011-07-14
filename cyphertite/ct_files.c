@@ -97,6 +97,24 @@ ct_insert_dir(struct dir_stat *ds)
 	}
 }
 
+void
+ct_fnode_cleanup(void)
+{
+	struct flist *fnode;
+	while (!TAILQ_EMPTY(&fl_list_head)) {
+		fnode = TAILQ_FIRST(&fl_list_head);
+		TAILQ_REMOVE(&fl_list_head, fnode, fl_list);
+		if (fnode->fl_fname)
+			e_free(&fnode->fl_fname);
+		if (fnode->fl_hlname)
+			e_free(&fnode->fl_hlname);
+		if (fnode->fl_sname)
+			e_free(&fnode->fl_sname);
+		e_free(&fnode);
+	}
+
+}
+
 int				stop;
 
 char *eat_double_dots(char *, char *);
@@ -167,7 +185,6 @@ ct_sched_backup_file(struct stat *sb, char *filename)
 	fnode->fl_state = CT_FILE_START;
 	ct_sha1_setup(&fnode->fl_shactx);
 
-
 	fnode->fl_hlname = NULL;
 
 	/* deal with hardlink */
@@ -175,7 +192,7 @@ ct_sched_backup_file(struct stat *sb, char *filename)
 	if (fnode_exists != NULL) {
 		fnode->fl_hardlink = 1;
 		fnode->fl_type = C_TY_LINK;
-		fnode->fl_hlname = strdup(fnode_exists->fl_sname);
+		fnode->fl_hlname = e_strdup(fnode_exists->fl_sname);
 		CDBG("found %s as hardlink of %s", fnode->fl_sname,
 		    fnode_exists->fl_sname);
 	} else {
@@ -219,7 +236,8 @@ ct_archive(struct ct_op *op)
 		ct_setup_write_md(mfile, CT_MD_REGULAR);
 
 		ct_traverse(filelist);
-	}
+	} else if (ct_state->ct_file_state == CT_S_FINISHED) 
+		return;
 
 	ct_set_file_state(CT_S_RUNNING);
 
@@ -669,6 +687,7 @@ ct_file_extract_close(struct flist *fnode)
 			CFATAL("utimes failed");
 	}
 	close(ct_extract_fd);
+	e_free(&fnode);
 	ct_ex_curnode = NULL;
 	ct_extract_fd = -1;
 }

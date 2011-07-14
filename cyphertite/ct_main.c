@@ -459,6 +459,9 @@ main(int argc, char **argv)
 		    strerror(errno));
 
 out:
+	ct_trans_cleanup();
+	ct_fnode_cleanup();
+	ct_ssl_cleanup();
 #ifdef notyet
 	e_check_memory();
 #endif
