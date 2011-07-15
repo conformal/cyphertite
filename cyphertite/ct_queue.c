@@ -846,7 +846,6 @@ ct_complete_normal(struct ct_trans *trans)
 		if (trans->tr_eof == 1) {
 			ct_write_md_eof(trans);
 		}
-		if (trans->tr_fl_node->fl_state == CT_FILE_FINISHED)
 		break;
 	case TR_S_EX_FILE_START:
 		ct_sha1_setup(&trans->tr_fl_node->fl_shactx);
