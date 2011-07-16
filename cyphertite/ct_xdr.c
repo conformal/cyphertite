@@ -796,6 +796,11 @@ ct_basis_setup(const char *basisbackup)
 	ct_prev_backup_time = gh.cmg_created;
 	CINFO("prev backup time %s %s", ctime(&ct_prev_backup_time),
 	    basisbackup);
+
+	/* XXX - here? */
+	if (ct_basisbackup == basisbackup)
+		e_free(&ct_basisbackup);
+
 	ct_metadata_close(xdr_f);
 }
 

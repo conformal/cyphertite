@@ -127,10 +127,6 @@ ct_op_complete(void)
 	TAILQ_REMOVE(&ct_state->ct_operations, op, op_link);
 	e_free(&op);
 
-	/* XXX - here? */
-	if (ct_basisbackup != NULL)
-		e_free(&ct_basisbackup);
-
 	if (TAILQ_EMPTY(&ct_state->ct_operations))
 		return (1);
 
