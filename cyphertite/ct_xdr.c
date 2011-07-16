@@ -494,7 +494,7 @@ ct_extract_setup(const char *file)
 
 	xdr_f = ct_metadata_open(file,  &gh);
 	if (xdr_f == NULL)
-		CFATALX("ct_extract_setup unable to open metadata file '%s'\n",
+		CFATALX("extract failure: unable to open metadata file '%s'\n",
 		    file);
 
 	ct_encrypt_enabled = (gh.cmg_flags & CT_MD_CRYPTO);
@@ -535,7 +535,7 @@ ct_extract_setup_queue(const char *file)
 
 	xdr_f = ct_metadata_open(file,  &gh);
 	if (xdr_f == NULL)
-		CFATALX("ct_extract_setup_queue unable to open metadata file "
+		CFATALX("extract failure: unable to open differential archive"
 		    "'%s'\n", file);
 
 	ct_encrypt_enabled = (gh.cmg_flags & CT_MD_CRYPTO);
