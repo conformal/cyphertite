@@ -934,15 +934,27 @@ ct_md_download_next(struct ct_op *op)
 	char			*md_prev;
 	char			*cachename;
 
+	md_is_open = 0;	/* prevent trying to close upon next download */
+again:
 	CDBG("mfile %s", mfile);
 
 	md_prev = ct_metadata_check_prev(mfile);
 
 	if (md_prev && md_prev[0] != '\0') {
-		CDBG("prevfile %s", md_prev);
 		cachename = ct_md_get_cachename(md_prev);
-		ct_add_operation(ct_md_extract, ct_md_download_next,
-		    (char *)md_prev, cachename, md_prev, 0, 0); 
+		CDBG("prev file %s cachename %s", md_prev, cachename);
+		if (!md_is_in_cache(cachename)) {
+			e_free(&cachename);
+			ct_add_operation_after(op, ct_md_extract,
+			    ct_md_download_next, (char *)md_prev,
+			    NULL, md_prev, 0, 0); 
+		} else {
+			if (mfile == mfilename)
+				e_free(&mfile);
+			e_free(&cachename);
+			mfile = mfilename = md_prev;
+			goto again;
+		}
 	}
 	if (mfile == mfilename) {
 		e_free(&mfile);
@@ -1045,8 +1057,16 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 			ct_basisbackup = cachename;
 		ct_add_operation(ct_md_extract, ct_md_extract_nextop,
 		    cachename, best, filelist, action, match_mode); 
+		return;
+	}
 
-	} else if (action == CT_A_EXTRACT) {
+	/* if not in cache, check we have no differentials we need get. */
+	if (action == CT_A_EXTRACT || action == CT_A_LIST) {
+		op->op_arg1 = cachename;
+		ct_md_download_next(op);
+	}
+
+	if (action == CT_A_EXTRACT) {
 		e_free(&best);
 		// XXX switch on action 
 		ct_add_operation(ct_extract, ct_extract_free_mdname,
