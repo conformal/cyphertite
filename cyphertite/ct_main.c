@@ -112,9 +112,9 @@ struct ct_settings	settings[] = {
 void
 usage(void)
 {
-	fprintf(stderr, "%s {-ctxV} [-BCDFPRXabdpv0] -f <archive> [filelist]\n",
+	fprintf(stderr, "%s {-ctxV} [-0BCDFPRXabdpv] -f <archive> [filelist]\n",
 	    __progname);
-	exit(0);
+	exit(1);
 }
 
 void
@@ -317,7 +317,6 @@ main(int argc, char **argv)
 	if (ct_mfile == NULL && !(ct_metadata && ct_action == CT_A_LIST)) {
 		CWARNX("archive file is required");
 		usage();
-		return (1);
 	}
 
 	if (!foreground)
@@ -376,8 +375,6 @@ main(int argc, char **argv)
 	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
 	ct_setup_wakeup_complete(ct_state, ct_process_completions);
 
-
-
 	if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
 		switch (ct_action) {
 		case CT_A_EXTRACT:
@@ -422,7 +419,6 @@ main(int argc, char **argv)
 		default:
 			CWARNX("must specify action");
 			usage();
-			ret = 1;
 			break;
 		}
 	} else {
@@ -443,7 +439,6 @@ main(int argc, char **argv)
 		default:
 			CWARNX("must specify action");
 			usage();
-			ret = 1;
 			break;
 		}
 	}
