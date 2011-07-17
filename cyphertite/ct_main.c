@@ -422,6 +422,7 @@ main(int argc, char **argv)
 			break;
 		}
 	} else {
+		/* list handled above. */
 		switch (ct_action) {
 		case CT_A_ARCHIVE:
 			ct_add_operation(ct_archive, NULL, ct_mfile, argv,
@@ -431,10 +432,6 @@ main(int argc, char **argv)
 			ct_add_operation(ct_extract, NULL, ct_mfile,
 			    argv, NULL, ct_match_mode, 0);
 			break;
-		case CT_A_LIST:
-			ret = ct_list(ct_mfile, argv, ct_match_mode);
-			goto out;
-			break;
 		case CT_A_ERASE:
 		default:
 			CWARNX("must specify action");
@@ -442,9 +439,6 @@ main(int argc, char **argv)
 			break;
 		}
 	}
-
-	if (ret != 0)
-		goto out;
 
 	ct_wakeup_file();
 
