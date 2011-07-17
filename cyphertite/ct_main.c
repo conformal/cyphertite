@@ -50,9 +50,7 @@ FILE			*ct_listfile;
 int			ct_strip_slash = 1;
 int			ct_verbose_ratios;
 int			ct_no_cross_mounts;
-char			*ct_mfile;
 int			ct_verbose;
-char			*ct_basisbackup;
 char			*ct_configfile;
 int			ct_attr;
 
@@ -148,6 +146,8 @@ main(int argc, char **argv)
 {
 	char		pwd[PASS_MAX];
 	char		ct_fullcachedir[PATH_MAX];
+	char		*ct_basisbackup = NULL;
+	char		*ct_mfile = NULL;
 	int		ct_metadata = 0;
 	int		ct_match_mode = CT_MATCH_GLOB;
 	struct stat	sb;
@@ -336,6 +336,8 @@ main(int argc, char **argv)
 	ct_mdmode_setup(ct_mdmode_str);
 
 	if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
+		if (ct_basisbackup != NULL)
+			CFATALX("differential basis in remote mode");
 		if (ct_md_cachedir == NULL)
 			CFATALX("remote mode needs a cachedir set");
 		if (ct_md_cachedir[strlen(ct_md_cachedir) - 1] != '/') {
@@ -390,7 +392,7 @@ main(int argc, char **argv)
 				    argv, NULL, ct_action, ct_match_mode);
 			else   {
 				ct_add_operation(ct_archive, NULL, ct_mfile,
-				    argv, ct_basisbackup, 0, 0);
+				    argv, NULL, 0, 0);
 				ct_add_operation(ct_md_archive, NULL, ct_mfile,
 				    NULL, NULL, 0, 0);
 			}

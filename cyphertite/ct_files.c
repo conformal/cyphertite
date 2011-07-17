@@ -233,7 +233,10 @@ ct_archive(struct ct_op *op)
 		}
 		/* XXX - deal with stdin */
 		/* XXX - if basisbackup should the type change ? */
-		ct_setup_write_md(mfile, CT_MD_REGULAR);
+		ct_setup_write_md(mfile, CT_MD_REGULAR, basisbackup);
+
+		if (basisbackup != NULL)
+			e_free(&basisbackup);
 
 		ct_traverse(filelist);
 	} else if (ct_state->ct_file_state == CT_S_FINISHED) 

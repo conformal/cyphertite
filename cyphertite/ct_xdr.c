@@ -137,7 +137,7 @@ ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp)
 }
 
 FILE *
-ct_metadata_create(const char *filename, int intype)
+ct_metadata_create(const char *filename, int intype, const char *basis)
 {
 	FILE			*f;
 	struct ct_md_gheader	gh;
@@ -159,7 +159,7 @@ ct_metadata_create(const char *filename, int intype)
 		gh.cmg_flags |= CT_MD_CRYPTO;
 	if (ct_multilevel_allfiles)
 		gh.cmg_flags |= CT_MD_MLB_ALLFILES;
-	gh.cmg_prevlvl_filename = ct_basisbackup ? ct_basisbackup : "";
+	gh.cmg_prevlvl_filename = basis ? (char *)basis : "";
 
 	md_dir = XDR_ENCODE;
 	/* write global header */
@@ -280,6 +280,28 @@ ct_write_sha_crypto(struct ct_trans *trans)
 		CWARNX("failed to write sha");
 
 	return (ret == FALSE);
+}
+
+void
+ct_list_op(struct ct_op *op)
+{
+	struct ct_trans		*trans;
+	const char		*mfile = op->op_arg1;
+	char			**filelist = op->op_arg2;
+	int			 match_mode = op->op_arg4;
+
+	ct_list(mfile, filelist, match_mode);
+	trans = ct_trans_alloc();
+	if (trans == NULL) {
+		/* system busy, return (should never happen) */
+		CDBG("ran out of transactions, waiting");
+		ct_set_file_state(CT_S_WAITING_TRANS);
+		return;
+	}
+	trans->tr_state = TR_S_DONE;
+	trans->tr_trans_id = ct_trans_id++;
+	ct_queue_transfer(trans);
+	ct_set_file_state(CT_S_FINISHED);
 }
 
 int
@@ -797,10 +819,6 @@ ct_basis_setup(const char *basisbackup)
 	CINFO("prev backup time %s %s", ctime(&ct_prev_backup_time),
 	    basisbackup);
 
-	/* XXX - here? */
-	if (ct_basisbackup == basisbackup)
-		e_free(&ct_basisbackup);
-
 	ct_metadata_close(xdr_f);
 }
 
@@ -811,14 +829,12 @@ ct_metadata_check_prev(const char *mdname)
 	struct ct_md_gheader	 gh;
 	char			 *ret = NULL;
 
-	md_file = ct_metadata_open(mdname, &gh);
+	if ((md_file = ct_metadata_open(mdname, &gh)) != NULL) {
+		if (gh.cmg_prevlvl_filename)
+			ret = e_strdup(gh.cmg_prevlvl_filename);
 
-	if (md_file && gh.cmg_prevlvl_filename) {
-		ret = e_strdup(gh.cmg_prevlvl_filename);
-	}
-
-	if (md_file)
 		ct_metadata_close(md_file);
+	}
 
 	return ret;
 }

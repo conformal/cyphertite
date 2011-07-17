@@ -35,7 +35,6 @@ extern int		ct_debug;
 extern int		ct_compress_enabled;
 extern int		ct_encrypt_enabled;
 extern int		ct_multilevel_allfiles;
-extern char		*ct_basisbackup;
 extern char		*ct_tdir;
 extern int		ct_attr;
 extern int		ct_strip_slash;
@@ -258,6 +257,7 @@ struct ct_op;
 
 void			ct_archive(struct ct_op *);
 void			ct_extract(struct ct_op *);
+void			ct_list_op(struct ct_op *);
 int			ct_list(const char *, char **, int);
 void			ct_md_archive(struct ct_op *);
 void			ct_md_extract(struct ct_op *);
@@ -390,7 +390,8 @@ int				ctdb_insert(struct ct_trans *trans);
 
 /* metadata */
 int				ct_s_to_e_type(int);
-FILE				*ct_metadata_create(const char *, int);
+FILE				*ct_metadata_create(const char *, int,
+				    const char *);
 void				ct_metadata_close(FILE *);
 char				*ct_metadata_check_prev(const char *);
 
@@ -522,7 +523,7 @@ struct ct_assl_io_ctx	*ct_ssl_connect(int);
 void			ct_reconnect(int, short, void *);
 void			ct_load_certs(struct assl_context *);
 int			ct_assl_negotiate_poll(struct ct_assl_io_ctx *);
-void			ct_setup_write_md(const char *, int);
+void			ct_setup_write_md(const char *, int, const char *);
 void			ct_cleanup_md(void);
 
 /* limit extract and list by regex */

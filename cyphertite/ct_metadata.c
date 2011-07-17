@@ -915,11 +915,11 @@ ct_find_md_for_extract(struct ct_op *op)
 }
 
 void
-ct_extract_free_mdname(struct ct_op *op)
+ct_free_mdname(struct ct_op *op)
 {
 	const char		*mfile = op->op_arg1;
 
-	CDBG("extract_free_mdname %s", mfile);
+	CDBG("%s: %s", __func__, mfile);
 	if (mfile != NULL)
 		e_free(&mfile);
 }
@@ -969,12 +969,7 @@ again:
 void
 ct_md_extract_nextop(struct ct_op *op)
 {
-	extern char		*ct_mfile;
-	const char		*mfile = op->op_arg1;
-	char			**filelist = op->op_arg3;
-	char			*afile;
 	int			 action = op->op_arg4;
-	int			 match_mode = op->op_arg5;
 
 	md_is_open = 0;
 	/*
@@ -983,25 +978,6 @@ ct_md_extract_nextop(struct ct_op *op)
 	 */
 	if (action == CT_A_EXTRACT || action == CT_A_LIST)
 		ct_md_download_next(op);
-
-	/* mdname if we set it will have been freed on transaction completion */
-
-	if (action == CT_A_EXTRACT) {
-		ct_add_operation(ct_extract, ct_extract_free_mdname,
-		    (char *)mfile, filelist, NULL, match_mode, 0); 
-	} else if (action == CT_A_LIST) {
-		ct_list(mfile, filelist, match_mode);
-		e_free(&mfile);
-	} else if (action == CT_A_ARCHIVE) {
-		CDBG("starting archive %s %s", mfile, ct_basisbackup);
-		afile = ct_find_md_for_archive(ct_mfile);
-		ct_add_operation(ct_archive, NULL, afile, filelist,
-		    ct_basisbackup, 0, 0);
-		ct_add_operation(ct_md_archive, NULL, afile, NULL, NULL, 0, 0);
-	} else {
-		CFATALX("invalid action");
-	}
-
 }
 
 void
@@ -1012,7 +988,7 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 	char		*mfile;
 	struct ct_op	*list_fakeop = op->op_priv;
 	char		**result, **tmp;
-	char	 	*best, *cachename; 
+	char	 	*best, *cachename = NULL; 
 	int		 nresults = 0;
 	int		 action = op->op_arg4;
 	int		 match_mode = op->op_arg5;
@@ -1027,14 +1003,10 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 		nresults++;
 	if (nresults == 0) {
 		if (action == CT_A_ARCHIVE) {
-			mfile = ct_find_md_for_archive(op->op_arg1);
-			ct_add_operation(ct_archive, NULL, mfile, filelist,
-			    ct_basisbackup, 0, 0);
-			ct_add_operation(ct_md_archive, NULL, mfile, NULL,
-			    NULL, 0, 0);
-			return;
-		} else 
+			goto do_operation;
+		} else  {
 			CFATALX("unable to find metadata tagged %s", mdname);
+		}
 	}
 		
 	/* sort and calculate newest */
@@ -1051,39 +1023,51 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 	}
 	e_free(&result);
 
+	/*
+	 * if the metadata file is not in the cache directory then we
+	 * need to download it first. if we need to recursively download
+	 * a differential chain then that code will handle scheduling
+	 * those operations too. If we have it, we still need to check
+	 * that all others in the chain exist, however.
+	 */
 	cachename = ct_md_get_cachename(best);
 	if (!md_is_in_cache(best)) {
-		if (action == CT_A_ARCHIVE)
-			ct_basisbackup = cachename;
 		ct_add_operation(ct_md_extract, ct_md_extract_nextop,
 		    cachename, best, filelist, action, match_mode); 
-		return;
-	}
-
-	/* if not in cache, check we have no differentials we need get. */
-	if (action == CT_A_EXTRACT || action == CT_A_LIST) {
-		op->op_arg1 = cachename;
-		ct_md_download_next(op);
-	}
-
-	if (action == CT_A_EXTRACT) {
-		e_free(&best);
-		// XXX switch on action 
-		ct_add_operation(ct_extract, ct_extract_free_mdname,
-		    cachename, filelist, NULL, match_mode, 0); 
-		// we can go right to the operation now 
-	} else if (action == CT_A_LIST) {
-		ct_list(cachename, filelist, match_mode);
-		e_free(&cachename);
-	} else if (action == CT_A_ARCHIVE) {
-		e_free(&best);
-		CDBG("setting basisname %s", cachename);
-		mfile = ct_find_md_for_archive(op->op_arg1);
-		ct_basisbackup = cachename;
-		ct_add_operation(ct_archive, NULL, mfile, filelist,
-		    ct_basisbackup, 0, 0);
-		ct_add_operation(ct_md_archive, NULL, mfile, NULL, NULL, 0, 0);
 	} else {
+		if (action == CT_A_EXTRACT || action == CT_A_LIST) {
+			op->op_arg1 = cachename;
+			ct_md_download_next(op);
+		}
+
+		e_free(&best);
+	}
+
+do_operation:
+	/*
+	 * Any recursive download after now will be carried placed after the
+	 * current operation in the queue of ops. So we can add the final 
+	 * operation to the end of the queue now without difficulty.
+	 */
+	switch (action) {
+	case CT_A_EXTRACT:
+		ct_add_operation(ct_extract, ct_free_mdname,
+		    cachename, filelist, NULL, match_mode, 0); 
+		break;
+	case CT_A_LIST:
+		ct_add_operation(ct_list_op, ct_free_mdname,
+		    cachename, filelist, NULL, match_mode, 0);
+		break;
+	case CT_A_ARCHIVE:
+		mfile = ct_find_md_for_archive(op->op_arg1);
+		CDBG("setting basisname %s", cachename);
+		/* XXX does this leak cachename? */
+		ct_add_operation(ct_archive, NULL, mfile, filelist,
+		    cachename, 0, 0);
+		ct_add_operation(ct_md_archive, ct_free_mdname, mfile,
+		    NULL, NULL, 0, 0);
+		break;
+	default:
 		CFATALX("invalid action");
 	}
 }
