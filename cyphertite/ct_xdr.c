@@ -497,8 +497,6 @@ ct_read_trailer(struct ct_md_trailer *trl)
 	return (ret == FALSE);
 }
 
-int ct_extract_second_pass;
-
 struct ct_extract_stack   {
 	TAILQ_ENTRY(ct_extract_stack)	next;
 	char		*filename;
