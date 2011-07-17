@@ -55,8 +55,6 @@ char			*ct_configfile;
 int			ct_attr;
 
 /* runtime */
-int			ct_got_secrets;
-int			ct_crypto = CT_MD_NOCRYPTO;
 unsigned char		ct_iv[CT_IV_LEN];
 unsigned char		ct_crypto_key[CT_KEY_LEN];
 
@@ -285,7 +283,6 @@ main(int argc, char **argv)
 				CFATALX("can't create secrets");
 		}
 		/* we got crypto */
-		ct_crypto = CT_MD_CRYPTO;
 		if (ct_unlock_secrets(ct_crypto_password,
 		    ct_crypto_secrets,
 		    ct_crypto_key,
@@ -293,7 +290,6 @@ main(int argc, char **argv)
 		    ct_iv,
 		    sizeof ct_iv))
 			CFATALX("can't unlock secrets");
-		ct_got_secrets = 1; /* XXX do we need this? */
 		ct_encrypt_enabled = 1;
 	}
 
