@@ -720,10 +720,13 @@ ct_file_extract_special(struct flist *fnode)
 			appath = fnode->fl_hlname;
 		}
 
-		if (fnode->fl_hardlink)
-			link(appath, tpath);
-		else
-			symlink(appath, tpath);
+		if (fnode->fl_hardlink) {
+			if (link(appath, tpath))
+				CWARN("link failed: %s", tpath);
+		} else {
+			if (symlink(appath, tpath))
+				CWARN("symlink failed: %s", tpath);
+		}
 	} else {
 		CFATALX("illegal file %s of type %d", tpath, fnode->fl_mode);
 	}
@@ -1045,8 +1048,7 @@ ct_create_config(void)
 	if (conf_buf == NULL)
 		CFATALX("strdup");
 	dir = dirname(conf_buf);
-	asprintf(&md_cachedir, "%s/.cyphertite_md_cachedir", dir);
-	if (md_cachedir == NULL)
+	if (asprintf(&md_cachedir, "%s/.cyphertite_md_cachedir", dir) == -1)
 		CFATALX("default md_cachedir");
 
 	snprintf(prompt, sizeof prompt,
