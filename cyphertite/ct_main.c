@@ -271,33 +271,6 @@ main(int argc, char **argv)
 		ct_io_bw_limit = ct_io_bw_limit * 10 / 7;
 	}
 
-	if (ct_password == NULL) {
-		if (ct_get_password(pwd, sizeof pwd, "Login password: ", 0))
-			CFATALX("invalid password");
-		ct_password = strdup(pwd);
-		if (ct_password == NULL)
-			CFATAL("ct_password");
-		bzero(pwd, sizeof pwd);
-	}
-
-	if (ct_crypto_secrets) {
-		if (stat(ct_crypto_secrets, &sb) == -1) {
-			fprintf(stderr, "No crypto secrets file. Creating\n");
-			if (ct_create_secrets(ct_crypto_password,
-			    ct_crypto_secrets))
-				CFATALX("can't create secrets");
-		}
-		/* we got crypto */
-		if (ct_unlock_secrets(ct_crypto_password,
-		    ct_crypto_secrets,
-		    ct_crypto_key,
-		    sizeof ct_crypto_key,
-		    ct_iv,
-		    sizeof ct_iv))
-			CFATALX("can't unlock secrets");
-		ct_encrypt_enabled = 1;
-	}
-
 	if (ct_compression_type == NULL) {
 		ct_compress_enabled = 0;
 	} else if (strcmp("lzo", ct_compression_type) == 0) {
@@ -361,6 +334,33 @@ main(int argc, char **argv)
 	    ct_metadata == 0 ) {
 		ret = ct_list(ct_mfile, argv, ct_match_mode);
 		goto out;
+	}
+
+	if (ct_password == NULL) {
+		if (ct_get_password(pwd, sizeof pwd, "Login password: ", 0))
+			CFATALX("invalid password");
+		ct_password = strdup(pwd);
+		if (ct_password == NULL)
+			CFATAL("ct_password");
+		bzero(pwd, sizeof pwd);
+	}
+
+	if (ct_crypto_secrets) {
+		if (stat(ct_crypto_secrets, &sb) == -1) {
+			fprintf(stderr, "No crypto secrets file. Creating\n");
+			if (ct_create_secrets(ct_crypto_password,
+			    ct_crypto_secrets))
+				CFATALX("can't create secrets");
+		}
+		/* we got crypto */
+		if (ct_unlock_secrets(ct_crypto_password,
+		    ct_crypto_secrets,
+		    ct_crypto_key,
+		    sizeof ct_crypto_key,
+		    ct_iv,
+		    sizeof ct_iv))
+			CFATALX("can't unlock secrets");
+		ct_encrypt_enabled = 1;
 	}
 
 	ct_event_init();
@@ -445,10 +445,10 @@ main(int argc, char **argv)
 		CWARNX("event_dispatch returned, %d %s", errno,
 		    strerror(errno));
 
-out:
 	ct_trans_cleanup();
 	ct_fnode_cleanup();
 	ct_ssl_cleanup();
+out:
 #ifdef notyet
 	e_check_memory();
 #endif
