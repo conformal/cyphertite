@@ -44,9 +44,11 @@ struct ct_settings {
 #define CT_S_STR		(2)
 #define CT_S_FLOAT		(3)
 #define CT_S_DIR		(4) /* string with ~ expansion */
+#define CT_S_SIZE		(5) /* size with postfix */
 	int			*cs_ival;
 	char			**cs_sval;
 	double			*cs_fval;
+	long long		*cs_szval;
 	struct ct_special	*cs_s;
 };
 

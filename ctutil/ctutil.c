@@ -228,6 +228,12 @@ ct_settings_add(struct ct_settings *settings, char *var, char *val)
 				*f = atof(val);
 				rv = 0;
 				break;
+			case CT_S_SIZE:
+				if (scan_scaled(val, cs->cs_szval) != 0)
+					CFATAL("can't parse size for %s",
+					    cs->cs_name);
+				rv = 0;
+				break;
 			case CT_S_INVALID:
 			default:
 				CFATALX("invalid type for %s", var);
