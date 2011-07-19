@@ -252,6 +252,11 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
+	if (ct_mfile == NULL && !(ct_metadata && ct_action == CT_A_LIST)) {
+		CWARNX("archive file is required");
+		usage();
+	}
+
 	/* please don't delete this line AGAIN! --mp */
 	if (clog_set_flags(cflags))
 		errx(1, "illegal clog flags");
@@ -308,11 +313,6 @@ main(int argc, char **argv)
 	if (ct_compress_enabled != 0) {
 		ct_init_compression(ct_compress_enabled);
 		ct_cur_compress_mode = ct_compress_enabled;
-	}
-
-	if (ct_mfile == NULL && !(ct_metadata && ct_action == CT_A_LIST)) {
-		CWARNX("archive file is required");
-		usage();
 	}
 
 	if (!foreground)
