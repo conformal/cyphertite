@@ -80,6 +80,17 @@ Specify the path to the client certificate key file.
 Specify the path to the directory to be used to cache metadata files in
 remote mode.
 .Pp
+.It Ic md_cachedir_max_size =  Ar size
+Specify the maximum size of the metadata cache directory.
+If this is set then when the size of the directory is larger than this
+directive the oldest files will be deleted from the cache to make the
+cache directory take at most
+.Op size
+bytes of space.
+.Op size
+may end with a letter to signify units, for example a value of 128M would
+equal 128 megabytes.
+.Pp
 .It Xo
 .Ic md_mode =
 .Pq Ic local Ns \&| Ns Ic remote

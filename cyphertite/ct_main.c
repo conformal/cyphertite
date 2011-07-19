@@ -81,6 +81,7 @@ int			ct_compress_enabled;
 int			ct_encrypt_enabled;
 int			ct_multilevel_allfiles;
 int			ct_auto_differential;
+long long		ct_max_mdcache_size = -1LL; /* unbounded */
 
 struct ct_settings	settings[] = {
 	{ "queue_depth", CT_S_INT, &ct_max_trans, NULL, NULL, NULL },
@@ -100,6 +101,8 @@ struct ct_settings	settings[] = {
 	{ "polltype", CT_S_STR, NULL, &ct_polltype, NULL, NULL },
 	{ "md_mode", CT_S_STR, NULL, &ct_mdmode_str, NULL, NULL },
 	{ "md_cachedir", CT_S_DIR, NULL, &ct_md_cachedir, NULL, NULL },
+	{ "md_cachedir_max_size", CT_S_SIZE, NULL, NULL, NULL,
+	    &ct_max_mdcache_size, NULL },
 	{ "md_remote_auto_differential" , CT_S_INT, &ct_auto_differential,
 	    NULL, NULL, NULL },
 	{ NULL, 0, NULL, NULL, NULL,  NULL }
@@ -445,6 +448,9 @@ main(int argc, char **argv)
 	ct_fnode_cleanup();
 	ct_ssl_cleanup();
 out:
+	if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0)
+		ct_mdcache_trim(ct_md_cachedir, ct_max_mdcache_size);
+
 #ifdef notyet
 	e_check_memory();
 #endif

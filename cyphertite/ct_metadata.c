@@ -27,6 +27,7 @@
 #include <clog.h>
 #include <exude.h>
 #include <xmlsd.h>
+#include <fts.h>
 
 #include <ctutil.h>
 #include "ct_xml.h"
@@ -1110,4 +1111,108 @@ ct_find_md_for_archive(const char *mdname)
 	e_free(&fullname);
 
 	return (cachename);
+}
+
+/*
+ * make fts_* return entities in mtime order, oldest first
+ */
+static int
+datecompare(const FTSENT **a, const FTSENT **b)
+{
+	return (timespeccmp(&(*a)->fts_statp->st_mtim,
+	    &(*b)->fts_statp->st_mtim, <));
+}
+
+/*
+ * Trim down the metadata cachedir to be smaller than ``max_size''.
+ *
+ * We only look at files in the directory (and lower, since we use fts(3),
+ * since cyphertite will only ever create files, not symlinkts or directories.
+ * We delete files in date order, oldest first, until the size constraint has
+ * been met.
+ */
+void
+ct_mdcache_trim(const char *cachedir, long long max_size)
+{
+	char		*paths[2];
+	FTS		*ftsp;
+	FTSENT		*fe;
+	long long	 dirsize = 0;
+
+	paths[0] = (char *)cachedir;
+	paths[1] = NULL;
+
+	if ((ftsp = fts_open(paths, FTS_XDEV | FTS_PHYSICAL | FTS_NOCHDIR,
+	   NULL)) == NULL)
+		CFATAL("can't open metadata cache to scan");
+
+	while ((fe = fts_read(ftsp)) != NULL) {
+		switch(fe->fts_info) {
+		case FTS_F:
+			/*
+			 * XXX no OFF_T_MAX in posix, on openbsd it is always a
+			 * long long
+			 */
+			if (LLONG_MAX - dirsize < fe->fts_statp->st_size)
+				CWARNX("dirsize overflowed");
+			dirsize += fe->fts_statp->st_size;	
+			break;
+		case FTS_ERR:
+		case FTS_DNR:
+		case FTS_NS:
+			errno = fe->fts_errno;
+			CFATAL("can't read directory entry");
+		case FTS_DC:
+			CWARNX("file system cycle found");
+			/* FALLTHROUGH */
+		default:
+			/* valid but we don't care */
+			continue;
+		}
+	}
+
+	if (fts_close(ftsp))
+		CFATAL("close directory failed");
+
+	if (dirsize <= max_size)
+		return;
+	CDBG("cleaning up md cachedir, %llu > %llu",
+	    (long long)dirsize, (long long)max_size);
+
+	if ((ftsp = fts_open(paths, FTS_XDEV | FTS_PHYSICAL | FTS_NOCHDIR,
+	   datecompare)) == NULL)
+		CFATAL("can't open metadata cache to trim");
+
+	while ((fe = fts_read(ftsp)) != NULL) {
+		switch(fe->fts_info) {
+		case FTS_F:
+			CDBG("%s %llu", fe->fts_path,
+			    (long long)fe->fts_statp->st_size);
+			if (unlink(fe->fts_path) != 0) {
+				CWARN("couldn't delete md file %s",
+				    fe->fts_path);
+				continue;
+			}
+			dirsize -= fe->fts_statp->st_size;
+			break;
+		case FTS_ERR:
+		case FTS_DNR:
+		case FTS_NS:
+			errno = fe->fts_errno;
+			CFATAL("can't read directory entry");
+		case FTS_DC:
+			CWARNX("file system cycle found");
+			/* FALLTHROUGH */
+		default:
+			/* valid but we don't care */
+			continue;
+		}
+		CDBG("size now %llu", (long long)dirsize);
+
+		if (dirsize < max_size)
+			break;
+	}
+
+	if (fts_close(ftsp))
+		CFATAL("close directory failed");
 }
