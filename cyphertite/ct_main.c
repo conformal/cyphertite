@@ -322,11 +322,6 @@ main(int argc, char **argv)
 			
 		if (ct_make_full_path(ct_md_cachedir, 0700) != 0)
 			CFATALX("can't create MD cachedir");
-
-		if (ct_action == CT_A_ARCHIVE) {
-			if (!ct_auto_differential)
-				ct_mfile = ct_find_md_for_archive(ct_mfile);
-		}
 	}
 
 	/* Don't bother starting a connection if just listing local files. */
@@ -378,19 +373,20 @@ main(int argc, char **argv)
 		case CT_A_EXTRACT:
 		case CT_A_LIST:
 			ct_add_operation(ct_find_md_for_extract,
-			    ct_find_md_for_extract_complete, ct_mfile,
-			    argv, NULL, ct_action, ct_match_mode);
+			    ct_find_md_for_extract_complete, ct_mfile, NULL,
+			    argv, NULL, ct_match_mode, ct_action);
 			break;
 		case CT_A_ARCHIVE:
 			if (ct_auto_differential)
 				ct_add_operation(ct_find_md_for_extract,
 				    ct_find_md_for_extract_complete, ct_mfile,
-				    argv, NULL, ct_action, ct_match_mode);
+				    NULL, argv, NULL, ct_match_mode, ct_action);
 			else   {
+				ct_mfile = ct_find_md_for_archive(ct_mfile);
 				ct_add_operation(ct_archive, NULL, ct_mfile,
-				    argv, NULL, 0, 0);
+				    NULL, argv, NULL, 0, 0);
 				ct_add_operation(ct_md_archive, NULL, ct_mfile,
-				    NULL, NULL, 0, 0);
+				    NULL, NULL, NULL, 0, 0);
 			}
 			break;
 		default:
@@ -400,19 +396,19 @@ main(int argc, char **argv)
 		switch (ct_action) {
 		case CT_A_ARCHIVE:
 			ct_add_operation(ct_md_archive, NULL,
-			    ct_mfile, NULL, NULL, 0, 0);
+			    ct_mfile, NULL, NULL, NULL, 0, 0);
 			break;
 		case CT_A_EXTRACT:
 			ct_add_operation(ct_md_extract, NULL, ct_mfile,
-			    NULL, NULL, 0, 0);
+			    NULL, NULL, NULL, 0, 0);
 			break;
 		case CT_A_LIST:
 			ct_add_operation(ct_md_list_start, ct_md_list_print,
-			    argv, NULL, NULL, ct_match_mode, 0);
+			    NULL, NULL, argv, NULL, ct_match_mode, 0);
 			break;
 		case CT_A_ERASE:
-			ct_add_operation(ct_md_delete, NULL, ct_mfile,
-			    NULL, NULL, 0, 0);
+			ct_add_operation(ct_md_delete, NULL, NULL,
+			    ct_mfile, NULL, NULL, 0, 0);
 			break;
 		default:
 			CWARNX("must specify action");
@@ -423,11 +419,11 @@ main(int argc, char **argv)
 		/* list handled above. */
 		switch (ct_action) {
 		case CT_A_ARCHIVE:
-			ct_add_operation(ct_archive, NULL, ct_mfile, argv,
+			ct_add_operation(ct_archive, NULL, ct_mfile, NULL, argv,
 			    ct_basisbackup, 0, 0);
 			break;
 		case CT_A_EXTRACT:
-			ct_add_operation(ct_extract, NULL, ct_mfile,
+			ct_add_operation(ct_extract, NULL, ct_mfile, NULL,
 			    argv, NULL, ct_match_mode, 0);
 			break;
 		case CT_A_ERASE:

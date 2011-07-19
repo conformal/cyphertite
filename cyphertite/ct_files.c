@@ -211,9 +211,9 @@ ct_sched_backup_file(struct stat *sb, char *filename)
 void
 ct_archive(struct ct_op *op)
 {
-	const char		*mfile = op->op_arg1;
-	char			**filelist = op->op_arg2;
-	const char		*basisbackup = op->op_arg3;
+	const char		*mfile = op->op_local_fname;
+	char			**filelist = op->op_filelist;
+	const char		*basisbackup = op->op_basis;
 	size_t			rsz, rlen;
 	struct stat		sb;
 	struct ct_trans		*ct_trans;

@@ -286,11 +286,8 @@ void
 ct_list_op(struct ct_op *op)
 {
 	struct ct_trans		*trans;
-	const char		*mfile = op->op_arg1;
-	char			**filelist = op->op_arg2;
-	int			 match_mode = op->op_arg4;
 
-	ct_list(mfile, filelist, match_mode);
+	ct_list(op->op_local_fname, op->op_filelist, op->op_matchmode);
 	trans = ct_trans_alloc();
 	if (trans == NULL) {
 		/* system busy, return (should never happen) */
@@ -612,9 +609,9 @@ ct_metadata_open_next()
 void
 ct_extract(struct ct_op *op)
 {
-	const char		*mfile = op->op_arg1;
-	char			**filelist = op->op_arg2;
-	int			 match_mode = op->op_arg4;
+	const char		*mfile = op->op_local_fname;
+	char			**filelist = op->op_filelist;
+	int			 match_mode = op->op_matchmode;
 	struct flist		*fnode;
 	struct ct_md_header	hdr;
 	struct ct_md_trailer	trl;

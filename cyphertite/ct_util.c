@@ -83,37 +83,40 @@ ct_setup_assl(void)
 }
 
 void
-ct_add_operation(ct_op_cb *start, ct_op_cb *complete, void *arg1, void *arg2,
-    void *arg3, int arg4, int arg5)
+ct_add_operation(ct_op_cb *start, ct_op_cb *complete, char *localname,
+    char *remotename, char **flist, char *basis, int matchmode, int action)
 {
 	struct ct_op	*op;
 
 	op = e_calloc(1, sizeof(*op));
 	op->op_start = start;
 	op->op_complete = complete;
-	op->op_arg1 = arg1;
-	op->op_arg2 = arg2;
-	op->op_arg3 = arg3;
-	op->op_arg4 = arg4;
-	op->op_arg5 = arg5;
+	op->op_local_fname = localname;
+	op->op_remote_fname = remotename;
+	op->op_filelist = flist;
+	op->op_basis = basis;
+	op->op_matchmode = matchmode;
+	op->op_action = action;
 
 	TAILQ_INSERT_TAIL(&ct_state->ct_operations, op, op_link);
 }
 
 void
 ct_add_operation_after(struct ct_op *after, ct_op_cb *start, ct_op_cb *complete,
-    void *arg1, void *arg2, void *arg3, int arg4, int arg5)
+    char *localname, char *remotename, char **flist, char *basis,
+    int matchmode, int action)
 {
 	struct ct_op	*op;
 
 	op = e_calloc(1, sizeof(*op));
 	op->op_start = start;
 	op->op_complete = complete;
-	op->op_arg1 = arg1;
-	op->op_arg2 = arg2;
-	op->op_arg3 = arg3;
-	op->op_arg4 = arg4;
-	op->op_arg5 = arg5;
+	op->op_local_fname = localname;
+	op->op_remote_fname = remotename;
+	op->op_filelist = flist;
+	op->op_basis = basis;
+	op->op_matchmode = matchmode;
+	op->op_action = action;
 
 	TAILQ_INSERT_AFTER(&ct_state->ct_operations, after, op, op_link);
 }

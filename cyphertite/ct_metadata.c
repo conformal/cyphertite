@@ -83,8 +83,8 @@ struct flist	*md_node;
 void
 ct_md_archive(struct ct_op *op)
 {
-	const char		*mfile = op->op_arg1;
-	const char		*mdname = op->op_arg2;
+	const char		*mfile = op->op_local_fname;
+	const char		*mdname = op->op_remote_fname;
 	struct stat		sb;
 	ssize_t			rsz, rlen;
 	struct ct_trans		*ct_trans;
@@ -129,7 +129,7 @@ loop:
 
 		if (mdname == NULL) {
 			mdname = ct_md_cook_filename(mfile);
-			op->op_arg2 = (void *)mdname;
+			op->op_remote_fname = (char *)mdname;
 		}
 		ct_xml_file_open(ct_trans, mdname, MD_O_WRITE, 0);
 		md_open_inflight = 1;
@@ -408,8 +408,8 @@ ct_xml_file_close(void)
 void
 ct_md_extract(struct ct_op *op)
 {
-	const char		*mfile = op->op_arg1;
-	const char		*mdname = op->op_arg2;
+	const char		*mfile = op->op_local_fname;
+	const char		*mdname = op->op_remote_fname;
 	struct ct_trans		*trans;
 	struct ct_header	*hdr;
 
@@ -438,7 +438,7 @@ ct_md_extract(struct ct_op *op)
 
 		if (mdname == NULL) {
 			mdname = ct_md_cook_filename(mfile);
-			op->op_arg2 = (void *)mdname;
+			op->op_remote_fname = (char *)mdname;
 		}
 		ct_xml_file_open(trans, mdname, MD_O_READ, 0);
 		md_open_inflight = 1;
@@ -582,8 +582,7 @@ ct_md_list_start(struct ct_op *op)
 char **
 ct_md_list_complete(struct ct_op *op)
 {
-	char			**pat = op->op_arg1;
-	int			 match_mode = op->op_arg4;
+	char			**pat = op->op_filelist;
 	regex_t			*re = NULL;
 	char			error[1024];
 	char			**str, **matchedlist, *curstr;
@@ -592,7 +591,7 @@ ct_md_list_complete(struct ct_op *op)
 	if (ct_md_listfiles == NULL)
 		return (NULL);
 
-	if (match_mode == CT_MATCH_REGEX && *pat) {
+	if (op->op_matchmode == CT_MATCH_REGEX && *pat) {
 		re = e_calloc(1, sizeof(*re));
 		if ((rv = regcomp(re, *pat,
 		    REG_EXTENDED | REG_NOSUB)) != 0) {
@@ -615,7 +614,7 @@ ct_md_list_complete(struct ct_op *op)
 		match = 0;
 		if (*pat == NULL) {
 			match = 1;
-		} else if (match_mode == CT_MATCH_REGEX) {
+		} else if (op->op_matchmode == CT_MATCH_REGEX) {
 			if (regexec(re, curstr, 0, NULL, 0) == 0)
 				match = 1;
 		} else {
@@ -630,7 +629,7 @@ ct_md_list_complete(struct ct_op *op)
 	}
 	matchedlist[i] = NULL;
 	e_free(&ct_md_listfiles); /* sets md_listfiles to NULL, too */
-	if (match_mode == CT_MATCH_REGEX && *pat) {
+	if (op->op_matchmode == CT_MATCH_REGEX && *pat) {
 		regfree(re);
 		e_free(&re);
 	}
@@ -658,7 +657,7 @@ ct_md_list_print(struct ct_op *op)
 void
 ct_md_delete(struct ct_op *op)
 {
-	const char		*md = op->op_arg1;
+	const char		*md = op->op_remote_fname;
 	struct ct_header	*hdr;
 	struct ct_trans		*trans;
 	char			*buf, *body = NULL;
@@ -879,7 +878,7 @@ strcompare(const void *a, const void *b)
 void
 ct_find_md_for_extract(struct ct_op *op)
 {
-	const char	*mdname = op->op_arg1;
+	const char	*mdname = op->op_local_fname;
 	struct ct_op	*list_fakeop;
 	char	 	**bufp;
 	int		 matchmode;
@@ -907,8 +906,8 @@ ct_find_md_for_extract(struct ct_op *op)
 
 	CDBG("looking for %s", bufp[0]);
 
-	list_fakeop->op_arg1 = bufp;
-	list_fakeop->op_arg4 = matchmode;
+	list_fakeop->op_filelist = bufp;
+	list_fakeop->op_matchmode = matchmode;
 
 	op->op_priv = list_fakeop;
 	ct_md_list_start(list_fakeop);
@@ -917,20 +916,18 @@ ct_find_md_for_extract(struct ct_op *op)
 void
 ct_free_mdname(struct ct_op *op)
 {
-	const char		*mfile = op->op_arg1;
 
-	CDBG("%s: %s", __func__, mfile);
-	if (mfile != NULL)
-		e_free(&mfile);
+	CDBG("%s: %s", __func__, op->op_local_fname);
+	if (op->op_local_fname != NULL)
+		e_free(&op->op_local_fname);
 }
 
 void ct_md_download_next(struct ct_op *op);
 void
 ct_md_download_next(struct ct_op *op)
 {
-	const char		*mfile = op->op_arg1;
-	//const char		*mcachename = op->op_arg2;
-	const char		*mfilename = op->op_arg3;
+	const char		*mfile = op->op_local_fname;
+	const char		*mfilename = op->op_remote_fname;
 	char			*md_prev;
 	char			*cachename;
 
@@ -946,8 +943,8 @@ again:
 		if (!md_is_in_cache(cachename)) {
 			e_free(&cachename);
 			ct_add_operation_after(op, ct_md_extract,
-			    ct_md_download_next, (char *)md_prev,
-			    NULL, md_prev, 0, 0); 
+			    ct_md_download_next, (char *)md_prev, md_prev,
+				NULL, NULL, 0, 0); 
 		} else {
 			if (mfile == mfilename)
 				e_free(&mfile);
@@ -969,43 +966,72 @@ again:
 void
 ct_md_extract_nextop(struct ct_op *op)
 {
-	int			 action = op->op_arg4;
+	char	*mfile;
 
 	md_is_open = 0;
 	/*
 	 * need to determine if this is a layered backup, if so, we need to
 	 * queue download of that file
 	 */
-	if (action == CT_A_EXTRACT || action == CT_A_LIST)
+	if (op->op_action == CT_A_EXTRACT || op->op_action == CT_A_LIST)
 		ct_md_download_next(op);
+
+	/*
+	 * Any recursive download after here will be placed after the
+	 * current operation in the queue of ops. So we can now add the final 
+	 * operation to the end of the queue without difficulty.
+	 */
+	switch (op->op_action) {
+	case CT_A_EXTRACT:
+		ct_add_operation(ct_extract, ct_free_mdname,
+		    op->op_local_fname, op->op_remote_fname, op->op_filelist,
+		    NULL, op->op_matchmode, 0); 
+		break;
+	case CT_A_LIST:
+		ct_add_operation(ct_list_op, ct_free_mdname,
+		    op->op_local_fname, NULL, op->op_filelist, NULL,
+		    op->op_matchmode, 0);
+		break;
+	case CT_A_ARCHIVE:
+		/*
+		 * Since we were searching for previous, original mdname
+		 * is stored in basis. Swap them.
+		 */
+		mfile = ct_find_md_for_archive(op->op_basis);
+		CDBG("setting basisname %s", op->op_local_fname);
+		/* XXX does this leak cachename? */
+		ct_add_operation(ct_archive, NULL, mfile, NULL,
+		    op->op_filelist, op->op_local_fname, 0, 0);
+		ct_add_operation(ct_md_archive, ct_free_mdname, mfile, NULL,
+		    NULL, NULL, 0, 0);
+		break;
+	default:
+		CFATALX("invalid action");
+	}
 }
 
 void
 ct_find_md_for_extract_complete(struct ct_op *op)
 {
-	const char	*mdname = op->op_arg1;
-	char		**filelist = op->op_arg2;
-	char		*mfile;
 	struct ct_op	*list_fakeop = op->op_priv;
 	char		**result, **tmp;
 	char	 	*best, *cachename = NULL; 
 	int		 nresults = 0;
-	int		 action = op->op_arg4;
-	int		 match_mode = op->op_arg5;
 
 	result = ct_md_list_complete(list_fakeop);
-	e_free(list_fakeop->op_arg1);
-	e_free(&list_fakeop->op_arg1);
+	e_free(list_fakeop->op_filelist);
+	e_free(&list_fakeop->op_filelist);
 	e_free(&list_fakeop);
 
 	tmp = result;
 	while (*(tmp++) != NULL)
 		nresults++;
 	if (nresults == 0) {
-		if (action == CT_A_ARCHIVE) {
+		if (op->op_action == CT_A_ARCHIVE) {
 			goto do_operation;
 		} else  {
-			CFATALX("unable to find metadata tagged %s", mdname);
+			CFATALX("unable to find metadata tagged %s",
+			    op->op_local_fname);
 		}
 	}
 		
@@ -1032,44 +1058,28 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 	 */
 	cachename = ct_md_get_cachename(best);
 	if (!md_is_in_cache(best)) {
+		/*
+		 * since archive needs the original metadata name still
+		 * and is searching for a prior archive for differentials
+		 * we put local_fname (the original) in the basis slot here.
+		 * nextop will fix it for us.
+		 */
 		ct_add_operation(ct_md_extract, ct_md_extract_nextop,
-		    cachename, best, filelist, action, match_mode); 
+		    cachename, best, op->op_filelist, op->op_local_fname,
+		    op->op_matchmode, op->op_action); 
 	} else {
-		if (action == CT_A_EXTRACT || action == CT_A_LIST) {
-			op->op_arg1 = cachename;
-			ct_md_download_next(op);
-		}
-
 		e_free(&best);
+do_operation:
+		/*
+		 * Don't need to grab this mdfile, but may need one later in
+		 * the differential chain, recurse. When we know more we can
+		 * prepare the final operation
+		 */
+		op->op_basis = op->op_local_fname;
+		op->op_local_fname = cachename;
+		ct_md_extract_nextop(op);
 	}
 
-do_operation:
-	/*
-	 * Any recursive download after now will be carried placed after the
-	 * current operation in the queue of ops. So we can add the final 
-	 * operation to the end of the queue now without difficulty.
-	 */
-	switch (action) {
-	case CT_A_EXTRACT:
-		ct_add_operation(ct_extract, ct_free_mdname,
-		    cachename, filelist, NULL, match_mode, 0); 
-		break;
-	case CT_A_LIST:
-		ct_add_operation(ct_list_op, ct_free_mdname,
-		    cachename, filelist, NULL, match_mode, 0);
-		break;
-	case CT_A_ARCHIVE:
-		mfile = ct_find_md_for_archive(op->op_arg1);
-		CDBG("setting basisname %s", cachename);
-		/* XXX does this leak cachename? */
-		ct_add_operation(ct_archive, NULL, mfile, filelist,
-		    cachename, 0, 0);
-		ct_add_operation(ct_md_archive, ct_free_mdname, mfile,
-		    NULL, NULL, 0, 0);
-		break;
-	default:
-		CFATALX("invalid action");
-	}
 }
 
 char *
