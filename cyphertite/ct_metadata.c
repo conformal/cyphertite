@@ -1120,7 +1120,7 @@ ct_find_md_for_archive(const char *mdname)
  * make fts_* return entities in mtime order, oldest first
  */
 static int
-datecompare(const FTSENT * const *a, const FTSENT * const *b)
+datecompare(const FTSENT **a, const FTSENT **b)
 {
 	return (timespeccmp(&(*a)->fts_statp->st_mtim,
 	    &(*b)->fts_statp->st_mtim, <));
