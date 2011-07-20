@@ -839,7 +839,7 @@ ct_basis_setup(const char *basisbackup, char **filelist)
 {
 	struct ct_md_gheader	 gh;
 	FILE			*xdr_f;
-	char			 cwd[MAXPATHLEN], **fptr;
+	char			 cwd[PATH_MAX], **fptr;
 	int			 alldata, nextlvl, i;
 
 	alldata = ct_multilevel_allfiles;
