@@ -212,9 +212,9 @@ ct_ssl_cleanup(void)
 }
 
 void
-ct_setup_write_md(const char *mfile, int infile, const char *basis)
+ct_setup_write_md(const char *mfile, int infile, const char *basis, int lvl)
 {
-	ct_mdf = ct_metadata_create(mfile, infile, basis);
+	ct_mdf = ct_metadata_create(mfile, infile, basis, lvl);
 	if (ct_mdf == NULL)
 		CFATAL("can't create %s", mfile);
 }

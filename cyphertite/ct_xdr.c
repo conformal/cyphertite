@@ -133,15 +133,21 @@ ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp)
 		return (FALSE);
 	if (!xdr_string(xdrs, &objp->cmg_prevlvl_filename, PATH_MAX))
 		return (FALSE);
+	if (objp->cmg_version >= CT_MD_VERSION) {
+		if (!xdr_int(xdrs, &objp->cmg_cur_lvl))
+			return (FALSE);
+	}
 	return (TRUE);
 }
 
 FILE *
-ct_metadata_create(const char *filename, int intype, const char *basis)
+ct_metadata_create(const char *filename, int intype, const char *basis, int lvl)
 {
 	FILE			*f;
 	struct ct_md_gheader	gh;
 
+	if (lvl != 0 && basis == NULL)
+		CFATALX("multilevel archive  with no basis");
 	/* open metadata file */
 	f = fopen(filename, "wb");
 	if (f == NULL)
@@ -160,6 +166,7 @@ ct_metadata_create(const char *filename, int intype, const char *basis)
 	if (ct_multilevel_allfiles)
 		gh.cmg_flags |= CT_MD_MLB_ALLFILES;
 	gh.cmg_prevlvl_filename = basis ? (char *)basis : "";
+	gh.cmg_cur_lvl = lvl;
 
 	md_dir = XDR_ENCODE;
 	/* write global header */
@@ -445,13 +452,13 @@ ct_metadata_open(const char *filename, struct ct_md_gheader *gh)
 
 	ltime = gh->cmg_created;
 	if (ct_verbose > 1)
-		printf("version: %d block size: %d created: %s",
-		    gh->cmg_version, gh->cmg_chunk_size,
+		printf("version: %d level: %d block size: %d created: %s",
+		    gh->cmg_version, gh->cmg_cur_lvl, gh->cmg_chunk_size,
 		    ctime(&ltime));
 
 	if (gh->cmg_beacon != CT_MD_BEACON)
 		CFATALX("Not a cyphertite file");
-	if (gh->cmg_version != CT_MD_VERSION) {
+	if (gh->cmg_version > CT_MD_VERSION) {
 		CFATALX("Invalid version %d, expected %d", gh->cmg_version,
 		    CT_MD_VERSION);
 	}
@@ -796,12 +803,12 @@ ct_populate_fnode(struct flist *fnode, struct ct_md_header *hdr, int *state)
 	return 0;
 }
 
-void
+int
 ct_basis_setup(const char *basisbackup)
 {
 	struct ct_md_gheader	gh;
 	FILE			*xdr_f;
-	int			alldata;
+	int			alldata, nextlvl;
 
 	alldata = ct_multilevel_allfiles;
 	xdr_f = ct_metadata_open(basisbackup,  &gh);
@@ -809,12 +816,21 @@ ct_basis_setup(const char *basisbackup)
 		CFATALX("unable to open/parse previous backup %s",
 		    basisbackup);
 	ct_multilevel_allfiles = alldata; /* dont whack this flag from client */
+
+	if (ct_max_differentials == 0 ||
+	    gh.cmg_cur_lvl < ct_max_differentials) {
+		ct_prev_backup_time = gh.cmg_created;
+		CINFO("prev backup time %s %s", ctime(&ct_prev_backup_time),
+		    basisbackup);
+		nextlvl = ++gh.cmg_cur_lvl;
+	} else {
+		nextlvl = 0;
+	}
 	
-	ct_prev_backup_time = gh.cmg_created;
-	CINFO("prev backup time %s %s", ctime(&ct_prev_backup_time),
-	    basisbackup);
 
 	ct_metadata_close(xdr_f);
+
+	return (nextlvl);
 }
 
 char *

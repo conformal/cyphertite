@@ -113,6 +113,17 @@ for a description of the different metadata modes.
 Specify if differentials should be generated for remote mode.
 This only applies for remote metadata mode.
 .Pp
+.It Xo
+.Ic md_max_differentials = Ar number
+.Xc
+Specify the number of differential backups to perform between full
+(level 0) backups.
+For example, setting this value to 6 would instruct cyphertite to
+perform one full backup followed by 6 differential backups.
+Assuming backups are performed daily, the aforemenioned value would
+result in a full backup once per week with 6 days of differential
+backups.
+.Pp
 .It Ic password = Ar string
 Specify the password with which to authenticate.
 .Pp

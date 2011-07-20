@@ -82,6 +82,7 @@ int			ct_encrypt_enabled;
 int			ct_multilevel_allfiles;
 int			ct_auto_differential;
 long long		ct_max_mdcache_size = -1LL; /* unbounded */
+int			ct_max_differentials;
 
 struct ct_settings	settings[] = {
 	{ "queue_depth", CT_S_INT, &ct_max_trans, NULL, NULL, NULL },
@@ -104,6 +105,8 @@ struct ct_settings	settings[] = {
 	{ "md_cachedir_max_size", CT_S_SIZE, NULL, NULL, NULL,
 	    &ct_max_mdcache_size, NULL },
 	{ "md_remote_auto_differential" , CT_S_INT, &ct_auto_differential,
+	    NULL, NULL, NULL },
+	{ "md_max_differentials" , CT_S_INT, &ct_max_differentials,
 	    NULL, NULL, NULL },
 	{ NULL, 0, NULL, NULL, NULL,  NULL }
 };

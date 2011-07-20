@@ -49,6 +49,7 @@ extern int		ct_trans_id;
 extern int		md_backup_fd;
 extern int		ct_md_mode;
 extern char		*ct_md_cachedir;
+extern int		ct_max_differentials;
 extern char *		__progname;
 
 /* crypto */
@@ -392,7 +393,7 @@ int				ctdb_insert(struct ct_trans *trans);
 /* metadata */
 int				ct_s_to_e_type(int);
 FILE				*ct_metadata_create(const char *, int,
-				    const char *);
+				    const char *, int);
 void				ct_metadata_close(FILE *);
 char				*ct_metadata_check_prev(const char *);
 
@@ -408,7 +409,8 @@ struct ct_md_gheader {
 	int			cmg_beacon;	/* magic marker */
 #define CT_MD_BEACON		(0x43595048)
 	int			cmg_version;	/* version of the archive */
-#define CT_MD_VERSION		(1)
+#define CT_MD_V1		(1)
+#define CT_MD_VERSION		(2)
 	int			cmg_chunk_size;	/* chunk size */
 	int64_t			cmg_created;	/* date created */
 	int			cmg_type;	/* normal, stdin or crypto */
@@ -419,6 +421,7 @@ struct ct_md_gheader {
 #define CT_MD_CRYPTO		(1)
 #define CT_MD_MLB_ALLFILES	(2)
 	char			*cmg_prevlvl_filename;
+	int			cmg_cur_lvl;
 };
 
 /* XDR for metadata header */
@@ -475,7 +478,7 @@ void			ct_cleanup_md(void);
 int			ct_read_header(struct ct_md_header *hdr);
 struct ct_assl_io_ctx	*ct_assl_ctx;
 void			ct_extract_setup(const char *);
-void			ct_basis_setup(const char *);
+int			ct_basis_setup(const char *);
 
 /* ct_file.c: extract functions */
 void ct_file_extract_open(struct flist *fnode);
@@ -524,7 +527,7 @@ struct ct_assl_io_ctx	*ct_ssl_connect(int);
 void			ct_reconnect(int, short, void *);
 void			ct_load_certs(struct assl_context *);
 int			ct_assl_negotiate_poll(struct ct_assl_io_ctx *);
-void			ct_setup_write_md(const char *, int, const char *);
+void			ct_setup_write_md(const char *, int, const char *, int);
 void			ct_cleanup_md(void);
 
 /* limit extract and list by regex */

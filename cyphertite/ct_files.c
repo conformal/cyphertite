@@ -220,6 +220,7 @@ ct_archive(struct ct_op *op)
 	int			new_file = 0;
 	int			error;
 	int			skip_file;
+	int			nextlvl = 0;
 
 	CDBG("processing");
 	/* XXX if state finished jump to done */
@@ -228,12 +229,13 @@ ct_archive(struct ct_op *op)
 			CFATALX("no files specified");
 		}
 
-		if (basisbackup != NULL) {
-			ct_basis_setup(basisbackup);
-		}
+		if (basisbackup != NULL &&
+		    (nextlvl = ct_basis_setup(basisbackup)) == 0)
+				e_free(&basisbackup);
+		
 		/* XXX - deal with stdin */
 		/* XXX - if basisbackup should the type change ? */
-		ct_setup_write_md(mfile, CT_MD_REGULAR, basisbackup);
+		ct_setup_write_md(mfile, CT_MD_REGULAR, basisbackup, nextlvl);
 
 		if (basisbackup != NULL)
 			e_free(&basisbackup);
