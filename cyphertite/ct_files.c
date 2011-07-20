@@ -217,6 +217,7 @@ ct_archive(struct ct_op *op)
 	size_t			rsz, rlen;
 	struct stat		sb;
 	struct ct_trans		*ct_trans;
+	char			cwd[MAXPATHLEN];
 	int			new_file = 0;
 	int			error;
 	int			skip_file;
@@ -230,12 +231,15 @@ ct_archive(struct ct_op *op)
 		}
 
 		if (basisbackup != NULL &&
-		    (nextlvl = ct_basis_setup(basisbackup)) == 0)
-				e_free(&basisbackup);
+		    (nextlvl = ct_basis_setup(basisbackup, filelist)) == 0)
+			e_free(&basisbackup);
 		
+		if (getcwd(cwd, MAXPATHLEN) == NULL)
+			CFATAL("can't get current working directory");
 		/* XXX - deal with stdin */
 		/* XXX - if basisbackup should the type change ? */
-		ct_setup_write_md(mfile, CT_MD_REGULAR, basisbackup, nextlvl);
+		ct_setup_write_md(mfile, CT_MD_REGULAR, basisbackup, nextlvl,
+		    cwd, filelist);
 
 		if (basisbackup != NULL)
 			e_free(&basisbackup);

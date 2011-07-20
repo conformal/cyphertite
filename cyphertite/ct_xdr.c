@@ -117,8 +117,10 @@ ct_xdr_stdin(XDR *xdrs, struct ct_md_stdin *objp)
 }
 
 bool_t
-ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp)
+ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp, int write)
 {
+	int	i;
+
 	if (!xdr_int(xdrs, &objp->cmg_beacon))
 		return (FALSE);
 	if (!xdr_int(xdrs, &objp->cmg_version))
@@ -136,13 +138,27 @@ ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp)
 	if (objp->cmg_version >= CT_MD_VERSION) {
 		if (!xdr_int(xdrs, &objp->cmg_cur_lvl))
 			return (FALSE);
+		if (!xdr_string(xdrs, &objp->cmg_cwd, PATH_MAX))
+			return (FALSE);
+		if (!xdr_int(xdrs, &objp->cmg_num_paths))
+			return (FALSE);
+		if (write == 0) { 
+			objp->cmg_paths = e_calloc(objp->cmg_num_paths,
+			    sizeof(*objp->cmg_paths));
+		}
+		for (i = 0; i < objp->cmg_num_paths; i++) {
+			if (!xdr_string(xdrs, &objp->cmg_paths[i], PATH_MAX))
+				return (FALSE);
+		}
 	}
 	return (TRUE);
 }
 
 FILE *
-ct_metadata_create(const char *filename, int intype, const char *basis, int lvl)
+ct_metadata_create(const char *filename, int intype, const char *basis, int lvl,
+    char *cwd, char **filelist)
 {
+	char			**fptr;
 	FILE			*f;
 	struct ct_md_gheader	gh;
 
@@ -167,11 +183,18 @@ ct_metadata_create(const char *filename, int intype, const char *basis, int lvl)
 		gh.cmg_flags |= CT_MD_MLB_ALLFILES;
 	gh.cmg_prevlvl_filename = basis ? (char *)basis : "";
 	gh.cmg_cur_lvl = lvl;
+	gh.cmg_cwd = cwd;
+
+	fptr = filelist;
+	while((*fptr++) != NULL)
+		gh.cmg_num_paths++;
+	gh.cmg_paths = filelist;
+
 
 	md_dir = XDR_ENCODE;
 	/* write global header */
 	xdrstdio_create(&xdr, f, XDR_ENCODE);
-	if (ct_xdr_gheader(&xdr, &gh) == FALSE)
+	if (ct_xdr_gheader(&xdr, &gh, 1) == FALSE)
 		CFATALX("e_xdr_gheader failed");
 
 	return (f);
@@ -342,6 +365,8 @@ next_file:
 
 	if (gh.cmg_prevlvl_filename) 
 		CDBG("previous backup file %s\n", gh.cmg_prevlvl_filename);
+	if (gh.cmg_paths != NULL)
+		e_free(&gh.cmg_paths);
 	bzero(&fnodestore, sizeof(fnodestore));
 	file = NULL;
 
@@ -447,7 +472,7 @@ ct_metadata_open(const char *filename, struct ct_md_gheader *gh)
 
 	bzero(gh, sizeof *gh);
 
-	if (ct_xdr_gheader(&xdr, gh) == FALSE)
+	if (ct_xdr_gheader(&xdr, gh, 0) == FALSE)
 		CFATALX("e_xdr_gheader failed");
 
 	ltime = gh->cmg_created;
@@ -544,6 +569,8 @@ ct_extract_setup(const char *file)
 			xdr_f = last_xdr;
 		}
 	}
+	if (gh.cmg_paths != NULL)
+		e_free(&gh.cmg_paths);
 
 	ct_xdr_f = xdr_f;
 
@@ -587,6 +614,8 @@ ct_extract_setup_queue(const char *file)
 			TAILQ_INSERT_TAIL(&ct_file_extract_head, nfile, next);
 		}
 	}
+	if (gh.cmg_paths != NULL)
+		e_free(&gh.cmg_paths);
 	return xdr_f;
 }
 
@@ -607,6 +636,8 @@ ct_metadata_open_next()
 
 		if (gh.cmg_prevlvl_filename)
 			free(gh.cmg_prevlvl_filename);
+		if (gh.cmg_paths != NULL)
+			e_free(&gh.cmg_paths);
 	} else {
 		CFATALX("open next with no next archive");
 	}
@@ -804,11 +835,12 @@ ct_populate_fnode(struct flist *fnode, struct ct_md_header *hdr, int *state)
 }
 
 int
-ct_basis_setup(const char *basisbackup)
+ct_basis_setup(const char *basisbackup, char **filelist)
 {
-	struct ct_md_gheader	gh;
+	struct ct_md_gheader	 gh;
 	FILE			*xdr_f;
-	int			alldata, nextlvl;
+	char			 cwd[MAXPATHLEN], **fptr;
+	int			 alldata, nextlvl, i;
 
 	alldata = ct_multilevel_allfiles;
 	xdr_f = ct_metadata_open(basisbackup,  &gh);
@@ -826,7 +858,40 @@ ct_basis_setup(const char *basisbackup)
 	} else {
 		nextlvl = 0;
 	}
-	
+
+	/*
+	 * if we have the list of dirs in this previous backup, check that 
+	 * our cwd matches and the list of dirs we care about are a strict
+	 * superset of the previous backup
+	 */
+	if (gh.cmg_version >= CT_MD_VERSION) {
+		if (getcwd(cwd, sizeof(cwd)) == NULL)
+			CFATAL("can't get current working directory");
+		if (strcmp(cwd, gh.cmg_cwd) != 0)
+			CFATALX("current working directory %s differs from "
+			    " basis %s", cwd, gh.cmg_cwd);
+		for (i = 0, fptr = filelist; *fptr != NULL &&
+		    i < gh.cmg_num_paths; fptr++, i++) {
+			if (strcmp(gh.cmg_paths[i], *fptr) != 0)
+				break;
+		}
+		if (i < gh.cmg_num_paths || *fptr != NULL) {
+			if (ct_verbose == 0) {
+				CFATALX("list of directories provided does not"
+				    " match list of directories in basis");
+			} else {
+				CWARNX("list of directories provided does not"
+				    " match list of directories in basis:");
+				for (i = 0; i < gh.cmg_num_paths; i++)
+					CWARNX("%s", gh.cmg_paths[i]);
+				exit(1);
+			}
+
+		}
+
+		/* done with the paths now, don't leak them */
+		e_free(&gh.cmg_paths);
+	}
 
 	ct_metadata_close(xdr_f);
 
@@ -843,6 +908,8 @@ ct_metadata_check_prev(const char *mdname)
 	if ((md_file = ct_metadata_open(mdname, &gh)) != NULL) {
 		if (gh.cmg_prevlvl_filename)
 			ret = e_strdup(gh.cmg_prevlvl_filename);
+		if (gh.cmg_paths != NULL)
+			e_free(&gh.cmg_paths);
 
 		ct_metadata_close(md_file);
 	}

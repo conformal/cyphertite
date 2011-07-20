@@ -26,7 +26,7 @@ bool_t		ct_xdr_dedup_sha_crypto(XDR *, uint8_t *, uint8_t *,
 bool_t          ct_xdr_header(XDR *, struct ct_md_header *);
 bool_t          ct_xdr_trailer(XDR *, struct ct_md_trailer *);
 bool_t          ct_xdr_stdin(XDR *, struct ct_md_stdin *);
-bool_t          ct_xdr_gheader(XDR *, struct ct_md_gheader *);
+bool_t          ct_xdr_gheader(XDR *, struct ct_md_gheader *, int);
 
 FILE           *ct_metadata_open(const char *,
 			struct ct_md_gheader *);
