@@ -81,7 +81,7 @@ int			ct_compress_enabled;
 int			ct_encrypt_enabled;
 int			ct_multilevel_allfiles;
 int			ct_auto_differential;
-long long		ct_max_mdcache_size = -1LL; /* unbounded */
+long long		ct_max_mdcache_size = LLONG_MAX; /* unbounded */
 int			ct_max_differentials;
 
 struct ct_settings	settings[] = {
