@@ -973,6 +973,23 @@ ct_create_config(void)
 	if (conf == NULL)
 		CFATALX("conf");
 
+	/*
+	 * Make path and create conf file early so permission failures are
+	 * are caught before the user fills out all of the information.
+	 */
+	conf_buf = strdup(conf);
+	if (conf_buf == NULL)
+		CFATALX("strdup conf");
+	if (ct_make_full_path(conf_buf, 0700))
+		CFATAL("unable to create directory %s", conf_buf);
+	if (conf_buf != NULL)
+		free(conf_buf);
+
+	if ((fd = open(conf, O_RDWR | O_CREAT, 0400)) == -1)
+		CFATAL("unable to open file for writing %s", conf);
+	if ((f = fdopen(fd, "r+")) == NULL)
+		CFATAL("unable to open file %s", conf);
+
 	while (user == NULL) {
 		snprintf(prompt, sizeof prompt,
 		    "%s login username: ", __progname);
@@ -1083,11 +1100,6 @@ ct_create_config(void)
 		if (rv == 1)
 			md_remote_diff = 1;
 	}
-
-	if ((fd = open(conf, O_RDWR | O_CREAT, 0400)) == -1)
-		CFATAL("open");
-	if ((f = fdopen(fd, "r+")) == NULL)
-		CFATAL("fdopen");
 
 	fprintf(f, "username\t\t\t= %s\n", user);
 	if (password)
