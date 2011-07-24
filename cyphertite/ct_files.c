@@ -939,7 +939,7 @@ ct_prompt_password(char *prompt, char *answer, size_t answer_len,
 	return (0);
 }
 
-char *
+void
 ct_create_config(void)
 {
 	char			prompt[1024];
@@ -1140,6 +1140,4 @@ ct_create_config(void)
 		free(md_cachedir);
 	if (f)
 		fclose(f);
-
-	return (conf);
 }

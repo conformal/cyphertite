@@ -37,7 +37,7 @@
 __attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 __attribute__((__unused__)) static const char *vertag = "version: " CT_VERSION;
 
-void			ct_load_config(struct ct_settings *);
+int			ct_load_config(struct ct_settings *);
 void			usage(void);
 
 extern char		*__progname;
@@ -258,6 +258,17 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
+	/* Generate config file if one doesn't exist and there are no params. */
+	if (ct_load_config(settings)) {
+		if ((argc + optind) == 1) {
+			ct_create_config();
+			return (0);
+		} else
+			CFATALX("config file not found.  Use the -F option to "
+			    "specify its path or run %s with no parameters "
+			    "to generate one.", __progname);
+	}
+
 	if (ct_mfile == NULL && !(ct_metadata && ct_action == CT_A_LIST)) {
 		CWARNX("archive file is required");
 		usage();
@@ -266,8 +277,6 @@ main(int argc, char **argv)
 	/* please don't delete this line AGAIN! --mp */
 	if (clog_set_flags(cflags))
 		errx(1, "illegal clog flags");
-
-	ct_load_config(settings);
 
 	/* Run with restricted umask as we create numerous sensitive files. */
 	umask(S_IRWXG|S_IRWXO);
@@ -461,7 +470,7 @@ out:
 	return (ret);
 }
 
-void
+int
 ct_load_config(struct ct_settings *settings)
 {
 	char		*config_path = NULL;
@@ -471,7 +480,7 @@ ct_load_config(struct ct_settings *settings)
 		if (ct_config_parse(settings, ct_configfile))
 			CFATALX("Unable to open specified config file %s",
 			   ct_configfile);
-		return;
+		return (0);
 	}
 
 	for (;;) {
@@ -486,7 +495,7 @@ ct_load_config(struct ct_settings *settings)
 			config_path = ct_system_config();
 			break;
 		default:
-			config_path = ct_create_config();
+			return (1);
 			break;
 		}
 		if (ct_config_parse(settings, config_path) == 0) {
@@ -496,6 +505,8 @@ ct_load_config(struct ct_settings *settings)
 		}
 		config_try++;
 	}
+
+	return (0);
 }
 
 void

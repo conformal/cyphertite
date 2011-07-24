@@ -489,7 +489,7 @@ void ct_file_extract_write(uint8_t *buf, size_t size);
 void ct_file_extract_close(struct flist *fnode);
 void ct_file_extract_special(struct flist *fnode);
 void ct_file_extract_fixup(void);
-char *ct_create_config(void);
+void ct_create_config(void);
 char *ct_system_config(void);
 char *ct_user_config(void);
 
