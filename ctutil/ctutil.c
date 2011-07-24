@@ -74,6 +74,7 @@ done:
 	bzero(pw, sizeof pw);
 	return (rv);
 }
+
 uint8_t
 ct_getbyteval(char c)
 {
@@ -107,6 +108,7 @@ ct_text2sha(char *shat, uint8_t *sha)
 
 	return (0);
 }
+
 void
 ct_wire_header(struct ct_header *h)
 {
