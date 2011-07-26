@@ -1,7 +1,7 @@
 # $cyphertite$
 
 %define name		cyphertite
-%define version		0.2.0
+%define version		0.3.0
 %define release		1
 
 Name: 		%{name}
@@ -47,5 +47,17 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertite
 
 %changelog
+* Tue Jul 26 2011 - davec 0.3.0-1
+- Modify wizard to create the configuration path and to run it at more
+  expected times
+- Add max_mdcache_size to config file to govern that the cache dir doesn't grow
+  beyond set value
+- Add md_max_differentials to config file to govern when a new level 0 backup
+  is run
+- Ensure that all metadata parts are downloaded before starting the extract
+  operation
+- Prevent asymmetrical differential backups from running
+- Improve some error messages
+- Fix a couple of bugs in the differential backup code path
 * Tue Jul 03 2011 - davec 0.2.0-1
 - Create
