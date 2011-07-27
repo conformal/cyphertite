@@ -334,7 +334,7 @@ main(int argc, char **argv)
 				CFATALX("invalid md pathname");
 			ct_md_cachedir = ct_fullcachedir;
 		}
-			
+
 		if (ct_make_full_path(ct_md_cachedir, 0700) != 0)
 			CFATALX("can't create MD cachedir");
 	}
