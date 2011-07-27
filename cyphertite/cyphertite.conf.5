@@ -34,9 +34,9 @@ Lines beginning with
 .Ql #
 are comments. Blank lines are ignored.
 .Sh CONFIGURATION
-There are a few settings that affect the operation of the
+There are a few settings that affect the operation of
 .Xr cyphertite 1 
-daemon.
+.
 .Pp
 .Bl -tag -width Ds -compact
 .It Ic bandwidth = Ar number
@@ -62,7 +62,9 @@ Specify the path to the certificate authority file.
 Specify the path to the client certificate file.
 .Pp
 .It Ic crypto_password = Ar password
-Specify the password of your crypto_secrets file.
+Specify the password of your crypto_secrets file.  Optional.
+.Xr cyphertite 1
+will prompt for this if it is not specified. 
 .Pp
 .It Ic crypto_secrets = Ar file
 Specify the file that will hold your secrets.
@@ -125,7 +127,9 @@ result in a full backup once per week with 6 days of differential
 backups.
 .Pp
 .It Ic password = Ar string
-Specify the password with which to authenticate.
+Specify the password with which to authenticate.  Optional.
+.Xr cyphertite 1
+will prompt for this if it is not specified.
 .Pp
 .It Xo
 .Ic polltype =
