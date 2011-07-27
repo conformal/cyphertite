@@ -118,7 +118,7 @@ ct_ssl_over_bw_func(void *cbarg, struct ct_assl_io_ctx *ioctx)
 
 	curdbg->op = 'O';
 
-	/* 
+	/*
 	 * Create a sliding window of 5 slots, if the upload speed
 	 * over those 5 slots is greater than the bandwidth allowed,
 	 * delay for one slot window.
@@ -183,7 +183,7 @@ ct_ssl_over_bw_func(void *cbarg, struct ct_assl_io_ctx *ioctx)
 			event_add(&wakeuptimer_ev, &sleep_tv);
 		}
 	}
-		
+
 	CDBG("cbarg bytes %" PRIu64, ioctx->io_write_bytes);
 	if (traceslot == 0 || traceslot == 0) {
 		dump_bw_stats();
@@ -204,9 +204,8 @@ dump_bw_stats(void)
 		d->op,
 		d->io_time.tv_sec, d->io_time.tv_usec,
 		d->prev_time.tv_sec, d->prev_time.tv_usec,
-		d->tot_trans, d->this_trans, 
+		d->tot_trans, d->this_trans,
 		d->bw_curslot, d->bw_total, d->sleeping);
-		
 	}
 #endif
 }

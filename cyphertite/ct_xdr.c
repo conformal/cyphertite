@@ -422,7 +422,8 @@ skipped:
 			if (ct_read_trailer(&trl))
 				CFATALX("trailer read failure");
 			if (doprint && ct_verbose > 1)
-				printf(" shas: %" PRIu64 " reduction: %" PRIu64 "%%\n",
+				printf(" shas: %" PRIu64 " reduction: %" PRIu64
+				    "%%\n",
 				    hdr.cmh_nr_shas,
 				    trl.cmt_orig_size == 0 ? 0 :
 				    100 * (trl.cmt_orig_size-trl.cmt_comp_size)
@@ -502,8 +503,9 @@ ct_read_header(struct ct_md_header *hdr)
 	if (ct_xdr_header(&xdr, hdr) == FALSE)
 		return 1;
 
-	CDBG("header beacon 0x%08x 0x%08x shas %" PRIu64 " name %s", hdr->cmh_beacon,
-	    CT_HDR_BEACON, hdr->cmh_nr_shas, hdr->cmh_filename);
+	CDBG("header beacon 0x%08x 0x%08x shas %" PRIu64 " name %s",
+	    hdr->cmh_beacon, CT_HDR_BEACON, hdr->cmh_nr_shas,
+	    hdr->cmh_filename);
 
 	if (hdr->cmh_beacon != CT_HDR_BEACON && hdr->cmh_beacon != CT_HDR_EOF)
 		return 1;

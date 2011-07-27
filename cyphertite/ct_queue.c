@@ -428,7 +428,7 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 	if (hdr == NULL) {
 		/* backend disconnected -exit */
 		CWARNX("Server disconnected, attempting to reconnect");
-		
+
 		ct_disconnected = 1;
 		ct_assl_disconnect(ct_assl_ctx);
 		while(!RB_EMPTY(&ct_state->ct_inflight)) {
@@ -502,7 +502,8 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 	    (hdr->c_flags & C_HDR_F_METADATA) == 0))
 		CFATALX("not expecting vbody");
 
-	CDBG("write done, trans %" PRIu64 " op %u", trans->tr_trans_id, hdr->c_opcode);
+	CDBG("write done, trans %" PRIu64 " op %u",
+	    trans->tr_trans_id, hdr->c_opcode);
 
 	if (ct_disconnected) {
 		/*
@@ -683,8 +684,8 @@ ct_compute_csha(void *vctx)
 
 		if (ct_debug) {
 			ct_sha1_encode(trans->tr_sha, shat);
-			CDBG("block tr_id %" PRIu64 " sha %s", trans->tr_trans_id,
-			    shat);
+			CDBG("block tr_id %" PRIu64 " sha %s",
+			    trans->tr_trans_id, shat);
 		}
 		trans->tr_state = TR_S_COMPSHA_ED;
 		ct_queue_transfer(trans);
@@ -903,8 +904,8 @@ ct_process_completions(void *vctx)
 		RB_REMOVE(ct_trans_lookup, &ct_state->ct_complete, trans);
 		ct_state->ct_complete_rblen--;
 
-		CDBG("writing file trans %" PRIu64 " eof %d", trans->tr_trans_id,
-			trans->tr_eof);
+		CDBG("writing file trans %" PRIu64 " eof %d",
+		    trans->tr_trans_id, trans->tr_eof);
 
 		ct_packet_id++;
 
@@ -923,8 +924,8 @@ ct_process_completions(void *vctx)
 		trans = RB_MIN(ct_trans_lookup, &ct_state->ct_complete);
 	}
 	if (trans != NULL && trans->tr_trans_id < ct_packet_id) {
-		CFATALX("old transaction found in completion queue %" PRIu64 " %" PRIu64,
-		    trans->tr_trans_id, ct_packet_id);
+		CFATALX("old transaction found in completion queue %" PRIu64
+		    " %" PRIu64, trans->tr_trans_id, ct_packet_id);
 	}
 }
 
@@ -990,8 +991,8 @@ ct_wakeup_write(void)
 		/* hdr->c_tag - set once when trans was originally created */
 		hdr->c_version = C_HDR_VERSION;
 
-		CDBG("queuing write of op %u trans %" PRIu64 " iotrans %u tstate %d"
-		    " flags 0x%x",
+		CDBG("queuing write of op %u trans %" PRIu64
+		    " iotrans %u tstate %d flags 0x%x",
 		    hdr->c_opcode, trans->tr_trans_id, hdr->c_tag,
 		    trans->tr_state, hdr->c_flags);
 
@@ -1074,7 +1075,7 @@ ct_handle_write_reply(struct ct_trans *trans, struct ct_header *hdr,
 	if (hdr->c_status == C_HDR_S_OK) {
 		if (trans->hdr.c_flags & C_HDR_F_METADATA)
 			trans->tr_state = TR_S_WMD_READY; /* XXX */
-		else 
+		else
 			trans->tr_state = TR_S_WRITTEN;
 		ct_queue_transfer(trans);
 		ct_header_free(NULL, hdr);

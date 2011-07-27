@@ -233,7 +233,7 @@ ct_archive(struct ct_op *op)
 		if (basisbackup != NULL &&
 		    (nextlvl = ct_basis_setup(basisbackup, filelist)) == 0)
 			e_free(&basisbackup);
-		
+
 		if (getcwd(cwd, PATH_MAX) == NULL)
 			CFATAL("can't get current working directory");
 		/* XXX - deal with stdin */
@@ -245,7 +245,7 @@ ct_archive(struct ct_op *op)
 			e_free(&basisbackup);
 
 		ct_traverse(filelist);
-	} else if (ct_state->ct_file_state == CT_S_FINISHED) 
+	} else if (ct_state->ct_file_state == CT_S_FINISHED)
 		return;
 
 	ct_set_file_state(CT_S_RUNNING);

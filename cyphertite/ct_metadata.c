@@ -258,7 +258,7 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
 	if (sz == -1)
 		CFATALX("cannot allocate memory");
 	sz += 1;	/* include null */
-		    
+
 	hdr = &trans->hdr;
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
@@ -311,7 +311,6 @@ ct_xml_file_open_polled(struct ct_assl_io_ctx *ct_assl_ctx,
 	if (sz == -1)
 		CFATALX("cannot allocate memory");
 	sz += 1;	/* include null */
-		    
 
 	hdr.c_version = C_HDR_VERSION;
 	hdr.c_opcode = C_HDR_O_XML;
@@ -553,11 +552,11 @@ ct_md_list_start(struct ct_op *op)
 
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_state = TR_S_XML_LIST;
-	
+
 	CDBG("setting up XML");
 
 	/* XXX - pat */
-	sz = asprintf(&buf, ct_md_list_fmt, ""); 
+	sz = asprintf(&buf, ct_md_list_fmt, "");
 	if (sz == -1)
 		CFATALX("cannot allocate memory");
 	sz += 1;	/* include null */
@@ -576,7 +575,7 @@ ct_md_list_start(struct ct_op *op)
 	CDBG("got body %p", body);
 	bcopy(buf, body, sz);
 	free(buf);
-	
+
 	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
 	ct_state->ct_queued_qlen++;
 
@@ -637,7 +636,7 @@ ct_md_list_complete(struct ct_op *op)
 		regfree(re);
 		e_free(&re);
 	}
-	
+
 	return (matchedlist);
 }
 
@@ -989,7 +988,7 @@ ct_md_extract_nextop(struct ct_op *op)
 	case CT_A_EXTRACT:
 		ct_add_operation(ct_extract, ct_free_mdname,
 		    op->op_local_fname, op->op_remote_fname, op->op_filelist,
-		    NULL, op->op_matchmode, 0); 
+		    NULL, op->op_matchmode, 0);
 		break;
 	case CT_A_LIST:
 		ct_add_operation(ct_list_op, ct_free_mdname,
@@ -1019,7 +1018,7 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 {
 	struct ct_op	*list_fakeop = op->op_priv;
 	char		**result, **tmp;
-	char	 	*best, *cachename = NULL; 
+	char		*best, *cachename = NULL;
 	int		 nresults = 0;
 
 	result = ct_md_list_complete(list_fakeop);
@@ -1038,7 +1037,7 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 			    op->op_local_fname);
 		}
 	}
-		
+
 	/* sort and calculate newest */
 	qsort(result, nresults, sizeof(*result), strcompare);
 
@@ -1070,7 +1069,7 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 		 */
 		ct_add_operation(ct_md_extract, ct_md_extract_nextop,
 		    cachename, best, op->op_filelist, op->op_local_fname,
-		    op->op_matchmode, op->op_action); 
+		    op->op_matchmode, op->op_action);
 	} else {
 		e_free(&best);
 do_operation:
@@ -1089,7 +1088,7 @@ do_operation:
 char *
 ct_find_md_for_archive(const char *mdname)
 {
-	char	 buf[TIMEDATA_LEN], *fullname, *cachename; 
+	char	 buf[TIMEDATA_LEN], *fullname, *cachename;
 	time_t	 now;
 
 	/* cook the mdname so we only search for the actual tag */
@@ -1170,7 +1169,7 @@ ct_mdcache_trim(const char *cachedir, long long max_size)
 			 */
 			if (LLONG_MAX - dirsize < fe->fts_statp->st_size)
 				CWARNX("dirsize overflowed");
-			dirsize += fe->fts_statp->st_size;	
+			dirsize += fe->fts_statp->st_size;
 			break;
 		case FTS_ERR:
 		case FTS_DNR:
