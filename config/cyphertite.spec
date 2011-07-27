@@ -1,7 +1,7 @@
 # $cyphertite$
 
 %define name		cyphertite
-%define version		0.3.0
+%define version		0.3.1
 %define release		1
 
 Name: 		%{name}
@@ -47,6 +47,8 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertite
 
 %changelog
+* Tue Jul 27 2011 - davec 0.3.1-1
+- Man page updates 
 * Tue Jul 26 2011 - davec 0.3.0-1
 - Modify wizard to create the configuration path and to run it at more
   expected times

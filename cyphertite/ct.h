@@ -28,8 +28,8 @@
 /* versioning */
 #define CT_VERSION_MAJOR	0
 #define CT_VERSION_MINOR	3
-#define CT_VERSION_PATCH	0
-#define CT_VERSION		"0.3.0"
+#define CT_VERSION_PATCH	1
+#define CT_VERSION		"0.3.1"
 
 extern int		ct_debug;
 extern int		ct_compress_enabled;
