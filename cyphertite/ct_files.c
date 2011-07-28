@@ -43,7 +43,7 @@ int		ct_get_answer(char *, char *, char *, char *, char *, size_t,
 int		ct_prompt_password(char *, char *, size_t, char *, size_t);
 
 struct flist_head	fl_list_head = TAILQ_HEAD_INITIALIZER(fl_list_head);
-struct flist		*fl_curnode;
+struct fnode		*fl_curnode;
 
 struct dir_stat;
 
@@ -100,7 +100,7 @@ ct_insert_dir(struct dir_stat *ds)
 void
 ct_fnode_cleanup(void)
 {
-	struct flist *fnode;
+	struct fnode *fnode;
 	while (!TAILQ_EMPTY(&fl_list_head)) {
 		fnode = TAILQ_FIRST(&fl_list_head);
 		TAILQ_REMOVE(&fl_list_head, fnode, fl_list);
@@ -124,15 +124,15 @@ int s_to_e_type(int);
 
 int current_fd = -1;
 int ct_extract_fd = -1;
-struct flist *ct_ex_curnode;
+struct fnode *ct_ex_curnode;
 char	tpath[PATH_MAX];
 
 struct fl_tree		fl_rb_head = RB_INITIALIZER(&fl_rb_head);
 
-RB_GENERATE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
+RB_GENERATE(fl_tree, fnode, fl_inode_entry, fl_inode_sort);
 
 int
-fl_inode_sort(struct flist *f1, struct flist *f2)
+fl_inode_sort(struct fnode *f1, struct fnode *f2)
 {
 	int rv;
 
@@ -147,9 +147,9 @@ fl_inode_sort(struct flist *f1, struct flist *f2)
 int
 ct_sched_backup_file(struct stat *sb, char *filename)
 {
-	struct flist		*fnode;
+	struct fnode		*fnode;
 	char			*safe;
-	struct flist		*fnode_exists;
+	struct fnode		*fnode_exists;
 	/* compute 'safe' name */
 	safe = filename;
 	if (ct_strip_slash && safe[0] == '/') {
@@ -629,7 +629,7 @@ s_to_e_type(int mode)
 }
 
 void
-ct_file_extract_open(struct flist *fnode)
+ct_file_extract_open(struct fnode *fnode)
 {
 	/*
 	 * XXX - this should open a temporary file and rename
@@ -672,7 +672,7 @@ ct_file_extract_write(uint8_t *buf, size_t size)
 }
 
 void
-ct_file_extract_close(struct flist *fnode)
+ct_file_extract_close(struct fnode *fnode)
 {
 	struct timeval          tv[2];
 
@@ -702,7 +702,7 @@ ct_file_extract_close(struct flist *fnode)
 }
 
 void
-ct_file_extract_special(struct flist *fnode)
+ct_file_extract_special(struct fnode *fnode)
 {
 	struct timeval          tv[2];
 	char			apath[PATH_MAX];

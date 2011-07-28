@@ -543,7 +543,7 @@ ct_display_assl_stats(FILE *outfh)
 }
 
 void
-ct_pr_fmt_file(struct flist *fnode)
+ct_pr_fmt_file(struct fnode *fnode)
 {
 	struct passwd *passwd;
 	struct group *group;

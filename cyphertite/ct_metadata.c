@@ -83,7 +83,7 @@ ct_md_cook_filename(const char *path)
 	return (fname);
 }
 
-struct flist	*md_node;
+struct fnode	*md_node;
 void
 ct_md_archive(struct ct_op *op)
 {

@@ -608,7 +608,7 @@ void
 ct_compute_sha(void *vctx)
 {
 	struct ct_trans		*trans;
-	struct flist		*fnode;
+	struct fnode		*fnode;
 	char			shat[SHA_DIGEST_STRING_LENGTH];
 	int			slot;
 
@@ -695,7 +695,7 @@ ct_compute_csha(void *vctx)
 void
 ct_write_md_special(struct ct_trans *trans)
 {
-	struct flist		*fnode = trans->tr_fl_node;
+	struct fnode		*fnode = trans->tr_fl_node;
 	char			link[PATH_MAX];
 	char			*plink;
 	int			type = fnode->fl_type;
@@ -763,7 +763,7 @@ void
 ct_write_md_eof(struct ct_trans *trans)
 {
 	int			compression;
-	struct flist		*fnode;
+	struct fnode		*fnode;
 	int			nrshas;
 
 	fnode = trans->tr_fl_node;
@@ -801,7 +801,7 @@ void
 ct_complete_normal(struct ct_trans *trans)
 {
 	int			slot;
-	struct flist		*fnode = trans->tr_fl_node;
+	struct fnode		*fnode = trans->tr_fl_node;
 
 	switch (trans->tr_state) {
 	case TR_S_DONE:

@@ -75,15 +75,15 @@ void ct_compute_encrypt(void *vctx);
 void ct_compute_csha(void *vctx);
 void ct_process_completions(void *vctx);
 
-struct flist;
+struct fnode;
 
-RB_HEAD(fl_tree, flist);
+RB_HEAD(fl_tree, fnode);
 
 /* XXX - seperate allocation for path len, or part of struct? */
 /* XXX - create RB tree of matching inodes at the same time */
-struct flist {
-	TAILQ_ENTRY(flist)	fl_list;
-	RB_ENTRY(flist)		fl_inode_entry;
+struct fnode {
+	TAILQ_ENTRY(fnode)	fl_list;
+	RB_ENTRY(fnode)		fl_inode_entry;
 	char			*fl_hlname;
 	int			fl_hardlink;
 	dev_t			fl_dev;
@@ -109,7 +109,7 @@ struct flist {
 };
 #if 0
 struct fnode {
-	TAILQ_ENTRY(flist)	fl_list;
+	TAILQ_ENTRY(fnode)	fl_list;
 	char fnode		*fl_hardlink_node;
 	char			*fl_fname;
 	int			fl_hardlink;
@@ -136,11 +136,11 @@ struct fnode_live {
 };
 #endif
 
-int fl_inode_sort(struct flist *, struct flist *);
+int fl_inode_sort(struct fnode *, struct fnode *);
 
-RB_PROTOTYPE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
+RB_PROTOTYPE(fl_tree, fnode, fl_inode_entry, fl_inode_sort);
 
-TAILQ_HEAD(flist_head, flist);
+TAILQ_HEAD(flist_head, fnode);
 
 extern struct flist_head	fl_list_head;
 
@@ -168,7 +168,7 @@ struct ct_trans {
 	TAILQ_ENTRY(ct_trans)	tr_next;
 	RB_ENTRY(ct_trans)	tr_trans_rbnode;
 
-	struct flist		*tr_fl_node;
+	struct fnode		*tr_fl_node;
 	uint64_t tr_trans_id;
 	int tr_type;
 /* DIR is another special */
@@ -484,17 +484,17 @@ void			ct_extract_setup(const char *);
 int			ct_basis_setup(const char *, char **);
 
 /* ct_file.c: extract functions */
-void ct_file_extract_open(struct flist *fnode);
+void ct_file_extract_open(struct fnode *fnode);
 void ct_file_extract_write(uint8_t *buf, size_t size);
-void ct_file_extract_close(struct flist *fnode);
-void ct_file_extract_special(struct flist *fnode);
+void ct_file_extract_close(struct fnode *fnode);
+void ct_file_extract_special(struct fnode *fnode);
 void ct_file_extract_fixup(void);
 void ct_create_config(void);
 char *ct_system_config(void);
 char *ct_user_config(void);
 
 /* print file data nicely */
-void			ct_pr_fmt_file(struct flist *fnode);
+void			ct_pr_fmt_file(struct fnode *fnode);
 
 RB_PROTOTYPE(ct_iotrans_lookup, ct_trans, tr_trans_id, ct_cmp_iotrans);
 RB_PROTOTYPE(ct_trans_lookup, ct_trans, tr_trans_id, ct_cmp_trans);
@@ -535,8 +535,8 @@ void			ct_setup_write_md(const char *, int, const char *, int,
 void			ct_cleanup_md(void);
 
 /* limit extract and list by regex */
-void			ct_build_regex(char **flist);
-int			ct_match_regex(char *file);
+void			ct_build_regex(char **);
+int			ct_match_regex(char *);
 
 /* match functionality */
 #define CT_MATCH_INVALID	(0)

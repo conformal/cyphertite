@@ -33,7 +33,7 @@
 
 __attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
-int ct_populate_fnode(struct flist *, struct ct_md_header *, int *);
+int ct_populate_fnode(struct fnode *, struct ct_md_header *, int *);
 FILE *ct_extract_setup_queue(const char *);
 FILE *ct_metadata_open_next(void);
 
@@ -42,7 +42,7 @@ FILE				*ct_xdr_f;
 time_t				ct_prev_backup_time;
 int				md_dir = -1;
 int64_t				ct_num_shas = -1;
-struct flist			*fl_ex_node;
+struct fnode			*fl_ex_node;
 int				ct_doextract;
 
 
@@ -223,7 +223,7 @@ ct_metadata_close(FILE *file)
 int
 ct_write_header(struct ct_trans *trans, char *filename)
 {
-	struct flist *fnode;
+	struct fnode *fnode;
 	struct ct_md_header	hdr;
 
 	fnode = trans->tr_fl_node;
@@ -261,7 +261,7 @@ int
 ct_write_trailer(struct ct_trans *trans)
 {
 	struct ct_md_trailer trl;
-	struct flist *fnode;
+	struct fnode *fnode;
 	bool_t ret;
 
 	fnode = trans->tr_fl_node;
@@ -338,8 +338,8 @@ ct_list(const char *file, char **flist, int match_mode)
 	struct ct_md_gheader	gh;
 	struct ct_md_header	hdr;
 	struct ct_md_trailer	trl;
-	struct flist		fnodestore;
-	struct flist		*fnode = &fnodestore;
+	struct fnode		fnodestore;
+	struct fnode		*fnode = &fnodestore;
 	int			state;
 	int			doprint;
 
@@ -652,7 +652,7 @@ ct_extract(struct ct_op *op)
 	const char		*mfile = op->op_local_fname;
 	char			**filelist = op->op_filelist;
 	int			 match_mode = op->op_matchmode;
-	struct flist		*fnode;
+	struct fnode		*fnode;
 	struct ct_md_header	hdr;
 	struct ct_md_trailer	trl;
 	int			ret;
@@ -800,7 +800,7 @@ ct_extract(struct ct_op *op)
 }
 
 int
-ct_populate_fnode(struct flist *fnode, struct ct_md_header *hdr, int *state)
+ct_populate_fnode(struct fnode *fnode, struct ct_md_header *hdr, int *state)
 {
 	int ret;
 	struct ct_md_header	hdr2;
