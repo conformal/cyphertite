@@ -317,11 +317,11 @@ was written by
 .Nm
 is currently in beta testing.  Some of the above options
 may change before official release.
-When running the first backup on a system,
+Before executing the first backup on a system, run
 .Nm
-prompts the user for the information needed to setup the
-account as follows:
-.Dl $ cyphertite -cf backup.md /usr/local/bin
+with no parameters to allow cyphertite to prompt for the
+information needed to setup the account as follows:
+.Dl $ cyphertite
 .Dl cyphertite config file not found. Create one? [yes]: 
 .Dl Target conf file [/root/.cyphertite.conf]: 
 .Dl cyphertite login username: mylogin
@@ -330,8 +330,10 @@ account as follows:
 .Dl confirm: 
 .Dl Save cyphertite crypto passphrase to configuration file? [yes]: 
 .Dl Automatically generate crypto passphrase? [yes]: 
+.Dl Choose a metadata operation mode (remote/local) [remote]: 
+.Dl Target metadata cache directory [/root/.cyphertite_md_cachedir]: 
+.Dl Use automatic remote differentials? [no]: 
 .Dl Configuration file created.
-.Dl No crypto secrets file. Creating
 .Pp
 Using the built-in configuration file generator simplifies
 the install substantially.
