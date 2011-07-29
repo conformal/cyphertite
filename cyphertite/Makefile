@@ -16,10 +16,12 @@ SRCS+= ct_aes_xts.c ct_crypto.c ct_match.c ct_metadata.c
 SRCS+= ct_db.c ct_xdr.c ct_xml.c ct_bw_lim.c
 MAN= cyphertite.1 cyphertite.conf.5
 
-.if exists(${.CURDIR}/../ctutil/obj)
-LDADD+=	-L${.CURDIR}/../ctutil/obj
+.if ${.CURDIR} == ${.OBJDIR}
+LDADD+= -L${.CURDIR}/../ctutil
+.elif ${.CURDIR}/obj == ${.OBJDIR}
+LDADD+= -L${.CURDIR}/../ctutil/obj
 .else
-LDADD+=	-L${.CURDIR}/../ctuil
+LDADD+= -L${.OBJDIR}/../ctutil
 .endif
 
 COPT+= -O2
