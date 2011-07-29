@@ -214,6 +214,7 @@ main(int argc, char **argv)
 			ct_debug = debug = 1;
 			cflags |= CLOG_F_DBGENABLE | CLOG_F_FILE | CLOG_F_FUNC |
 			    CLOG_F_LINE | CLOG_F_DTIME;
+			exude_enable();
 			break;
 		case 'e':
 			if (ct_action)
