@@ -802,6 +802,7 @@ ct_complete_normal(struct ct_trans *trans)
 {
 	int			slot;
 	struct fnode		*fnode = trans->tr_fl_node;
+	int			release_fnode = 0;
 
 	switch (trans->tr_state) {
 	case TR_S_DONE:
@@ -818,6 +819,7 @@ ct_complete_normal(struct ct_trans *trans)
 		if (ct_verbose)
 			printf("%s\n", fnode->fl_sname);
 		ct_write_md_special(trans);
+		release_fnode = 1;
 		break;
 	case TR_S_FILE_START:
 		if ((ct_multilevel_allfiles == 0) &&
@@ -846,6 +848,7 @@ ct_complete_normal(struct ct_trans *trans)
 		}
 		if (trans->tr_eof == 1) {
 			ct_write_md_eof(trans);
+			release_fnode = 1;
 		}
 		break;
 	case TR_S_EX_FILE_START:
@@ -887,6 +890,10 @@ ct_complete_normal(struct ct_trans *trans)
 		break;
 	default:
 		CFATALX("process_normal unexpected state %d", trans->tr_state);
+	}
+
+	if (release_fnode) {
+		ct_free_fnode(fnode);
 	}
 }
 

@@ -44,10 +44,13 @@ int		ct_prompt_password(char *, char *, size_t, char *, size_t);
 
 struct flist_head	fl_list_head = TAILQ_HEAD_INITIALIZER(fl_list_head);
 struct fnode		*fl_curnode;
+struct flist		*fl_lcurnode;
 
 struct dir_stat;
 
 int			 ct_cmp_dirlist(struct dir_stat *, struct dir_stat *);
+struct fnode		*ct_populate_fnode_from_flist(struct flist *);
+const char		*ct_name_to_safename(const char *);
 
 RB_HEAD(ct_dir_lookup, dir_stat) ct_dir_rb_head =
     RB_INITIALIZER(&ct_dir_rb_head);
@@ -98,20 +101,29 @@ ct_insert_dir(struct dir_stat *ds)
 }
 
 void
-ct_fnode_cleanup(void)
+ct_flnode_cleanup(void)
 {
-	struct fnode *fnode;
+	struct flist *flnode;
 	while (!TAILQ_EMPTY(&fl_list_head)) {
-		fnode = TAILQ_FIRST(&fl_list_head);
-		TAILQ_REMOVE(&fl_list_head, fnode, fl_list);
-		if (fnode->fl_fname)
-			e_free(&fnode->fl_fname);
-		if (fnode->fl_hlname)
-			e_free(&fnode->fl_hlname);
-		if (fnode->fl_sname)
-			e_free(&fnode->fl_sname);
-		e_free(&fnode);
+		flnode = TAILQ_FIRST(&fl_list_head);
+		TAILQ_REMOVE(&fl_list_head, flnode, fl_list);
+		if (flnode->fl_fname)
+			e_free(&flnode->fl_fname);
+		e_free(&flnode);
 	}
+
+}
+
+void
+ct_free_fnode(struct fnode *fnode)
+{
+	if (fnode->fl_hlname != NULL)
+		e_free(&fnode->fl_hlname);
+	if (fnode->fl_sname != NULL)
+		e_free(&fnode->fl_sname);
+	if (fnode->fl_fname)
+		e_free(&fnode->fl_fname);
+	e_free(&fnode);
 
 }
 
@@ -129,10 +141,10 @@ char	tpath[PATH_MAX];
 
 struct fl_tree		fl_rb_head = RB_INITIALIZER(&fl_rb_head);
 
-RB_GENERATE(fl_tree, fnode, fl_inode_entry, fl_inode_sort);
+RB_GENERATE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 
 int
-fl_inode_sort(struct fnode *f1, struct fnode *f2)
+fl_inode_sort(struct flist *f1, struct flist *f2)
 {
 	int rv;
 
@@ -144,32 +156,56 @@ fl_inode_sort(struct fnode *f1, struct fnode *f2)
 	return (0);
 }
 
-int
-ct_sched_backup_file(struct stat *sb, char *filename)
+const char *
+ct_name_to_safename(const char *filename)
 {
-	struct fnode		*fnode;
-	char			*safe;
-	struct fnode		*fnode_exists;
+	const char		*safe;
+
 	/* compute 'safe' name */
 	safe = filename;
 	if (ct_strip_slash && safe[0] == '/') {
 		safe++;
 		if (safe[0] == '\0') {
-			return 0;
+			return NULL;
 		}
 	}
 	while (!(strncmp(safe, "../", 3)))
 		safe += 3;
 	if (!strcmp(safe, ".."))
-		return 0;
+		return NULL;
 	/* skip '.' */
 	if (!strcmp(filename, ".")) {
-		return 0;
+		return NULL;
+	}
+	return safe;
+}
+
+struct fnode *
+ct_populate_fnode_from_flist(struct flist *flnode)
+{
+	struct fnode		*fnode;
+	const char		*safe;
+	struct stat		*sb, sbstore;
+	int			 rc;
+
+	sb = &sbstore;
+	rc = stat(flnode->fl_fname, sb);
+
+	if (rc == -1) {
+		/* file no longer available return failure */
+		return NULL;
 	}
 
-	fnode = e_calloc(1, sizeof (*fnode));
+	fnode = e_calloc(1, sizeof(*fnode));
 
-	fnode->fl_fname = e_strdup(filename);
+	/*
+	 * ct_name_to_safename has run before and not returned failure
+	 * so safe to not check for failure here
+	 */
+
+	safe = ct_name_to_safename(flnode->fl_fname);
+
+	fnode->fl_fname = e_strdup(flnode->fl_fname);
 	fnode->fl_sname = e_strdup(safe);
 	fnode->fl_dev = sb->st_dev;
 	fnode->fl_rdev = sb->st_rdev;
@@ -185,25 +221,50 @@ ct_sched_backup_file(struct stat *sb, char *filename)
 	fnode->fl_state = CT_FILE_START;
 	ct_sha1_setup(&fnode->fl_shactx);
 
-	fnode->fl_hlname = NULL;
-
-	/* deal with hardlink */
-	fnode_exists = RB_INSERT(fl_tree, &fl_rb_head, fnode);
-	if (fnode_exists != NULL) {
+	if (flnode->fl_hlnode != NULL) {
 		fnode->fl_hardlink = 1;
 		fnode->fl_type = C_TY_LINK;
-		fnode->fl_hlname = e_strdup(fnode_exists->fl_sname);
-		CDBG("found %s as hardlink of %s", fnode->fl_sname,
-		    fnode_exists->fl_sname);
+		safe = ct_name_to_safename(flnode->fl_hlnode->fl_fname);
+		fnode->fl_hlname = e_strdup(safe);
+	}
+
+	return fnode;
+}
+
+int
+ct_sched_backup_file(struct stat *sb, char *filename)
+{
+	struct flist		*flnode;
+	const char		*safe;
+	struct flist		*flnode_exists;
+
+	/* compute 'safe' name */
+	safe = ct_name_to_safename(filename);
+	if (safe == NULL)
+		return 0;
+
+	//ct_numalloc++;
+	flnode = e_calloc(1, sizeof (*flnode));
+
+	flnode->fl_fname = e_strdup(filename);
+	flnode->fl_dev = sb->st_dev;
+	flnode->fl_ino = sb->st_ino;
+
+	flnode->fl_hlnode = NULL;
+
+	/* deal with hardlink */
+	flnode_exists = RB_INSERT(fl_tree, &fl_rb_head, flnode);
+	if (flnode_exists != NULL) {
+		flnode->fl_hlnode = flnode_exists;
+		CDBG("found %s as hardlink of %s", safe,
+		    ct_name_to_safename(flnode->fl_hlnode->fl_fname));
 	} else {
-		if (C_ISREG(fnode->fl_type))
-			ct_stats->st_bytes_tot += fnode->fl_size;
+		if (S_ISREG(sb->st_mode))
+			ct_stats->st_bytes_tot += sb->st_size;
 	}
 	ct_stats->st_files_scanned++;
 
-	TAILQ_INSERT_TAIL(&fl_list_head, fnode, fl_list);
-	if (fl_curnode == NULL)
-		fl_curnode = fnode;
+	TAILQ_INSERT_TAIL(&fl_list_head, flnode, fl_list);
 
 	return 0;
 }
@@ -245,6 +306,21 @@ ct_archive(struct ct_op *op)
 			e_free(&basisbackup);
 
 		ct_traverse(filelist);
+
+		/*
+		 * it is possible the first files may have been deleted
+		 * before the scan completes, in that case skip
+		 * to the first existing node for fl_lcurnode/fl_curnode
+		 */
+		fl_lcurnode = TAILQ_FIRST(&fl_list_head);
+		do {
+			fl_curnode = ct_populate_fnode_from_flist(fl_lcurnode);
+			if (fl_curnode == NULL)
+				fl_lcurnode = TAILQ_NEXT(fl_lcurnode, fl_list);
+		} while (fl_lcurnode != NULL && fl_curnode == NULL);
+
+		CINFO("num files %" PRIu64, ct_stats->st_files_scanned);
+
 	} else if (ct_state->ct_file_state == CT_S_FINISHED)
 		return;
 
@@ -393,10 +469,25 @@ loop:
 next_file:
 	/* XXX should node be removed from list at this time? */
 	if (fl_curnode->fl_state == CT_FILE_FINISHED) {
-		fl_curnode = TAILQ_NEXT(fl_curnode, fl_list);
-		if (fl_curnode == NULL)
-			CDBG("no more files");
-		else
+		/* free old fl_curnode if the file was skipped */
+		if (fl_curnode && fl_curnode->fl_skip_file) 
+			ct_free_fnode(fl_curnode);
+
+		/*
+		 * if files are deleted ct_populate_fnode_from_flist()
+		 * will return NULL, so keep walking the list
+		 */
+		do {
+			fl_lcurnode = TAILQ_NEXT(fl_lcurnode, fl_list);
+			if (fl_lcurnode == NULL) {
+				CDBG("no more files");
+				fl_curnode = NULL;
+			} else {
+				fl_curnode =
+				    ct_populate_fnode_from_flist(fl_lcurnode);
+			}
+		} while (fl_lcurnode != NULL && fl_curnode == NULL);
+		if (fl_curnode != NULL)
 			CDBG("going to next file %s", fl_curnode->fl_sname);
 	}
 

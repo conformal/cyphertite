@@ -77,13 +77,10 @@ void ct_process_completions(void *vctx);
 
 struct fnode;
 
-RB_HEAD(fl_tree, fnode);
+RB_HEAD(fl_tree, flist);
 
-/* XXX - seperate allocation for path len, or part of struct? */
-/* XXX - create RB tree of matching inodes at the same time */
 struct fnode {
-	TAILQ_ENTRY(fnode)	fl_list;
-	RB_ENTRY(fnode)		fl_inode_entry;
+//	TAILQ_ENTRY(fnode)	fl_list;
 	char			*fl_hlname;
 	int			fl_hardlink;
 	dev_t			fl_dev;
@@ -107,40 +104,22 @@ struct fnode {
 	SHA_CTX			fl_shactx;
 	int			fl_skip_file;
 };
-#if 0
-struct fnode {
-	TAILQ_ENTRY(fnode)	fl_list;
-	char fnode		*fl_hardlink_node;
+
+struct flist {
+	TAILQ_ENTRY(flist)	fl_list;
+	RB_ENTRY(flist)		fl_inode_entry;
+	struct flist		*fl_hlnode;
 	char			*fl_fname;
-	int			fl_hardlink;
+	struct fnode		*fl_node;
 	dev_t			fl_dev;
 	ino_t			fl_ino;
-	struct fnode_live	*fl_live;
 };
-struct fnode_live {
-	uint32_t		fl_uid;
-	uint32_t		fl_gid;
-	int			fl_mode;
-	uint64_t		fl_atime;
-	uint64_t		fl_mtime;
-	int			fl_type;
-	size_t			fl_size;
-	size_t			fl_offset;
-	size_t			fl_comp_size;
-	char			*fl_sname;
-	int			fl_state;
-#define CT_FILE_START		(0)
-#define CT_FILE_PROCESSING	(1)
-#define CT_FILE_FINISHED	(2)
-	SHA_CTX			fl_shactx;
-};
-#endif
 
-int fl_inode_sort(struct fnode *, struct fnode *);
+int fl_inode_sort(struct flist *, struct flist *);
 
-RB_PROTOTYPE(fl_tree, fnode, fl_inode_entry, fl_inode_sort);
+RB_PROTOTYPE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 
-TAILQ_HEAD(flist_head, fnode);
+TAILQ_HEAD(flist_head, flist);
 
 extern struct flist_head	fl_list_head;
 
@@ -224,7 +203,8 @@ struct ct_trans {
 struct ct_trans		*ct_trans_alloc(void);
 void			ct_trans_free(struct ct_trans *trans);
 void			ct_trans_cleanup(void);
-void			ct_fnode_cleanup(void);
+void			ct_flnode_cleanup(void);
+void			ct_free_fnode(struct fnode *);
 void			ct_ssl_cleanup(void);
 
 void			ct_queue_transfer(struct ct_trans *);

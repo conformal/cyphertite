@@ -458,7 +458,7 @@ main(int argc, char **argv)
 		    strerror(errno));
 
 	ct_trans_cleanup();
-	ct_fnode_cleanup();
+	ct_flnode_cleanup();
 	ct_ssl_cleanup();
 out:
 	if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0)
