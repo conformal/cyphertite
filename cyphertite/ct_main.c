@@ -29,6 +29,9 @@
 #include <shrink.h>
 #include <xmlsd.h>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+
 #include <ctutil.h>
 
 #include "ct.h"

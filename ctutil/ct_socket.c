@@ -21,6 +21,7 @@
 #include <limits.h>
 #include <clog.h>
 #include <event.h>
+#include <fcntl.h>
 
 #include <assl.h>
 #include <ctutil.h>

@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <dirent.h>
 #include <libgen.h>
+#include <fcntl.h>
 #include <fnmatch.h>
 #include <regex.h>
 #include <vis.h>
