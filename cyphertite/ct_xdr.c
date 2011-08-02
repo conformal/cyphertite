@@ -842,7 +842,7 @@ ct_basis_setup(const char *basisbackup, char **filelist)
 	struct ct_md_gheader	 gh;
 	FILE			*xdr_f;
 	char			 cwd[PATH_MAX], **fptr;
-	int			 alldata, nextlvl, i;
+	int			 alldata, nextlvl, i, rooted = 1;
 
 	alldata = ct_multilevel_allfiles;
 	xdr_f = ct_metadata_open(basisbackup,  &gh);
@@ -869,13 +869,13 @@ ct_basis_setup(const char *basisbackup, char **filelist)
 	if (gh.cmg_version >= CT_MD_VERSION) {
 		if (getcwd(cwd, sizeof(cwd)) == NULL)
 			CFATAL("can't get current working directory");
-		if (strcmp(cwd, gh.cmg_cwd) != 0)
-			CFATALX("current working directory %s differs from "
-			    " basis %s", cwd, gh.cmg_cwd);
+
 		for (i = 0, fptr = filelist; *fptr != NULL &&
 		    i < gh.cmg_num_paths; fptr++, i++) {
 			if (strcmp(gh.cmg_paths[i], *fptr) != 0)
 				break;
+			if (gh.cmg_paths[i][0] != '/')
+				rooted = 0;
 		}
 		if (i < gh.cmg_num_paths || *fptr != NULL) {
 			if (ct_verbose == 0) {
@@ -891,6 +891,9 @@ ct_basis_setup(const char *basisbackup, char **filelist)
 
 		}
 
+		if (rooted == 0 && strcmp(cwd, gh.cmg_cwd) != 0)
+			CFATALX("current working directory %s differs from "
+			    " basis %s", cwd, gh.cmg_cwd);
 		/* done with the paths now, don't leak them */
 		e_free(&gh.cmg_paths);
 	}
