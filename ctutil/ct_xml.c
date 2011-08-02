@@ -29,6 +29,8 @@ struct xmlsd_v_attr		ct_cmd_attr[] = {
 
 struct xmlsd_v_attr		xa_ct_md_file_attr[] = {
 	{ "name" },
+	{ "size" },
+	{ "mtime" },
 	{ "chunkno" },
 	{ NULL }
 };
@@ -95,10 +97,18 @@ struct xmlsd_v_elem             xe_ct_md_list[] = {
 	{ NULL,		NULL,			NULL}
 };
 
-const char * const ct_md_list_fmt =
+const char * const ct_md_list_fmt_v2 =
     "<?xml version=\"1.0\"?>\r\n"
     "<ct_md_list version=\""
     CT_MD_LIST_VERSION
+    "\">\r\n"
+    "%s\r\n"
+    "</ct_md_list>\r\n";
+
+const char * const ct_md_list_fmt =
+    "<?xml version=\"2.0\"?>\r\n"
+    "<ct_md_list version=\""
+    "V1"
     "\">\r\n"
     "%s\r\n"
     "</ct_md_list>\r\n";

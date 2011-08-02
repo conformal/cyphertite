@@ -31,9 +31,10 @@ extern const char * const ct_md_open_read_chunkno_fmt;
 extern struct xmlsd_v_elem xe_ct_md_close[];
 extern const char * const ct_md_close_fmt;
 
-#define CT_MD_LIST_VERSION		"V1"
+#define CT_MD_LIST_VERSION		"V2"
 extern struct xmlsd_v_elem xe_ct_md_list[];
 extern const char * const ct_md_list_fmt;
+extern const char * const ct_md_list_fmt_v2;
 
 #define CT_MD_DELETE_VERSION		"V1"
 extern struct xmlsd_v_elem xe_ct_md_delete[];
