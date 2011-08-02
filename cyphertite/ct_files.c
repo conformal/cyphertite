@@ -469,10 +469,6 @@ loop:
 next_file:
 	/* XXX should node be removed from list at this time? */
 	if (fl_curnode->fl_state == CT_FILE_FINISHED) {
-		/* free old fl_curnode if the file was skipped */
-		if (fl_curnode && fl_curnode->fl_skip_file) 
-			ct_free_fnode(fl_curnode);
-
 		/*
 		 * if files are deleted ct_populate_fnode_from_flist()
 		 * will return NULL, so keep walking the list

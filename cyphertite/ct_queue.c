@@ -823,8 +823,10 @@ ct_complete_normal(struct ct_trans *trans)
 		break;
 	case TR_S_FILE_START:
 		if ((ct_multilevel_allfiles == 0) &&
-		    fnode->fl_skip_file)
+		    fnode->fl_skip_file) {
+			release_fnode = 1;
 			break;
+		}
 
 		if (ct_write_header(trans, fnode->fl_sname))
 			CWARNX("header write failed");
