@@ -659,6 +659,32 @@ ct_cmp_md(struct md_list_file *f1, struct md_list_file *f2)
 
 RB_GENERATE(md_list_tree, md_list_file, next, ct_cmp_md);
 
+/* Taken from OpenBSD ls */
+static void
+printtime(time_t ftime)
+{
+	int i;
+	char *longstring;
+
+	longstring = ctime(&ftime);
+	for (i = 4; i < 11; ++i)
+		(void)putchar(longstring[i]);
+
+#define DAYSPERNYEAR	365
+#define SECSPERDAY	(60*60*24)
+#define	SIXMONTHS	((DAYSPERNYEAR / 2) * SECSPERDAY)
+	if (ftime + SIXMONTHS > time(NULL))
+		for (i = 11; i < 16; ++i)
+			(void)putchar(longstring[i]);
+	else {
+		(void)putchar(' ');
+		for (i = 20; i < 24; ++i)
+			(void)putchar(longstring[i]);
+	}
+	(void)putchar(' ');
+}
+
+
 void
 ct_md_list_print(struct ct_op *op)
 {
@@ -671,6 +697,10 @@ ct_md_list_print(struct ct_op *op)
 
 	RB_FOREACH_SAFE(file, md_list_tree, results, tfile) {
 		RB_REMOVE(md_list_tree, results, file);
+		/* XXX only the extras if verbose? */
+		printf("%llu\t", file->size);
+		printtime(file->mtime);
+		printf("\t");
 		printf("%s\n", file->name);
 		e_free(&file);
 	}
