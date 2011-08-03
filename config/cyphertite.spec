@@ -1,7 +1,7 @@
 # $cyphertite$
 
 %define name		cyphertite
-%define version		0.3.1
+%define version		0.3.2
 %define release		1
 
 Name: 		%{name}
@@ -47,7 +47,15 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertite
 
 %changelog
-* Tue Jul 27 2011 - davec 0.3.1-1
+* Wed Aug 03 2011 - davec 0.3.2-1
+- Dramatically decrease memory footprint of cyphertite
+- Add XML definitions for expanded metada list mode
+- Print out the filesize and mtime from the server prettily in md list mode
+- Permit differential backups of absolute paths to come from different working
+  directories
+- Improve error reporting
+- Other misc bug fixes
+* Wed Jul 27 2011 - davec 0.3.1-1
 - Man page updates 
 * Tue Jul 26 2011 - davec 0.3.0-1
 - Modify wizard to create the configuration path and to run it at more

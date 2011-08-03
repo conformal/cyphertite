@@ -1,3 +1,15 @@
+cyphertite (0.3.2-1) unstable; urgency=low
+
+  - Dramatically decrease memory footprint of cyphertite
+  - Add XML definitions for expanded metada list mode
+  - Print out the filesize and mtime from the server prettily in md list mode
+  - Permit differential backups of absolute paths to come from different working
+    directories
+  - Improve error reporting
+  - Other misc bug fixes
+
+ -- Conformal Systems <package-discuss@conformal.com>  Wed, 03 Aug 2011 16:32:18 -0500
+
 cyphertite (0.3.1-1) unstable; urgency=low
 
   * Man page updates
