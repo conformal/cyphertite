@@ -58,7 +58,7 @@ RB_PROTOTYPE(md_list_tree, md_list_file, next, ct_cmp_md);
 
 struct md_list			ct_md_listfiles =
 				     SLIST_HEAD_INITIALIZER(&ct_md_listfiles);
-int				md_backup_fd;
+int				md_backup_fd = -1;
 int				md_block_no = 0;
 int				md_is_open = 0;
 int				md_open_inflight = 0;
