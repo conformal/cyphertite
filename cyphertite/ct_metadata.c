@@ -701,7 +701,7 @@ ct_md_list_print(struct ct_op *op)
 	RB_FOREACH_SAFE(file, md_list_tree, results, tfile) {
 		RB_REMOVE(md_list_tree, results, file);
 		/* XXX only the extras if verbose? */
-		printf("%llu\t", file->mlf_size);
+		printf("%llu\t", (unsigned long long)file->mlf_size);
 		printtime(file->mlf_mtime);
 		printf("\t");
 		printf("%s\n", file->mlf_name);
