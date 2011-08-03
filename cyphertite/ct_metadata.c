@@ -44,12 +44,12 @@ struct md_list_file {
 	union {
 		RB_ENTRY(md_list_file)		nxt;
 		SLIST_ENTRY(md_list_file)	lnk;
-	}					entries;
-#define next	entries.nxt
-#define link	entries.lnk
-	char					name[CT_MAX_MD_FILENAME];
-	off_t					size;
-	time_t					mtime;
+	}					mlf_entries;
+#define mlf_next	mlf_entries.nxt
+#define mlf_link	mlf_entries.lnk
+	char					mlf_name[CT_MAX_MD_FILENAME];
+	off_t					mlf_size;
+	time_t					mlf_mtime;
 };
 
 SLIST_HEAD(md_list, md_list_file);
@@ -502,7 +502,7 @@ void
 ct_complete_metadata(struct ct_trans *trans)
 {
 	ssize_t			wlen;
-	int			slot;
+	int			slot, done = 0;
 
 	switch(trans->tr_state) {
 	case TR_S_EX_READ:
@@ -522,12 +522,15 @@ ct_complete_metadata(struct ct_trans *trans)
 		break;
 
 	case TR_S_DONE:
+		/* More operations to be done? */
+		if (ct_op_complete())
+			done = 1;
+
 		/* Clean up md reconnect name, shared between all trans */
 		if (trans->tr_md_name != NULL)
 			e_free(&trans->tr_md_name);
 
-		/* More operations to be done? */
-		if (ct_op_complete() == 0)
+		if (!done)
 			return;
 		if (ct_verbose_ratios)
 			ct_dump_stats(stdout);
@@ -626,15 +629,15 @@ ct_md_list_complete(struct ct_op *op)
 	}
 
 	while ((file = SLIST_FIRST(&ct_md_listfiles)) != NULL) {
-		SLIST_REMOVE_HEAD(&ct_md_listfiles, link);
+		SLIST_REMOVE_HEAD(&ct_md_listfiles, mlf_link);
 		match = 0;
 		if (*pat == NULL) {
 			match = 1;
 		} else if (op->op_matchmode == CT_MATCH_REGEX) {
-			if (regexec(re, file->name, 0, NULL, 0) == 0)
+			if (regexec(re, file->mlf_name, 0, NULL, 0) == 0)
 				match = 1;
 		} else {
-			if (fnmatch(*pat, file->name, 0) == 0)
+			if (fnmatch(*pat, file->mlf_name, 0) == 0)
 				match = 1;
 		}
 		if (match) {
@@ -654,10 +657,10 @@ ct_md_list_complete(struct ct_op *op)
 int
 ct_cmp_md(struct md_list_file *f1, struct md_list_file *f2)
 {
-	return (strcmp(f1->name, f2->name));
+	return (strcmp(f1->mlf_name, f2->mlf_name));
 }
 
-RB_GENERATE(md_list_tree, md_list_file, next, ct_cmp_md);
+RB_GENERATE(md_list_tree, md_list_file, mlf_next, ct_cmp_md);
 
 /* Taken from OpenBSD ls */
 static void
@@ -698,10 +701,10 @@ ct_md_list_print(struct ct_op *op)
 	RB_FOREACH_SAFE(file, md_list_tree, results, tfile) {
 		RB_REMOVE(md_list_tree, results, file);
 		/* XXX only the extras if verbose? */
-		printf("%llu\t", file->size);
-		printtime(file->mtime);
+		printf("%llu\t", file->mlf_size);
+		printtime(file->mlf_mtime);
 		printf("\t");
-		printf("%s\n", file->name);
+		printf("%s\n", file->mlf_name);
 		e_free(&file);
 	}
 	e_free(&results);
@@ -815,9 +818,10 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 					e_free(&file);
 					continue;
 				}
-				strlcpy(file->name, tmp, sizeof(file->name));
+				strlcpy(file->mlf_name, tmp,
+				    sizeof(file->mlf_name));
 				tmp = xmlsd_get_attr(xe, "size");
-				file->size = strtonum(tmp, 0, LLONG_MAX,
+				file->mlf_size = strtonum(tmp, 0, LLONG_MAX,
 				    &errstr);
 				if (errstr != NULL) {
 					CWARNX("size = %s", tmp);
@@ -825,14 +829,14 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 				}
 
 				tmp = xmlsd_get_attr(xe, "mtime");
-				file->mtime = strtonum(tmp, 0, LLONG_MAX,
+				file->mlf_mtime = strtonum(tmp, 0, LLONG_MAX,
 				    &errstr);
 				if (errstr != NULL) {
 					CWARNX("mtime = %s", tmp);
 					CFATAL("can't parse mtime");
 				}
 				SLIST_INSERT_HEAD(&ct_md_listfiles, file,
-				    link);
+				    mlf_link);
 			}
 		}
 		trans->tr_state = TR_S_DONE;
@@ -1098,7 +1102,7 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 	}
 
 	/* pick the newest one */
-	best = e_strdup(tmp->name);
+	best = e_strdup(tmp->mlf_name);
 	CDBG("backup file is %s", best);
 
 	while((tmp = RB_ROOT(result)) != NULL) {
