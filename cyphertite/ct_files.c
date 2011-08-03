@@ -366,7 +366,7 @@ loop:
 		current_fd = open(fl_curnode->fl_fname, O_RDONLY);
 
 		if (current_fd == -1) {
-			CWARNX("ct_process_file unable to open file '%s'",
+			CWARN("archive: unable to open file '%s'",
 			    fl_curnode->fl_sname);
 			ct_trans_free(ct_trans);
 			fl_curnode->fl_state = CT_FILE_FINISHED;
@@ -376,8 +376,8 @@ loop:
 		skip_file = 0;
 		error = fstat(current_fd, &sb);
 		if (error) {
-			CWARNX("file stat error %s %d %s",
-			    fl_curnode->fl_sname, errno, strerror(errno));
+			CWARN("archive: file %s stat error",
+			    fl_curnode->fl_sname);
 		} else {
 			if (sb.st_mtime < ct_prev_backup_time) {
 				if (ct_verbose > 1)
@@ -441,8 +441,8 @@ loop:
 		/* restat file for modifications */
 		error = fstat(current_fd, &sb);
 		if (error) {
-			CWARNX("file stat error %s %d %s",
-			    fl_curnode->fl_sname, errno, strerror(errno));
+			CWARN("archive: file %s stat error",
+			    fl_curnode->fl_sname);
 		} else if (sb.st_size != fl_curnode->fl_size) {
 			CWARNX("file truncated during backup");
 			/*

@@ -386,7 +386,7 @@ ct_reconnect(int unused, short event, void *varg)
 				if (ct_xml_file_open_polled(ct_assl_ctx,
 				    trans->tr_md_name, MD_O_APPEND,
 				    trans->tr_md_chunkno))
-					CFATALX("can't reopen MD file");
+					CFATALX("can't reopen metadata file");
 				break;
 			} else if (trans->tr_state == TR_S_EX_SHA) {
 				CINFO("read in queue chunkno %d",
@@ -399,7 +399,7 @@ ct_reconnect(int unused, short event, void *varg)
 				if (ct_xml_file_open_polled(ct_assl_ctx,
 				    trans->tr_md_name, MD_O_READ,
 				    trans->tr_md_chunkno))
-					CFATALX("can't reopen MD file");
+					CFATALX("can't reopen metadata file");
 				break;
 			}
 		}
@@ -1320,9 +1320,8 @@ ct_compute_encrypt(void *vctx)
 					CFATALX("can't create iv");
 			}
 
-			if ((newlen = ct_encrypt(key, keysz, iv, ivlen, src,
-			    len, dst, ct_alloc_block_size)) <= 0)
-				CFATALX("c_encrypt");
+			newlen = ct_encrypt(key, keysz, iv, ivlen, src,
+			    len, dst, ct_alloc_block_size);
 			/* XXX - which one ? */
 			trans->hdr.c_flags |= C_HDR_F_ENCRYPTED;
 		} else {

@@ -329,7 +329,7 @@ ct_create_secrets(char *passphrase, char *filename)
 
 	fd = open(filename, O_CREAT | O_WRONLY, 0600);
 	if (fd == -1) {
-		CWARN("open");
+		CWARN("can't open secrets file");
 		return (-1);
 	}
 	f = fdopen(fd, "w");
@@ -411,7 +411,7 @@ ct_create_secrets(char *passphrase, char *filename)
 	rv = 0;
 done:
 	if (fchmod(fd, 0400) == -1)
-		CWARN("unable to chmod");
+		CWARN("unable to chmod secrets file");
 	fclose(f);
 
 	/* clean things up */
@@ -478,7 +478,7 @@ ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
 
 	f = fopen(filename, "r");
 	if (f == NULL) {
-		CWARN("fopen");
+		CWARN("can't fopen secrets file");
 		return (-1);
 	}
 
@@ -536,7 +536,7 @@ ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
 			}
 			got_digest = 1;
 		} else {
-			CWARNX("invalid entry");
+			CWARNX("invalid entry in secrets file");
 			goto done;
 		}
 	};
@@ -577,7 +577,7 @@ ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
 	}
 
 	if (bcmp(digest, digest_v, sizeof digest)) {
-		CWARNX("corrupt file");
+		CWARNX("corrupt secrets file");
 		goto done;
 	}
 

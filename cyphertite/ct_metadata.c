@@ -83,20 +83,17 @@ ct_md_cook_filename(const char *path)
 	char	*bname, *fname, *pdup;
 
 	fname = e_calloc(1, CT_MAX_MD_FILENAME);
-	if (fname == NULL)
-		CFATALX("can't allocate space for filename");
-
 
 	pdup = e_strdup(path);
 	bname = basename(pdup);
 	if (bname == NULL)
-		CFATAL("can't basename md path");
+		CFATAL("can't basename metadata path");
 	if (bname[0] == '/')
-		CFATALX("invalid md filename");
+		CFATALX("invalid metadata filename");
 
 	if (strnvis(fname, bname, CT_MAX_MD_FILENAME, VIS_GLOB |
 	    VIS_WHITE | VIS_SAFE) >= CT_MAX_MD_FILENAME)
-		CFATALX("md filename too long");
+		CFATALX("metadata filename too long");
 	e_free(&pdup);
 	return (fname);
 }
@@ -143,7 +140,7 @@ loop:
 
 		error = fstat(md_backup_fd, &sb);
 		if (error) {
-			CFATAL("can't state backup file %s", mfile);
+			CFATAL("can't stat backup file %s", mfile);
 		} else {
 			md_size = sb.st_size;
 			md_mtime = sb.st_mtime;
@@ -261,20 +258,16 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
 	CDBG("setting up XML");
 
 	if (mode == MD_O_WRITE) {
-		sz = asprintf(&buf, ct_md_open_create_fmt, file);
+		sz = e_asprintf(&buf, ct_md_open_create_fmt, file);
 	} else if (mode == MD_O_APPEND) {
-		sz = asprintf(&buf, ct_md_open_create_chunkno_fmt,
+		sz = e_asprintf(&buf, ct_md_open_create_chunkno_fmt,
+		    file, chunkno);
+	} else if (chunkno) {
+		sz = e_asprintf(&buf, ct_md_open_read_chunkno_fmt,
 		    file, chunkno);
 	} else {
-		if (chunkno) {
-			sz = asprintf(&buf, ct_md_open_read_chunkno_fmt,
-			    file, chunkno);
-		} else {
-			sz = asprintf(&buf, ct_md_open_read_fmt, file);
-		}
+		sz = e_asprintf(&buf, ct_md_open_read_fmt, file);
 	}
-	if (sz == -1)
-		CFATALX("cannot allocate memory");
 	sz += 1;	/* include null */
 
 	hdr = &trans->hdr;
@@ -290,7 +283,7 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
 	body = (char *)ct_body_alloc(NULL, hdr);
 	CDBG("got body %p", body);
 	bcopy(buf, body, sz);
-	free(buf);
+	e_free(&buf);
 
 	CDBG("open trans %"PRIu64, trans->tr_trans_id);
 
@@ -318,17 +311,13 @@ ct_xml_file_open_polled(struct ct_assl_io_ctx *ct_assl_ctx,
 	} else if (mode == MD_O_APPEND) {
 		sz = e_asprintf(&body, ct_md_open_create_chunkno_fmt,
 		    file, chunkno);
+	} else if (chunkno) {
+		sz = e_asprintf(&body, ct_md_open_read_chunkno_fmt,
+		    file, chunkno);
 	} else {
-		if (chunkno) {
-			sz = e_asprintf(&body, ct_md_open_read_chunkno_fmt,
-			    file, chunkno);
-		} else {
-			sz = e_asprintf(&body, ct_md_open_read_fmt, file);
-		}
+		sz = e_asprintf(&body, ct_md_open_read_fmt, file);
 	}
-	if (sz == -1)
-		CFATALX("cannot allocate memory");
-	sz += 1;	/* include null */
+	sz += 1;	/* include NUL */
 
 	hdr.c_version = C_HDR_VERSION;
 	hdr.c_opcode = C_HDR_O_XML;
@@ -400,9 +389,7 @@ ct_xml_file_close(void)
 	// XXX: Some flavors of gcc don't like externed strings with no
 	// arguments to printf style functions since the format specifiers
 	// can't be checked at compile time.
-	sz = asprintf(&buf, "%s", ct_md_close_fmt);
-	if (sz == -1)
-		CFATALX("cannot allocate memory");
+	sz = e_asprintf(&buf, "%s", ct_md_close_fmt);
 	sz += 1;	/* include null */
 
 	hdr = &trans->hdr;
@@ -418,7 +405,7 @@ ct_xml_file_close(void)
 	body = (char *)ct_body_alloc(NULL, hdr);
 	CDBG("got body %p", body);
 	bcopy(buf, body, sz);
-	free(buf);
+	e_free(&buf);
 
 	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
 	ct_state->ct_queued_qlen++;
@@ -576,10 +563,7 @@ ct_md_list_start(struct ct_op *op)
 
 	CDBG("setting up XML");
 
-	/* XXX - pat */
-	sz = asprintf(&buf, ct_md_list_fmt_v2, "");
-	if (sz == -1)
-		CFATALX("cannot allocate memory");
+	sz = e_asprintf(&buf, ct_md_list_fmt_v2, "");
 	sz += 1;	/* include null */
 
 	hdr = &trans->hdr;
@@ -595,7 +579,7 @@ ct_md_list_start(struct ct_op *op)
 	body = (char *)ct_body_alloc(NULL, hdr);
 	CDBG("got body %p", body);
 	bcopy(buf, body, sz);
-	free(buf);
+	e_free(&buf);
 
 	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
 	ct_state->ct_queued_qlen++;
@@ -722,12 +706,11 @@ ct_md_delete(struct ct_op *op)
 	CDBG("setting up XML");
 
 	md = ct_md_cook_filename(md);
-	sz = asprintf(&buf, ct_md_delete_fmt, md);
-	e_free(&md);
 
-	if (sz == -1)
-		CFATALX("cannot allocate memory");
+	sz = e_asprintf(&buf, ct_md_delete_fmt, md);
 	sz += 1;	/* include null */
+
+	e_free(&md);
 
 	trans = ct_trans_alloc();
 	trans->tr_trans_id = ct_trans_id++;
@@ -740,7 +723,7 @@ ct_md_delete(struct ct_op *op)
 
 	body = ct_body_alloc(NULL, hdr);
 	bcopy(buf, body, sz);
-	free(buf);
+	e_free(&buf);
 
 	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
 	ct_state->ct_queued_qlen++;
@@ -823,18 +806,15 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 				tmp = xmlsd_get_attr(xe, "size");
 				file->mlf_size = strtonum(tmp, 0, LLONG_MAX,
 				    &errstr);
-				if (errstr != NULL) {
-					CWARNX("size = %s", tmp);
-					CFATAL("can't parse file size");
-				}
+				if (errstr != NULL)
+					CFATAL("can't parse file size %s",
+					    errstr);
 
 				tmp = xmlsd_get_attr(xe, "mtime");
 				file->mlf_mtime = strtonum(tmp, 0, LLONG_MAX,
 				    &errstr);
-				if (errstr != NULL) {
-					CWARNX("mtime = %s", tmp);
-					CFATAL("can't parse mtime");
-				}
+				if (errstr != NULL)
+					CFATAL("can't parse mtime: %s", errstr);
 				SLIST_INSERT_HEAD(&ct_md_listfiles, file,
 				    mlf_link);
 			}
@@ -869,7 +849,7 @@ ct_mdmode_setup(const char *mdmode)
 	else if (strcmp(mdmode, "local") == 0)
 		ct_md_mode = CT_MDMODE_LOCAL;
 	else
-		CFATALX("invalid md mode specified");
+		CFATALX("invalid metadata mode specified");
 }
 
 int
@@ -880,7 +860,7 @@ md_is_in_cache(const char *mdfile)
 	int		 found = 0;
 
 	if ((dirp = opendir(ct_md_cachedir)) == NULL)
-		CFATALX("can't open md cache dir");
+		CFATALX("can't open metadata cache dir");
 	while ((dp = readdir(dirp)) != NULL) {
 		if (strcmp(dp->d_name, mdfile) == 0) {
 			CDBG("found in cachedir");
@@ -1154,7 +1134,7 @@ ct_find_md_for_archive(const char *mdname)
 	mdname = ct_md_cook_filename(mdname);
 
 	if (ct_md_is_full_mdname(mdname) != 0)
-		CFATALX("mdname with data tag already filled in");
+		CFATALX("metadata name with date tag already filled in");
 
 	now = time(NULL);
 	if (strftime(buf, TIMEDATA_LEN, "%Y%m%d-%H%M%S",
@@ -1166,7 +1146,8 @@ ct_find_md_for_archive(const char *mdname)
 	/* check it isn't already in the cache */
 	cachename = ct_md_get_cachename(fullname);
 	if (md_is_in_cache(fullname))
-		CFATALX("generated mdname is already in cache dir");
+		CFATALX("generated metadata name %s already in cache dir",
+		    fullname);
 
 	e_free(&mdname);
 	e_free(&fullname);

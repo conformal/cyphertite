@@ -85,7 +85,7 @@ ct_ssl_over_bw_wakeup(int fd_unused, short reason, void *varg)
 	curdbg->op = 'W';
 
 	if (gettimeofday(&now,NULL)) {
-		CWARN("gettimeofday failed in over_bw_lim");
+		CWARN("gettimeofday failed in over_bw_wakeup");
 		return;
 	}
 	curdbg->io_time = now;

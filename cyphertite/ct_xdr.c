@@ -163,7 +163,7 @@ ct_metadata_create(const char *filename, int intype, const char *basis, int lvl,
 	struct ct_md_gheader	gh;
 
 	if (lvl != 0 && basis == NULL)
-		CFATALX("multilevel archive  with no basis");
+		CFATALX("multilevel archive with no basis");
 	/* open metadata file */
 	f = fopen(filename, "wb");
 	if (f == NULL)
@@ -420,7 +420,7 @@ next_file:
 			}
 skipped:
 			if (ct_read_trailer(&trl))
-				CFATALX("trailer read failure");
+				CFATALX("can't read metadata trailer");
 			if (doprint && ct_verbose > 1)
 				printf(" shas: %" PRIu64 " reduction: %" PRIu64
 				    "%%\n",
@@ -680,7 +680,7 @@ ct_extract(struct ct_op *op)
 		if (ct_num_shas == -1) {
 			/* read header */
 			if (ct_read_header(&hdr))
-				CFATALX("failure reading header");
+				CFATALX("failure reading metadata header");
 
 			switch (hdr.cmh_beacon) {
 			case CT_HDR_BEACON:

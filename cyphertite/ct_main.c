@@ -335,12 +335,12 @@ main(int argc, char **argv)
 			    sizeof(ct_fullcachedir),
 			    "%s/", ct_md_cachedir)) == -1 || rv >
 			    PATH_MAX)
-				CFATALX("invalid md pathname");
+				CFATALX("invalid metadata pathname");
 			ct_md_cachedir = ct_fullcachedir;
 		}
 
 		if (ct_make_full_path(ct_md_cachedir, 0700) != 0)
-			CFATALX("can't create MD cachedir");
+			CFATALX("can't create metadata cachedir");
 	}
 
 	/* Don't bother starting a connection if just listing local files. */
@@ -409,7 +409,10 @@ main(int argc, char **argv)
 			}
 			break;
 		default:
-			CFATALX("invalid action");
+			CWARNX("invalid action");
+			usage();
+			/* NOTREACHED */
+			break;
 		}
 	} else if (ct_metadata != 0) {
 		switch (ct_action) {
@@ -432,6 +435,7 @@ main(int argc, char **argv)
 		default:
 			CWARNX("must specify action");
 			usage();
+			/* NOTREACHED */
 			break;
 		}
 	} else {
