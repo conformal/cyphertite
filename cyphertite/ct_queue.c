@@ -339,7 +339,7 @@ ct_reconnect(int unused, short event, void *varg)
 				 * don't worry.
 				 */
 				if (trans->tr_state == TR_S_XML_OPEN) {
-					CINFO("found open in queue, ignoring");
+					CDBG("found open in queue, ignoring");
 					break;
 				}
 				/*
@@ -349,7 +349,7 @@ ct_reconnect(int unused, short event, void *varg)
 				 */
 				if (trans->tr_state == TR_S_XML_CLOSING ||
 				    trans->tr_state == TR_S_XML_CLOSE) {
-					CINFO("found close in queue, completing");
+					CDBG("found close in queue, completing");
 					/* Don't try and close again */
 					/* XXX should be S_DONE? */
 					trans->tr_state = TR_S_XML_CLOSING;
@@ -371,7 +371,7 @@ ct_reconnect(int unused, short event, void *varg)
 			    trans->tr_state == TR_S_COMPRESSED ||
 			    trans->tr_state == TR_S_ENCRYPTED ||
 			    trans->tr_state == TR_S_READ) {
-				CINFO("write in queue chunkno %d",
+				CDBG("write in queue chunkno %d",
 				    trans->tr_md_chunkno);
 				/*
 				 * Reopen the file at the point we are.
@@ -389,7 +389,7 @@ ct_reconnect(int unused, short event, void *varg)
 					CFATALX("can't reopen metadata file");
 				break;
 			} else if (trans->tr_state == TR_S_EX_SHA) {
-				CINFO("read in queue chunkno %d",
+				CDBG("read in queue chunkno %d",
 				    trans->tr_md_chunkno);
 				/*
 				 * We had a read in progress. reinject
