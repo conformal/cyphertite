@@ -40,7 +40,24 @@
 
 __attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
-char				**ct_md_listfiles;
+struct md_list_file {
+	union {
+		RB_ENTRY(md_list_file)		nxt;
+		SLIST_ENTRY(md_list_file)	lnk;
+	}					entries;
+#define next	entries.nxt
+#define link	entries.lnk
+	char					name[CT_MAX_MD_FILENAME];
+	off_t					size;
+	time_t					mtime;
+};
+
+SLIST_HEAD(md_list, md_list_file);
+RB_HEAD(md_list_tree, md_list_file);
+RB_PROTOTYPE(md_list_tree, md_list_file, next, ct_cmp_md);
+
+struct md_list			ct_md_listfiles =
+				     SLIST_HEAD_INITIALIZER(&ct_md_listfiles);
 int				md_backup_fd;
 int				md_block_no = 0;
 int				md_is_open = 0;
@@ -48,8 +65,8 @@ int				md_open_inflight = 0;
 size_t				md_size, md_offset;
 time_t				md_mtime;
 
-int	 strcompare(const void *, const void *);
-char	**ct_md_list_complete(struct ct_op *);
+int	 		 strcompare(const void *, const void *);
+struct md_list_tree	*ct_md_list_complete(struct ct_op *);
 
 struct xmlsd_v_elements ct_xml_cmds[] = {
 	{ "ct_md_list", xe_ct_md_list },
@@ -557,7 +574,7 @@ ct_md_list_start(struct ct_op *op)
 	CDBG("setting up XML");
 
 	/* XXX - pat */
-	sz = asprintf(&buf, ct_md_list_fmt, "");
+	sz = asprintf(&buf, ct_md_list_fmt_v2, ""); 
 	if (sz == -1)
 		CFATALX("cannot allocate memory");
 	sz += 1;	/* include null */
@@ -583,17 +600,21 @@ ct_md_list_start(struct ct_op *op)
 	ct_assl_write_op(ct_assl_ctx, hdr, body);
 }
 
-char **
+struct md_list_tree *
 ct_md_list_complete(struct ct_op *op)
 {
+	struct md_list_tree	*results;
+	struct md_list_file	*file;
 	char			**pat = op->op_filelist;
 	regex_t			*re = NULL;
 	char			error[1024];
-	char			**str, **matchedlist, *curstr;
-	int			rv, nfiles, i, match;
+	int			rv, match;
 
-	if (ct_md_listfiles == NULL)
+	if (SLIST_EMPTY(&ct_md_listfiles))
 		return (NULL);
+
+	results = e_malloc(sizeof(*results));
+	RB_INIT(results);
 
 	if (op->op_matchmode == CT_MATCH_REGEX && *pat) {
 		re = e_calloc(1, sizeof(*re));
@@ -604,56 +625,54 @@ ct_md_list_complete(struct ct_op *op)
 		}
 	}
 
-
-	str = ct_md_listfiles;
-	nfiles = 0;
-	while (*(str++) != NULL)
-		nfiles++;
-
-	matchedlist = e_calloc(nfiles + 1, sizeof(*ct_md_listfiles));
-
-	str = ct_md_listfiles;
-	i = 0;
-	while ((curstr = *(str++)) != NULL) {
+	while ((file = SLIST_FIRST(&ct_md_listfiles)) != NULL) {
+		SLIST_REMOVE_HEAD(&ct_md_listfiles, link);
 		match = 0;
 		if (*pat == NULL) {
 			match = 1;
 		} else if (op->op_matchmode == CT_MATCH_REGEX) {
-			if (regexec(re, curstr, 0, NULL, 0) == 0)
+			if (regexec(re, file->name, 0, NULL, 0) == 0)
 				match = 1;
 		} else {
-			if (fnmatch(*pat, curstr, 0) == 0)
+			if (fnmatch(*pat, file->name, 0) == 0)
 				match = 1;
 		}
 		if (match) {
-			matchedlist[i++] = curstr;
+			RB_INSERT(md_list_tree, results, file);
 		} else {
-			e_free(&curstr);
+			e_free(&file);
 		}
 	}
-	matchedlist[i] = NULL;
-	e_free(&ct_md_listfiles); /* sets md_listfiles to NULL, too */
 	if (op->op_matchmode == CT_MATCH_REGEX && *pat) {
 		regfree(re);
 		e_free(&re);
 	}
-
-	return (matchedlist);
+	
+	return (results);
 }
+
+int
+ct_cmp_md(struct md_list_file *f1, struct md_list_file *f2)
+{
+	return (strcmp(f1->name, f2->name));
+}
+
+RB_GENERATE(md_list_tree, md_list_file, next, ct_cmp_md);
 
 void
 ct_md_list_print(struct ct_op *op)
 {
-	char	**results, **str, *curstr;
+	struct md_list_tree	*results;
+	struct md_list_file	*file, *tfile;
 
 	results = ct_md_list_complete(op);
 	if (results == NULL)
-		return; // (1);
+		return;
 
-	str = results;
-	while ((curstr = *(str++)) != NULL) {
-		printf("%s\n", curstr);
-		e_free(&curstr);
+	RB_FOREACH_SAFE(file, md_list_tree, results, tfile) {
+		RB_REMOVE(md_list_tree, results, file);
+		printf("%s\n", file->name);
+		e_free(&file);
 	}
 	e_free(&results);
 }
@@ -754,27 +773,38 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 	} else if (strcmp(xe->name, "ct_md_close") == 0) {
 		trans->tr_state = TR_S_DONE;
 	} else if (strcmp(xe->name, "ct_md_list") == 0) {
-		int nfiles = 0;
+		struct md_list_file	*file;
+		const char		*errstr;
+		char			*tmp;
 
 		TAILQ_FOREACH(xe, &xl, entry) {
-			if (strcmp(xe->name, "file") == 0)
-				nfiles++;
-		}
-		/* array is NULL terminated */
-		ct_md_listfiles = e_calloc(nfiles + 1, 
-		    sizeof(*ct_md_listfiles));
-		nfiles = 0;
-		TAILQ_FOREACH(xe, &xl, entry) {
 			if (strcmp(xe->name, "file") == 0) {
-				filename = xmlsd_get_attr(xe, "name");
-				if (filename) {
-					ct_md_listfiles[nfiles] =
-					    e_strdup(filename);
-					nfiles++;
+				file = e_malloc(sizeof(*file));
+				tmp = xmlsd_get_attr(xe, "name");
+				if (tmp == NULL) {
+					e_free(&file);
+					continue;
 				}
+				strlcpy(file->name, tmp, sizeof(file->name));
+				tmp = xmlsd_get_attr(xe, "size");
+				file->size = strtonum(tmp, 0, LLONG_MAX,
+				    &errstr);
+				if (errstr != NULL) {
+					CWARNX("size = %s", tmp);
+					CFATAL("can't parse file size");
+				}
+
+				tmp = xmlsd_get_attr(xe, "mtime");
+				file->mtime = strtonum(tmp, 0, LLONG_MAX,
+				    &errstr);
+				if (errstr != NULL) {
+					CWARNX("mtime = %s", tmp);
+					CFATAL("can't parse mtime");
+				}
+				SLIST_INSERT_HEAD(&ct_md_listfiles, file,
+				    link);
 			}
 		}
-		ct_md_listfiles[nfiles] = NULL;
 		trans->tr_state = TR_S_DONE;
 	} else  if (strcmp(xe->name, "ct_md_delete") == 0) {
 		TAILQ_FOREACH(xe, &xl, entry) {
@@ -1017,20 +1047,18 @@ ct_md_extract_nextop(struct ct_op *op)
 void
 ct_find_md_for_extract_complete(struct ct_op *op)
 {
-	struct ct_op	*list_fakeop = op->op_priv;
-	char		**result, **tmp;
-	char		*best, *cachename = NULL;
-	int		 nresults = 0;
+	struct ct_op		*list_fakeop = op->op_priv;
+	struct md_list_tree	*result;
+	struct md_list_file	*tmp;
+	char	 		*best, *cachename = NULL; 
 
 	result = ct_md_list_complete(list_fakeop);
 	e_free(list_fakeop->op_filelist);
 	e_free(&list_fakeop->op_filelist);
 	e_free(&list_fakeop);
 
-	tmp = result;
-	while (*(tmp++) != NULL)
-		nresults++;
-	if (nresults == 0) {
+	/* grab the newest one */
+	if ((tmp = RB_MAX(md_list_tree, result)) == NULL) {
 		if (op->op_action == CT_A_ARCHIVE) {
 			goto do_operation;
 		} else  {
@@ -1039,17 +1067,13 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 		}
 	}
 
-	/* sort and calculate newest */
-	qsort(result, nresults, sizeof(*result), strcompare);
-
 	/* pick the newest one */
-	best = e_strdup(result[0]);
+	best = e_strdup(tmp->name);
 	CDBG("backup file is %s", best);
 
-	tmp = result;
-	while (*tmp != NULL) {
-		e_free(tmp);
-		tmp++;
+	while((tmp = RB_ROOT(result)) != NULL) {
+		RB_REMOVE(md_list_tree, result, tmp);
+		e_free(&tmp);
 	}
 	e_free(&result);
 
@@ -1231,3 +1255,4 @@ ct_mdcache_trim(const char *cachedir, long long max_size)
 	if (fts_close(ftsp))
 		CFATAL("close directory failed");
 }
+
