@@ -577,7 +577,7 @@ ct_md_list_start(struct ct_op *op)
 	CDBG("setting up XML");
 
 	/* XXX - pat */
-	sz = asprintf(&buf, ct_md_list_fmt_v2, ""); 
+	sz = asprintf(&buf, ct_md_list_fmt_v2, "");
 	if (sz == -1)
 		CFATALX("cannot allocate memory");
 	sz += 1;	/* include null */
@@ -650,7 +650,7 @@ ct_md_list_complete(struct ct_op *op)
 		regfree(re);
 		e_free(&re);
 	}
-	
+
 	return (results);
 }
 
@@ -1084,7 +1084,7 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 	struct ct_op		*list_fakeop = op->op_priv;
 	struct md_list_tree	*result;
 	struct md_list_file	*tmp;
-	char	 		*best, *cachename = NULL; 
+	char	 		*best, *cachename = NULL;
 
 	result = ct_md_list_complete(list_fakeop);
 	e_free(list_fakeop->op_filelist);
