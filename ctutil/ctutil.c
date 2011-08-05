@@ -109,6 +109,36 @@ ct_text2sha(char *shat, uint8_t *sha)
 	return (0);
 }
 
+char *
+ct_header_strerror(struct ct_header *h)
+{
+	char	*errstr;
+
+	if (h == NULL)
+		CFATALX("invalid pointer");
+
+	errstr = "unknown error";
+
+#ifndef nitems
+#define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
+#endif
+	/* at some future point, having 2d map table might be better. */
+	switch (h->c_opcode) {
+	case C_HDR_O_LOGIN_REPLY:
+		if (h->c_ex_status > nitems(*c_hdr_login_reply_ex_errstrs))
+			break;
+		errstr = c_hdr_login_reply_ex_errstrs[h->c_ex_status];
+		break;
+	default:
+		break;
+	}
+#undef nitems
+
+	return (errstr);
+}
+
+
+
 void
 ct_wire_header(struct ct_header *h)
 {
@@ -391,3 +421,10 @@ ct_make_full_path(char *path, mode_t mode)
 
 	return (0);
 }
+
+/* opcode to error string tables; see ctutil.h/ct_header_strerror(); */
+char *c_hdr_login_reply_ex_errstrs[] = {
+	"Invalid login credentials. Please check your username,"
+	    "password and certificates.",
+	"Account has been disabled."
+};

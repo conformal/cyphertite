@@ -377,8 +377,9 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *ct_assl_ctx)
 
 	if (hdr.c_version == C_HDR_VERSION &&
 	    hdr.c_opcode == C_HDR_O_LOGIN_REPLY) {
-		if (hdr.c_status != C_HDR_S_OK)
-			CFATALX("login failed");
+		if (hdr.c_status != C_HDR_S_OK) {
+			CFATALX("login failed: %s", ct_header_strerror(&hdr));
+		}
 	} else {
 		CWARNX("login: invalid server reply");
 		goto done;

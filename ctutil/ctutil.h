@@ -117,6 +117,8 @@ struct ct_nop_reply {
  */
 #define C_HDR_O_LOGIN		(4)
 #define C_HDR_O_LOGIN_REPLY	(5)
+#define C_HDR_O_LOGIN_EXS_DISABLED	(1)
+extern char	*c_hdr_login_reply_ex_errstrs[];
 
 /*
  * C_O_EXISTS: ask server if digest exists
@@ -196,6 +198,9 @@ void		ct_sha512_encode(uint8_t *, char *);
 void		ct_sha1_setup(SHA_CTX *);
 void		ct_sha1_add(uint8_t *, SHA_CTX *, size_t);
 void		ct_sha1_final(uint8_t *, SHA_CTX *);
+
+/* error handling */
+char		*ct_header_strerror(struct ct_header *);
 
 /* protocol */
 void		ct_wire_header(struct ct_header *);
