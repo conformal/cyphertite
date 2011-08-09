@@ -294,7 +294,8 @@ ct_fscanfhex(char *src, uint8_t *dst, size_t dstlen)
  * key) and d) hmac of uncrypted mask key
  */
 int
-ct_create_secrets(char *passphrase, char *filename)
+ct_create_secrets(char *passphrase, char *filename, uint8_t *mysalt,
+    uint8_t *mymaskkey, uint8_t *myaeskey, uint8_t *myivkey)
 {
 	char			pwd[PASS_MAX], *p;
 	uint8_t			salt[C_SALT_LEN];
@@ -352,7 +353,10 @@ ct_create_secrets(char *passphrase, char *filename)
 	    sizeof rounds_save);
 
 	/* step 1 */
-	arc4random_buf(salt, sizeof salt);
+	if (mysalt)
+		bcopy(mysalt, salt, sizeof salt);
+	else
+		arc4random_buf(salt, sizeof salt);
 	ct_fprintfhex(f, C_F_SALT, salt, sizeof salt);
 
 	if (!PKCS5_PBKDF2_HMAC_SHA1(p, strlen(p), salt,
@@ -362,11 +366,20 @@ ct_create_secrets(char *passphrase, char *filename)
 	}
 
 	/* step 2 */
-	arc4random_buf(maskkey, sizeof maskkey);
+	if (mymaskkey)
+		bcopy(mymaskkey, maskkey, sizeof maskkey);
+	else
+		arc4random_buf(maskkey, sizeof maskkey);
 
 	/* step 3 */
-	arc4random_buf(aeskey, sizeof aeskey);
-	arc4random_buf(ivkey, sizeof ivkey);
+	if (myaeskey)
+		bcopy(myaeskey, aeskey, sizeof aeskey);
+	else
+		arc4random_buf(aeskey, sizeof aeskey);
+	if (myivkey)
+		bcopy(myivkey, ivkey, sizeof ivkey);
+	else
+		arc4random_buf(ivkey, sizeof ivkey);
 
 	if ((tot = ct_passphrase_encrypt(maskkey, sizeof maskkey, aeskey,
 	    sizeof aeskey, e_aeskey, sizeof e_aeskey)) <= 0) {

@@ -149,7 +149,51 @@ show_version(void)
 }
 
 int
-main(int argc, char **argv)
+ct_load_config(struct ct_settings *settings)
+{
+	char		*config_path = NULL;
+	int		config_try = 0;
+
+	if (ct_configfile) {
+		if (ct_config_parse(settings, ct_configfile))
+			CFATALX("Unable to open specified config file %s",
+			   ct_configfile);
+		return (0);
+	}
+
+	for (;;) {
+		if (config_path != NULL)
+			e_free(&config_path);
+
+		switch(config_try) {
+		case 0:
+			config_path = ct_user_config();
+			break;
+		case 1:
+			config_path = ct_system_config();
+			break;
+		default:
+			return (1);
+			break;
+		}
+		if (ct_config_parse(settings, config_path) == 0) {
+			if (config_path != NULL)
+				e_free(&config_path);
+			break;
+		}
+		config_try++;
+	}
+
+	return (0);
+}
+
+void
+ct_unload_config(void)
+{
+}
+
+int
+ct_main(int argc, char **argv)
 {
 	char		pwd[PASS_MAX];
 	char		ct_fullcachedir[PATH_MAX];
@@ -363,7 +407,7 @@ main(int argc, char **argv)
 		if (stat(ct_crypto_secrets, &sb) == -1) {
 			fprintf(stderr, "No crypto secrets file. Creating\n");
 			if (ct_create_secrets(ct_crypto_password,
-			    ct_crypto_secrets))
+			    ct_crypto_secrets, NULL, NULL, NULL, NULL))
 				CFATALX("can't create secrets");
 		}
 		/* we got crypto */
@@ -479,45 +523,22 @@ out:
 }
 
 int
-ct_load_config(struct ct_settings *settings)
+ctctl_main(int argc, char *argv[])
 {
-	char		*config_path = NULL;
-	int		config_try = 0;
-
-	if (ct_configfile) {
-		if (ct_config_parse(settings, ct_configfile))
-			CFATALX("Unable to open specified config file %s",
-			   ct_configfile);
-		return (0);
-	}
-
-	for (;;) {
-		if (config_path != NULL)
-			e_free(&config_path);
-
-		switch(config_try) {
-		case 0:
-			config_path = ct_user_config();
-			break;
-		case 1:
-			config_path = ct_system_config();
-			break;
-		default:
-			return (1);
-			break;
-		}
-		if (ct_config_parse(settings, config_path) == 0) {
-			if (config_path != NULL)
-				e_free(&config_path);
-			break;
-		}
-		config_try++;
-	}
-
-	return (0);
+	return (EINVAL);
 }
 
-void
-ct_unload_config(void)
+int
+main(int argc, char *argv[])
 {
+	clog_init(1);
+	if (clog_set_flags(CLOG_F_ENABLE | CLOG_F_STDERR))
+		errx(1, "illegal clog flags");
+
+	if (!strcmp(argv[0], "ct") || !strcmp(argv[0], "cyphertite"))
+		return (ct_main(argc, argv));
+	if (!strcmp(argv[0], "ctctl") || !strcmp(argv[0], "cyphertitectl"))
+		return (ctctl_main(argc, argv));
+	else
+		CFATALX("invalid executable name");
 }
