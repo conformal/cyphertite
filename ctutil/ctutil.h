@@ -230,4 +230,22 @@ int		ct_base64_encode(int, uint8_t *, size_t, uint8_t *, size_t);
 /* directory handling */
 int     ct_make_full_path(char *, mode_t);
 
+/* cli parsing */
+struct ct_cli_cmd {
+	char			*cc_cmd;	/* command name */
+	struct ct_cli_cmd	*cc_subcmd;	/* subcommand structure */
+	int			cc_paramc;	/* number of parameters */
+#define CLI_CMD_SUBCOMMAND	(-2)	/* dereference cmd in substructure */
+#define CLI_CMD_UNKNOWN		(-1)    /* unknown number of parameters */
+	char			*cc_usage;	/* command usage string */
+	void			(*cc_cb)(struct ct_cli_cmd *, int, char **);
+	int			cc_auth;	/* need authentication */
+};
+
+struct ct_cli_cmd	*ct_cli_cmd_find(struct ct_cli_cmd *, char *);
+void			ct_cli_usage(struct ct_cli_cmd *, struct ct_cli_cmd *);
+struct ct_cli_cmd	*ct_cli_validate(struct ct_cli_cmd *, int *, char ***);
+void			ct_cli_execute(struct ct_cli_cmd *, int *, char ***);
+
+
 #endif /* CTUTIL_H */

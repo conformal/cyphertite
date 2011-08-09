@@ -39,6 +39,8 @@
 __attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
 
+extern char		*__progname;
+
 int			ct_settings_add(struct ct_settings *, char *, char *);
 uint8_t			ct_getbyteval(char);
 
@@ -428,3 +430,94 @@ char *c_hdr_login_reply_ex_errstrs[] = {
 	    "password and certificates.",
 	"Account has been disabled."
 };
+
+/* cli parsing */
+struct ct_cli_cmd *
+ct_cli_cmd_find(struct ct_cli_cmd *cl, char *cmd)
+{
+	struct ct_cli_cmd		*found = NULL, *c;
+
+	if (cl == NULL || cmd == NULL)
+		return (NULL);
+
+	for (c = cl; c->cc_cmd != NULL; c++) {
+		CDBG("searching for [%p] in [%p]", c->cc_cmd, cmd);
+		CDBG("searching for [%s] in [%s]", c->cc_cmd, cmd);
+		if (!strncmp(c->cc_cmd, cmd, strlen(cmd))) {
+			if (found)
+				return (NULL); /* ambiguous */
+			found = c;
+		}
+	}
+
+	return (found);
+}
+
+void
+ct_cli_usage(struct ct_cli_cmd *cmd_list, struct ct_cli_cmd *c)
+{
+	struct ct_cli_cmd	*cc, *found;
+
+	for (cc = cmd_list; cc != NULL; cc++) {
+		found = ct_cli_cmd_find(cc->cc_subcmd, c->cc_cmd);
+		if (found == c)
+			break;
+	}
+
+	CFATALX("usage: %s %s %s %s", __progname,
+	    cc ? cc->cc_cmd : "", c->cc_cmd, c->cc_usage);
+}
+
+struct ct_cli_cmd *
+ct_cli_validate(struct ct_cli_cmd *cmd_list, int *argc, char **argv[])
+{
+	struct ct_cli_cmd		*c, *cl;
+	char			*cmd;
+
+	cmd = **argv;
+	cl = cmd_list;
+	for (;;) {
+		c = ct_cli_cmd_find(cl, cmd);
+		if (c == NULL)
+			goto bad;
+
+		if (c->cc_paramc == CLI_CMD_UNKNOWN) {
+			/* call function with all argv */
+			if (*argc - 1 < 0)
+				goto bad;
+			break;
+		} else if (c->cc_paramc == CLI_CMD_SUBCOMMAND) {
+			/* dereference sub-command */
+			if (*argc - 1 < 0)
+				goto bad;
+			cmd = *(*argv + 1);
+			cl = c->cc_subcmd;
+			(*argc)--;
+			(*argv)++;
+			continue;
+		} else if (c->cc_paramc != *argc - 1) {
+			/* invalid paramter count */
+			goto bad;
+		} else if (c->cc_paramc == *argc - 1) {
+			/* correct parameter count */
+			break;
+		}
+		goto bad;
+	}
+
+	return (c);
+bad:
+	if (c)
+		ct_cli_usage(cmd_list, c);
+
+	return (NULL);
+}
+
+void
+ct_cli_execute(struct ct_cli_cmd *c, int *argc, char **argv[])
+{
+	(*argc)--;
+	(*argv)++;
+
+	c->cc_cb(c, *argc, *argv);
+}
