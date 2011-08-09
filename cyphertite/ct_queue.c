@@ -265,7 +265,7 @@ ct_trans_alloc(void)
 		if (ct_compress_enabled)
 			ct_alloc_block_size = s_compress_bounds(
 			    ct_max_block_size);
-		else 
+		else
 			ct_alloc_block_size = ct_max_block_size;
 
 		ct_alloc_block_size += ct_crypto_blocksz();
