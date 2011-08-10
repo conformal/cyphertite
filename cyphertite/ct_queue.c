@@ -317,8 +317,10 @@ ct_trans_cleanup(void)
 	CDBG("freed %d transactions", count);
 }
 
-void
-ct_reconnect(int unused, short event, void *varg)
+int ct_reconnect_pending;
+
+int
+ct_reconnect_internal(void)
 {
 	struct ct_trans		*trans;
 
@@ -405,7 +407,14 @@ ct_reconnect(int unused, short event, void *varg)
 				break;
 			}
 		}
+	}
+	return (ct_assl_ctx == NULL);
+}
 
+void
+ct_reconnect(int unused, short event, void *varg)
+{
+	if (ct_reconnect_internal() == 0) {
 		/* XXX - wakeup everyone */
 		ct_wakeup_sha();
 		ct_wakeup_compress();
@@ -415,10 +424,10 @@ ct_reconnect(int unused, short event, void *varg)
 		ct_wakeup_write();
 		ct_wakeup_complete();
 		ct_wakeup_file();
-
 	} else {
 		ct_set_reconnect_timeout(ct_reconnect, NULL, 5);
 	}
+
 }
 
 void
@@ -426,6 +435,7 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 {
 	struct ct_trans		ltrans, *trans = NULL;
 	int			lookup_body = 0;
+	int			idle = 1;
 
 	if (hdr == NULL) {
 		/* backend disconnected -exit */
@@ -445,9 +455,14 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 			    tr_next);
 			ct_state->ct_write_qlen++;
 			ct_state->ct_inflight_rblen--;
+			idle = 0;
+		}
+		if (idle) {
+			ct_reconnect_pending = 1;
+		} else {
+			ct_set_reconnect_timeout(ct_reconnect, NULL, 5);
 		}
 
-		ct_set_reconnect_timeout(ct_reconnect, NULL, 5);
 		return;
 	}
 	ltrans.hdr.c_tag = hdr->c_tag;
@@ -946,6 +961,13 @@ ct_wakeup_write(void)
 	struct ct_header	*hdr;
 	void			*data;
 	int			slot;
+
+	/* did we idle out? */
+	if (ct_reconnect_pending) {
+		if (ct_reconnect_internal() != 0)
+			ct_set_reconnect_timeout(ct_reconnect, NULL, 5);
+		ct_reconnect_pending = 0;
+	}
 
 	CDBG("wakup write");
 	while (ct_disconnected == 0 &&
