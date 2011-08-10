@@ -317,7 +317,9 @@ ct_trans_cleanup(void)
 	CDBG("freed %d transactions", count);
 }
 
+#define CT_RECONNECT_DEFAULT_TIMEOUT	30
 int ct_reconnect_pending;
+int ct_reconnect_timeout = CT_RECONNECT_DEFAULT_TIMEOUT;
 
 int
 ct_reconnect_internal(void)
@@ -330,8 +332,9 @@ ct_reconnect_internal(void)
 			CFATALX("negotiate failed");
 		}
 
+		if (ct_disconnected > 2)
+			CINFO("Reconnected");
 		ct_disconnected = 0;
-		CINFO("Reconnected");
 
 		TAILQ_FOREACH(trans, &ct_state->ct_write_queue, tr_next) {
 			if ((trans->hdr.c_flags & C_HDR_F_METADATA) == 0)
@@ -407,6 +410,16 @@ ct_reconnect_internal(void)
 				break;
 			}
 		}
+	} else {
+		if (ct_disconnected == 2)
+			CWARNX("Lost connection to server will attempt "
+			    "to reconnect");
+		if (ct_disconnected == 10) {
+			CWARNX("Unable to contact server, continuing to retry "
+			    "connection");
+			ct_reconnect_timeout *= 2;
+		}
+		ct_disconnected++;
 	}
 	return (ct_assl_ctx == NULL);
 }
@@ -415,6 +428,7 @@ void
 ct_reconnect(int unused, short event, void *varg)
 {
 	if (ct_reconnect_internal() == 0) {
+		ct_reconnect_timeout = CT_RECONNECT_DEFAULT_TIMEOUT;
 		/* XXX - wakeup everyone */
 		ct_wakeup_sha();
 		ct_wakeup_compress();
@@ -425,7 +439,8 @@ ct_reconnect(int unused, short event, void *varg)
 		ct_wakeup_complete();
 		ct_wakeup_file();
 	} else {
-		ct_set_reconnect_timeout(ct_reconnect, NULL, 5);
+		ct_set_reconnect_timeout(ct_reconnect, NULL,
+		     ct_reconnect_timeout);
 	}
 
 }
@@ -438,9 +453,6 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 	int			idle = 1;
 
 	if (hdr == NULL) {
-		/* backend disconnected -exit */
-		CWARNX("Server disconnected, attempting to reconnect");
-
 		ct_disconnected = 1;
 		ct_assl_disconnect(ct_assl_ctx);
 		while(!RB_EMPTY(&ct_state->ct_inflight)) {
@@ -460,7 +472,8 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 		if (idle) {
 			ct_reconnect_pending = 1;
 		} else {
-			ct_set_reconnect_timeout(ct_reconnect, NULL, 5);
+			ct_set_reconnect_timeout(ct_reconnect, NULL,
+			    ct_reconnect_timeout);
 		}
 
 		return;
@@ -965,7 +978,8 @@ ct_wakeup_write(void)
 	/* did we idle out? */
 	if (ct_reconnect_pending) {
 		if (ct_reconnect_internal() != 0)
-			ct_set_reconnect_timeout(ct_reconnect, NULL, 5);
+			ct_set_reconnect_timeout(ct_reconnect, NULL,
+			     ct_reconnect_timeout);
 		ct_reconnect_pending = 0;
 	}
 

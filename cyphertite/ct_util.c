@@ -190,7 +190,6 @@ ct_ssl_connect(int nonfatal)
 		ASSL_F_NONBLOCK|ASSL_F_KEEPALIVE|ASSL_F_THROUGHPUT,
 	    ct_event_assl_read, ct_event_assl_write, ctx)) {
 		if (nonfatal) {
-			CINFO("Reconnect failed");
 			/* XXX */
 			ct_assl_disconnect(ctx);
 			ctx = NULL;
