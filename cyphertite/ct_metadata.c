@@ -595,10 +595,6 @@ ct_md_list_complete(struct ct_op *op)
 {
 	struct md_list_tree	*results;
 	struct md_list_file	*file;
-	char			**pat = op->op_filelist;
-	regex_t			*re = NULL;
-	char			error[1024];
-	int			rv, match;
 
 	if (SLIST_EMPTY(&ct_md_listfiles))
 		return (NULL);
@@ -606,37 +602,16 @@ ct_md_list_complete(struct ct_op *op)
 	results = e_malloc(sizeof(*results));
 	RB_INIT(results);
 
-	if (op->op_matchmode == CT_MATCH_REGEX && *pat) {
-		re = e_calloc(1, sizeof(*re));
-		if ((rv = regcomp(re, *pat,
-		    REG_EXTENDED | REG_NOSUB)) != 0) {
-			regerror(rv, re, error, sizeof(error) - 1);
-			CFATALX("%s: regcomp failed: %s", __func__, error);
-		}
-	}
-
+	ct_match_compile(op->op_matchmode, op->op_filelist);
 	while ((file = SLIST_FIRST(&ct_md_listfiles)) != NULL) {
 		SLIST_REMOVE_HEAD(&ct_md_listfiles, mlf_link);
-		match = 0;
-		if (*pat == NULL) {
-			match = 1;
-		} else if (op->op_matchmode == CT_MATCH_REGEX) {
-			if (regexec(re, file->mlf_name, 0, NULL, 0) == 0)
-				match = 1;
-		} else {
-			if (fnmatch(*pat, file->mlf_name, 0) == 0)
-				match = 1;
-		}
-		if (match) {
+		if (ct_match(op->op_matchmode, file->mlf_name) == 0) {
 			RB_INSERT(md_list_tree, results, file);
 		} else {
 			e_free(&file);
 		}
 	}
-	if (op->op_matchmode == CT_MATCH_REGEX && *pat) {
-		regfree(re);
-		e_free(&re);
-	}
+	ct_match_unwind(op->op_matchmode);
 
 	return (results);
 }
@@ -938,7 +913,7 @@ ct_find_md_for_extract(struct ct_op *op)
 	mdname = ct_md_cook_filename(mdname);
 
 	list_fakeop = e_calloc(1, sizeof(*list_fakeop));
-	bufp = e_malloc(sizeof(char **));
+	bufp = e_calloc(2, sizeof(char **));
 	if (ct_md_is_full_mdname(mdname)) {
 		/* use md_list as stat() for now */
 		*bufp = e_strdup(mdname);
