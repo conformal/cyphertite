@@ -759,6 +759,30 @@ ct_extract(struct ct_op *op)
 			trans->tr_fl_node = fnode;
 
 			ct_populate_fnode(fnode, &hdr, &trans->tr_state);
+			/*
+			 * This is here instead of the completion handler
+			 * because we need to be able to skip chunks in the
+			 * file if we can't open it first.
+			 * otherwise logically it belongs in complete_normal().
+			 */
+			if (trans->tr_state == TR_S_EX_FILE_START) {
+				if (ct_file_extract_open(trans->tr_fl_node)) {
+					ct_doextract = 0;
+					ct_free_fnode(trans->tr_fl_node);
+					ct_trans_free(trans);
+					continue;
+				}
+				if (ct_verbose) {
+					ct_pr_fmt_file(trans->tr_fl_node);
+					printf("\n");
+				}
+			} else if (trans->tr_state == TR_S_EX_SPECIAL) {
+				ct_file_extract_special(trans->tr_fl_node);
+				if (ct_verbose) {
+					ct_pr_fmt_file(trans->tr_fl_node);
+					printf("\n");
+				}
+			}
 
 			CDBG("file %s numshas %" PRId64, fnode->fl_sname,
 			    ct_num_shas);

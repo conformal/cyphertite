@@ -136,7 +136,6 @@ int ct_sched_backup_file(struct stat *, char *);
 int s_to_e_type(int);
 
 int current_fd = -1;
-int ct_extract_fd = -1;
 struct fnode *ct_ex_curnode;
 char	tpath[PATH_MAX];
 
@@ -740,7 +739,7 @@ s_to_e_type(int mode)
 	return (rv);
 }
 
-void
+int
 ct_file_extract_open(struct fnode *fnode)
 {
 	char		dirpath[PATH_MAX], *dirp;
@@ -750,9 +749,6 @@ ct_file_extract_open(struct fnode *fnode)
 	 * XXX - on EX_FILE_END
 	 */
 	CDBG("opening %s for writing", fnode->fl_sname);
-	if (ct_extract_fd != -1) {
-		CFATALX("file open on extract_open");
-	}
 	snprintf(tpath, sizeof tpath, "%s%s%s",
 	    ct_tdir ? ct_tdir : "", ct_tdir ? "/" : "", fnode->fl_sname);
 	ct_ex_curnode = fnode;
@@ -764,7 +760,7 @@ ct_file_extract_open(struct fnode *fnode)
 		e_free(&fnode->fl_fname);
 	e_asprintf(&fnode->fl_fname, "%s/%s", dirp, "cyphertite.XXXXXXXXXX");
 again:
-	if ((ct_extract_fd = mkstemp(fnode->fl_fname)) == -1) {
+	if ((fnode->fl_fd = mkstemp(fnode->fl_fname)) == -1) {
 		/*
 		 * with -C or regex we may not have dependant directories in
 		 * our list of paths to operate on. ENOENT here means we're
@@ -774,16 +770,21 @@ again:
 		if (errno == ENOENT && tries++ == 0 &&
 		    ct_make_full_path(tpath, 0777) == 0)
 			goto again;
-		CFATAL("unable to open file for writing %s", tpath);
+		/* XXX tpath may have been modified in ct_make_full_path */
+		CWARNX("unable to open file for writing %s%s%s",
+		    ct_tdir ? ct_tdir : "", ct_tdir ? "/" : "",
+		    fnode->fl_sname);
+		return (1);
 	}
+	return (0);
 }
 
 void
-ct_file_extract_write(uint8_t *buf, size_t size)
+ct_file_extract_write(struct fnode *fnode, uint8_t *buf, size_t size)
 {
 	ssize_t len;
 
-	len = write(ct_extract_fd, buf, size);
+	len = write(fnode->fl_fd, buf, size);
 
 	if (len != size)
 		CFATAL("unable to write file %s",
@@ -795,11 +796,11 @@ ct_file_extract_close(struct fnode *fnode)
 {
 	struct timeval          tv[2];
 
-	if (fchmod(ct_extract_fd, fnode->fl_mode) == -1)
+	if (fchmod(fnode->fl_fd, fnode->fl_mode) == -1)
 		CFATAL("chmod failed on %s", tpath);
 
 	if (ct_attr) {
-		if (fchown(ct_extract_fd, fnode->fl_uid, fnode->fl_gid) == -1) {
+		if (fchown(fnode->fl_fd, fnode->fl_uid, fnode->fl_gid) == -1) {
 			if (errno == EPERM && geteuid() != 0) {
 				if (ct_verbose)
 					CWARN("chown failed: %s", tpath);
@@ -810,16 +811,15 @@ ct_file_extract_close(struct fnode *fnode)
 
 		tv[0].tv_sec = fnode->fl_atime;
 		tv[1].tv_sec = fnode->fl_mtime;
-		if (futimes(ct_extract_fd, tv) == -1)
+		if (futimes(fnode->fl_fd, tv) == -1)
 			CFATAL("utimes failed");
 	}
 	if (rename(fnode->fl_fname, tpath) != 0)
 		CFATAL("rename to %s failed", tpath);
 
-	close(ct_extract_fd);
+	close(fnode->fl_fd);
 	e_free(&fnode);
 	ct_ex_curnode = NULL;
-	ct_extract_fd = -1;
 }
 
 void
@@ -833,8 +833,11 @@ ct_file_extract_special(struct fnode *fnode)
 	    ct_tdir ? ct_tdir : "", ct_tdir ? "/" : "", fnode->fl_sname);
 	CDBG("special %s mode %d", tpath, fnode->fl_mode);
 
-	if(C_ISDIR(fnode->fl_type)) {
-		mkdir(tpath, 0700);
+	if (C_ISDIR(fnode->fl_type)) {
+		if (mkdir(tpath, 0700) != 0 && errno != EEXIST)  {
+			CWARN("can not create directory %s", tpath);
+			return;
+		}
 		/* queue directory mode fixup */
 	} else if (C_ISBLK(fnode->fl_type) || C_ISCHR(fnode->fl_type))  {
 		mknod(tpath, fnode->fl_mode, fnode->fl_dev);
