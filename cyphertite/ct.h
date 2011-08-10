@@ -245,6 +245,8 @@ void			ct_md_extract(struct ct_op *);
 void			ct_md_list_start(struct ct_op *);
 void			ct_md_list_print(struct ct_op *);
 void			ct_md_delete(struct ct_op *);
+void			ct_check_crypto_secrets_nextop(struct ct_op *);
+void			ct_md_trigger_delete(struct ct_op *);
 
 /* CT context state */
 

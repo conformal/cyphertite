@@ -61,6 +61,9 @@ int			ct_attr;
 /* runtime */
 unsigned char		ct_iv[CT_IV_LEN];
 unsigned char		ct_crypto_key[CT_KEY_LEN];
+char			*secrets_file_pattern[] =
+			    { "^[[:digit:]]+-crypto.secrets", NULL };
+
 
 /* config */
 int			ct_max_trans = 100;
@@ -87,6 +90,7 @@ int			ct_multilevel_allfiles;
 int			ct_auto_differential;
 long long		ct_max_mdcache_size = LLONG_MAX; /* unbounded */
 int			ct_max_differentials;
+int			ct_secrets_upload = 1;
 
 struct ct_settings	settings[] = {
 	{ "queue_depth", CT_S_INT, &ct_max_trans, NULL, NULL, NULL },
@@ -111,6 +115,8 @@ struct ct_settings	settings[] = {
 	{ "md_remote_auto_differential" , CT_S_INT, &ct_auto_differential,
 	    NULL, NULL, NULL },
 	{ "md_max_differentials" , CT_S_INT, &ct_max_differentials,
+	    NULL, NULL, NULL },
+	{ "upload_crypto_secrets" , CT_S_INT, &ct_secrets_upload,
 	    NULL, NULL, NULL },
 	{ NULL, 0, NULL, NULL, NULL,  NULL }
 };
@@ -202,7 +208,6 @@ ct_main(int argc, char **argv)
 	char		*ct_mfile = NULL;
 	int		ct_metadata = 0;
 	int		ct_match_mode = CT_MATCH_GLOB;
-	struct stat	sb;
 	int		c;
 	int		cflags;
 	int		debug;
@@ -405,21 +410,12 @@ ct_main(int argc, char **argv)
 	}
 
 	if (ct_crypto_secrets) {
-		if (stat(ct_crypto_secrets, &sb) == -1) {
-			fprintf(stderr, "No crypto secrets file. Creating\n");
-			if (ct_create_secrets(ct_crypto_password,
-			    ct_crypto_secrets, NULL, NULL, NULL, NULL))
-				CFATALX("can't create secrets");
-		}
-		/* we got crypto */
-		if (ct_unlock_secrets(ct_crypto_password,
-		    ct_crypto_secrets,
-		    ct_crypto_key,
-		    sizeof ct_crypto_key,
-		    ct_iv,
-		    sizeof ct_iv))
+		if (ct_secrets_upload == 0 &&
+		    ct_create_or_unlock_secrets(ct_crypto_secrets,
+		    ct_crypto_password))
 			CFATALX("can't unlock secrets");
-		ct_encrypt_enabled = 1;
+	} else {
+		ctdb_setup(ct_localdb, 0);
 	}
 
 	ct_event_init();
@@ -431,6 +427,17 @@ ct_main(int argc, char **argv)
 	ct_setup_wakeup_csha(ct_state, ct_compute_csha);
 	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
 	ct_setup_wakeup_complete(ct_state, ct_process_completions);
+
+	if (ct_secrets_upload > 0) {
+		CDBG("doing list for crypto secrets");
+		ct_add_operation(ct_md_list_start,
+		    ct_check_crypto_secrets_nextop, ct_crypto_secrets,
+		    NULL, secrets_file_pattern, NULL, CT_MATCH_REGEX, 0);
+	} else {
+		ct_add_operation(ct_md_list_start,
+		    ct_md_trigger_delete, NULL, NULL, secrets_file_pattern,
+		    NULL, CT_MATCH_REGEX, 0);
+	}
 
 	if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
 		switch (ct_action) {

@@ -68,7 +68,6 @@ ct_setup_assl(void)
 	/* dont connect to server on list operation */
 	assl_initialize();
 
-	ctdb_setup(ct_localdb, ct_encrypt_enabled);
 	ct_setup_state();
 
 	gettimeofday(&ct_stats->st_time_start, NULL);

@@ -37,6 +37,7 @@
 #include "ct_xml.h"
 
 #include "ct.h"
+#include "ct_crypto.h"
 
 __attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
@@ -439,9 +440,11 @@ ct_md_extract(struct ct_op *op)
 		}
 
 		/* XXX -chmod when done */
-		md_backup_fd = open(mfile, O_WRONLY|O_TRUNC|O_CREAT, 0600);
-		if (md_backup_fd == -1)
-			CFATALX("unable to open file %s", mfile);
+		if (md_backup_fd == -1) { /* may have been opened for us */
+			if ((md_backup_fd = open(mfile,
+			    O_WRONLY|O_TRUNC|O_CREAT, 0600)) == -1)
+				CFATALX("unable to open file %s", mfile);
+		}
 		md_block_no = 0;
 
 		if (mdname == NULL) {
@@ -1271,3 +1274,182 @@ ct_mdcache_trim(const char *cachedir, long long max_size)
 		CFATAL("close directory failed");
 }
 
+/*
+ * Functions for automatic crypto secrets storage on the server.
+ */
+
+void	ct_secrets_unlock(struct ct_op *);
+
+/*
+ * List available crypto secrets files so we can see if we are ahead or behind
+ */
+void
+ct_check_crypto_secrets_nextop(struct ct_op *op)
+{
+	extern char		*ct_crypto_password;
+	char			*current_secrets = op->op_local_fname;
+	char			*t, *remote_name = NULL;
+	char			 *dirp, dir[PATH_MAX], tmp[PATH_MAX];
+	const char		*errstr;
+	struct md_list_tree	*results;
+	struct md_list_file	*file = NULL;
+	struct stat		 sb;
+	time_t			 mtime = 0, local_mtime = 0;
+
+	results = ct_md_list_complete(op);
+	if (results != NULL) {
+		/* grab newest */
+		if ((file = RB_MAX(md_list_tree, results)) == NULL)
+			goto check_local;
+
+		CDBG("latest secrets file on server: %s", file->mlf_name);
+		/* parse out mtime */
+		if ((t = strchr(file->mlf_name, '-')) == NULL)
+			CFATALX("invalid answer from server");
+		*t = '\0';
+		mtime = strtonum(file->mlf_name, LLONG_MIN, LLONG_MAX, &errstr);
+		if (errstr)
+			CFATALX("mtime %s from secrets file invalid: %s",
+			    file->mlf_name, errstr);
+		*t = '-'; /* put it back */
+		remote_name = e_strdup(file->mlf_name);
+		while((file = RB_ROOT(results)) != NULL) {
+			RB_REMOVE(md_list_tree, results, file);
+			e_free(&file);
+		}
+	} else {
+		CWARNX("no uploaded ct secrets files, using current");
+	}
+
+check_local:
+	/* get mtime, if any for current secrets file */
+	if (stat(current_secrets, &sb) != -1)
+		local_mtime = sb.st_mtime;
+
+	/* This includes the case where both are missing */
+	if (mtime == local_mtime) {
+		CDBG("dates match, nothing to do");
+		if (ct_create_or_unlock_secrets(current_secrets,
+		    ct_crypto_password))
+			CFATALX("can't unlock secrets file");
+		ctdb_setup(ct_localdb, ct_encrypt_enabled);
+	} else if (mtime < local_mtime) {
+		/* XXX verify local file before upload? */
+		CDBG("uploading local file");
+		if (remote_name)
+			e_free(&remote_name);
+		e_asprintf(&remote_name, "%020lld-crypto.secrets", local_mtime);
+		ct_add_operation_after(op, ct_md_archive, ct_secrets_unlock,
+		    current_secrets, remote_name, NULL, NULL, 0, 0);
+	} else { /* mtime > local_mtime */
+		CDBG("downloading remote file");
+		strlcpy(dir, current_secrets, sizeof(dir));
+		if ((dirp = dirname(dir)) == NULL)
+			CFATALX("can't get dirname of secrets file");
+		strlcpy(tmp, dirp, sizeof(tmp));
+		strlcat(tmp, "/.ctcrypto.XXXXXXXX", sizeof(tmp));
+		if ((md_backup_fd = mkstemp(tmp)) == -1)
+			CFATAL("can't make temporary file");
+		CDBG("temp file: %s", tmp);
+		/* stash current name in basis in case we need to fallback */
+		ct_add_operation_after(op, ct_md_extract, ct_secrets_unlock,
+		    e_strdup(tmp), remote_name, NULL, current_secrets, 0, 0);
+	}
+}
+
+void
+ct_secrets_unlock(struct ct_op *op)
+{
+	extern char		*ct_crypto_password;
+	char			*crypto_secrets = op->op_local_fname;
+	char			*old_secrets = op->op_basis;
+	char			 tmp[PATH_MAX], *t;
+	const char		*errstr;
+	struct timeval		 times[2] = { };
+	struct stat	 	 sb;
+
+	CDBG("operation complete, unlocking secrets file");
+again:
+	if (stat(crypto_secrets, &sb) == -1) {
+		if (old_secrets != NULL) {
+			/* unlink tmp file */
+			(void)unlink(crypto_secrets);
+			e_free(&crypto_secrets);
+			crypto_secrets = old_secrets;
+			old_secrets = NULL;
+			CWARNX("can't parse new secrets file, using old one");
+			goto again;
+		}
+		/* XXX should we *ever* hit this case? */
+		fprintf(stderr, "No crypto secrets file. Creating\n");
+		if (ct_create_secrets(ct_crypto_password,
+		    ct_crypto_secrets, NULL, NULL, NULL, NULL))
+			CFATALX("can't create secrets");
+	}
+	if (ct_unlock_secrets(ct_crypto_password, crypto_secrets,
+	    ct_crypto_key, sizeof (ct_crypto_key), ct_iv, sizeof ct_iv)) {
+		if (old_secrets != NULL) {
+			/* unlink tmp file */
+			(void)unlink(crypto_secrets);
+			e_free(&crypto_secrets);
+			crypto_secrets = old_secrets;
+			old_secrets = NULL;
+			CWARNX("can't parse new secrets file, using old one");
+			goto again;
+		}
+		CFATALX("can't unlock secrets");
+	}
+	if (old_secrets != NULL) {
+		strlcpy(tmp, old_secrets, sizeof(tmp));
+		strlcat(tmp, ".bak", sizeof(tmp));
+
+		/* parse out mtime */
+		if ((t = strchr(op->op_remote_fname, '-')) == NULL)
+			CFATALX("invalid answer from server");
+		*t = '\0';
+		times[1].tv_sec = strtonum(op->op_remote_fname, LLONG_MIN,
+		    LLONG_MAX, &errstr);
+		if (errstr)
+			CFATALX("mtime %s from secrets file invalid: %s",
+			    op->op_remote_fname, errstr);
+		times[0].tv_sec = times[1].tv_sec;
+
+		/* remove an existing backup file */
+		(void)unlink(tmp);
+		/* save old file allow for failure in case it exists */
+		(void)link(old_secrets, tmp);
+		/* rename to ``real'' filename */
+		if (rename(crypto_secrets, old_secrets) != 0)
+			CFATAL("can't rename secrets file to real name");
+		/*
+		 * Set mtime to the mtime we downloaded.
+		 * XXX futimens() would be nice here since atime doesn't matter
+		 */
+		if (utimes(old_secrets, times) != 0)
+			CWARN("couldn't set mtime on new secrets file");
+		e_free(&crypto_secrets);
+	}
+	ct_encrypt_enabled = 1;
+	ctdb_setup(ct_localdb, ct_encrypt_enabled);
+}
+
+/*
+ * Delete all metadata files that were found by the preceding list operation.
+ */
+void
+ct_md_trigger_delete(struct ct_op *op)
+{
+	struct md_list_tree	*results;
+	struct md_list_file	*file = NULL;
+
+	results = ct_md_list_complete(op);
+	if (results == NULL)
+		return;
+	while((file = RB_ROOT(results)) != NULL) {
+		CDBG("deleting remote crypto secrets file %s", file->mlf_name);
+		ct_add_operation_after(op, ct_md_delete, NULL, NULL,
+		    e_strdup(file->mlf_name), NULL, NULL, 0, 0);
+		RB_REMOVE(md_list_tree, results, file);
+		e_free(&file);
+	}
+}

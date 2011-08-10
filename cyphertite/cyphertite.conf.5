@@ -148,6 +148,19 @@ will transparently handle any of the compression algorithms.)
 .Pp
 .It Ic username = Ar string
 Specify the username with which to authenticate.
+.Pp
+.It Xo
+.Ic upload_crypto_secrets =
+.Pq Ic 0 Ns \&| Ns Ic 1
+.Xc
+Upload the encrypted secrets file to the server after login.
+If a newer file has been uploaded to the server then it will be
+downloaded and used instead, this also applies if no local secrets file
+is found.
+If this option is disabled then any secrets files on the server will be
+deleted the next time
+.Xr cyphertite 1
+is run.
 .El
 .Sh FILES
 .Bl -tag -width "cyphertite" -compact
