@@ -208,6 +208,7 @@ ct_main(int argc, char **argv)
 	char		*ct_mfile = NULL;
 	char		*ct_excludefile = NULL;
 	char		**excludelist = NULL;
+	char		**includelist = NULL;
 	int		ct_metadata = 0;
 	int		ct_match_mode = CT_MATCH_GLOB;
 	int		c;
@@ -216,6 +217,7 @@ ct_main(int argc, char **argv)
 	int		foreground = 1;
 	int		ret = 0;
 	int		level0 = 0;
+	int		freeincludes = 0;
 
 	ct_savecore();
 
@@ -316,10 +318,17 @@ ct_main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if ((ct_action == CT_A_LIST || ct_action == CT_A_EXTRACT) &&
-	    ct_includefile != NULL && argc != 0)
-		CFATALX("-I is invalid when a pattern is provided on "
-		    "the command line");
+	if ((ct_action == CT_A_LIST || ct_action == CT_A_EXTRACT)) {
+		if (ct_includefile != NULL) {
+			if (argc != 0)
+				CFATALX("-I is invalid when a pattern is "
+				    "provided on the command line");
+			includelist = ct_matchlist_fromfile(ct_includefile);
+			freeincludes = 1;
+		} else {
+			includelist = argv;
+		}
+	}
 	if (ct_excludefile != NULL)
 		excludelist = ct_matchlist_fromfile(ct_excludefile);
 
@@ -408,7 +417,8 @@ ct_main(int argc, char **argv)
 	/* Don't bother starting a connection if just listing local files. */
 	if (ct_action == CT_A_LIST && ct_md_mode == CT_MDMODE_LOCAL &&
 	    ct_metadata == 0 ) {
-		ret = ct_list(ct_mfile, argv, excludelist, ct_match_mode);
+		ret = ct_list(ct_mfile, includelist, excludelist,
+		    ct_match_mode);
 		goto out;
 	}
 
@@ -457,7 +467,8 @@ ct_main(int argc, char **argv)
 		case CT_A_LIST:
 			ct_add_operation(ct_find_md_for_extract,
 			    ct_find_md_for_extract_complete, ct_mfile, NULL,
-			    argv, excludelist, NULL, ct_match_mode, ct_action);
+			    includelist, excludelist, NULL, ct_match_mode,
+			    ct_action);
 			break;
 		case CT_A_ARCHIVE:
 			if (ct_auto_differential)
@@ -491,7 +502,7 @@ ct_main(int argc, char **argv)
 			break;
 		case CT_A_LIST:
 			ct_add_operation(ct_md_list_start, ct_md_list_print,
-			    NULL, NULL, argv, excludelist, NULL,
+			    NULL, NULL, includelist, excludelist, NULL,
 			    ct_match_mode, 0);
 			break;
 		case CT_A_ERASE:
@@ -513,7 +524,7 @@ ct_main(int argc, char **argv)
 			break;
 		case CT_A_EXTRACT:
 			ct_add_operation(ct_extract, NULL, ct_mfile, NULL,
-			    argv, excludelist, NULL, ct_match_mode, 0);
+			    includelist, excludelist, NULL, ct_match_mode, 0);
 			break;
 		case CT_A_ERASE:
 		default:
@@ -534,6 +545,8 @@ ct_main(int argc, char **argv)
 	ct_flnode_cleanup();
 	ct_ssl_cleanup();
 out:
+	if (includelist && freeincludes == 1)
+		ct_matchlist_free(includelist);
 	if (excludelist)
 		ct_matchlist_free(excludelist);
 	if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0)

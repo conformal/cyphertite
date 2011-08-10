@@ -355,10 +355,7 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode)
 	char			shat[SHA_DIGEST_STRING_LENGTH];
 	char			*ct_next_filename;
 
-	if (ct_includefile != NULL)
-		match = ct_match_fromfile(ct_includefile, match_mode);
-	else
-		match = ct_match_compile(match_mode, flist);
+	match = ct_match_compile(match_mode, flist);
 	if (excludelist != NULL)
 		ex_match = ct_match_compile(match_mode, excludelist);
 
@@ -678,13 +675,8 @@ ct_extract(struct ct_op *op)
 	if (ct_state->ct_file_state == CT_S_STARTING) {
 		if (ex_priv == NULL) {
 			ex_priv = e_calloc(1, sizeof(*ex_priv));
-			if (ct_includefile != NULL)
-				ex_priv->inc_match =
-				    ct_match_fromfile(ct_includefile,
-				    match_mode);
-			else
-				ex_priv->inc_match =
-				    ct_match_compile(match_mode, filelist);
+			ex_priv->inc_match = ct_match_compile(match_mode,
+			    filelist);
 			if (op->op_excludelist != NULL)
 				ex_priv->ex_match = ct_match_compile(match_mode,
 				    op->op_excludelist);
