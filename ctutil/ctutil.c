@@ -456,7 +456,11 @@ ct_cli_cmd_find(struct ct_cli_cmd *cl, char *cmd)
 void
 ct_cli_usage(struct ct_cli_cmd *cmd_list, struct ct_cli_cmd *c)
 {
-	struct ct_cli_cmd	*cc, *found;
+	struct ct_cli_cmd	*cc = cmd_list, *found;
+
+	if (c == NULL)
+		CFATALX("usage: %s %s %s %s", __progname,
+		    cc ? cc->cc_cmd : "", cc->cc_cmd, cc->cc_usage);
 
 	for (cc = cmd_list; cc != NULL; cc++) {
 		found = ct_cli_cmd_find(cc->cc_subcmd, c->cc_cmd);
