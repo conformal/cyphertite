@@ -435,7 +435,7 @@ char *c_hdr_login_reply_ex_errstrs[] = {
 struct ct_cli_cmd *
 ct_cli_cmd_find(struct ct_cli_cmd *cl, char *cmd)
 {
-	struct ct_cli_cmd		*found = NULL, *c;
+	struct ct_cli_cmd	*found = NULL, *c;
 
 	if (cl == NULL || cmd == NULL)
 		return (NULL);
@@ -456,26 +456,32 @@ ct_cli_cmd_find(struct ct_cli_cmd *cl, char *cmd)
 void
 ct_cli_usage(struct ct_cli_cmd *cmd_list, struct ct_cli_cmd *c)
 {
-	struct ct_cli_cmd	*cc = cmd_list, *found;
+	struct ct_cli_cmd	*cc, *found;
 
-	if (c == NULL)
-		CFATALX("usage: %s %s %s %s", __progname,
-		    cc ? cc->cc_cmd : "", cc->cc_cmd, cc->cc_usage);
+	if (c == NULL) {
+		fprintf(stderr, "%s ", __progname);
+		for (cc = cmd_list; cc->cc_cmd != NULL; cc++)
+			fprintf(stderr, "<%s> ", cc->cc_cmd);
+		fprintf(stderr, "\n");
+		exit(1);
+	}
 
-	for (cc = cmd_list; cc != NULL; cc++) {
+	for (cc = cmd_list; cc->cc_cmd != NULL; cc++) {
 		found = ct_cli_cmd_find(cc->cc_subcmd, c->cc_cmd);
 		if (found == c)
 			break;
 	}
 
-	CFATALX("usage: %s %s %s %s", __progname,
-	    cc ? cc->cc_cmd : "", c->cc_cmd, c->cc_usage);
+	CFATALX("usage: %s%s%s %s %s", __progname,
+	    cc->cc_cmd ? cc->cc_cmd : "",
+	    cc->cc_cmd ? " " : "",
+	    c->cc_cmd, c->cc_usage);
 }
 
 struct ct_cli_cmd *
 ct_cli_validate(struct ct_cli_cmd *cmd_list, int *argc, char **argv[])
 {
-	struct ct_cli_cmd		*c, *cl;
+	struct ct_cli_cmd	*c, *cl;
 	char			*cmd;
 
 	cmd = **argv;
