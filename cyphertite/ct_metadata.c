@@ -1323,7 +1323,7 @@ check_local:
 			e_free(&remote_name);
 		e_asprintf(&remote_name, "%020lld-crypto.secrets", local_mtime);
 		ct_add_operation_after(op, ct_md_archive, ct_secrets_unlock,
-		    current_secrets, remote_name, NULL, NULL, 0, 0);
+		    current_secrets, remote_name, NULL, NULL, NULL, 0, 0);
 	} else { /* mtime > local_mtime */
 		CDBG("downloading remote file");
 		strlcpy(dir, current_secrets, sizeof(dir));
@@ -1336,7 +1336,8 @@ check_local:
 		CDBG("temp file: %s", tmp);
 		/* stash current name in basis in case we need to fallback */
 		ct_add_operation_after(op, ct_md_extract, ct_secrets_unlock,
-		    e_strdup(tmp), remote_name, NULL, current_secrets, 0, 0);
+		    e_strdup(tmp), remote_name, NULL, NULL,  current_secrets,
+		    0, 0);
 	}
 }
 
@@ -1431,7 +1432,7 @@ ct_md_trigger_delete(struct ct_op *op)
 	while((file = RB_ROOT(results)) != NULL) {
 		CDBG("deleting remote crypto secrets file %s", file->mlf_name);
 		ct_add_operation_after(op, ct_md_delete, NULL, NULL,
-		    e_strdup(file->mlf_name), NULL, NULL, 0, 0);
+		    e_strdup(file->mlf_name), NULL, NULL, NULL, 0, 0);
 		RB_REMOVE(md_list_tree, results, file);
 		e_free(&file);
 	}

@@ -454,11 +454,11 @@ ct_main(int argc, char **argv)
 		CDBG("doing list for crypto secrets");
 		ct_add_operation(ct_md_list_start,
 		    ct_check_crypto_secrets_nextop, ct_crypto_secrets,
-		    NULL, secrets_file_pattern, NULL, CT_MATCH_REGEX, 0);
+		    NULL, secrets_file_pattern, NULL, NULL, CT_MATCH_REGEX, 0);
 	} else {
 		ct_add_operation(ct_md_list_start,
 		    ct_md_trigger_delete, NULL, NULL, secrets_file_pattern,
-		    NULL, CT_MATCH_REGEX, 0);
+		    NULL, NULL, CT_MATCH_REGEX, 0);
 	}
 
 	if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
