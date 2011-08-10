@@ -515,19 +515,16 @@ void			ct_setup_write_md(const char *, int, const char *, int,
 			    char *, char **);
 void			ct_cleanup_md(void);
 
-/* limit extract and list by regex */
-void			ct_build_regex(char **);
-int			ct_match_regex(char *);
-
 /* match functionality */
 #define CT_MATCH_INVALID	(0)
 #define CT_MATCH_REGEX		(1)
 #define CT_MATCH_RB		(2)
 #define CT_MATCH_GLOB		(3)
 
-void			ct_match_compile(int, char **);
-int			ct_match(int, char *);
-void			ct_match_unwind(int);
+struct ct_match;
+struct ct_match		*ct_match_compile(int, char **);
+int			 ct_match(struct ct_match *, char *);
+void			 ct_match_unwind(struct ct_match *);
 
 void			ct_ssl_init_bw_lim(struct ct_assl_io_ctx *);
 

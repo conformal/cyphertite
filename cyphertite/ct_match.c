@@ -29,32 +29,41 @@
 
 __attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
-void		ct_regex_comp(regex_t *, char **);
-int		ct_regex_match(regex_t *, char *);
-void		ct_regex_unwind(regex_t *);
-void		ct_glob_unwind(char **);
-int		ct_glob_match(char **, char *);
-void		ct_rb_comp(char **);
-int		ct_rb_match(char *);
-void		ct_rb_unwind(void);
-
-regex_t		*regex = NULL;
-char		**glob = NULL;
-
 struct ct_match_node {
 	RB_ENTRY(ct_match_node)	cmn_entry;
 	char			*cmn_string;
 };
 
-int		ct_match_rb_cmp(struct ct_match_node *, struct ct_match_node *);
+RB_HEAD(ct_match_tree, ct_match_node);
 
+struct ct_match {
+	union {
+		regex_t			*regex;
+		char			**glob;
+		struct ct_match_tree	*rb_head;
+	}				 cm_pattern;
+#define cm_regex	cm_pattern.regex
+#define cm_glob		cm_pattern.glob
+#define cm_rb_head	cm_pattern.rb_head
+	int				 cm_mode;
+};
+
+
+void		ct_regex_comp(regex_t *, char **);
+int		ct_regex_match(regex_t *, char *);
+void		ct_regex_unwind(regex_t *);
+void		ct_glob_unwind(char **);
+int		ct_glob_match(char **, char *);
+void		ct_rb_comp(struct ct_match_tree *, char **);
+int		ct_rb_match(struct ct_match_tree *, char *);
+void		ct_rb_unwind(struct ct_match_tree *);
+int		ct_match_rb_cmp(struct ct_match_node *, struct ct_match_node *);
 int
 ct_match_rb_cmp(struct ct_match_node *d1, struct ct_match_node *d2)
 {
 	return (strcmp(d1->cmn_string, d2->cmn_string));
 }
 
-RB_HEAD(ct_match_tree, ct_match_node) ct_match_head = RB_INITIALIZER(&ct_match_head);
 RB_PROTOTYPE(ct_match_tree, ct_match_node, cmn_entry, ct_match_rb_cmp);
 RB_GENERATE(ct_match_tree, ct_match_node, cmn_entry, ct_match_rb_cmp);
 
@@ -145,7 +154,7 @@ ct_glob_match(char **g, char *file)
 }
 
 void
-ct_rb_comp(char **flist)
+ct_rb_comp(struct ct_match_tree *head, char **flist)
 {
 	int			i;
 	struct ct_match_node	*n;
@@ -155,7 +164,7 @@ ct_rb_comp(char **flist)
 			break;
 		n = e_calloc(1, sizeof(struct ct_match_node));
 		n->cmn_string = e_strdup(flist[i]);
-		if (RB_INSERT(ct_match_tree, &ct_match_head, n)) {
+		if (RB_INSERT(ct_match_tree, head, n)) {
 			/* pattern already exists free it */
 			e_free(&n->cmn_string);
 			e_free(&n);
@@ -165,15 +174,15 @@ ct_rb_comp(char **flist)
 }
 
 int
-ct_rb_match(char *file)
+ct_rb_match(struct ct_match_tree *head, char *file)
 {
 	struct ct_match_node	*n, nfind;
 
-	if (RB_EMPTY(&ct_match_head))
+	if (RB_EMPTY(head))
 		return (0); /* no pattern means everything matches */
 
 	nfind.cmn_string = file;
-	n = RB_FIND(ct_match_tree, &ct_match_head, &nfind);
+	n = RB_FIND(ct_match_tree, head, &nfind);
 	if (n == NULL)
 		return (1);
 
@@ -181,70 +190,78 @@ ct_rb_match(char *file)
 }
 
 void
-ct_rb_unwind(void)
+ct_rb_unwind(struct ct_match_tree *head)
 {
 	struct ct_match_node	*n;
 
-	while (!RB_EMPTY(&ct_match_head)) {
-		n = RB_MIN(ct_match_tree, &ct_match_head);
-		RB_REMOVE(ct_match_tree, &ct_match_head, n);
+	while (!RB_EMPTY(head)) {
+		n = RB_MIN(ct_match_tree, head);
+		RB_REMOVE(ct_match_tree, head, n);
 		e_free(&n->cmn_string);
 		e_free(&n);
 	}
 }
 
-void
+struct ct_match *
 ct_match_compile(int mode, char **flist)
 {
-	int	i;
+	struct ct_match	*match;
+	int		 i;
 
-	ct_match_unwind(mode);
+	match = e_calloc(1, sizeof(*match));
+	match->cm_mode = mode;
 
 	switch (mode) {
 	case CT_MATCH_REGEX:
-		regex = e_calloc(1, sizeof(regex_t));
-		ct_regex_comp(regex, flist);
+		match->cm_regex = e_calloc(1, sizeof(regex_t));
+		ct_regex_comp(match->cm_regex, flist);
 		break;
 	case CT_MATCH_RB:
-		ct_rb_comp(flist);
+		match->cm_rb_head = e_calloc(1, sizeof(*match->cm_rb_head));
+		ct_rb_comp(match->cm_rb_head, flist);
 		break;
 	case CT_MATCH_GLOB:
 		for (i = 0; flist[i] != NULL; i++)
 			if (flist[i] == NULL)
 				break;
 		if (i == 0)
-			return;
+			return (match);
 		i++; /* extra NULL */
-		glob = e_calloc(i, sizeof(char *));
+		match->cm_glob = e_calloc(i, sizeof(char *));
 
 		for (i = 0; flist[i] != NULL; i++) {
 			if (flist[i] == NULL)
 				break;
-			glob[i] = e_strdup(flist[i]);
+			match->cm_glob[i] = e_strdup(flist[i]);
 		}
 		break;
 	default:
 		CFATALX("invalid match mode");
 	}
+
+	return (match);
 }
 
 void
-ct_match_unwind(int mode)
+ct_match_unwind(struct ct_match *match)
 {
-	switch (mode) {
+	switch (match->cm_mode) {
 	case CT_MATCH_REGEX:
-		if (regex) {
-			ct_regex_unwind(regex);
-			e_free(&regex);
+		if (match->cm_regex) {
+			ct_regex_unwind(match->cm_regex);
+			e_free(&match->cm_regex);
 		}
 		break;
 	case CT_MATCH_RB:
-		ct_rb_unwind();
+		if (match->cm_rb_head) {
+			ct_rb_unwind(match->cm_rb_head);
+			e_free(&match->cm_rb_head);
+		}
 		break;
 	case CT_MATCH_GLOB:
-		if (glob) {
-			ct_glob_unwind(glob);
-			e_free(&glob);
+		if (match->cm_glob) {
+			ct_glob_unwind(match->cm_glob);
+			e_free(&match->cm_glob);
 		}
 		break;
 	default:
@@ -253,17 +270,17 @@ ct_match_unwind(int mode)
 }
 
 int
-ct_match(int mode, char *match)
+ct_match(struct ct_match *match, char *candidate)
 {
-	switch (mode) {
+	switch (match->cm_mode) {
 	case CT_MATCH_REGEX:
-		return (ct_regex_match(regex, match));
+		return (ct_regex_match(match->cm_regex, candidate));
 		break;
 	case CT_MATCH_RB:
-		return (ct_rb_match(match));
+		return (ct_rb_match(match->cm_rb_head, candidate));
 		break;
 	case CT_MATCH_GLOB:
-		return (ct_glob_match(glob, match));
+		return (ct_glob_match(match->cm_glob, candidate));
 		break;
 	default:
 		CFATALX("invalid match mode");
