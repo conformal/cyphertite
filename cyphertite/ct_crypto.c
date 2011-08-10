@@ -294,8 +294,8 @@ ct_fscanfhex(char *src, uint8_t *dst, size_t dstlen)
  * key) and d) hmac of uncrypted mask key
  */
 int
-ct_create_secrets(char *passphrase, char *filename, uint8_t *mysalt,
-    uint8_t *mymaskkey, uint8_t *myaeskey, uint8_t *myivkey)
+ct_create_secrets(char *passphrase, char *filename, uint8_t *myaeskey,
+    uint8_t *myivkey)
 {
 	char			pwd[PASS_MAX], *p;
 	uint8_t			salt[C_SALT_LEN];
@@ -353,10 +353,8 @@ ct_create_secrets(char *passphrase, char *filename, uint8_t *mysalt,
 	    sizeof rounds_save);
 
 	/* step 1 */
-	if (mysalt)
-		bcopy(mysalt, salt, sizeof salt);
-	else
-		arc4random_buf(salt, sizeof salt);
+	arc4random_buf(salt, sizeof salt);
+
 	ct_fprintfhex(f, C_F_SALT, salt, sizeof salt);
 
 	if (!PKCS5_PBKDF2_HMAC_SHA1(p, strlen(p), salt,
@@ -366,10 +364,7 @@ ct_create_secrets(char *passphrase, char *filename, uint8_t *mysalt,
 	}
 
 	/* step 2 */
-	if (mymaskkey)
-		bcopy(mymaskkey, maskkey, sizeof maskkey);
-	else
-		arc4random_buf(maskkey, sizeof maskkey);
+	arc4random_buf(maskkey, sizeof maskkey);
 
 	/* step 3 */
 	if (myaeskey)
@@ -674,8 +669,7 @@ ct_create_or_unlock_secrets(char *secrets, char *password)
 
 	if (stat(secrets, &sb) == -1) {
 		fprintf(stderr, "No crypto secrets file. Creating\n");
-		if (ct_create_secrets(password, secrets, NULL, NULL,
-		    NULL, NULL))
+		if (ct_create_secrets(password, secrets, NULL, NULL))
 			CFATALX("can't create secrets");
 	}
 	/* we got crypto */

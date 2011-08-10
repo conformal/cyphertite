@@ -26,8 +26,7 @@ int			ct_decrypt(uint8_t *, size_t, uint8_t *, size_t,
 			    uint8_t *, size_t, uint8_t *, size_t);
 int			ct_create_iv(uint8_t *, size_t, uint8_t *, size_t,
 			    uint8_t *, size_t);
-int			ct_create_secrets(char *, char *, uint8_t *, uint8_t *,
-			    uint8_t *, uint8_t *);
+int			ct_create_secrets(char *, char *, uint8_t *, uint8_t *);
 int			ct_unlock_secrets(char *, char *, uint8_t *, size_t,
 			    uint8_t *, size_t);
 void			ct_crypt_create_iv(uint8_t *iv, size_t, uint8_t *,

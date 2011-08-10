@@ -66,7 +66,7 @@ int				md_open_inflight = 0;
 size_t				md_size, md_offset;
 time_t				md_mtime;
 
-int	 		 strcompare(const void *, const void *);
+int			strcompare(const void *, const void *);
 struct md_list_tree	*ct_md_list_complete(struct ct_op *);
 
 struct xmlsd_v_elements ct_xml_cmds[] = {
@@ -1366,8 +1366,8 @@ again:
 		}
 		/* XXX should we *ever* hit this case? */
 		fprintf(stderr, "No crypto secrets file. Creating\n");
-		if (ct_create_secrets(ct_crypto_password,
-		    ct_crypto_secrets, NULL, NULL, NULL, NULL))
+		if (ct_create_secrets(ct_crypto_password, ct_crypto_secrets,
+		    NULL, NULL))
 			CFATALX("can't create secrets");
 	}
 	if (ct_unlock_secrets(ct_crypto_password, crypto_secrets,
