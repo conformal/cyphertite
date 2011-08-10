@@ -190,7 +190,7 @@ loop:
 	ct_trans->tr_trans_id = ct_trans_id++;
 	ct_trans->tr_eof = 0;
 	ct_trans->hdr.c_flags = C_HDR_F_METADATA;
-	ct_trans->hdr.c_ex_status = 1; /* we handle new metadata protocol */
+	ct_trans->hdr.c_ex_status = 2; /* we handle new metadata protocol */
 	ct_trans->tr_md_chunkno = md_block_no;
 	ct_trans->tr_md_name = mdname;
 
@@ -462,7 +462,7 @@ ct_md_extract(struct ct_op *op)
 	trans->tr_md_name = mdname;
 
 	hdr = &trans->hdr;
-	hdr->c_ex_status = 1;
+	hdr->c_ex_status = 2;
 	hdr->c_flags |= C_HDR_F_METADATA;
 
 	bzero(trans->tr_sha, sizeof(trans->tr_sha));

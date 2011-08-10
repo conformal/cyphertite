@@ -532,8 +532,7 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 		ct_state->ct_inflight_rblen++;
 		/* XXX no nice place to put this */
 		if (hdr->c_opcode == C_HDR_O_WRITE &&
-		    hdr->c_flags & C_HDR_F_METADATA &&
-		    hdr->c_ex_status == 1) {
+		    hdr->c_flags & C_HDR_F_METADATA) {
 			/* free iovec and footer data */
 			struct ct_iovec	*iov = vbody;
 
@@ -1011,21 +1010,21 @@ ct_wakeup_write(void)
 
 		/* XXX there really isn't a better place to do this */
 		if (hdr->c_opcode == C_HDR_O_WRITE &&
-		    (hdr->c_flags & C_HDR_F_METADATA) != 0 &&
-		    hdr->c_ex_status == 1) {
+		    (hdr->c_flags & C_HDR_F_METADATA) != 0) {
 			struct ct_metadata_footer	*cmf;
 			struct ct_iovec			*iov;
 
 			iov = e_calloc(2, sizeof(*iov));
 			cmf = e_calloc(1, sizeof(*cmf));
-			cmf->cmf_chunkno = trans->tr_md_chunkno;
-			cmf->cmf_size = hdr->c_size;
-			hdr->c_size += sizeof(*cmf);
+			cmf->cmf_chunkno = htonl(trans->tr_md_chunkno);
+			cmf->cmf_size = htonl(hdr->c_size);
 
 			iov[0].iov_base = data;
-			iov[0].iov_len = cmf->cmf_size;
+			iov[0].iov_len = hdr->c_size;
 			iov[1].iov_base = cmf;
 			iov[1].iov_len = sizeof(*cmf);
+
+			hdr->c_size += sizeof(*cmf);
 
 			ct_assl_writev_op(ct_assl_ctx, hdr, iov, 2);
 			continue;
@@ -1105,12 +1104,25 @@ ct_handle_read_reply(struct ct_trans *trans, struct ct_header *hdr,
 	slot = trans->tr_dataslot = !(trans->tr_dataslot);
 	if (hdr->c_status == C_HDR_S_OK) {
 		trans->tr_state = TR_S_EX_READ;
-		/* Check the chunk number for sanity */
+		/*
+		 * Check the chunk number for sanity.
+		 * The server will only send md proto version 1 (ex_status == 0)
+		 * or v3 (ex_status == 2). v3 fixed a byteswapping problem in
+		 * v2, thus v2 will not be sent to any client that understands
+		 * v3.
+		 */
 		if (hdr->c_flags & C_HDR_F_METADATA &&
-		    hdr->c_ex_status == 1) {
+		    ((hdr->c_ex_status != 0) && (hdr->c_ex_status != 2)))
+			CFATALX("invalid metadata prootcol (v%d)",
+			    hdr->c_ex_status + 1);
+
+		if (hdr->c_flags & C_HDR_F_METADATA &&
+		    hdr->c_ex_status == 2) {
 			CDBG("checking footer");
 			cmf = (struct ct_metadata_footer *)
 			    (trans->tr_data[slot] + hdr->c_size - sizeof(*cmf));
+			cmf->cmf_size = ntohl(cmf->cmf_size);
+			cmf->cmf_chunkno = ntohl(cmf->cmf_chunkno);
 
 			if (cmf->cmf_size != hdr->c_size - sizeof(*cmf))
 				CFATALX("invalid chunkfile footer");
