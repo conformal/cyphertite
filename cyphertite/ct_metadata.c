@@ -593,7 +593,7 @@ ct_md_list_start(struct ct_op *op)
 struct md_list_tree *
 ct_md_list_complete(struct ct_op *op)
 {
-	struct ct_match		*match;
+	struct ct_match		*match, *ex_match = NULL;
 	struct md_list_tree	*results;
 	struct md_list_file	*file;
 
@@ -604,14 +604,20 @@ ct_md_list_complete(struct ct_op *op)
 	RB_INIT(results);
 
 	match = ct_match_compile(op->op_matchmode, op->op_filelist);
+	if (op->op_excludelist)
+		ex_match = ct_match_compile(op->op_matchmode,
+		    op->op_excludelist);
 	while ((file = SLIST_FIRST(&ct_md_listfiles)) != NULL) {
 		SLIST_REMOVE_HEAD(&ct_md_listfiles, mlf_link);
-		if (ct_match(match, file->mlf_name) == 0) {
+		if (ct_match(match, file->mlf_name) == 0 && (ex_match == NULL ||
+		    ct_match(ex_match, file->mlf_name) == 1)) {
 			RB_INSERT(md_list_tree, results, file);
 		} else {
 			e_free(&file);
 		}
 	}
+	if (ex_match != NULL)
+		ct_match_unwind(ex_match);
 	ct_match_unwind(match);
 
 	return (results);
