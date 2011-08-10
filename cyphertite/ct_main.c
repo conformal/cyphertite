@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <err.h>
+#include <libgen.h>
 
 #include <assl.h>
 #include <clog.h>
@@ -531,13 +532,20 @@ ctctl_main(int argc, char *argv[])
 int
 main(int argc, char *argv[])
 {
+	char *executablepath, *executablename;
+
 	clog_init(1);
 	if (clog_set_flags(CLOG_F_ENABLE | CLOG_F_STDERR))
 		errx(1, "illegal clog flags");
 
-	if (!strcmp(argv[0], "ct") || !strcmp(argv[0], "cyphertite"))
+	executablepath = strdup(argv[0]);
+	executablename = basename(executablepath);
+
+	if (!strcmp(executablename, "ct") ||
+	    !strcmp(executablename, "cyphertite"))
 		return (ct_main(argc, argv));
-	if (!strcmp(argv[0], "ctctl") || !strcmp(argv[0], "cyphertitectl"))
+	if (!strcmp(executablename, "ctctl") ||
+	    !strcmp(executablename, "cyphertitectl"))
 		return (ctctl_main(argc, argv));
 	else
 		CFATALX("invalid executable name");
