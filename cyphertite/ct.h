@@ -523,6 +523,7 @@ void			ct_cleanup_md(void);
 
 struct ct_match;
 struct ct_match		*ct_match_compile(int, char **);
+struct ct_match		*ct_match_fromfile(const char *, int);
 int			 ct_match(struct ct_match *, char *);
 void			 ct_match_unwind(struct ct_match *);
 

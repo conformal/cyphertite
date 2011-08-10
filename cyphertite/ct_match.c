@@ -25,6 +25,10 @@
 #include <clog.h>
 #include <exude.h>
 
+#ifndef NO_UTIL_H
+#include <util.h>
+#endif
+
 #include "ct.h"
 
 __attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
@@ -286,6 +290,49 @@ ct_match(struct ct_match *match, char *candidate)
 		CFATALX("invalid match mode");
 	}
 	/* NOTREACHED */
+}
+
+struct ct_match *
+ct_match_fromfile(const char *file, int matchmode)
+{
+	struct ct_match	*match;
+	FILE		*f;
+	char		**flist, **tmp, *line;
+	size_t		 len, lineno = 0;
+	int		 n = 0;
+
+	if ((f = fopen(file, "r")) == NULL)
+		CFATAL("can't open match file %s", file);
+
+	/* XXX wish there was a nicer way to count these lines */
+	/* XXX comments? empty lines? */
+	while ((line = fparseln(f, &len, NULL, NULL, 0)) != NULL) {
+		free(line);
+		n++;
+	}
+
+	if (n == 0)
+		return (NULL);
+	if (fseeko(f, 0, SEEK_SET) != 0)
+		CFATAL("can't seek to start of match file %s", file);
+	flist = e_calloc(n + 1, sizeof(*flist));
+
+	/* do it again actually parsing this time */
+	n = 0;
+	while ((line = fparseln(f, &len, &lineno, NULL, 0)) != NULL) {
+		flist[n++] = line;
+	}
+	
+	(void)fclose(f);
+
+	match = ct_match_compile(matchmode, flist);
+
+	tmp = flist;
+	while (*tmp != NULL)
+		free(*(tmp++));
+	e_free(&flist);
+
+	return (match);
 }
 
 #if 0
