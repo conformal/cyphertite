@@ -669,6 +669,9 @@ ct_create_or_unlock_secrets(char *secrets, char *password)
 {
 	struct stat	sb;
 
+	if (secrets == NULL)
+		return (0);
+
 	if (stat(secrets, &sb) == -1) {
 		fprintf(stderr, "No crypto secrets file. Creating\n");
 		if (ct_create_secrets(password, secrets, NULL, NULL,
