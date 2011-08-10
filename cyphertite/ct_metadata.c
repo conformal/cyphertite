@@ -971,7 +971,7 @@ again:
 			e_free(&cachename);
 			ct_add_operation_after(op, ct_md_extract,
 			    ct_md_download_next, (char *)md_prev, md_prev,
-				NULL, NULL, 0, 0); 
+				NULL, NULL, NULL, 0, 0); 
 		} else {
 			if (mfile == mfilename)
 				e_free(&mfile);
@@ -1012,12 +1012,12 @@ ct_md_extract_nextop(struct ct_op *op)
 	case CT_A_EXTRACT:
 		ct_add_operation(ct_extract, ct_free_mdname,
 		    op->op_local_fname, op->op_remote_fname, op->op_filelist,
-		    NULL, op->op_matchmode, 0);
+		    op->op_excludelist, NULL, op->op_matchmode, 0);
 		break;
 	case CT_A_LIST:
 		ct_add_operation(ct_list_op, ct_free_mdname,
-		    op->op_local_fname, NULL, op->op_filelist, NULL,
-		    op->op_matchmode, 0);
+		    op->op_local_fname, NULL, op->op_filelist,
+		    op->op_excludelist, NULL, op->op_matchmode, 0);
 		break;
 	case CT_A_ARCHIVE:
 		/*
@@ -1028,9 +1028,10 @@ ct_md_extract_nextop(struct ct_op *op)
 		CDBG("setting basisname %s", op->op_local_fname);
 		/* XXX does this leak cachename? */
 		ct_add_operation(ct_archive, NULL, mfile, NULL,
-		    op->op_filelist, op->op_local_fname, op->op_matchmode, 0);
+		    op->op_filelist, op->op_excludelist, op->op_local_fname,
+		    op->op_matchmode, 0);
 		ct_add_operation(ct_md_archive, ct_free_mdname, mfile, NULL,
-		    NULL, NULL, 0, 0);
+		    NULL, NULL, NULL, 0, 0);
 		break;
 	default:
 		CFATALX("invalid action");
@@ -1086,8 +1087,8 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 		 * nextop will fix it for us.
 		 */
 		ct_add_operation(ct_md_extract, ct_md_extract_nextop,
-		    cachename, best, op->op_filelist, op->op_local_fname,
-		    op->op_matchmode, op->op_action);
+		    cachename, best, op->op_filelist, op->op_excludelist,
+		    op->op_local_fname, op->op_matchmode, op->op_action);
 	} else {
 		e_free(&best);
 do_operation:

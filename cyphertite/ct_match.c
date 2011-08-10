@@ -292,12 +292,11 @@ ct_match(struct ct_match *match, char *candidate)
 	/* NOTREACHED */
 }
 
-struct ct_match *
-ct_match_fromfile(const char *file, int matchmode)
+char **
+ct_matchlist_fromfile(const char *file)
 {
-	struct ct_match	*match;
 	FILE		*f;
-	char		**flist, **tmp, *line;
+	char		**flist, *line;
 	size_t		 len, lineno = 0;
 	int		 n = 0;
 
@@ -325,12 +324,29 @@ ct_match_fromfile(const char *file, int matchmode)
 	
 	(void)fclose(f);
 
-	match = ct_match_compile(matchmode, flist);
+	return flist;
+}
 
-	tmp = flist;
+void
+ct_matchlist_free(char **flist)
+{
+	char **tmp = flist;
+
 	while (*tmp != NULL)
 		free(*(tmp++));
 	e_free(&flist);
+}
+
+struct ct_match *
+ct_match_fromfile(const char *file, int matchmode)
+{
+	struct ct_match	*match;
+	char		**flist;
+
+	if ((flist = ct_matchlist_fromfile(file)) == NULL)
+		return (NULL);
+
+	match = ct_match_compile(matchmode, flist);
 
 	return (match);
 }

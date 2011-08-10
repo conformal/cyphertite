@@ -50,7 +50,6 @@ extern int		ct_md_mode;
 extern char		*ct_md_cachedir;
 extern int		ct_max_differentials;
 extern char *		__progname;
-extern char		*ct_excludefile;
 extern char		*ct_includefile;
 
 /* crypto */
@@ -239,7 +238,7 @@ struct ct_op;
 void			ct_archive(struct ct_op *);
 void			ct_extract(struct ct_op *);
 void			ct_list_op(struct ct_op *);
-int			ct_list(const char *, char **, int);
+int			ct_list(const char *, char **, char **, int);
 void			ct_md_archive(struct ct_op *);
 void			ct_md_extract(struct ct_op *);
 void			ct_md_list_start(struct ct_op *);
@@ -263,6 +262,7 @@ struct ct_op {
 	ct_op_cb		*op_complete;	
 	char			*op_local_fname;
 	char			**op_filelist;
+	char			**op_excludelist;
 	char			*op_remote_fname;
 	char			*op_basis;
 	int			 op_action;
@@ -271,9 +271,9 @@ struct ct_op {
 };
 
 void	ct_add_operation(ct_op_cb *, ct_op_cb *, char *, char *,
-	    char **, char *, int, int);
+	    char **, char **, char *, int, int);
 void	ct_add_operation_after(struct ct_op *, ct_op_cb *, ct_op_cb *,
-	    char *, char *, char **, char *, int, int);
+	    char *, char *, char **, char **, char *, int, int);
 void	ct_nextop(void *);
 int	ct_op_complete(void);
 
@@ -525,6 +525,8 @@ void			ct_cleanup_md(void);
 struct ct_match;
 struct ct_match		*ct_match_compile(int, char **);
 struct ct_match		*ct_match_fromfile(const char *, int);
+char			**ct_matchlist_fromfile(const char *);
+void			 ct_matchlist_free(char **);
 int			 ct_match(struct ct_match *, char *);
 void			 ct_match_unwind(struct ct_match *);
 

@@ -51,7 +51,7 @@ struct dir_stat;
 int			 ct_cmp_dirlist(struct dir_stat *, struct dir_stat *);
 struct fnode		*ct_populate_fnode_from_flist(struct flist *);
 const char		*ct_name_to_safename(const char *);
-void			 ct_traverse(char **, int);
+void			 ct_traverse(char **, char **, int);
 
 RB_HEAD(ct_dir_lookup, dir_stat) ct_dir_rb_head =
     RB_INITIALIZER(&ct_dir_rb_head);
@@ -306,7 +306,7 @@ ct_archive(struct ct_op *op)
 		if (basisbackup != NULL)
 			e_free(&basisbackup);
 
-		ct_traverse(filelist, op->op_matchmode);
+		ct_traverse(filelist, op->op_excludelist, op->op_matchmode);
 
 		/*
 		 * it is possible the first files may have been deleted
@@ -511,7 +511,7 @@ done:
 }
 
 void
-ct_traverse(char **paths, int match_mode)
+ct_traverse(char **paths, char **exclude, int match_mode)
 {
 	FTS			*ftsp;
 	FTSENT			*fe;
@@ -521,8 +521,8 @@ ct_traverse(char **paths, int match_mode)
 
 	if (ct_includefile)
 		include_match = ct_match_fromfile(ct_includefile, match_mode);
-	if (ct_excludefile)
-		exclude_match = ct_match_fromfile(ct_excludefile, match_mode);
+	if (exclude)
+		exclude_match = ct_match_compile(match_mode, exclude);
 
 	fts_options = FTS_PHYSICAL | FTS_NOCHDIR;
 	if (ct_no_cross_mounts)

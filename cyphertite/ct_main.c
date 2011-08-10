@@ -83,7 +83,6 @@ char			*ct_polltype;
 char			*ct_mdmode_str;
 char			*ct_md_cachedir;
 char			*ct_includefile;
-char			*ct_excludefile;
 int			ct_md_mode = CT_MDMODE_LOCAL;
 int			ct_compress_enabled;
 int			ct_encrypt_enabled;
@@ -207,6 +206,8 @@ ct_main(int argc, char **argv)
 	char		ct_fullcachedir[PATH_MAX];
 	char		*ct_basisbackup = NULL;
 	char		*ct_mfile = NULL;
+	char		*ct_excludefile = NULL;
+	char		**excludelist = NULL;
 	int		ct_metadata = 0;
 	int		ct_match_mode = CT_MATCH_GLOB;
 	int		c;
@@ -319,6 +320,9 @@ ct_main(int argc, char **argv)
 	    ct_includefile != NULL && argc != 0)
 		CFATALX("-I is invalid when a pattern is provided on "
 		    "the command line");
+	if (ct_excludefile != NULL)
+		excludelist = ct_matchlist_fromfile(ct_excludefile);
+
 
 	/* Generate config file if one doesn't exist and there are no params. */
 	if (ct_load_config(settings)) {
@@ -404,7 +408,7 @@ ct_main(int argc, char **argv)
 	/* Don't bother starting a connection if just listing local files. */
 	if (ct_action == CT_A_LIST && ct_md_mode == CT_MDMODE_LOCAL &&
 	    ct_metadata == 0 ) {
-		ret = ct_list(ct_mfile, argv, ct_match_mode);
+		ret = ct_list(ct_mfile, argv, excludelist, ct_match_mode);
 		goto out;
 	}
 
@@ -453,19 +457,20 @@ ct_main(int argc, char **argv)
 		case CT_A_LIST:
 			ct_add_operation(ct_find_md_for_extract,
 			    ct_find_md_for_extract_complete, ct_mfile, NULL,
-			    argv, NULL, ct_match_mode, ct_action);
+			    argv, excludelist, NULL, ct_match_mode, ct_action);
 			break;
 		case CT_A_ARCHIVE:
 			if (ct_auto_differential)
 				ct_add_operation(ct_find_md_for_extract,
 				    ct_find_md_for_extract_complete, ct_mfile,
-				    NULL, argv, NULL, ct_match_mode, ct_action);
+				    NULL, argv, excludelist, NULL,
+				    ct_match_mode, ct_action);
 			else   {
 				ct_mfile = ct_find_md_for_archive(ct_mfile);
 				ct_add_operation(ct_archive, NULL, ct_mfile,
-				    NULL, argv, NULL, 0, 0);
+				    NULL, argv, excludelist, NULL, 0, 0);
 				ct_add_operation(ct_md_archive, NULL, ct_mfile,
-				    NULL, NULL, NULL, ct_match_mode, 0);
+				    NULL, NULL, NULL, NULL, ct_match_mode, 0);
 			}
 			break;
 		default:
@@ -478,19 +483,20 @@ ct_main(int argc, char **argv)
 		switch (ct_action) {
 		case CT_A_ARCHIVE:
 			ct_add_operation(ct_md_archive, NULL,
-			    ct_mfile, NULL, NULL, NULL, 0, 0);
+			    ct_mfile, NULL, NULL, NULL, NULL, 0, 0);
 			break;
 		case CT_A_EXTRACT:
 			ct_add_operation(ct_md_extract, NULL, ct_mfile,
-			    NULL, NULL, NULL, 0, 0);
+			    NULL, NULL, NULL, NULL, 0, 0);
 			break;
 		case CT_A_LIST:
 			ct_add_operation(ct_md_list_start, ct_md_list_print,
-			    NULL, NULL, argv, NULL, ct_match_mode, 0);
+			    NULL, NULL, argv, excludelist, NULL,
+			    ct_match_mode, 0);
 			break;
 		case CT_A_ERASE:
 			ct_add_operation(ct_md_delete, NULL, NULL,
-			    ct_mfile, NULL, NULL, 0, 0);
+			    ct_mfile, NULL, NULL, NULL, 0, 0);
 			break;
 		default:
 			CWARNX("must specify action");
@@ -503,11 +509,11 @@ ct_main(int argc, char **argv)
 		switch (ct_action) {
 		case CT_A_ARCHIVE:
 			ct_add_operation(ct_archive, NULL, ct_mfile, NULL, argv,
-			    ct_basisbackup, ct_match_mode, 0);
+			    excludelist, ct_basisbackup, ct_match_mode, 0);
 			break;
 		case CT_A_EXTRACT:
 			ct_add_operation(ct_extract, NULL, ct_mfile, NULL,
-			    argv, NULL, ct_match_mode, 0);
+			    argv, excludelist, NULL, ct_match_mode, 0);
 			break;
 		case CT_A_ERASE:
 		default:
@@ -528,6 +534,8 @@ ct_main(int argc, char **argv)
 	ct_flnode_cleanup();
 	ct_ssl_cleanup();
 out:
+	if (excludelist)
+		ct_matchlist_free(excludelist);
 	if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0)
 		ct_mdcache_trim(ct_md_cachedir, ct_max_mdcache_size);
 

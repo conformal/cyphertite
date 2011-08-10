@@ -80,7 +80,8 @@ ct_setup_assl(void)
 
 void
 ct_add_operation(ct_op_cb *start, ct_op_cb *complete, char *localname,
-    char *remotename, char **flist, char *basis, int matchmode, int action)
+    char *remotename, char **flist, char **exlist, char *basis, int matchmode,
+    int action)
 {
 	struct ct_op	*op;
 
@@ -90,6 +91,7 @@ ct_add_operation(ct_op_cb *start, ct_op_cb *complete, char *localname,
 	op->op_local_fname = localname;
 	op->op_remote_fname = remotename;
 	op->op_filelist = flist;
+	op->op_excludelist = exlist;
 	op->op_basis = basis;
 	op->op_matchmode = matchmode;
 	op->op_action = action;
@@ -99,7 +101,7 @@ ct_add_operation(ct_op_cb *start, ct_op_cb *complete, char *localname,
 
 void
 ct_add_operation_after(struct ct_op *after, ct_op_cb *start, ct_op_cb *complete,
-    char *localname, char *remotename, char **flist, char *basis,
+    char *localname, char *remotename, char **flist, char **exlist, char *basis,
     int matchmode, int action)
 {
 	struct ct_op	*op;
@@ -110,6 +112,7 @@ ct_add_operation_after(struct ct_op *after, ct_op_cb *start, ct_op_cb *complete,
 	op->op_local_fname = localname;
 	op->op_remote_fname = remotename;
 	op->op_filelist = flist;
+	op->op_excludelist = exlist;
 	op->op_basis = basis;
 	op->op_matchmode = matchmode;
 	op->op_action = action;

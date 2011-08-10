@@ -317,7 +317,8 @@ ct_list_op(struct ct_op *op)
 {
 	struct ct_trans		*trans;
 
-	ct_list(op->op_local_fname, op->op_filelist, op->op_matchmode);
+	ct_list(op->op_local_fname, op->op_filelist, op->op_excludelist,
+	    op->op_matchmode);
 	trans = ct_trans_alloc();
 	if (trans == NULL) {
 		/* system busy, return (should never happen) */
@@ -332,7 +333,7 @@ ct_list_op(struct ct_op *op)
 }
 
 int
-ct_list(const char *file, char **flist, int match_mode)
+ct_list(const char *file, char **flist, char **excludelist, int match_mode)
 {
 	FILE			*xdr_f;
 	struct ct_md_gheader	gh;
@@ -358,8 +359,8 @@ ct_list(const char *file, char **flist, int match_mode)
 		match = ct_match_fromfile(ct_includefile, match_mode);
 	else
 		match = ct_match_compile(match_mode, flist);
-	if (ct_excludefile != NULL)
-		ex_match = ct_match_fromfile(ct_excludefile, match_mode);
+	if (excludelist != NULL)
+		ex_match = ct_match_compile(match_mode, excludelist);
 
 	ct_verbose++;	/* by default print something. */
 
@@ -684,10 +685,9 @@ ct_extract(struct ct_op *op)
 			else
 				ex_priv->inc_match =
 				    ct_match_compile(match_mode, filelist);
-			if (ct_excludefile != NULL)
-				ex_priv->ex_match =
-				    ct_match_fromfile(ct_excludefile,
-				    match_mode);
+			if (op->op_excludelist != NULL)
+				ex_priv->ex_match = ct_match_compile(match_mode,
+				    op->op_excludelist);
 			op->op_priv = ex_priv;
 		}
 		ct_extract_setup(mfile);
