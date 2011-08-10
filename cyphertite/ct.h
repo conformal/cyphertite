@@ -43,7 +43,6 @@ extern int		ct_verbose_ratios;
 extern int		ct_cur_compress_mode;
 extern struct ct_stat	*ct_stats;
 extern int		ct_no_cross_mounts;
-extern int		ct_all_files;
 extern time_t		ct_prev_backup_time;
 extern int		ct_trans_id;
 extern int		md_backup_fd;

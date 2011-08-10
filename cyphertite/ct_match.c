@@ -40,7 +40,6 @@ void		ct_rb_unwind(void);
 
 regex_t		*regex = NULL;
 char		**glob = NULL;
-int		ct_all_files = 1;
 
 struct ct_match_node {
 	RB_ENTRY(ct_match_node)	cmn_entry;
@@ -90,16 +89,13 @@ ct_regex_comp(regex_t *re, char **flist)
 	}
 
 	e_free(&q);
-
-	/* use regex */
-	ct_all_files = 0;
 }
 
 int
 ct_regex_match(regex_t *re, char *file)
 {
 	if (re == NULL)
-		return (1); /* no match */
+		return (0); /* no pattern means everything matches */
 
 	if (regexec(re, file, 0, NULL, 0) == 0) {
 		/* we got a match */
@@ -136,7 +132,7 @@ ct_glob_match(char **g, char *file)
 	int			i;
 
 	if (g == NULL)
-		return (1); /* no match */
+		return (0); /* no pattern means everything matches */
 
 	for (i = 0; g[i] != NULL; i++) {
 		if (g[i] == NULL)
@@ -151,7 +147,7 @@ ct_glob_match(char **g, char *file)
 void
 ct_rb_comp(char **flist)
 {
-	int			i, gotsome = 0;
+	int			i;
 	struct ct_match_node	*n;
 
 	for (i = 0; flist[i] != NULL; i++) {
@@ -165,12 +161,6 @@ ct_rb_comp(char **flist)
 			e_free(&n);
 			continue;
 		}
-		gotsome = 1;
-	}
-
-	if (gotsome) {
-		/* use regex */
-		ct_all_files = 0;
 	}
 }
 
@@ -178,6 +168,9 @@ int
 ct_rb_match(char *file)
 {
 	struct ct_match_node	*n, nfind;
+
+	if (RB_EMPTY(&ct_match_head))
+		return (0); /* no pattern means everything matches */
 
 	nfind.cmn_string = file;
 	n = RB_FIND(ct_match_tree, &ct_match_head, &nfind);
@@ -203,20 +196,19 @@ ct_rb_unwind(void)
 void
 ct_match_compile(int mode, char **flist)
 {
-	int			i, gotsome = 0;
+	int	i;
+
+	ct_match_unwind(mode);
 
 	switch (mode) {
 	case CT_MATCH_REGEX:
-		ct_match_unwind(mode);
 		regex = e_calloc(1, sizeof(regex_t));
 		ct_regex_comp(regex, flist);
 		break;
 	case CT_MATCH_RB:
-		ct_rb_unwind();
 		ct_rb_comp(flist);
 		break;
 	case CT_MATCH_GLOB:
-		ct_match_unwind(mode);
 		for (i = 0; flist[i] != NULL; i++)
 			if (flist[i] == NULL)
 				break;
@@ -229,11 +221,6 @@ ct_match_compile(int mode, char **flist)
 			if (flist[i] == NULL)
 				break;
 			glob[i] = e_strdup(flist[i]);
-			gotsome = 1;
-		}
-		if (gotsome) {
-			/* use regex */
-			ct_all_files = 0;
 		}
 		break;
 	default:
@@ -270,22 +257,18 @@ ct_match(int mode, char *match)
 {
 	switch (mode) {
 	case CT_MATCH_REGEX:
-		if (regex)
-			return (ct_regex_match(regex, match));
+		return (ct_regex_match(regex, match));
 		break;
 	case CT_MATCH_RB:
 		return (ct_rb_match(match));
-		/* NOTREACHED */
 		break;
 	case CT_MATCH_GLOB:
-		if (glob)
-			return (ct_glob_match(glob, match));
+		return (ct_glob_match(glob, match));
 		break;
 	default:
 		CFATALX("invalid match mode");
 	}
-
-	return (1); /* no match */
+	/* NOTREACHED */
 }
 
 #if 0

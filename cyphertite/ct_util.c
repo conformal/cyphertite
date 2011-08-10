@@ -52,9 +52,6 @@ struct ct_assl_io_ctx	*ct_assl_ctx;
 /* next transaction id */
 int			ct_trans_id = 0;
 
-/* limited restore/list flag; */
-int			ct_all_files;
-
 void ct_setup_assl(void);
 struct ct_io_queue	*ct_ioctx_alloc(void);
 void			ct_ioctx_free(struct ct_io_queue *);

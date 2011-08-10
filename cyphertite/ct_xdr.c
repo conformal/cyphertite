@@ -373,8 +373,7 @@ next_file:
 	ret = ct_read_header(&hdr);
 
 	while (ret == 0 && hdr.cmh_beacon != CT_HDR_EOF) {
-		doprint = (ct_all_files ||
-		    !ct_match(match_mode, hdr.cmh_filename));
+		doprint = !ct_match(match_mode, hdr.cmh_filename);
 		ct_populate_fnode(fnode, &hdr, &state);
 
 		if (doprint )
@@ -707,8 +706,7 @@ ct_extract(struct ct_op *op)
 				CFATALX("invalid archive");
 			}
 
-			ct_doextract = (ct_all_files ||
-			    !ct_match(match_mode, hdr.cmh_filename));
+			ct_doextract = !ct_match(match_mode, hdr.cmh_filename);
 
 			if (C_ISREG(hdr.cmh_type)) {
 				ct_num_shas = hdr.cmh_nr_shas;
