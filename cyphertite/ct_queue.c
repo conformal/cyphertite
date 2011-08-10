@@ -884,9 +884,12 @@ ct_complete_normal(struct ct_trans *trans)
 		break;
 	case TR_S_EX_FILE_START:
 		ct_sha1_setup(&trans->tr_fl_node->fl_shactx);
-		/* actual open happened in ct_extract */
-		break;
-	case TR_S_EX_SPECIAL:
+		ct_file_extract_open(trans->tr_fl_node);
+		CDBG("should print");
+		if (ct_verbose) {
+			ct_pr_fmt_file(trans->tr_fl_node);
+			printf("\n");
+		}
 		break;
 	case TR_S_EX_FILE_END:
 		ct_sha1_final(trans->tr_csha, &trans->tr_fl_node->fl_shactx);
@@ -904,10 +907,17 @@ ct_complete_normal(struct ct_trans *trans)
 		ct_sha1_add(trans->tr_data[slot], &trans->tr_fl_node->fl_shactx,
 		    trans->tr_size[slot]);
 		ct_stats->st_chunks_completed++;
-		ct_file_extract_write(trans->tr_fl_node, trans->tr_data[slot],
+		ct_file_extract_write(trans->tr_data[slot],
 		    trans->tr_size[slot]);
 
 		ct_stats->st_bytes_written += trans->tr_size[slot];
+		break;
+	case TR_S_EX_SPECIAL:
+		ct_file_extract_special(trans->tr_fl_node);
+		if (ct_verbose) {
+			ct_pr_fmt_file(trans->tr_fl_node);
+			printf("\n");
+		}
 		break;
 	default:
 		CFATALX("process_normal unexpected state %d", trans->tr_state);

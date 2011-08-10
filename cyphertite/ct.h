@@ -102,7 +102,6 @@ struct fnode {
 #define CT_FILE_FINISHED	(2)
 	SHA_CTX			fl_shactx;
 	int			fl_skip_file;
-	int			fl_fd;
 };
 
 struct flist {
@@ -467,10 +466,10 @@ void			ct_extract_setup(const char *);
 int			ct_basis_setup(const char *, char **);
 
 /* ct_file.c: extract functions */
-int  ct_file_extract_open(struct fnode *);
-void ct_file_extract_write(struct fnode *, uint8_t *, size_t);
-void ct_file_extract_close(struct fnode *);
-void ct_file_extract_special(struct fnode *);
+void ct_file_extract_open(struct fnode *fnode);
+void ct_file_extract_write(uint8_t *buf, size_t size);
+void ct_file_extract_close(struct fnode *fnode);
+void ct_file_extract_special(struct fnode *fnode);
 void ct_file_extract_fixup(void);
 void ct_create_config(void);
 char *ct_system_config(void);
