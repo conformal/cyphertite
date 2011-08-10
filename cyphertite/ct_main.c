@@ -457,7 +457,7 @@ ct_main(int argc, char **argv)
 				ct_add_operation(ct_archive, NULL, ct_mfile,
 				    NULL, argv, NULL, 0, 0);
 				ct_add_operation(ct_md_archive, NULL, ct_mfile,
-				    NULL, NULL, NULL, 0, 0);
+				    NULL, NULL, NULL, ct_match_mode, 0);
 			}
 			break;
 		default:
@@ -495,7 +495,7 @@ ct_main(int argc, char **argv)
 		switch (ct_action) {
 		case CT_A_ARCHIVE:
 			ct_add_operation(ct_archive, NULL, ct_mfile, NULL, argv,
-			    ct_basisbackup, 0, 0);
+			    ct_basisbackup, ct_match_mode, 0);
 			break;
 		case CT_A_EXTRACT:
 			ct_add_operation(ct_extract, NULL, ct_mfile, NULL,

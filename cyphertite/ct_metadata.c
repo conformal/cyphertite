@@ -1028,7 +1028,7 @@ ct_md_extract_nextop(struct ct_op *op)
 		CDBG("setting basisname %s", op->op_local_fname);
 		/* XXX does this leak cachename? */
 		ct_add_operation(ct_archive, NULL, mfile, NULL,
-		    op->op_filelist, op->op_local_fname, 0, 0);
+		    op->op_filelist, op->op_local_fname, op->op_matchmode, 0);
 		ct_add_operation(ct_md_archive, ct_free_mdname, mfile, NULL,
 		    NULL, NULL, 0, 0);
 		break;
