@@ -863,9 +863,16 @@ int
 ct_basis_setup(const char *basisbackup, char **filelist)
 {
 	struct ct_md_gheader	 gh;
+	struct ct_md_header	 hdr;
+	struct ct_md_trailer	 trl;
+	int			 sha_size = -1;
+	off_t			 pos0, pos1;
 	FILE			*xdr_f;
 	char			 cwd[PATH_MAX], **fptr;
 	int			 alldata, nextlvl, i, rooted = 1;
+	uint8_t			 sha[SHA_DIGEST_LENGTH];
+	uint8_t			 csha[SHA_DIGEST_LENGTH];
+	uint8_t			 iv[E_IV_LEN];
 
 	alldata = ct_multilevel_allfiles;
 	xdr_f = ct_metadata_open(basisbackup,  &gh);
@@ -921,6 +928,32 @@ ct_basis_setup(const char *basisbackup, char **filelist)
 		e_free(&gh.cmg_paths);
 	}
 
+	while (ct_read_header(&hdr) == 0 && hdr.cmh_beacon != CT_HDR_EOF) {
+		if (!C_ISREG(hdr.cmh_type))
+			continue;
+		if (hdr.cmh_nr_shas == -1)
+			goto skip;
+		if (sha_size < 0) {
+			pos0 = ftello(xdr_f);
+			if (ct_encrypt_enabled) {
+				if (ct_xdr_dedup_sha_crypto(&xdr, sha,
+				    csha, iv) == FALSE)
+					CFATALX("basis corrupt: can't get sha");
+			} else if (ct_xdr_dedup_sha(&xdr, sha) == FALSE) {
+				CFATALX("basis corrupt: can't get sha");
+			}
+			pos1 = ftello(xdr_f);
+			sha_size = pos1 - pos0;
+			hdr.cmh_nr_shas--;
+		}
+		if (fseek(xdr_f, sha_size * hdr.cmh_nr_shas, SEEK_CUR) != 0)
+			CFATAL("basis corrupt: can't seek to end of shas");
+skip:
+		if (ct_read_trailer(&trl))
+			CFATALX("basis corrupt: can't read trailer");
+	}
+	if (hdr.cmh_beacon != CT_HDR_EOF)
+		CFATALX("basis corrupt: EOF not found");
 	ct_metadata_close(xdr_f);
 
 	return (nextlvl);
