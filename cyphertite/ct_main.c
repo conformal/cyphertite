@@ -555,7 +555,6 @@ out:
 #ifdef notyet
 	e_check_memory();
 #endif
-
 	return (ret);
 }
 
@@ -585,4 +584,7 @@ main(int argc, char *argv[])
 		return (ctctl_main(argc, argv));
 	else
 		CFATALX("invalid executable name");
+
+	/* NOTREACHED */
+	return (0);
 }
