@@ -828,19 +828,20 @@ ct_file_extract_special(struct fnode *fnode)
 	struct timeval          tv[2];
 	char			apath[PATH_MAX];
 	char			*appath;
+	char			ltpath[PATH_MAX];
 
-	snprintf(tpath, sizeof tpath, "%s%s%s",
+	snprintf(ltpath, sizeof ltpath, "%s%s%s",
 	    ct_tdir ? ct_tdir : "", ct_tdir ? "/" : "", fnode->fl_sname);
-	CDBG("special %s mode %d", tpath, fnode->fl_mode);
+	CDBG("special %s mode %d", ltpath, fnode->fl_mode);
 
 	if (C_ISDIR(fnode->fl_type)) {
-		if (mkdir(tpath, 0700) != 0 && errno != EEXIST)  {
-			CWARN("can not create directory %s", tpath);
+		if (mkdir(ltpath, 0700) != 0 && errno != EEXIST)  {
+			CWARN("can not create directory %s", ltpath);
 			return;
 		}
 		/* queue directory mode fixup */
 	} else if (C_ISBLK(fnode->fl_type) || C_ISCHR(fnode->fl_type))  {
-		mknod(tpath, fnode->fl_mode, fnode->fl_dev);
+		mknod(ltpath, fnode->fl_mode, fnode->fl_dev);
 	} else if (C_ISLINK(fnode->fl_type)){
 		if (fnode->fl_hardlink && ct_tdir != NULL) {
 			snprintf(apath, sizeof(apath), "%s/%s", ct_tdir,
@@ -851,14 +852,14 @@ ct_file_extract_special(struct fnode *fnode)
 		}
 
 		if (fnode->fl_hardlink) {
-			if (link(appath, tpath))
-				CWARN("link failed: %s", tpath);
+			if (link(appath, ltpath))
+				CWARN("link failed: %s", ltpath);
 		} else {
-			if (symlink(appath, tpath))
-				CWARN("symlink failed: %s", tpath);
+			if (symlink(appath, ltpath))
+				CWARN("symlink failed: %s", ltpath);
 		}
 	} else {
-		CFATALX("illegal file %s of type %d", tpath, fnode->fl_mode);
+		CFATALX("illegal file %s of type %d", ltpath, fnode->fl_mode);
 	}
 
 	if(C_ISDIR(fnode->fl_type)) {
@@ -883,15 +884,15 @@ ct_file_extract_special(struct fnode *fnode)
 			/* symlinks have no 'real' permissions */
 			if (ct_attr) {
 				/* set the link's ownership */
-				if (lchown(tpath, fnode->fl_uid, fnode->fl_gid)
+				if (lchown(ltpath, fnode->fl_uid, fnode->fl_gid)
 				    == -1) {
 					if (errno == EPERM && geteuid() != 0) {
 						if (ct_verbose)
 							CWARN("lchown failed:"
-							    " %s", tpath);
+							    " %s", ltpath);
 					} else {
 						CFATAL("lchown failed %s",
-						    tpath);
+						    ltpath);
 					}
 				}
 			}
@@ -900,23 +901,23 @@ ct_file_extract_special(struct fnode *fnode)
 			;
 		}
 	} else {
-		if (chmod(tpath, fnode->fl_mode) == -1)
-			CFATAL("chmod failed on %s", tpath);
+		if (chmod(ltpath, fnode->fl_mode) == -1)
+			CFATAL("chmod failed on %s", ltpath);
 
 		if (ct_attr) {
-			if (chown(tpath, fnode->fl_uid, fnode->fl_gid) == -1) {
+			if (chown(ltpath, fnode->fl_uid, fnode->fl_gid) == -1) {
 				if (errno == EPERM && geteuid() != 0) {
 					if (ct_verbose)
 						CWARN("chown failed: %s",
-						    tpath);
+						    ltpath);
 				} else {
-					CFATAL("chown failed %s", tpath);
+					CFATAL("chown failed %s", ltpath);
 				}
 			}
 
 			tv[0].tv_sec = fnode->fl_atime;
 			tv[1].tv_sec = fnode->fl_mtime;
-			if (utimes(tpath, tv) == -1)
+			if (utimes(ltpath, tv) == -1)
 				CFATAL("utimes failed");
 		}
 	}
