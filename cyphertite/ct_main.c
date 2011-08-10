@@ -50,7 +50,6 @@ extern char		*__progname;
 int			ct_debug;
 int			ct_action = 0;
 char			*ct_tdir;
-FILE			*ct_listfile;
 int			ct_strip_slash = 1;
 int			ct_verbose_ratios;
 int			ct_no_cross_mounts;
@@ -83,6 +82,8 @@ char			*ct_compression_type;
 char			*ct_polltype;
 char			*ct_mdmode_str;
 char			*ct_md_cachedir;
+char			*ct_includefile;
+char			*ct_excludefile;
 int			ct_md_mode = CT_MDMODE_LOCAL;
 int			ct_compress_enabled;
 int			ct_encrypt_enabled;
@@ -223,7 +224,8 @@ ct_main(int argc, char **argv)
 		errx(1, "illegal clog flags");
 
 	ct_debug = debug = 0;
-	while ((c = getopt(argc, argv, "B:C:DF:I:PRVXa:cdef:mprtvx0")) != -1) {
+	while ((c = getopt(argc, argv,
+	    "B:C:DE:F:I:PRVXa:cdef:mprtvx0")) != -1) {
 		switch (c) {
 		case 'B':
 			ct_basisbackup = e_strdup(optarg);
@@ -234,13 +236,14 @@ ct_main(int argc, char **argv)
 		case 'D':
 			foreground = 0;
 			break;
+		case 'E':
+			ct_excludefile = e_strdup(optarg);
+			break;
 		case 'F':
 			ct_configfile = optarg;
 			break;
 		case 'I':
-			CFATALX("-I not supported");
-			if ((ct_listfile = fopen(optarg, "r")) == NULL)
-				CFATAL("option I: %s", optarg);
+			ct_includefile = e_strdup(optarg);
 			break;
 		case 'P':
 			ct_strip_slash = 0;

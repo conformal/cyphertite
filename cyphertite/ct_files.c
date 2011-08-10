@@ -51,6 +51,7 @@ struct dir_stat;
 int			 ct_cmp_dirlist(struct dir_stat *, struct dir_stat *);
 struct fnode		*ct_populate_fnode_from_flist(struct flist *);
 const char		*ct_name_to_safename(const char *);
+void			 ct_traverse(char **, int);
 
 RB_HEAD(ct_dir_lookup, dir_stat) ct_dir_rb_head =
     RB_INITIALIZER(&ct_dir_rb_head);
@@ -305,7 +306,7 @@ ct_archive(struct ct_op *op)
 		if (basisbackup != NULL)
 			e_free(&basisbackup);
 
-		ct_traverse(filelist);
+		ct_traverse(filelist, op->op_matchmode);
 
 		/*
 		 * it is possible the first files may have been deleted
@@ -510,12 +511,18 @@ done:
 }
 
 void
-ct_traverse(char **paths)
+ct_traverse(char **paths, int match_mode)
 {
 	FTS			*ftsp;
 	FTSENT			*fe;
-	char			clean[PATH_MAX];
-	int			fts_options;
+	struct ct_match		*include_match = NULL, *exclude_match = NULL;
+	char			 clean[PATH_MAX];
+	int			 fts_options;
+
+	if (ct_includefile)
+		include_match = ct_match_fromfile(ct_includefile, match_mode);
+	if (ct_excludefile)
+		exclude_match = ct_match_fromfile(ct_excludefile, match_mode);
 
 	fts_options = FTS_PHYSICAL | FTS_NOCHDIR;
 	if (ct_no_cross_mounts)
@@ -556,6 +563,20 @@ ct_traverse(char **paths)
 			if (backup_prefix(clean))
 				CFATAL("backup_prefix failed");
 
+		/*
+		 * First check to see if it matches any include file we have
+		 * Then, if it is matched by the exclude file then ignore it
+		 * anyway.
+		 */
+		if (include_match && ct_match(include_match, clean)) {
+			CDBG("failing %s: not in include list", clean);
+			continue;
+		}
+		if (exclude_match && !ct_match(exclude_match, clean)) {
+			CINFO("failing %s: in exclude list", clean);
+			continue;
+		}
+
 		/* backup all other files */
 		if (ct_sched_backup_file(fe->fts_statp, clean))
 			CFATAL("backup_file failed: %s", clean);
@@ -566,6 +587,10 @@ ct_traverse(char **paths)
 		CFATAL("fts_read failed");
 	if (fts_close(ftsp))
 		CFATAL("fts_close failed");
+	if (include_match)
+		ct_match_unwind(include_match);
+	if (exclude_match)
+		ct_match_unwind(exclude_match);
 	gettimeofday(&ct_stats->st_time_scan_end, NULL);
 }
 

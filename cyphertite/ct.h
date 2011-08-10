@@ -50,6 +50,8 @@ extern int		ct_md_mode;
 extern char		*ct_md_cachedir;
 extern int		ct_max_differentials;
 extern char *		__progname;
+extern char		*ct_excludefile;
+extern char		*ct_includefile;
 
 /* crypto */
 #define CT_KEY_LEN		(256>>3)
@@ -64,7 +66,6 @@ extern unsigned char		ct_crypto_key[CT_KEY_LEN];
 void			ct_shutdown(void);
 void			ct_unload_config(void);
 
-void ct_traverse(char **paths);
 void ct_process_input(void *vctx);
 void ct_process_file(void *vctx);
 void ct_process_md(void *vctx);
