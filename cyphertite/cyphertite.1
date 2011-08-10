@@ -26,7 +26,9 @@
 .Op Fl 0PRVXcdemprtvx
 .Op Fl B Ar mdfile
 .Op Fl C Ar tmpdir
+.Op Fl E Ar excludefile
 .Op Fl F Ar conffile  
+.Op Fl I Ar includefile
 .Op Fl f Ar mdfile
 .Op Ar file ...
 .Sh DESCRIPTION
@@ -175,9 +177,20 @@ file and the backup window.
 Set the current working directory.  When extracting, files will be
 extracted into the specified directory; when creating, the specified
 files will be matched from the directory.
+.It Fl E Ar pattern_file
+Specify the location of a file containing a list of patterns to be ignored
+in list, archive and extract modes.
+The patterns, one per line are interpreted as glob patterns unless the -r flag
+is specified.
 .It Fl F Ar config
 Specify the location of the configuration file to use, overriding
 the default values.
+.It Fl I Ar pattern_file
+Specify the location of a file containing a list of patterns to included
+in list, archive and extract modes.
+In list and extract modes it is allowed to specify a list of patterns on
+the command line or this option, not both.
+The file is interpreted as for the -E option.
 .It Fl P
 Do not strip leading slashes
 .Pq Sq /
