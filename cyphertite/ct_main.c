@@ -42,12 +42,12 @@ __attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 __attribute__((__unused__)) static const char *vertag = "version: " CT_VERSION;
 
 int			ct_load_config(struct ct_settings *);
-void			usage(void);
+void			ct_usage(void);
 
 extern char		*__progname;
 
 /* command line flags */
-int			ct_debug;
+int			ct_debug = 0;
 int			ct_action = 0;
 char			*ct_tdir;
 int			ct_strip_slash = 1;
@@ -58,11 +58,11 @@ char			*ct_configfile;
 int			ct_attr;
 
 /* runtime */
+int			cflags;
 unsigned char		ct_iv[CT_IV_LEN];
 unsigned char		ct_crypto_key[CT_KEY_LEN];
 char			*secrets_file_pattern[] =
 			    { "^[[:digit:]]+-crypto.secrets", NULL };
-
 
 /* config */
 int			ct_max_trans = 100;
@@ -122,9 +122,9 @@ struct ct_settings	settings[] = {
 };
 
 void
-usage(void)
+ct_usage(void)
 {
-	fprintf(stderr, "%s {-ctxV} [-0BCDFPRXabdpv] -f <archive> [filelist]\n",
+	fprintf(stderr, "%s {-ctxV} [-0BCDEFIPRXademprv] -f <archive> [filelist]\n",
 	    __progname);
 	exit(1);
 }
@@ -212,8 +212,6 @@ ct_main(int argc, char **argv)
 	int		ct_metadata = 0;
 	int		ct_match_mode = CT_MATCH_GLOB;
 	int		c;
-	int		cflags;
-	int		debug;
 	int		foreground = 1;
 	int		ret = 0;
 	int		level0 = 0;
@@ -221,12 +219,6 @@ ct_main(int argc, char **argv)
 
 	ct_savecore();
 
-	clog_init(1);
-	cflags = CLOG_F_ENABLE | CLOG_F_STDERR;
-	if (clog_set_flags(cflags))
-		errx(1, "illegal clog flags");
-
-	ct_debug = debug = 0;
 	while ((c = getopt(argc, argv,
 	    "B:C:DE:F:I:PRVXa:cdef:mprtvx0")) != -1) {
 		switch (c) {
@@ -270,7 +262,7 @@ ct_main(int argc, char **argv)
 			ct_action = CT_A_ARCHIVE;
 			break;
 		case 'd':
-			ct_debug = debug = 1;
+			ct_debug = 1;
 			cflags |= CLOG_F_DBGENABLE | CLOG_F_FILE | CLOG_F_FUNC |
 			    CLOG_F_LINE | CLOG_F_DTIME;
 			exude_enable();
@@ -310,7 +302,7 @@ ct_main(int argc, char **argv)
 			ct_auto_differential = 0; /* force differential off */
 			break;
 		default:
-			usage();
+			ct_usage();
 			/* NOTREACHED */
 		}
 	}
@@ -346,7 +338,7 @@ ct_main(int argc, char **argv)
 
 	if (ct_mfile == NULL && !(ct_metadata && ct_action == CT_A_LIST)) {
 		CWARNX("archive file is required");
-		usage();
+		ct_usage();
 	}
 
 	/* please don't delete this line AGAIN! --mp */
@@ -384,7 +376,7 @@ ct_main(int argc, char **argv)
 		errx(1, "illegal clog flags");
 
 	if (!foreground)
-		if (daemon(1, debug) == -1)
+		if (daemon(1, ct_debug) == -1)
 			errx(1, "failed to daemonize");
 
 	if (level0)
@@ -486,7 +478,7 @@ ct_main(int argc, char **argv)
 			break;
 		default:
 			CWARNX("invalid action");
-			usage();
+			ct_usage();
 			/* NOTREACHED */
 			break;
 		}
@@ -511,7 +503,7 @@ ct_main(int argc, char **argv)
 			break;
 		default:
 			CWARNX("must specify action");
-			usage();
+			ct_usage();
 			/* NOTREACHED */
 			break;
 		}
@@ -529,7 +521,7 @@ ct_main(int argc, char **argv)
 		case CT_A_ERASE:
 		default:
 			CWARNX("must specify action");
-			usage();
+			ct_usage();
 			break;
 		}
 	}
@@ -561,16 +553,39 @@ out:
 int
 ctctl_main(int argc, char *argv[])
 {
+	int		c;
+
+	while ((c = getopt(argc, argv, "d")) != -1) {
+		switch (c) {
+		case 'd':
+			ct_debug = 1;
+			cflags |= CLOG_F_DBGENABLE | CLOG_F_FILE | CLOG_F_FUNC |
+			    CLOG_F_LINE | CLOG_F_DTIME;
+			exude_enable();
+			break;
+		default:
+			CWARNX("must specify action");
+			ct_usage();
+			/* NOTREACHED */
+			break;
+		}
+	}
+
+	/* please don't delete this line AGAIN! --mp */
+	if (clog_set_flags(cflags))
+		errx(1, "illegal clog flags");
+
 	return (EINVAL);
 }
 
 int
 main(int argc, char *argv[])
 {
-	char *executablepath, *executablename;
+	char		*executablepath, *executablename;
 
 	clog_init(1);
-	if (clog_set_flags(CLOG_F_ENABLE | CLOG_F_STDERR))
+	cflags = CLOG_F_ENABLE | CLOG_F_STDERR;
+	if (clog_set_flags(cflags))
 		errx(1, "illegal clog flags");
 
 	executablepath = strdup(argv[0]);
