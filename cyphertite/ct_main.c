@@ -315,6 +315,11 @@ ct_main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
+	if ((ct_action == CT_A_LIST || ct_action == CT_A_EXTRACT) &&
+	    ct_includefile != NULL && argc != 0)
+		CFATALX("-I is invalid when a pattern is provided on "
+		    "the command line");
+
 	/* Generate config file if one doesn't exist and there are no params. */
 	if (ct_load_config(settings)) {
 		if ((argc + optind) == 1) {

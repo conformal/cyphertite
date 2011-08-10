@@ -340,7 +340,7 @@ ct_list(const char *file, char **flist, int match_mode)
 	struct ct_md_trailer	trl;
 	struct fnode		fnodestore;
 	struct fnode		*fnode = &fnodestore;
-	struct ct_match		*match;
+	struct ct_match		*match, *ex_match = NULL;
 	int			state;
 	int			doprint;
 
@@ -354,7 +354,12 @@ ct_list(const char *file, char **flist, int match_mode)
 	char			shat[SHA_DIGEST_STRING_LENGTH];
 	char			*ct_next_filename;
 
-	match = ct_match_compile(match_mode, flist);
+	if (ct_includefile != NULL)
+		match = ct_match_fromfile(ct_includefile, match_mode);
+	else
+		match = ct_match_compile(match_mode, flist);
+	if (ct_excludefile != NULL)
+		ex_match = ct_match_fromfile(ct_excludefile, match_mode);
 
 	ct_verbose++;	/* by default print something. */
 
@@ -375,6 +380,9 @@ next_file:
 
 	while (ret == 0 && hdr.cmh_beacon != CT_HDR_EOF) {
 		doprint = !ct_match(match, hdr.cmh_filename);
+		if (doprint && ex_match != NULL &&
+		    !ct_match(ex_match, hdr.cmh_filename))
+			doprint = 0;
 		ct_populate_fnode(fnode, &hdr, &state);
 
 		if (doprint )
@@ -646,25 +654,41 @@ ct_metadata_open_next()
 	return xdr_f;
 }
 
+struct ct_extract_priv {
+	struct ct_match	*inc_match;
+	struct ct_match	*ex_match;
+};
+
 void
 ct_extract(struct ct_op *op)
 {
 	const char		*mfile = op->op_local_fname;
 	char			**filelist = op->op_filelist;
 	int			 match_mode = op->op_matchmode;
-	struct ct_match		*match = op->op_priv;
 	struct fnode		*fnode;
 	struct ct_md_header	hdr;
 	struct ct_md_trailer	trl;
+	struct ct_extract_priv	*ex_priv = op->op_priv;
 	int			ret;
 	struct ct_trans		*trans;
 	char			shat[SHA_DIGEST_STRING_LENGTH];
 
 	CDBG("entry");
 	if (ct_state->ct_file_state == CT_S_STARTING) {
-		if (match == NULL) {
-			match = ct_match_compile(match_mode, filelist);
-			op->op_priv = match;
+		if (ex_priv == NULL) {
+			ex_priv = e_calloc(1, sizeof(*ex_priv));
+			if (ct_includefile != NULL)
+				ex_priv->inc_match =
+				    ct_match_fromfile(ct_includefile,
+				    match_mode);
+			else
+				ex_priv->inc_match =
+				    ct_match_compile(match_mode, filelist);
+			if (ct_excludefile != NULL)
+				ex_priv->ex_match =
+				    ct_match_fromfile(ct_excludefile,
+				    match_mode);
+			op->op_priv = ex_priv;
 		}
 		ct_extract_setup(mfile);
 	} else if (ct_state->ct_file_state == CT_S_FINISHED) {
@@ -699,7 +723,11 @@ ct_extract(struct ct_op *op)
 					/* poke file into action */
 					ct_wakeup_file();
 				} else {
-					ct_match_unwind(match);
+					ct_match_unwind(ex_priv->inc_match);
+					if (ex_priv->ex_match)
+						ct_match_unwind(
+						    ex_priv->ex_match);
+					e_free(&ex_priv);
 					op->op_priv = NULL;
 					trans->tr_state = TR_S_DONE;
 					trans->tr_trans_id = ct_trans_id++;
@@ -712,7 +740,11 @@ ct_extract(struct ct_op *op)
 				CFATALX("invalid archive");
 			}
 
-			ct_doextract = !ct_match(match, hdr.cmh_filename);
+			ct_doextract = !ct_match(ex_priv->inc_match,
+			    hdr.cmh_filename);
+			if (ct_doextract && ex_priv->ex_match != NULL &&
+			    !ct_match(ex_priv->ex_match, hdr.cmh_filename))
+				ct_doextract = 0;
 
 			if (C_ISREG(hdr.cmh_type)) {
 				ct_num_shas = hdr.cmh_nr_shas;
