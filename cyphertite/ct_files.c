@@ -718,6 +718,8 @@ s_to_e_type(int mode)
 void
 ct_file_extract_open(struct fnode *fnode)
 {
+	char		dirpath[PATH_MAX], *dirp;
+	int		tries = 0;
 	/*
 	 * XXX - this should open a temporary file and rename
 	 * XXX - on EX_FILE_END
@@ -730,18 +732,23 @@ ct_file_extract_open(struct fnode *fnode)
 	    ct_tdir ? ct_tdir : "", ct_tdir ? "/" : "", fnode->fl_sname);
 	ct_ex_curnode = fnode;
 
-	ct_extract_fd = open(tpath, O_WRONLY|O_CREAT|O_TRUNC, 0600);
-	if (ct_extract_fd == -1) {
+	strlcpy(dirpath, tpath, sizeof(dirpath));
+	if ((dirp = dirname(dirpath)) == NULL)
+		CFATALX("can't get dirname of secrets file");
+	if (fnode->fl_fname)
+		e_free(&fnode->fl_fname);
+	e_asprintf(&fnode->fl_fname, "%s/%s", dirp, "cyphertite.XXXXXXXXXX");
+again:
+	if ((ct_extract_fd = mkstemp(fnode->fl_fname)) == -1) {
 		/*
 		 * with -C or regex we may not have dependant directories in
 		 * our list of paths to operate on. ENOENT here means we're
 		 * lacking one of the path elements, so try to recursively
 		 * create the directory.
 		 */
-		if (errno == ENOENT && ct_make_full_path(tpath, 0777) == 0 &&
-		    (ct_extract_fd = open(tpath,
-		    O_WRONLY|O_CREAT|O_TRUNC, 0600)) != -1)
-			return;
+		if (errno == ENOENT && tries++ == 0 &&
+		    ct_make_full_path(tpath, 0777) == 0)
+			goto again;
 		CFATAL("unable to open file for writing %s", tpath);
 	}
 }
@@ -763,7 +770,6 @@ ct_file_extract_close(struct fnode *fnode)
 {
 	struct timeval          tv[2];
 
-	/* XXX - rename */
 	if (fchmod(ct_extract_fd, fnode->fl_mode) == -1)
 		CFATAL("chmod failed on %s", tpath);
 
@@ -782,6 +788,9 @@ ct_file_extract_close(struct fnode *fnode)
 		if (futimes(ct_extract_fd, tv) == -1)
 			CFATAL("utimes failed");
 	}
+	if (rename(fnode->fl_fname, tpath) != 0)
+		CFATAL("rename to %s failed", tpath);
+
 	close(ct_extract_fd);
 	e_free(&fnode);
 	ct_ex_curnode = NULL;
