@@ -61,6 +61,10 @@ const EVP_CIPHER *EVP_aes_xts(void);
 #define C_F_HMACMASKKEY_LEN	(strlen(C_F_HMACMASKKEY))
 #define C_F_DIGEST		("digest = ")
 #define C_F_DIGEST_LEN		(strlen(C_F_DIGEST))
+#define C_F_VERSION		("version = ")
+#define C_F_VERSION_LEN		(strlen(C_F_VERSION))
+
+#define C_FILE_VERSION		(1)
 
 int	ct_crypto_init(EVP_CIPHER_CTX *, const EVP_CIPHER *, uint8_t *, size_t,
 	    uint8_t *, size_t, int);
@@ -306,8 +310,8 @@ ct_create_secrets(char *passphrase, char *filename, uint8_t *myaeskey,
 	uint8_t			e_maskkey[C_PWDKEY_LEN + 16];
 	uint8_t			hmac_maskkey[SHA256_DIGEST_LENGTH];
 	uint8_t			digest[SHA512_DIGEST_LENGTH];
-	uint32_t		rounds;
-	uint32_t		rounds_save;
+	uint32_t		rounds, f_version;
+	uint32_t		rounds_save, f_version_save;
 	int			tot;
 	HMAC_CTX		hctx;
 	SHA512_CTX		ctx;
@@ -347,6 +351,11 @@ ct_create_secrets(char *passphrase, char *filename, uint8_t *myaeskey,
 	bzero(hmac_maskkey, sizeof hmac_maskkey);
 
 	/* step 0 */
+	f_version = C_FILE_VERSION;
+	f_version_save = htonl(f_version);
+	ct_fprintfhex(f, C_F_VERSION, (uint8_t *)&f_version_save,
+	    sizeof f_version_save);
+
 	rounds = C_ROUNDS;
 	rounds_save = htonl(rounds);
 	ct_fprintfhex(f, C_F_ROUNDS, (uint8_t *)&rounds_save,
@@ -407,7 +416,8 @@ ct_create_secrets(char *passphrase, char *filename, uint8_t *myaeskey,
 
 	/* hash it all */
 	SHA512_Init(&ctx);
-	SHA512_Update(&ctx, &rounds, sizeof rounds);
+	SHA512_Update(&ctx, &rounds_save, sizeof rounds_save);
+	SHA512_Update(&ctx, &f_version_save, sizeof f_version_save);
 	SHA512_Update(&ctx, salt, sizeof salt);
 	SHA512_Update(&ctx, e_aeskey, sizeof e_aeskey);
 	SHA512_Update(&ctx, e_ivkey, sizeof e_ivkey);
@@ -451,6 +461,7 @@ int
 ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
     size_t outaeskeylen, uint8_t *outivkey, size_t outivkeylen)
 {
+	char			old_crypto_secrets[PATH_MAX];
 	uint8_t			salt[C_SALT_LEN];
 	uint8_t			e_aeskey[CT_KEY_LEN + 16];
 	uint8_t			e_ivkey[CT_IV_LEN + 16];
@@ -461,8 +472,8 @@ ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
 	uint8_t			aeskey[CT_KEY_LEN], ivkey[CT_IV_LEN + 16];
 	uint8_t			digest[SHA512_DIGEST_LENGTH];
 	uint8_t			digest_v[SHA512_DIGEST_LENGTH];
-	uint32_t		rounds = 0;
-	uint32_t		rounds_load = 0;
+	uint32_t		rounds = 0, f_version = 0;
+	uint32_t		rounds_load = 0, f_version_load = 0;
 	char			pwd[PASS_MAX], *p;
 	char			line[1024], *s;
 	FILE			*f;
@@ -543,6 +554,14 @@ ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
 				goto done;
 			}
 			got_digest = 1;
+		} else if (!strncmp(line, C_F_VERSION,
+		    C_F_VERSION_LEN)) {
+			s = line + C_F_VERSION_LEN;
+			if (ct_fscanfhex(s, (uint8_t *)&f_version_load,
+			    sizeof f_version_load)) {
+				CDBG("invalid version");
+				goto done;
+			}
 		} else {
 			CWARNX("invalid entry in secrets file");
 			goto done;
@@ -555,33 +574,63 @@ ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
 		CDBG("invalid rounds");
 		goto done;
 	}
+	f_version = ntohl(f_version_load);
 
-	/* hash it all */
-	SHA512_Init(&ctx);
-	SHA512_Update(&ctx, &rounds, sizeof rounds);
-	SHA512_Update(&ctx, salt, sizeof salt);
-	SHA512_Update(&ctx, e_aeskey, sizeof e_aeskey);
-	SHA512_Update(&ctx, e_ivkey, sizeof e_ivkey);
-	SHA512_Update(&ctx, e_maskkey, sizeof e_maskkey);
-	SHA512_Update(&ctx, hmac_maskkey, sizeof hmac_maskkey);
-	SHA512_Final(digest_v, &ctx);
+	/*
+	 * version check of the file
+	 *
+	 * Initial version: does not have file digest
+	 * Next version   : does have file digest but no file version
+	 * V1             : current version
+	 */
 
-	/* update digest if we don't have it; this needs to go away over time */
-	if (got_digest == 0) {
-		bcopy(digest_v, digest, sizeof digest);
-		CDBG("adding digest to secrets file");
-		if (fstat(fileno(f), &sb) == -1)
-			CFATAL("stat");
-		if (fchmod(fileno(f), S_IRWXU) == -1)
-			CFATAL("fchmod");
-		/* the race can bite me, everything else is worse */
-		if (freopen(filename, "r+", f) == NULL)
-			CFATAL("freopen");
-		if (fseek(f, 0, SEEK_END) == -1)
-			CFATAL("fseek");
-		ct_fprintfhex(f, C_F_DIGEST, digest, sizeof digest);
-		if (fchmod(fileno(f), sb.st_mode) == -1)
-			CFATAL("fchmod");
+	/* we assume that version <= 0 ALSO handles the got_digest == 0 case */
+	if (f_version <= 0) {
+		SHA512_Init(&ctx);
+		SHA512_Update(&ctx, &rounds, sizeof rounds);
+		SHA512_Update(&ctx, salt, sizeof salt);
+		SHA512_Update(&ctx, e_aeskey, sizeof e_aeskey);
+		SHA512_Update(&ctx, e_ivkey, sizeof e_ivkey);
+		SHA512_Update(&ctx, e_maskkey, sizeof e_maskkey);
+		SHA512_Update(&ctx, hmac_maskkey, sizeof hmac_maskkey);
+		SHA512_Final(digest_v, &ctx);
+
+		/*
+		 * update digest if we don't have it;
+		 * this needs to go away over time
+		 */
+		if (got_digest == 0) {
+			bcopy(digest_v, digest, sizeof digest);
+			CDBG("adding digest to secrets file");
+			if (fstat(fileno(f), &sb) == -1)
+				CFATAL("stat");
+			if (fchmod(fileno(f), S_IRWXU) == -1)
+				CFATAL("fchmod");
+			/* the race can bite me, everything else is worse */
+			if (freopen(filename, "r+", f) == NULL)
+				CFATAL("freopen");
+			if (fseek(f, 0, SEEK_END) == -1)
+				CFATAL("fseek");
+			ct_fprintfhex(f, C_F_DIGEST, digest, sizeof digest);
+			if (fchmod(fileno(f), sb.st_mode) == -1)
+				CFATAL("fchmod");
+		}
+
+		if (bcmp(digest, digest_v, sizeof digest)) {
+			CWARNX("corrupt secrets file");
+			goto done;
+		}
+	} else {
+		/* the final else must always be the CURRENT path */
+		SHA512_Init(&ctx);
+		SHA512_Update(&ctx, &rounds_load, sizeof rounds_load);
+		SHA512_Update(&ctx, &f_version_load, sizeof f_version_load);
+		SHA512_Update(&ctx, salt, sizeof salt);
+		SHA512_Update(&ctx, e_aeskey, sizeof e_aeskey);
+		SHA512_Update(&ctx, e_ivkey, sizeof e_ivkey);
+		SHA512_Update(&ctx, e_maskkey, sizeof e_maskkey);
+		SHA512_Update(&ctx, hmac_maskkey, sizeof hmac_maskkey);
+		SHA512_Final(digest_v, &ctx);
 	}
 
 	if (bcmp(digest, digest_v, sizeof digest)) {
@@ -638,6 +687,15 @@ ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
 		goto done;
 	}
 
+	if (f_version <= 0) {
+		/* rewrite file */
+		snprintf(old_crypto_secrets, sizeof old_crypto_secrets, "%s~",
+		    ct_crypto_secrets);
+
+		if (rename(ct_crypto_secrets, old_crypto_secrets))
+			CFATAL("%s", ct_crypto_secrets);
+		ct_create_secrets(p, ct_crypto_secrets, aeskey, ivkey);
+	}
 
 	bcopy(aeskey, outaeskey, outaeskeylen);
 	bcopy(ivkey, outivkey, outivkeylen);

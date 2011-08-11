@@ -308,6 +308,10 @@ ct_main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
+	/* please don't delete this line AGAIN! --mp */
+	if (clog_set_flags(cflags))
+		errx(1, "illegal clog flags");
+
 	if ((ct_action == CT_A_LIST || ct_action == CT_A_EXTRACT)) {
 		if (ct_includefile != NULL) {
 			if (argc != 0)
@@ -338,10 +342,6 @@ ct_main(int argc, char **argv)
 		CWARNX("archive file is required");
 		ct_usage();
 	}
-
-	/* please don't delete this line AGAIN! --mp */
-	if (clog_set_flags(cflags))
-		errx(1, "illegal clog flags");
 
 	/* Run with restricted umask as we create numerous sensitive files. */
 	umask(S_IRWXG|S_IRWXO);
