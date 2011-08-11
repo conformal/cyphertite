@@ -31,6 +31,7 @@
 #define CT_VERSION_PATCH	2
 #define CT_VERSION		"0.3.2"
 
+extern int		cflags;
 extern int		ct_debug;
 extern int		ct_compress_enabled;
 extern int		ct_encrypt_enabled;
@@ -49,8 +50,10 @@ extern int		md_backup_fd;
 extern int		ct_md_mode;
 extern char		*ct_md_cachedir;
 extern int		ct_max_differentials;
-extern char *		__progname;
+extern char		*__progname;
 extern char		*ct_includefile;
+extern char		*ct_crypto_password;
+extern char		*ct_configfile;
 
 /* crypto */
 #define CT_KEY_LEN		(256>>3)
@@ -59,27 +62,30 @@ extern char		*ct_includefile;
 extern unsigned char		ct_iv[CT_IV_LEN];
 extern unsigned char		ct_crypto_key[CT_KEY_LEN];
 
+extern struct ct_settings	settings[];
+
 #define CT_ALLOC_NORMAL		(0)
 #define CT_ALLOC_CLEAR		(1)
 
 void			ct_shutdown(void);
 void			ct_unload_config(void);
 
-void ct_process_input(void *vctx);
-void ct_process_file(void *vctx);
-void ct_process_md(void *vctx);
-void ct_compute_sha(void *vctx);
-void ct_compute_compress(void *vctx);
-void ct_compute_encrypt(void *vctx);
-void ct_compute_csha(void *vctx);
-void ct_process_completions(void *vctx);
+int			ct_load_config(struct ct_settings *);
+void			ct_process_input(void *);
+void			ct_process_file(void *);
+void			ct_process_md(void *);
+void			ct_compute_sha(void *);
+void			ct_compute_compress(void *);
+void			ct_compute_encrypt(void *);
+void			ct_compute_csha(void *);
+void			ct_process_completions(void *);
 
 struct fnode;
 
 RB_HEAD(fl_tree, flist);
 
 struct fnode {
-//	TAILQ_ENTRY(fnode)	fl_list;
+	/* TAILQ_ENTRY(fnode)	fl_list; */
 	char			*fl_hlname;
 	int			fl_hardlink;
 	dev_t			fl_dev;
