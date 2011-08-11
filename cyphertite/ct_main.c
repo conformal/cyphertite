@@ -105,7 +105,7 @@ struct ct_settings	settings[] = {
 	{ "cert", CT_S_DIR, NULL, &ct_cert, NULL, NULL },
 	{ "key", CT_S_DIR, NULL, &ct_key, NULL, NULL },
 	{ "crypto_secrets", CT_S_DIR, NULL, &ct_crypto_secrets, NULL, NULL },
-	{ "crypto_password", CT_S_STR, NULL, &ct_crypto_password, NULL, NULL },
+	{ "crypto_password", CT_S_STR, NULL, &ct_crypto_password, NULL, NULL }, /* name may NOT be modified */
 	{ "session_compression", CT_S_STR, NULL, &ct_compression_type, NULL,
 	    NULL },
 	{ "polltype", CT_S_STR, NULL, &ct_polltype, NULL, NULL },
@@ -185,8 +185,7 @@ ct_load_config(struct ct_settings *settings)
 			break;
 		}
 		if (ct_config_parse(settings, config_path) == 0) {
-			if (config_path != NULL)
-				e_free(&config_path);
+			ct_configfile = config_path;
 			break;
 		}
 		config_try++;
@@ -234,7 +233,7 @@ ct_main(int argc, char **argv)
 			ct_excludefile = e_strdup(optarg);
 			break;
 		case 'F':
-			ct_configfile = optarg;
+			ct_configfile = e_strdup(optarg);
 			break;
 		case 'I':
 			ct_includefile = e_strdup(optarg);
@@ -544,6 +543,9 @@ out:
 		ct_mdcache_trim(ct_md_cachedir, ct_max_mdcache_size);
 
 #ifdef notyet
+	if (ct_configfile != NULL)
+		e_free(&ct_configfile);
+
 	e_check_memory();
 #endif
 	return (ret);
