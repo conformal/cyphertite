@@ -407,7 +407,7 @@ ct_create_secrets(char *passphrase, char *filename, uint8_t *myaeskey,
 
 	/* hash it all */
 	SHA512_Init(&ctx);
-	SHA512_Update(&ctx, &rounds_save, sizeof rounds_save);
+	SHA512_Update(&ctx, &rounds, sizeof rounds);
 	SHA512_Update(&ctx, salt, sizeof salt);
 	SHA512_Update(&ctx, e_aeskey, sizeof e_aeskey);
 	SHA512_Update(&ctx, e_ivkey, sizeof e_ivkey);
@@ -558,7 +558,7 @@ ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
 
 	/* hash it all */
 	SHA512_Init(&ctx);
-	SHA512_Update(&ctx, &rounds_load, sizeof rounds);
+	SHA512_Update(&ctx, &rounds, sizeof rounds);
 	SHA512_Update(&ctx, salt, sizeof salt);
 	SHA512_Update(&ctx, e_aeskey, sizeof e_aeskey);
 	SHA512_Update(&ctx, e_ivkey, sizeof e_ivkey);
