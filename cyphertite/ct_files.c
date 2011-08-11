@@ -835,7 +835,7 @@ ct_file_extract_special(struct fnode *fnode)
 	CDBG("special %s mode %d", ltpath, fnode->fl_mode);
 
 	if(C_ISDIR(fnode->fl_type)) {
-		mkdir(tpath, 0700);
+		mkdir(ltpath, 0700);
 	} else if (C_ISBLK(fnode->fl_type) || C_ISCHR(fnode->fl_type))  {
 		mknod(ltpath, fnode->fl_mode, fnode->fl_dev);
 	} else if (C_ISLINK(fnode->fl_type)){
