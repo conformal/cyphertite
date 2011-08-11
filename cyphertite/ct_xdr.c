@@ -863,7 +863,7 @@ int
 ct_basis_setup(const char *basisbackup, char **filelist)
 {
 	struct ct_md_gheader	 gh;
-	struct ct_md_header	 hdr;
+	struct ct_md_header	 hdr, hdr2;
 	struct ct_md_trailer	 trl;
 	int			 sha_size = -1;
 	off_t			 pos0, pos1;
@@ -929,6 +929,10 @@ ct_basis_setup(const char *basisbackup, char **filelist)
 	}
 
 	while (ct_read_header(&hdr) == 0 && hdr.cmh_beacon != CT_HDR_EOF) {
+		if (C_ISLINK(hdr.cmh_type)) {
+			if (ct_read_header(&hdr2))
+				CFATALX("basis corrupt: couldn't read link");
+		}
 		if (!C_ISREG(hdr.cmh_type))
 			continue;
 		if (hdr.cmh_nr_shas == -1)
