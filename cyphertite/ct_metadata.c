@@ -780,6 +780,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 			ct_shutdown();
 		}
 	} else if (strcmp(xe->name, "ct_md_close") == 0) {
+		md_is_open = 0;
 		trans->tr_state = TR_S_DONE;
 	} else if (strcmp(xe->name, "ct_md_list") == 0) {
 		struct md_list_file	*file;
