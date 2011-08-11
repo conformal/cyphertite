@@ -38,10 +38,6 @@
 
 __attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
-int		ct_get_answer(char *, char *, char *, char *, char *, size_t,
-		    int);
-int		ct_prompt_password(char *, char *, size_t, char *, size_t);
-
 struct flist_head	fl_list_head = TAILQ_HEAD_INITIALIZER(fl_list_head);
 struct fnode		*fl_curnode;
 struct flist		*fl_lcurnode;
@@ -1179,7 +1175,7 @@ ct_create_config(void)
 
 			if (strlen(answer)) {
 				crypto_password = strdup(answer);
-				if (password == NULL)
+				if (crypto_password == NULL)
 					CFATALX("strdup");
 			}
 		}

@@ -550,3 +550,9 @@ char                    *ct_find_md_for_archive(const char *);
 int			 md_is_in_cache(const char *);
 void			 ct_complete_metadata(struct ct_trans *);
 void			 ct_mdcache_trim(const char *, long long);
+
+/* misc */
+int			ct_get_answer(char *, char *, char *, char *, char *,
+			    size_t, int);
+int			ct_prompt_password(char *, char *, size_t, char *,
+			    size_t);
