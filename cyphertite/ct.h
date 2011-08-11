@@ -265,7 +265,7 @@ typedef void (ct_op_cb)(struct ct_op *);
 struct ct_op {
 	TAILQ_ENTRY(ct_op)	 op_link;
 	ct_op_cb		*op_start;
-	ct_op_cb		*op_complete;	
+	ct_op_cb		*op_complete;
 	char			*op_local_fname;
 	char			**op_filelist;
 	char			**op_excludelist;
@@ -410,7 +410,7 @@ struct ct_md_gheader {
 #define CT_MD_MLB_ALLFILES	(2)
 	char			*cmg_prevlvl_filename;
 	int			cmg_cur_lvl;
-	char 			*cmg_cwd;
+	char			*cmg_cwd;
 	int			cmg_num_paths;
 	char			**cmg_paths;
 };
