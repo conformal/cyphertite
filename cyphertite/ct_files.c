@@ -315,9 +315,6 @@ ct_archive(struct ct_op *op)
 			if (fl_curnode == NULL)
 				fl_lcurnode = TAILQ_NEXT(fl_lcurnode, fl_list);
 		} while (fl_lcurnode != NULL && fl_curnode == NULL);
-
-		CINFO("num files %" PRIu64, ct_stats->st_files_scanned);
-
 	} else if (ct_state->ct_file_state == CT_S_FINISHED)
 		return;
 
