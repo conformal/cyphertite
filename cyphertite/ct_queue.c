@@ -1259,7 +1259,6 @@ ct_compute_compress(void *vctx)
 		len = trans->tr_size[slot];
 		dst =  trans->tr_data[!slot];
 
-		trans->hdr.c_flags &= C_HDR_F_COMPRESSED_MASK;
 		if (compress) {
 			/*
 			 * XXX - we dont want compression to grow buffer so
@@ -1276,6 +1275,8 @@ ct_compute_compress(void *vctx)
 			}
 			if (rv == 0)
 				trans->hdr.c_flags |= ncompmode;
+			else
+				trans->hdr.c_flags &= C_HDR_F_COMPRESSED_MASK;
 			ct_stats->st_bytes_compressed += newlen;
 			ct_stats->st_bytes_uncompressed += trans->tr_chsize;
 		} else {
