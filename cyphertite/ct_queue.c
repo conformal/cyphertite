@@ -1276,7 +1276,6 @@ ct_compute_compress(void *vctx)
 			}
 			if (rv == 0)
 				trans->hdr.c_flags |= ncompmode;
-			}
 			ct_stats->st_bytes_compressed += newlen;
 			ct_stats->st_bytes_uncompressed += trans->tr_chsize;
 		} else {
