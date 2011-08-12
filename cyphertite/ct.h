@@ -350,6 +350,7 @@ void ct_setup_wakeup_write(void *, ct_func_cb *);
 void ct_setup_wakeup_complete(void *, ct_func_cb *);
 void ct_set_reconnect_timeout(void (*)(int, short, void*), void *,
     int);
+extern int ct_reconnect_pending;
 
 msgdeliver_ty			ct_handle_msg;
 msgcomplete_ty			ct_write_done;
@@ -516,6 +517,7 @@ struct ct_stat {
 void			ct_dump_stats(FILE *);
 struct ct_assl_io_ctx	*ct_ssl_connect(int);
 void			ct_reconnect(int, short, void *);
+int			ct_reconnect_internal(void);
 void			ct_load_certs(struct assl_context *);
 int			ct_assl_negotiate_poll(struct ct_assl_io_ctx *);
 void			ct_setup_write_md(const char *, int, const char *, int,
