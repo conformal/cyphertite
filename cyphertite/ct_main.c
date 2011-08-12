@@ -91,7 +91,7 @@ int			ct_multilevel_allfiles;
 int			ct_auto_differential;
 long long		ct_max_mdcache_size = LLONG_MAX; /* unbounded */
 int			ct_max_differentials;
-int			ct_secrets_upload = 1; /* XXX RT#1151 */
+int			ct_secrets_upload = 0; /* XXX RT#1151 */
 
 struct ct_settings	settings[] = {
 	{ "queue_depth", CT_S_INT, &ct_max_trans, NULL, NULL, NULL },

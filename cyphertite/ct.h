@@ -234,7 +234,6 @@ extern int		ct_action;
 #define CT_A_LIST	(2)
 #define CT_A_EXTRACT	(3)
 #define CT_A_ERASE	(4)
-#define CT_A_SECRETS	(5)
 
 /* assl */
 void ct_setup_assl(void);

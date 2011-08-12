@@ -164,7 +164,7 @@ loop:
 		ct_trans->tr_eof = 1;
 		ct_trans->tr_trans_id = ct_trans_id++;
 		CDBG("setting eof on trans %" PRIu64, ct_trans->tr_trans_id);
-		ct_trans->hdr.c_flags = C_HDR_F_METADATA | ct_cur_compress_mode;
+		ct_trans->hdr.c_flags = C_HDR_F_METADATA;
 		ct_trans->tr_md_name = mdname;
 		ct_queue_transfer(ct_trans);
 		return;
@@ -190,13 +190,7 @@ loop:
 	ct_trans->tr_type = TR_T_WRITE_CHUNK;
 	ct_trans->tr_trans_id = ct_trans_id++;
 	ct_trans->tr_eof = 0;
-	if (op->op_action == CT_A_SECRETS) {
-		/* secrets upload disable compression/encryption. */
-
-		ct_trans->hdr.c_flags = C_HDR_F_METADATA;
-	} else {
-		ct_trans->hdr.c_flags = C_HDR_F_METADATA | ct_cur_compress_mode;
-	}
+	ct_trans->hdr.c_flags = C_HDR_F_METADATA;
 	ct_trans->hdr.c_ex_status = 2; /* we handle new metadata protocol */
 	ct_trans->tr_md_chunkno = md_block_no;
 	ct_trans->tr_md_name = mdname;
@@ -1370,8 +1364,7 @@ check_local:
 			e_free(&remote_name);
 		e_asprintf(&remote_name, "%020lld-crypto.secrets", local_mtime);
 		ct_add_operation_after(op, ct_md_archive, ct_secrets_unlock,
-		    current_secrets, remote_name, NULL, NULL, NULL, 0,
-		        CT_A_SECRETS);
+		    current_secrets, remote_name, NULL, NULL, NULL, 0, 0);
 	} else { /* mtime > local_mtime */
 		CDBG("downloading remote file");
 		strlcpy(dir, current_secrets, sizeof(dir));

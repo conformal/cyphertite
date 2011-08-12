@@ -425,11 +425,7 @@ loop:
 	ct_trans->tr_type = TR_T_WRITE_CHUNK;
 	ct_trans->tr_trans_id = ct_trans_id++;
 	ct_trans->tr_eof = 0;
-	if (ct_compress_enabled) {
-		ct_trans->hdr.c_flags = ct_cur_compress_mode;
-	} else {
-		ct_trans->hdr.c_flags = 0;
-	}
+	ct_trans->hdr.c_flags = 0;
 	CDBG("read %zd for block %" PRIu64, rlen, ct_trans->tr_trans_id);
 
 	/* update offset */
