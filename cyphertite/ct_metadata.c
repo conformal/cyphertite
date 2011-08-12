@@ -291,6 +291,14 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
 	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
 	ct_state->ct_queued_qlen++;
 
+	/* did we idle out? - something better?*/
+	while (ct_reconnect_pending) {
+		if (ct_reconnect_internal() != 0) {
+			sleep(30);
+		} else {
+			ct_reconnect_pending = 0;
+		}
+	}
 	ct_assl_write_op(ct_assl_ctx, hdr, body);
 }
 
@@ -411,6 +419,14 @@ ct_xml_file_close(void)
 	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
 	ct_state->ct_queued_qlen++;
 
+	/* did we idle out? - something better?*/
+	while (ct_reconnect_pending) {
+		if (ct_reconnect_internal() != 0) {
+			sleep(30);
+		} else {
+			ct_reconnect_pending = 0;
+		}
+	}
 	ct_assl_write_op(ct_assl_ctx, hdr, body);
 }
 
@@ -587,6 +603,14 @@ ct_md_list_start(struct ct_op *op)
 	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
 	ct_state->ct_queued_qlen++;
 
+	/* did we idle out? - something better?*/
+	while (ct_reconnect_pending) {
+		if (ct_reconnect_internal() != 0) {
+			sleep(30);
+		} else {
+			ct_reconnect_pending = 0;
+		}
+	}
 	ct_assl_write_op(ct_assl_ctx, hdr, body);
 }
 
@@ -721,6 +745,14 @@ ct_md_delete(struct ct_op *op)
 	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
 	ct_state->ct_queued_qlen++;
 
+	/* did we idle out? - something better?*/
+	while (ct_reconnect_pending) {
+		if (ct_reconnect_internal() != 0) {
+			sleep(30);
+		} else {
+			ct_reconnect_pending = 0;
+		}
+	}
 	ct_assl_write_op(ct_assl_ctx, hdr, body);
 }
 
