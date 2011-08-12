@@ -137,7 +137,7 @@ ct_queue_transfer(struct ct_trans *trans)
 	case TR_S_UNCOMPSHA_ED:
 skip_sha:	/* metadata skips shas */
 		/* try to compress trans body, if compression enabled */
-		if (ct_compress_enabled) {
+		if (trans->hdr.c_flags & C_HDR_F_COMPRESSED_MASK) {
 			/* XXX - locks */
 			ct_state->ct_comp_qlen++;
 			TAILQ_INSERT_TAIL(&ct_state->ct_comp_queue, trans,
@@ -146,7 +146,7 @@ skip_sha:	/* metadata skips shas */
 			if (ct_state->ct_comp_state != CT_S_RUNNING) {
 				ct_wakeup_compress();
 			}
-			ct_wakeup_compress();
+			ct_wakeup_compress(); /* XXX */
 			break;
 		}
 		/* fallthru if compress not enabled */
@@ -532,8 +532,8 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 	    (hdr->c_flags & C_HDR_F_METADATA) == 0))
 		CFATALX("not expecting vbody");
 
-	CDBG("write done, trans %" PRIu64 " op %u",
-	    trans->tr_trans_id, hdr->c_opcode);
+	CDBG("write done, trans %" PRIu64 " op %u flags %x",
+	    trans->tr_trans_id, hdr->c_opcode, hdr->c_flags);
 
 	if (ct_disconnected) {
 		/*
@@ -1259,6 +1259,7 @@ ct_compute_compress(void *vctx)
 		len = trans->tr_size[slot];
 		dst =  trans->tr_data[!slot];
 
+		trans->hdr.c_flags &= C_HDR_F_COMPRESSED_MASK;
 		if (compress) {
 			/*
 			 * XXX - we dont want compression to grow buffer so
@@ -1275,6 +1276,7 @@ ct_compute_compress(void *vctx)
 			}
 			if (rv == 0)
 				trans->hdr.c_flags |= ncompmode;
+			}
 			ct_stats->st_bytes_compressed += newlen;
 			ct_stats->st_bytes_uncompressed += trans->tr_chsize;
 		} else {
