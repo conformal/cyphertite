@@ -23,6 +23,8 @@ endif
 # System utils.
 CC ?= gcc
 INSTALL ?= install
+LN ?= ln
+LNFORCE ?= -f
 MKDIR ?= mkdir
 RM ?= rm -f
 
@@ -45,6 +47,7 @@ LDFLAGS += -lshrink -lxmlsd -lexpat -lsqlite3 -llzma -llzo2 -lz -lclens -lbsd
 LDFLAGS += -Wl,-Bstatic -lssl -lcrypto -Wl,-Bdynamic -ldl
 
 BIN.NAME = cyphertite
+BIN.LINKS = ct cyphertitectl ctctl
 BIN.SRCS = ct_main.c ct_metadata.c ct_files.c ct_util.c ct_queue.c ct_event.c
 BIN.SRCS += ct_aes_xts.c ct_crypto.c ct_match.c
 BIN.SRCS += ct_db.c ct_xdr.c ct_bw_lim.c ct_ctl.c
@@ -76,6 +79,10 @@ install:
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(BINDIR)/
 	$(INSTALL) -m 0755 $(OBJPREFIX)$(BIN.NAME) $(DESTDIR)$(BINDIR)/
 	$(INSTALL) -m 0755 -d $(addprefix $(DESTDIR)$(MANDIR)/, $(BIN.MDIRS))
+	$(foreach link, $(BIN.LINKS), \
+		$(LN) $(LNFORCE) $(DESTDIR)$(BINDIR)/$(BIN.NAME) \
+		$(DESTDIR)$(BINDIR)/$(link); \
+	)
 	$(foreach page, $(BIN.MANPAGES), \
 		$(INSTALL) -m 0444 $(page) $(addprefix $(DESTDIR)$(MANDIR)/, \
 		$(subst ., man, $(suffix $(page))))/; \
@@ -83,6 +90,9 @@ install:
 
 uninstall:
 	$(RM) $(DESTDIR)$(BINDIR)/$(BIN.NAME)
+	$(foreach link, $(BIN.LINKS), \
+		$(RM) $(DESTDIR)$(BINDIR)/$(link); \
+	)
 	$(foreach page, $(BIN.MANPAGES), \
 		$(RM) $(addprefix $(DESTDIR)$(MANDIR)/, \
 		$(subst ., man, $(suffix $(page))))/$(page); \
