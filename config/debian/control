@@ -9,9 +9,6 @@ Homepage: http://opensource.conformal.com/wiki/cyphertite
 Package: cyphertite
 Section: utils
 Architecture: any
-#Depends: libassl (>= 0.10.0), libclog (>= 0.3.4), libexude (>= 0.3.0),
-#         libshrink (>= 0.2.1), libxmlsd (>= 0.3.1), libbsd0, libevent-1.4-2,
-#         libsqlite3-0 (>= 3.6), ${shlibs:Depends}, ${misc:Depends}
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: High-security scalable solution for online backups
  Cyphertite is a high-security scalable solution for online backups.

@@ -1,7 +1,7 @@
 # $cyphertite$
 
 %define name		cyphertite
-%define version		0.3.2
+%define version		0.4.0
 %define release		1
 
 Name: 		%{name}
@@ -45,8 +45,26 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 %defattr(-,root,root)
 %doc /usr/share/man/man?/*
 /usr/bin/cyphertite
+/usr/bin/ct
+/usr/bin/ctctl
+/usr/bin/cyphertitectl
 
 %changelog
+* Mon Aug 15 2011 - davec 0.4.0-1
+- Improve return messages to cyphertite from the backend
+- Add ctctl tool to change local crypto password
+- Fixed a metadata bug that made mixed endian architectures fail
+- Extract creates temporary files and then renames them instead of
+  extracting directly into the original filename
+- Make cyphertite less verbose when server idle disconnects
+- Add support for include and exclude patterns for archive mode
+- Validate metadata file before commencing extract operation
+- Log file and directory creation errors and continue rather than
+  exiting immediately
+- Fix a bug in the configuration file creation wizard where the
+  wrong pointer was checked for a memory allocation
+- Fix a bug where crypto secrets could not be copied between little and
+  big endian machines and vice versa
 * Wed Aug 03 2011 - davec 0.3.2-1
 - Dramatically decrease memory footprint of cyphertite
 - Add XML definitions for expanded metada list mode
