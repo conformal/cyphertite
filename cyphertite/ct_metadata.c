@@ -1442,7 +1442,8 @@ again:
 		/* remove an existing backup file */
 		(void)unlink(tmp);
 		/* save old file allow for failure in case it exists */
-		(void)link(old_secrets, tmp);
+		if (link(old_secrets, tmp))
+			CWARN("unable to backup secrets file");
 		/* rename to ``real'' filename */
 		if (rename(crypto_secrets, old_secrets) != 0)
 			CFATAL("can't rename secrets file to real name");
