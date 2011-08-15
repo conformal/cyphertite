@@ -748,17 +748,22 @@ ct_extract(struct ct_op *op)
 				}
 			}
 
-			if (ct_doextract == 0) {
-				ct_trans_free(trans);
-				continue;
-			}
-
 			fnode = e_calloc(1, sizeof(*fnode));
 			fl_ex_node = fnode;
 
 			trans->tr_fl_node = fnode;
 
 			ct_populate_fnode(fnode, &hdr, &trans->tr_state);
+
+			if (ct_doextract == 0) {
+				if (fnode->fl_sname)
+					e_free(&fnode->fl_sname);
+				if (fnode->fl_hlname)
+					e_free(&fnode->fl_hlname);
+				e_free(&fnode);
+				ct_trans_free(trans);
+				continue;
+			}
 
 			CDBG("file %s numshas %" PRId64, fnode->fl_sname,
 			    ct_num_shas);
