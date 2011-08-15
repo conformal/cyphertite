@@ -621,11 +621,11 @@ ct_md_list_complete(struct ct_op *op)
 	struct md_list_tree	*results;
 	struct md_list_file	*file;
 
-	if (SLIST_EMPTY(&ct_md_listfiles))
-		return (NULL);
-
 	results = e_malloc(sizeof(*results));
 	RB_INIT(results);
+
+	if (SLIST_EMPTY(&ct_md_listfiles))
+		return (results);
 
 	match = ct_match_compile(op->op_matchmode, op->op_filelist);
 	if (op->op_excludelist)
