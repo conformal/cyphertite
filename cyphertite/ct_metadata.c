@@ -685,7 +685,7 @@ void
 ct_md_list_print(struct ct_op *op)
 {
 	struct md_list_tree	*results;
-	struct md_list_file	*file, *tfile;
+	struct md_list_file	*file;
 	long long		maxsz = 8;
 	int			numlen;
 
@@ -699,7 +699,7 @@ ct_md_list_print(struct ct_op *op)
 	}
 	numlen = snprintf(NULL, 0, "%lld", maxsz);
 
-	RB_FOREACH_SAFE(file, md_list_tree, results, tfile) {
+	while ((file = RB_MIN(md_list_tree, results)) != NULL) {
 		RB_REMOVE(md_list_tree, results, file);
 		/* XXX only the extras if verbose? */
 		printf("%*llu ", numlen, (unsigned long long)file->mlf_size);
