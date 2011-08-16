@@ -135,7 +135,7 @@ ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp, int write)
 		return (FALSE);
 	if (!xdr_string(xdrs, &objp->cmg_prevlvl_filename, PATH_MAX))
 		return (FALSE);
-	if (objp->cmg_version >= CT_MD_VERSION) {
+	if (objp->cmg_version >= CT_MD_V2) {
 		if (!xdr_int(xdrs, &objp->cmg_cur_lvl))
 			return (FALSE);
 		if (!xdr_string(xdrs, &objp->cmg_cwd, PATH_MAX))
@@ -901,7 +901,7 @@ ct_basis_setup(const char *basisbackup, char **filelist)
 	 * our cwd matches and the list of dirs we care about are a strict
 	 * superset of the previous backup
 	 */
-	if (gh.cmg_version >= CT_MD_VERSION) {
+	if (gh.cmg_version >= CT_MD_V2) {
 		if (getcwd(cwd, sizeof(cwd)) == NULL)
 			CFATAL("can't get current working directory");
 
