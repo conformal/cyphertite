@@ -399,6 +399,7 @@ struct ct_md_gheader {
 #define CT_MD_BEACON		(0x43595048)
 	int			cmg_version;	/* version of the archive */
 #define CT_MD_V1		(1)
+#define CT_MD_V2		(2)
 #define CT_MD_VERSION		(2)
 	int			cmg_chunk_size;	/* chunk size */
 	int64_t			cmg_created;	/* date created */
