@@ -268,6 +268,7 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *ct_assl_ctx)
 	struct ct_header	hdr;
 	int			rv = 1;
 	int			user_len, payload_sz;
+	ssize_t			sz;
 
 	/* send server request */
 	hdr.c_version = C_HDR_VERSION;
@@ -295,9 +296,9 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *ct_assl_ctx)
 	}
 
 	/* get server reply */
-	if (ct_assl_io_read_poll(ct_assl_ctx, &hdr, sizeof hdr, ASSL_TIMEOUT)
-	    != sizeof hdr) {
-		CWARNX("invalid header size");
+	sz = ct_assl_io_read_poll(ct_assl_ctx, &hdr, sizeof hdr, ASSL_TIMEOUT);
+	if (sz != sizeof hdr) {
+		CWARNX("invalid header size %zd", sz);
 		goto done;
 	}
 	ct_unwire_header(&hdr);
@@ -365,9 +366,9 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *ct_assl_ctx)
 	}
 
 	/* get server reply */
-	if (ct_assl_io_read_poll(ct_assl_ctx, &hdr, sizeof hdr, ASSL_TIMEOUT)
-	    != sizeof hdr) {
-		CWARNX("invalid header size");
+	sz = ct_assl_io_read_poll(ct_assl_ctx, &hdr, sizeof hdr, ASSL_TIMEOUT);
+	if (sz != sizeof hdr) {
+		CWARNX("invalid header size %zd", sz);
 		goto done;
 	}
 	e_free(&body);
