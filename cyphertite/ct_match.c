@@ -271,6 +271,7 @@ ct_match_unwind(struct ct_match *match)
 	default:
 		CFATALX("invalid match mode");
 	}
+	e_free(&match);
 }
 
 int

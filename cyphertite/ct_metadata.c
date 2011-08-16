@@ -858,9 +858,9 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 	}
 
 	ct_queue_transfer(trans);
+	ct_body_free(NULL, vbody, hdr);
 	ct_header_free(NULL, hdr);
 	xmlsd_unwind(&xl);
-	e_free(&vbody);
 }
 
 void
@@ -1353,6 +1353,8 @@ check_local:
 	/* This includes the case where both are missing */
 	if (mtime == local_mtime) {
 		CDBG("dates match, nothing to do");
+		if (remote_name)
+			e_free(&remote_name);
 		if (ct_create_or_unlock_secrets(current_secrets,
 		    ct_crypto_password))
 			CFATALX("can't unlock secrets file");

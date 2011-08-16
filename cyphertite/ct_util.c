@@ -205,7 +205,7 @@ ct_ssl_connect(int nonfatal)
 void
 ct_ssl_cleanup(void)
 {
-	assl_event_close(ct_ssl_ctx->c);
+	ct_assl_disconnect(ct_assl_ctx);
 	e_free(&ct_ssl_ctx);
 }
 

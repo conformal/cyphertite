@@ -454,7 +454,7 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 
 	if (hdr == NULL) {
 		ct_disconnected = 1;
-		ct_assl_disconnect(ct_assl_ctx);
+		ct_ssl_cleanup();
 		while(!RB_EMPTY(&ct_state->ct_inflight)) {
 			trans = RB_MAX(ct_iotrans_lookup,
 			    &ct_state->ct_inflight);
@@ -624,13 +624,17 @@ void
 ct_body_free(void *vctx, void *body, struct ct_header *hdr)
 {
 	/* is this body one that was allocated or part of a reply? */
-
-	/* if ct_header->c_opcode & 1 */
 	if (hdr->c_opcode & 1) {
-	    /* body is a transaction data, do not free */
-	} else {
-		e_free(&body);
+		/* not all replies have bodies preallocated */
+		switch(hdr->c_opcode) {
+		case C_HDR_O_XML_REPLY:
+			break;
+		default:
+			return;
+		}
 	}
+
+	e_free(&body);
 }
 
 void
