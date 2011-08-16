@@ -884,33 +884,40 @@ ct_complete_normal(struct ct_trans *trans)
 		break;
 	case TR_S_EX_FILE_START:
 		ct_sha1_setup(&trans->tr_fl_node->fl_shactx);
-		ct_file_extract_open(trans->tr_fl_node);
-		CDBG("should print");
-		if (ct_verbose) {
-			ct_pr_fmt_file(trans->tr_fl_node);
-			printf("\n");
+		if (ct_file_extract_open(trans->tr_fl_node) == 0) {
+			if (ct_verbose) {
+				ct_pr_fmt_file(trans->tr_fl_node);
+				printf("\n");
+			}
+		} else {
+			trans->tr_fl_node->fl_skip_file = 1;
 		}
 		break;
 	case TR_S_EX_FILE_END:
-		ct_sha1_final(trans->tr_csha, &trans->tr_fl_node->fl_shactx);
-		if (bcmp(trans->tr_csha, trans->tr_sha, sizeof(trans->tr_sha))
-		    != 0)
-			CWARNX("extract sha mismatch on %s",
-			    trans->tr_fl_node->fl_sname);
+		if (trans->tr_fl_node->fl_skip_file == 0) {
+			ct_sha1_final(trans->tr_csha,
+			    &trans->tr_fl_node->fl_shactx);
+			if (bcmp(trans->tr_csha, trans->tr_sha,
+			    sizeof(trans->tr_sha)) != 0)
+				CWARNX("extract sha mismatch on %s",
+				    trans->tr_fl_node->fl_sname);
+			ct_file_extract_close(trans->tr_fl_node);
+		}
 		ct_stats->st_files_completed++;
-		ct_file_extract_close(trans->tr_fl_node);
 		break;
 	case TR_S_EX_READ:
 	case TR_S_EX_DECRYPTED:
 	case TR_S_EX_UNCOMPRESSED:
-		slot = trans->tr_dataslot;
-		ct_sha1_add(trans->tr_data[slot], &trans->tr_fl_node->fl_shactx,
-		    trans->tr_size[slot]);
 		ct_stats->st_chunks_completed++;
-		ct_file_extract_write(trans->tr_data[slot],
-		    trans->tr_size[slot]);
-
-		ct_stats->st_bytes_written += trans->tr_size[slot];
+		if (trans->tr_fl_node->fl_skip_file == 0) {
+			slot = trans->tr_dataslot;
+			ct_sha1_add(trans->tr_data[slot],
+			    &trans->tr_fl_node->fl_shactx,
+			    trans->tr_size[slot]);
+			ct_file_extract_write(trans->tr_fl_node,
+			    trans->tr_data[slot], trans->tr_size[slot]);
+			ct_stats->st_bytes_written += trans->tr_size[slot];
+		}
 		break;
 	case TR_S_EX_SPECIAL:
 		ct_file_extract_special(trans->tr_fl_node);

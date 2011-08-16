@@ -733,7 +733,7 @@ s_to_e_type(int mode)
 	return (rv);
 }
 
-void
+int
 ct_file_extract_open(struct fnode *fnode)
 {
 	char		dirpath[PATH_MAX], *dirp;
@@ -767,12 +767,18 @@ again:
 		if (errno == ENOENT && tries++ == 0 &&
 		    ct_make_full_path(tpath, 0777) == 0)
 			goto again;
-		CFATAL("unable to open file for writing %s", tpath);
+		/* XXX make_full_path may modify the path we want */
+		CWARN("unable to open file for writing %s%s%s", 
+		    ct_tdir ? ct_tdir : "", ct_tdir ? "/" : "",
+		    fnode->fl_sname);
+		return (1);
 	}
+
+	return (0);
 }
 
 void
-ct_file_extract_write(uint8_t *buf, size_t size)
+ct_file_extract_write(struct fnode *fnode, uint8_t *buf, size_t size)
 {
 	ssize_t len;
 
@@ -780,7 +786,7 @@ ct_file_extract_write(uint8_t *buf, size_t size)
 
 	if (len != size)
 		CFATAL("unable to write file %s",
-		ct_ex_curnode ? ct_ex_curnode->fl_sname : "[not open]" );
+		    fnode ? fnode->fl_sname : "[not open]" );
 }
 
 void
@@ -828,7 +834,8 @@ ct_file_extract_special(struct fnode *fnode)
 	CDBG("special %s mode %d", ltpath, fnode->fl_mode);
 
 	if(C_ISDIR(fnode->fl_type)) {
-		mkdir(ltpath, 0700);
+		if (mkdir(ltpath, 0700) != 0 && errno != EEXIST)
+			CWARN("can't create directory %s", fnode->fl_sname);
 	} else if (C_ISBLK(fnode->fl_type) || C_ISCHR(fnode->fl_type))  {
 		mknod(ltpath, fnode->fl_mode, fnode->fl_dev);
 	} else if (C_ISLINK(fnode->fl_type)){

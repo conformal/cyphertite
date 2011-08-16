@@ -756,11 +756,8 @@ ct_extract(struct ct_op *op)
 			ct_populate_fnode(fnode, &hdr, &trans->tr_state);
 
 			if (ct_doextract == 0) {
-				if (fnode->fl_sname)
-					e_free(&fnode->fl_sname);
-				if (fnode->fl_hlname)
-					e_free(&fnode->fl_hlname);
-				e_free(&fnode);
+				ct_free_fnode(fnode);
+				fnode = NULL;
 				ct_trans_free(trans);
 				continue;
 			}
@@ -776,7 +773,8 @@ ct_extract(struct ct_op *op)
 			/* consume trailer */
 			if (ct_read_trailer(&trl))
 				CFATALX("trailer read failure");
-			if (ct_doextract == 0) {
+			if (ct_doextract == 0 ||
+			    trans->tr_fl_node->fl_skip_file != 0) {
 				ct_trans_free(trans);
 				continue;
 			}
@@ -811,7 +809,8 @@ ct_extract(struct ct_op *op)
 			}
 			if (ret == FALSE)
 				CFATALX("error deduping sha");
-			if (ct_doextract == 0) {
+			if (ct_doextract == 0 ||
+			    trans->tr_fl_node->fl_skip_file != 0) {
 				ct_trans_free(trans);
 				continue;
 			}
