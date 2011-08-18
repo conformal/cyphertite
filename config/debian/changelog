@@ -1,3 +1,12 @@
+cyphertite (0.4.1-1) unstable; urgency=low
+
+  - Reimplement logic to prevent cyphertite from exiting immediately when
+    a file or directory can't be written during extract
+  - Fix various memory leaks
+  - Other misc cleanup and minor bug fixes
+
+ -- Conformal Systems <package-discuss@conformal.com>  Wed, 18 Aug 2011 15:38:46 -0500
+
 cyphertite (0.4.0-1) unstable; urgency=low
 
   - Improve return messages to cyphertite from the backend

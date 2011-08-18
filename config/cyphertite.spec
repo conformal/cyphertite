@@ -1,7 +1,7 @@
 # $cyphertite$
 
 %define name		cyphertite
-%define version		0.4.0
+%define version		0.4.1
 %define release		1
 
 Name: 		%{name}
@@ -50,6 +50,11 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertitectl
 
 %changelog
+* Wed Aug 18 2011 - davec 0.4.1-1
+- Reimplement logic to prevent cyphertite from exiting immediately when
+  a file or directory can't be written during extract
+- Fix various memory leaks
+- Other misc cleanup and minor bug fixes
 * Mon Aug 15 2011 - davec 0.4.0-1
 - Improve return messages to cyphertite from the backend
 - Add ctctl tool to change local crypto password
