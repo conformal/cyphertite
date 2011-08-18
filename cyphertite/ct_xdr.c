@@ -279,7 +279,7 @@ ct_write_header(struct fnode *fnode, char *filename, int base)
 
 		if (fnode->fl_curdir_dir->d_num == -2) {
 			fnode->fl_curdir_dir->d_num = ++ct_dirnum;
-			CDBG("tagging dir %s as %lld",
+			CDBG("tagging dir %s as %" PRId64,
 			    fnode->fl_curdir_dir->d_name,
 			    fnode->fl_curdir_dir->d_num);
 
@@ -296,7 +296,7 @@ ct_write_header(struct fnode *fnode, char *filename, int base)
 			}
 			return 0;
 		}
-		CDBG("WRITING %s tag %lld", 
+		CDBG("WRITING %s tag %" PRId64, 
 		    fnode->fl_curdir_dir->d_name,
 		    fnode->fl_curdir_dir->d_num);
 	} else if (fnode->fl_skip_file)
@@ -947,13 +947,13 @@ ct_populate_fnode(struct fnode *fnode, struct ct_md_header *hdr, int *state)
 		flistnode.fl_fname = hdr->cmh_filename;
 
 		flistnode.fl_parent_dir = gen_finddir(hdr->cmh_parent_dir);
-		CDBG("parent_dir %p %lld", flistnode.fl_parent_dir,
+		CDBG("parent_dir %p %" PRId64, flistnode.fl_parent_dir,
 		    hdr->cmh_parent_dir);
 
 		fnode->fl_sname = gen_fname(&flistnode);
 	} else 
 		fnode->fl_sname = e_strdup(hdr->cmh_filename);
-	CDBG("name %s from %s %lld", fnode->fl_sname, hdr->cmh_filename,
+	CDBG("name %s from %s %" PRId64, fnode->fl_sname, hdr->cmh_filename,
 	    hdr->cmh_parent_dir);
 
 	if (C_ISDIR(hdr->cmh_type)) {
@@ -961,7 +961,7 @@ ct_populate_fnode(struct fnode *fnode, struct ct_md_header *hdr, int *state)
 		dnode->d_name = e_strdup(fnode->fl_sname);
 		dnode->d_num = ct_ex_dirnum++;
 		RB_INSERT(d_num_tree, &ct_dnum_head, dnode);
-		CDBG("inserting %s as %lld", dnode->d_name, dnode->d_num );
+		CDBG("inserting %s as %" PRId64, dnode->d_name, dnode->d_num );
 	}
 
 
