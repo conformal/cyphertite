@@ -735,11 +735,11 @@ ct_write_md_special(struct ct_trans *trans)
 	int			ret;
 
 	if (C_ISDIR(type)) {
-		if (ct_write_header(trans, fnode->fl_sname))
+		if (ct_write_header(fnode, fnode->fl_sname, 1))
 			CWARNX("header write failed");
 		CDBG("record dir %s", fnode->fl_sname);
 	} else if (C_ISCHR(type) || C_ISBLK(type)) {
-		if (ct_write_header(trans, fnode->fl_sname))
+		if (ct_write_header(fnode, fnode->fl_sname, 1))
 			CWARNX("header write failed");
 	} else if (C_ISFIFO(type)) {
 		CWARNX("fifo not supported");
@@ -772,14 +772,14 @@ ct_write_md_special(struct ct_trans *trans)
 			return;
 		}
 		CDBG("link %s %s", fnode->fl_sname, plink);
-		if (ct_write_header(trans, fnode->fl_sname))
+		if (ct_write_header(fnode, fnode->fl_sname, 1))
 			CWARNX("header write failed");
 
 		if (fnode->fl_hardlink) {
 			fnode->fl_type = C_TY_REG; /* cheat */
 		}
 
-		if (ct_write_header(trans, plink))
+		if (ct_write_header(fnode, plink, 0))
 			CWARNX("header write failed");
 
 		fnode->fl_type = type; /* restore */
@@ -861,7 +861,7 @@ ct_complete_normal(struct ct_trans *trans)
 			break;
 		}
 
-		if (ct_write_header(trans, fnode->fl_sname))
+		if (ct_write_header(fnode, fnode->fl_sname, 1))
 			CWARNX("header write failed");
 
 		if (ct_verbose) {
@@ -906,6 +906,7 @@ ct_complete_normal(struct ct_trans *trans)
 				CWARNX("extract sha mismatch on %s",
 				    trans->tr_fl_node->fl_sname);
 			ct_file_extract_close(trans->tr_fl_node);
+			release_fnode = 1;
 		}
 		ct_stats->st_files_completed++;
 		break;
@@ -929,6 +930,7 @@ ct_complete_normal(struct ct_trans *trans)
 			ct_pr_fmt_file(trans->tr_fl_node);
 			printf("\n");
 		}
+		release_fnode = 1;
 		break;
 	default:
 		CFATALX("process_normal unexpected state %d", trans->tr_state);

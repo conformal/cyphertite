@@ -542,7 +542,7 @@ out:
 	if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0)
 		ct_mdcache_trim(ct_md_cachedir, ct_max_mdcache_size);
 
-#ifdef notyet
+#if 1
 	if (ct_configfile != NULL)
 		e_free(&ct_configfile);
 

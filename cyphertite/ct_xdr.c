@@ -21,6 +21,9 @@
 #include <limits.h>
 #include <string.h>
 #include <time.h>
+#include <inttypes.h>
+
+#include <libgen.h>
 
 #include <rpc/types.h>
 #include <rpc/xdr.h>
@@ -44,7 +47,7 @@ int				md_dir = -1;
 int64_t				ct_num_shas = -1;
 struct fnode			*fl_ex_node;
 int				ct_doextract;
-
+int				ct_xdr_version;
 
 /* metadata */
 bool_t
@@ -74,6 +77,13 @@ ct_xdr_header(XDR *xdrs, struct ct_md_header *objp)
 		return (FALSE);
 	if (!xdr_u_int64_t(xdrs, &objp->cmh_nr_shas))
 		return (FALSE);
+	if (ct_xdr_version >= CT_MD_V3) {
+		if (!xdr_int64_t(xdrs, &objp->cmh_parent_dir))
+			return (FALSE);
+	} else {
+		/* Old xdr versions are read-only */
+		objp->cmh_parent_dir = -1;
+	}
 	if (!xdr_u_int32_t(xdrs, &objp->cmh_uid))
 		return (FALSE);
 	if (!xdr_u_int32_t(xdrs, &objp->cmh_gid))
@@ -162,8 +172,12 @@ ct_metadata_create(const char *filename, int intype, const char *basis, int lvl,
 	FILE			*f;
 	struct ct_md_gheader	gh;
 
+	/* always save to the current version */
+	ct_xdr_version = CT_MD_VERSION;
+
 	if (lvl != 0 && basis == NULL)
 		CFATALX("multilevel archive with no basis");
+
 	/* open metadata file */
 	f = fopen(filename, "wb");
 	if (f == NULL)
@@ -220,20 +234,72 @@ ct_metadata_close(FILE *file)
 	fclose(file);
 }
 
-int
-ct_write_header(struct ct_trans *trans, char *filename)
+int64_t ct_dirnum = -1;
+void ct_alloc_dirnum(struct dnode *, struct dnode *);
+
+void
+ct_alloc_dirnum(struct dnode *dnode, struct dnode *parentdir)
 {
-	struct fnode *fnode;
+	struct fnode	*fnode_dir;
+
+	if (dnode->d_num != -1)
+		return;
+
+	/* flag as allocate dirnum */
+	dnode->d_num = -2;
+
+	if (parentdir && parentdir->d_num == -1) {
+		ct_alloc_dirnum(parentdir, parentdir->d_parent);
+	}
+
+	/*
+	 * lazy directory header writing 
+	 */
+	fnode_dir = ct_populate_fnode_from_flist(dnode->d_flnode);
+	CDBG("alloc_dirnum dir %"PRId64" %s", dnode->d_num,
+	    fnode_dir->fl_sname);
+	ct_write_header(fnode_dir, fnode_dir->fl_sname, 1);
+	ct_free_fnode(fnode_dir);
+}
+
+int
+ct_write_header(struct fnode *fnode, char *filename, int base)
+{
 	struct ct_md_header	hdr;
 
-	fnode = trans->tr_fl_node;
 
-	CDBG("writing file header %s %s", trans->tr_fl_node->fl_sname,
+	CDBG("writing file header %s %s", fnode->fl_sname,
 	    filename);
 
 	bzero(&hdr, sizeof hdr);
 
-	if (fnode->fl_skip_file)
+	if (C_ISDIR(fnode->fl_type)) {
+		if (fnode->fl_curdir_dir->d_parent == NULL)
+			fnode->fl_curdir_dir->d_parent = fnode->fl_parent_dir;
+
+		if (fnode->fl_curdir_dir->d_num == -2) {
+			fnode->fl_curdir_dir->d_num = ++ct_dirnum;
+			CDBG("tagging dir %s as %lld",
+			    fnode->fl_curdir_dir->d_name,
+			    fnode->fl_curdir_dir->d_num);
+
+		} else if (fnode->fl_curdir_dir->d_num == -1) {
+			if (fnode->fl_skip_file == 0) {
+				/* timestamp newer, back up this node */
+
+				/* alloc_dirnum will write the node */
+				ct_alloc_dirnum(fnode->fl_curdir_dir,
+				    fnode->fl_parent_dir);
+			} else {
+				CDBG("skipping dir %s", filename);
+				/* do not write 'unused' dirs */
+			}
+			return 0;
+		}
+		CDBG("WRITING %s tag %lld", 
+		    fnode->fl_curdir_dir->d_name,
+		    fnode->fl_curdir_dir->d_num);
+	} else if (fnode->fl_skip_file)
 		hdr.cmh_nr_shas = -1LL;
 	else if (C_ISREG(fnode->fl_type)) {
 		hdr.cmh_nr_shas = fnode->fl_size / ct_max_block_size;
@@ -241,6 +307,14 @@ ct_write_header(struct ct_trans *trans, char *filename)
 			hdr.cmh_nr_shas++;
 	}
 
+	if (fnode->fl_parent_dir) {
+		if (fnode->fl_parent_dir->d_num == -1) {
+			ct_alloc_dirnum(fnode->fl_parent_dir,
+			    fnode->fl_parent_dir->d_parent);
+		}
+		hdr.cmh_parent_dir = fnode->fl_parent_dir->d_num;
+	} else 
+		hdr.cmh_parent_dir = -1;
 	hdr.cmh_beacon = CT_HDR_BEACON;
 	hdr.cmh_uid = fnode->fl_uid;
 	hdr.cmh_gid = fnode->fl_gid;
@@ -248,7 +322,10 @@ ct_write_header(struct ct_trans *trans, char *filename)
 	hdr.cmh_rdev = fnode->fl_rdev;
 	hdr.cmh_atime = fnode->fl_atime;
 	hdr.cmh_mtime = fnode->fl_mtime;
-	hdr.cmh_filename = filename;
+	if (base)
+		hdr.cmh_filename = basename(filename);
+	else
+		hdr.cmh_filename = filename;
 	hdr.cmh_type = fnode->fl_type;
 
 	if (ct_xdr_header(&xdr, &hdr) == FALSE)
@@ -494,9 +571,11 @@ ct_metadata_open(const char *filename, struct ct_md_gheader *gh)
 		CFATALX("Invalid version %d, expected %d", gh->cmg_version,
 		    CT_MD_VERSION);
 	}
+
 	ct_max_block_size = gh->cmg_chunk_size;
 	ct_encrypt_enabled = (gh->cmg_flags & CT_MD_CRYPTO);
 	ct_multilevel_allfiles = (gh->cmg_flags & CT_MD_MLB_ALLFILES);
+	ct_xdr_version = gh->cmg_version;
 
 	return (f);
 }
@@ -826,13 +905,16 @@ ct_extract(struct ct_op *op)
 	}
 }
 
+int64_t ct_ex_dirnum = 0;
+
 int
 ct_populate_fnode(struct fnode *fnode, struct ct_md_header *hdr, int *state)
 {
 	int ret;
 	struct ct_md_header	hdr2;
+	struct flist		flistnode;
+	struct dnode		*dnode;
 
-	fnode->fl_sname = e_strdup(hdr->cmh_filename);
 
 	if (C_ISLINK(hdr->cmh_type)) {
 		/* hardlink/symlink */
@@ -851,6 +933,7 @@ ct_populate_fnode(struct fnode *fnode, struct ct_md_header *hdr, int *state)
 		/* regular file */
 		*state = TR_S_EX_FILE_START;
 	}
+
 	/* ino not preserved? */
 	fnode->fl_rdev = hdr->cmh_rdev;
 	fnode->fl_uid = hdr->cmh_uid;
@@ -859,6 +942,28 @@ ct_populate_fnode(struct fnode *fnode, struct ct_md_header *hdr, int *state)
 	fnode->fl_mtime = hdr->cmh_mtime;
 	fnode->fl_atime = hdr->cmh_atime;
 	fnode->fl_type = hdr->cmh_type;
+
+	if (hdr->cmh_parent_dir != -1) {
+		flistnode.fl_fname = hdr->cmh_filename;
+
+		flistnode.fl_parent_dir = gen_finddir(hdr->cmh_parent_dir);
+		CDBG("parent_dir %p %lld", flistnode.fl_parent_dir,
+		    hdr->cmh_parent_dir);
+
+		fnode->fl_sname = gen_fname(&flistnode);
+	} else 
+		fnode->fl_sname = e_strdup(hdr->cmh_filename);
+	CDBG("name %s from %s %lld", fnode->fl_sname, hdr->cmh_filename,
+	    hdr->cmh_parent_dir);
+
+	if (C_ISDIR(hdr->cmh_type)) {
+		dnode = e_calloc(1,sizeof (*dnode));
+		dnode->d_name = e_strdup(fnode->fl_sname);
+		dnode->d_num = ct_ex_dirnum++;
+		RB_INSERT(d_num_tree, &ct_dnum_head, dnode);
+		CDBG("inserting %s as %lld", dnode->d_name, dnode->d_num );
+	}
+
 
 	return 0;
 }

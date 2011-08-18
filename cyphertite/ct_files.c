@@ -46,13 +46,11 @@ struct dir_stat;
 
 int			 ct_cmp_dirlist(struct dir_stat *, struct dir_stat *);
 struct fnode		*ct_populate_fnode_from_flist(struct flist *);
-const char		*ct_name_to_safename(const char *);
+char			*ct_name_to_safename(char *);
 void			 ct_traverse(char **, char **, int);
 
 RB_HEAD(ct_dir_lookup, dir_stat) ct_dir_rb_head =
     RB_INITIALIZER(&ct_dir_rb_head);
-
-RB_PROTOTYPE(ct_dir_lookup, dir_stat, ds_rb, ct_cmp_dirlist);
 
 /* dir stat data */
 struct dir_stat {
@@ -74,6 +72,29 @@ int
 ct_cmp_dirlist(struct dir_stat *d1, struct dir_stat *d2)
 {
 	return strcmp(d1->ds_name, d2->ds_name);
+}
+
+RB_PROTOTYPE(ct_dir_lookup, dir_stat, ds_rb, ct_cmp_dirlist);
+
+int                      ct_dname_cmp(struct dnode *, struct dnode *);
+int                      ct_dnum_cmp(struct dnode *, struct dnode *);
+
+struct d_name_tree ct_dname_head = RB_INITIALIZER(&ct_dname_head);
+struct d_num_tree ct_dnum_head = RB_INITIALIZER(&ct_dnum_head);
+
+RB_GENERATE(d_name_tree, dnode, d_rb_name, ct_dname_cmp);
+RB_GENERATE(d_num_tree, dnode, d_rb_num, ct_dnum_cmp);
+
+int
+ct_dname_cmp(struct dnode *d1, struct dnode *d2)
+{
+	return strcmp(d2->d_name, d1->d_name);
+}
+
+int
+ct_dnum_cmp(struct dnode *d1, struct dnode *d2)
+{
+	return (d1->d_num < d2->d_num ? -1 : d1->d_num > d2->d_num);
 }
 
 SIMPLEQ_HEAD(, dir_stat) dirlist;
@@ -101,12 +122,20 @@ void
 ct_flnode_cleanup(void)
 {
 	struct flist *flnode;
+	struct dnode *dnode;
+
 	while (!TAILQ_EMPTY(&fl_list_head)) {
 		flnode = TAILQ_FIRST(&fl_list_head);
 		TAILQ_REMOVE(&fl_list_head, flnode, fl_list);
 		if (flnode->fl_fname)
 			e_free(&flnode->fl_fname);
 		e_free(&flnode);
+	}
+
+	while ((dnode = RB_ROOT(&ct_dname_head)) != NULL) {
+		RB_REMOVE(d_name_tree, &ct_dname_head, dnode);
+		e_free(&dnode->d_name);
+		e_free(&dnode);
 	}
 
 }
@@ -153,10 +182,10 @@ fl_inode_sort(struct flist *f1, struct flist *f2)
 	return (0);
 }
 
-const char *
-ct_name_to_safename(const char *filename)
+char *
+ct_name_to_safename(char *filename)
 {
-	const char		*safe;
+	char		*safe;
 
 	/* compute 'safe' name */
 	safe = filename;
@@ -177,16 +206,47 @@ ct_name_to_safename(const char *filename)
 	return safe;
 }
 
+char *
+gen_fname(struct flist *flnode)
+{
+	char *name;
+
+	if (flnode->fl_parent_dir) {
+		e_asprintf(&name, "%s/%s", flnode->fl_parent_dir->d_name,
+		    flnode->fl_fname);
+	} else {
+		name = e_strdup(flnode->fl_fname);
+	}
+
+	return name;
+}
+
+struct dnode *
+gen_finddir(int64_t idx)
+{
+	struct dnode dsearch;
+
+	dsearch.d_num = idx;
+	return RB_FIND(d_num_tree, &ct_dnum_head, &dsearch);
+}
+
+
 struct fnode *
 ct_populate_fnode_from_flist(struct flist *flnode)
 {
 	struct fnode		*fnode;
 	const char		*safe;
 	struct stat		*sb, sbstore;
+	struct dnode		dsearch, *dfound;
+	char			*hlname;
 	int			 rc;
+	char			*fname;
+
+	fname = gen_fname(flnode);
+	CINFO("alloc1 %p", fname);
 
 	sb = &sbstore;
-	rc = stat(flnode->fl_fname, sb);
+	rc = lstat(fname, sb);
 
 	if (rc == -1) {
 		/* file no longer available return failure */
@@ -200,10 +260,8 @@ ct_populate_fnode_from_flist(struct flist *flnode)
 	 * so safe to not check for failure here
 	 */
 
-	safe = ct_name_to_safename(flnode->fl_fname);
-
-	fnode->fl_fname = e_strdup(flnode->fl_fname);
-	fnode->fl_sname = e_strdup(safe);
+	fnode->fl_fname = fname;
+	fnode->fl_sname = e_strdup(ct_name_to_safename(fnode->fl_fname));
 	fnode->fl_dev = sb->st_dev;
 	fnode->fl_rdev = sb->st_rdev;
 	fnode->fl_ino = sb->st_ino;
@@ -215,14 +273,30 @@ ct_populate_fnode_from_flist(struct flist *flnode)
 	fnode->fl_type = s_to_e_type(sb->st_mode);
 	fnode->fl_size = sb->st_size;
 	fnode->fl_offset = 0;
+
+	/* either the parent is NULL (which is fine) or is our parent */
+	fnode->fl_parent_dir = flnode->fl_parent_dir;
+
 	fnode->fl_state = CT_FILE_START;
 	ct_sha1_setup(&fnode->fl_shactx);
+
+	if (C_ISDIR(fnode->fl_type)) {
+		dsearch.d_name = fnode->fl_fname;
+		dfound = RB_FIND(d_name_tree, &ct_dname_head, &dsearch);
+		if (dfound == NULL)
+			CFATALX("directory not found in d_name_tree %s",
+			    fnode->fl_fname);
+		fnode->fl_curdir_dir = dfound;
+	}
 
 	if (flnode->fl_hlnode != NULL) {
 		fnode->fl_hardlink = 1;
 		fnode->fl_type = C_TY_LINK;
-		safe = ct_name_to_safename(flnode->fl_hlnode->fl_fname);
+		hlname = gen_fname(flnode->fl_hlnode);
+		CINFO("alloc2 %p", hlname);
+		safe = ct_name_to_safename(hlname);
 		fnode->fl_hlname = e_strdup(safe);
+		e_free(&hlname);
 	}
 
 	return fnode;
@@ -234,18 +308,54 @@ ct_sched_backup_file(struct stat *sb, char *filename)
 	struct flist		*flnode;
 	const char		*safe;
 	struct flist		*flnode_exists;
+	struct dnode		dsearch, *dfound;
+	struct dnode		*dnode = NULL, *e_dnode;
+	char			fname_buf[PATH_MAX];
 
 	/* compute 'safe' name */
 	safe = ct_name_to_safename(filename);
 	if (safe == NULL)
 		return 0;
 
+	if (S_ISDIR(sb->st_mode)) {
+		dnode = e_calloc(1, sizeof(*dnode));
+		dnode->d_name = e_strdup(filename);
+		dnode->d_num = -1; /* numbers are allocated on xdr write */
+		e_dnode = RB_INSERT(d_name_tree, &ct_dname_head, dnode);
+		if (e_dnode != NULL) {
+			/* this directory already exists, do not record twice */
+			e_free(&dnode->d_name);
+			e_free(&dnode);
+			return 0;
+		} else
+			CDBG("inserted %s", filename);
+	}
+
 	//ct_numalloc++;
 	flnode = e_calloc(1, sizeof (*flnode));
 
-	flnode->fl_fname = e_strdup(filename);
 	flnode->fl_dev = sb->st_dev;
 	flnode->fl_ino = sb->st_ino;
+	flnode->fl_parent_dir = NULL;
+
+	if (dnode != NULL) {
+		dnode->d_flnode = flnode;
+	}
+
+	strlcpy(fname_buf, filename, sizeof(fname_buf));
+	dsearch.d_name = dirname(fname_buf);
+	dfound = RB_FIND(d_name_tree, &ct_dname_head, &dsearch);
+	if (dfound != NULL) {
+		flnode->fl_parent_dir = dfound;
+		CDBG("parent of %s is %s", filename, dfound->d_name);
+		strlcpy(fname_buf, filename, sizeof(fname_buf));
+		flnode->fl_fname = e_strdup(basename(fname_buf));
+		CDBG("setting name of %s as %s", filename, flnode->fl_fname);
+	} else {
+		flnode->fl_fname = e_strdup(filename);
+		CDBG("parent of %s is not found [%s]", flnode->fl_fname,
+		    dsearch.d_name);
+	}
 
 	flnode->fl_hlnode = NULL;
 
@@ -337,6 +447,25 @@ loop:
 
 	/* handle special files */
 	if (!C_ISREG(fl_curnode->fl_type)) {
+		if (C_ISDIR(fl_curnode->fl_type)) {
+			/*
+			 * we do want to skip old directories with
+			 * no (new) files in them
+			 */
+			error = lstat(fl_curnode->fl_fname, &sb);
+			if (error) {
+				CWARN("archive: dir %s stat error",
+				    fl_curnode->fl_sname);
+			} else {
+				if (sb.st_mtime < ct_prev_backup_time) {
+					if (ct_verbose > 1)
+						CDBG("skipping dir"
+						    " based on mtime %s",
+						    fl_curnode->fl_sname);
+					fl_curnode->fl_skip_file = 1;
+				}
+			}
+		}
 		ct_trans->tr_fl_node = fl_curnode;
 		fl_curnode->fl_state = CT_FILE_FINISHED;
 		fl_curnode->fl_size = 0;
@@ -376,7 +505,7 @@ loop:
 			if (sb.st_mtime < ct_prev_backup_time) {
 				if (ct_verbose > 1)
 					CINFO("skipping file based on mtime %s",
-						fl_curnode->fl_sname);
+					    fl_curnode->fl_sname);
 				skip_file = 1;
 				fl_curnode->fl_skip_file = skip_file;
 			}
@@ -816,7 +945,6 @@ ct_file_extract_close(struct fnode *fnode)
 		CFATAL("rename to %s failed", tpath);
 
 	close(ct_extract_fd);
-	e_free(&fnode);
 	ct_ex_curnode = NULL;
 	ct_extract_fd = -1;
 }

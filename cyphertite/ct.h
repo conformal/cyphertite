@@ -81,12 +81,13 @@ void			ct_compute_csha(void *);
 void			ct_process_completions(void *);
 
 struct fnode;
-
-RB_HEAD(fl_tree, flist);
+struct dnode;
 
 struct fnode {
 	/* TAILQ_ENTRY(fnode)	fl_list; */
 	char			*fl_hlname;
+	struct dnode		*fl_parent_dir;
+	struct dnode		*fl_curdir_dir;
 	int			fl_hardlink;
 	dev_t			fl_dev;
 	ino_t			fl_ino;
@@ -113,6 +114,7 @@ struct fnode {
 struct flist {
 	TAILQ_ENTRY(flist)	fl_list;
 	RB_ENTRY(flist)		fl_inode_entry;
+	struct dnode		*fl_parent_dir;
 	struct flist		*fl_hlnode;
 	char			*fl_fname;
 	struct fnode		*fl_node;
@@ -120,12 +122,37 @@ struct flist {
 	ino_t			fl_ino;
 };
 
+struct dnode * gen_finddir(int64_t idx);
+char *gen_fname(struct flist *);
+
 int fl_inode_sort(struct flist *, struct flist *);
+
+RB_HEAD(fl_tree, flist);
 
 RB_PROTOTYPE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 
 TAILQ_HEAD(flist_head, flist);
 
+struct dnode {
+	RB_ENTRY(dnode)		 d_rb_name;
+	RB_ENTRY(dnode)		 d_rb_num;
+	int64_t			 d_num;
+	struct dnode		*d_parent;
+	char			*d_name;
+	struct flist		*d_flnode;
+};
+
+int	ct_dname_cmp(struct dnode *, struct dnode *);
+RB_HEAD(d_name_tree, dnode);
+RB_PROTOTYPE(d_name_tree, dnode, ds_rb, ct_dname_cmp);
+
+int	ct_dnum_cmp(struct dnode *, struct dnode *);
+RB_HEAD(d_num_tree, dnode);
+RB_PROTOTYPE(d_num_tree, dnode, ds_rb, ct_dnum_cmp);
+
+struct fnode *ct_populate_fnode_from_flist(struct flist *);
+
+extern struct d_num_tree	ct_dnum_head;
 extern struct flist_head	fl_list_head;
 
 /* FILE STATUS */
@@ -400,7 +427,8 @@ struct ct_md_gheader {
 	int			cmg_version;	/* version of the archive */
 #define CT_MD_V1		(1)
 #define CT_MD_V2		(2)
-#define CT_MD_VERSION		(2)
+#define CT_MD_V3		(3)
+#define CT_MD_VERSION		CT_MD_V3		
 	int			cmg_chunk_size;	/* chunk size */
 	int64_t			cmg_created;	/* date created */
 	int			cmg_type;	/* normal, stdin or crypto */
@@ -423,6 +451,7 @@ struct ct_md_header {
 #define CT_HDR_BEACON		(0x4d4f306f)
 #define CT_HDR_EOF		(0x454f4621)
 	uint64_t		cmh_nr_shas;	/* total shas */
+	int64_t			cmh_parent_dir;	/* path file num */
 	uint32_t		cmh_uid;	/* user id */
 	uint32_t		cmh_gid;	/* group id */
 	uint32_t		cmh_mode;	/* file mode */
@@ -463,7 +492,7 @@ struct ct_md_trailer {
 	uint8_t			cmt_sha[SHA_DIGEST_LENGTH];
 };
 
-int			ct_write_header(struct ct_trans *, char *);
+int			ct_write_header(struct fnode *, char *, int);
 int			ct_write_sha(struct ct_trans *);
 int			ct_write_sha_crypto(struct ct_trans *);
 int			ct_write_trailer(struct ct_trans *);
