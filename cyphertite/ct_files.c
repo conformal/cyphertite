@@ -243,7 +243,6 @@ ct_populate_fnode_from_flist(struct flist *flnode)
 	char			*fname;
 
 	fname = gen_fname(flnode);
-	CINFO("alloc1 %p", fname);
 
 	sb = &sbstore;
 	rc = lstat(fname, sb);
