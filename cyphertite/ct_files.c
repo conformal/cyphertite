@@ -956,16 +956,36 @@ ct_file_extract_special(struct fnode *fnode)
 	char			apath[PATH_MAX];
 	char			*appath;
 	char			ltpath[PATH_MAX];
+	int			tries = 0, ret = 0;
 
 	snprintf(ltpath, sizeof ltpath, "%s%s%s",
 	    ct_tdir ? ct_tdir : "", ct_tdir ? "/" : "", fnode->fl_sname);
 	CDBG("special %s mode %d", ltpath, fnode->fl_mode);
 
 	if(C_ISDIR(fnode->fl_type)) {
-		if (mkdir(ltpath, 0700) != 0 && errno != EEXIST)
-			CWARN("can't create directory %s", fnode->fl_sname);
+mkdir_again:
+		if (mkdir(ltpath, 0700) != 0) {
+			if (errno == ENOENT && tries == 0 &&
+			    ct_make_full_path(ltpath, 0777) == 0) {
+				tries++;
+				goto mkdir_again;
+			}
+			if (errno != EEXIST) /* XXX check it is a dir */
+				CWARN("can't create directory %s",
+				    fnode->fl_sname);
+		}
 	} else if (C_ISBLK(fnode->fl_type) || C_ISCHR(fnode->fl_type))  {
-		mknod(ltpath, fnode->fl_mode, fnode->fl_dev);
+mknod_again:
+		if (mknod(ltpath, fnode->fl_mode, fnode->fl_dev) != 0) {
+			if (errno == ENOENT && tries == 0 &&
+			    ct_make_full_path(ltpath, 0777) == 0) {
+				tries++;
+				goto mknod_again;
+			}
+			if (errno != EEXIST) /* XXX check it is a spec node */
+				CWARN("can't create special file %s",
+				    fnode->fl_sname);
+		}
 	} else if (C_ISLINK(fnode->fl_type)){
 		if (fnode->fl_hardlink && ct_tdir != NULL) {
 			snprintf(apath, sizeof(apath), "%s/%s", ct_tdir,
@@ -975,13 +995,20 @@ ct_file_extract_special(struct fnode *fnode)
 			appath = fnode->fl_hlname;
 		}
 
+link_again:
 		if (fnode->fl_hardlink) {
-			if (link(appath, ltpath))
-				CWARN("link failed: %s", ltpath);
+			ret = link(appath, ltpath);
 		} else {
-			if (symlink(appath, ltpath))
-				CWARN("symlink failed: %s", ltpath);
+			ret = symlink(appath, ltpath);
 		}
+		if (ret && errno == ENOENT && tries == 0 &&
+		    ct_make_full_path(ltpath, 0777) == 0) {
+			tries++;
+			goto link_again;
+		}
+		if (ret)
+			CWARN("%s failed: %s", fnode->fl_hardlink ?
+			    "link" : "symlink", ltpath);
 	} else {
 		CFATALX("illegal file %s of type %d", ltpath, fnode->fl_mode);
 	}
