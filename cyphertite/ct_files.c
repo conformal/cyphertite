@@ -1007,8 +1007,8 @@ link_again:
 			goto link_again;
 		}
 		if (ret)
-			CWARN("%s failed: %s", fnode->fl_hardlink ?
-			    "link" : "symlink", ltpath);
+			CWARN("%s failed: %s to %s", fnode->fl_hardlink ?
+			    "link" : "symlink", ltpath, appath);
 	} else {
 		CFATALX("illegal file %s of type %d", ltpath, fnode->fl_mode);
 	}
