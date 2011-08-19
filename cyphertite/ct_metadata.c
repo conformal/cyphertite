@@ -1474,6 +1474,9 @@ again:
 	}
 	ct_encrypt_enabled = 1;
 	ctdb_setup(ct_localdb, ct_encrypt_enabled);
+	/* Free remote name */
+	if (op->op_remote_fname)
+		e_free(&op->op_remote_fname);
 }
 
 /*
