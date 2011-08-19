@@ -483,12 +483,12 @@ ct_main(int argc, char **argv)
 	} else if (ct_metadata != 0) {
 		switch (ct_action) {
 		case CT_A_ARCHIVE:
-			ct_add_operation(ct_md_archive, NULL,
+			ct_add_operation(ct_md_archive, ct_free_remotename,
 			    ct_mfile, NULL, NULL, NULL, NULL, 0, 0);
 			break;
 		case CT_A_EXTRACT:
-			ct_add_operation(ct_md_extract, NULL, ct_mfile,
-			    NULL, NULL, NULL, NULL, 0, 0);
+			ct_add_operation(ct_md_extract, ct_free_remotename,
+			    ct_mfile, NULL, NULL, NULL, NULL, 0, 0);
 			break;
 		case CT_A_LIST:
 			ct_add_operation(ct_md_list_start, ct_md_list_print,

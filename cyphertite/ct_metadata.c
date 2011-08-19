@@ -987,6 +987,21 @@ ct_free_mdname(struct ct_op *op)
 		e_free(&op->op_local_fname);
 }
 
+void
+ct_free_remotename(struct ct_op *op)
+{
+	CDBG("%s: %s", __func__, op->op_local_fname);
+	if (op->op_remote_fname != NULL)
+		e_free(&op->op_remote_fname);
+}
+
+void
+ct_free_mdname_and_remote(struct ct_op *op)
+{
+	ct_free_mdname(op);
+	ct_free_remotename(op);
+}
+
 void ct_md_download_next(struct ct_op *op);
 void
 ct_md_download_next(struct ct_op *op)
@@ -1053,13 +1068,13 @@ ct_md_extract_nextop(struct ct_op *op)
 	 */
 	switch (op->op_action) {
 	case CT_A_EXTRACT:
-		ct_add_operation(ct_extract, ct_free_mdname,
+		ct_add_operation(ct_extract, ct_free_mdname_and_remote,
 		    op->op_local_fname, op->op_remote_fname, op->op_filelist,
 		    op->op_excludelist, NULL, op->op_matchmode, 0);
 		break;
 	case CT_A_LIST:
-		ct_add_operation(ct_list_op, ct_free_mdname,
-		    op->op_local_fname, NULL, op->op_filelist,
+		ct_add_operation(ct_list_op, ct_free_mdname_and_remote,
+		    op->op_local_fname, op->op_remote_fname, op->op_filelist,
 		    op->op_excludelist, NULL, op->op_matchmode, 0);
 		break;
 	case CT_A_ARCHIVE:
@@ -1075,8 +1090,8 @@ ct_md_extract_nextop(struct ct_op *op)
 		ct_add_operation(ct_archive, NULL, mfile, NULL,
 		    op->op_filelist, op->op_excludelist, op->op_local_fname,
 		    op->op_matchmode, 0);
-		ct_add_operation(ct_md_archive, ct_free_mdname, mfile, NULL,
-		    NULL, NULL, NULL, 0, 0);
+		ct_add_operation(ct_md_archive, ct_free_mdname_and_remote,
+		    mfile, NULL, NULL, NULL, NULL, 0, 0);
 		break;
 	default:
 		CFATALX("invalid action");
