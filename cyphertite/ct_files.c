@@ -292,7 +292,6 @@ ct_populate_fnode_from_flist(struct flist *flnode)
 		fnode->fl_hardlink = 1;
 		fnode->fl_type = C_TY_LINK;
 		hlname = gen_fname(flnode->fl_hlnode);
-		CINFO("alloc2 %p", hlname);
 		safe = ct_name_to_safename(hlname);
 		fnode->fl_hlname = e_strdup(safe);
 		e_free(&hlname);
