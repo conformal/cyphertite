@@ -725,6 +725,11 @@ ct_metadata_open_next()
 			free(gh.cmg_prevlvl_filename);
 		if (gh.cmg_paths != NULL)
 			e_free(&gh.cmg_paths);
+		if (next->filename)
+			e_free(&next->filename);
+		if (next);
+			e_free(&next);
+
 	} else {
 		CFATALX("open next with no next archive");
 	}

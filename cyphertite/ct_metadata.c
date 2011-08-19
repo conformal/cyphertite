@@ -100,7 +100,7 @@ ct_md_cook_filename(const char *path)
 	return (fname);
 }
 
-struct fnode	*md_node;
+struct fnode	md_node;
 void
 ct_md_archive(struct ct_op *op)
 {
@@ -137,8 +137,6 @@ loop:
 
 		md_offset = 0;
 		md_block_no = 0;
-		md_node = e_calloc(1, sizeof(*md_node));
-		CDBG("mdnode %p", md_node);
 
 		error = fstat(md_backup_fd, &sb);
 		if (error) {
@@ -185,7 +183,7 @@ loop:
 
 	ct_stats->st_bytes_read += rlen;
 
-	ct_trans->tr_fl_node = md_node;
+	ct_trans->tr_fl_node = &md_node;
 	ct_trans->tr_chsize = ct_trans->tr_size[0] = rlen;
 	ct_trans->tr_state = TR_S_READ;
 	ct_trans->tr_type = TR_T_WRITE_CHUNK;
@@ -473,7 +471,7 @@ ct_md_extract(struct ct_op *op)
 		return;
 	}
 
-	trans->tr_fl_node = md_node;
+	trans->tr_fl_node = &md_node;
 	trans->tr_state = TR_S_EX_SHA;
 	trans->tr_type = TR_T_READ_CHUNK;
 	trans->tr_trans_id = ct_trans_id++;
@@ -1003,8 +1001,10 @@ again:
 	CDBG("mfile %s", mfile);
 
 	md_prev = ct_metadata_check_prev(mfile);
+	if (md_prev == NULL)
+		goto out;
 
-	if (md_prev && md_prev[0] != '\0') {
+	if (md_prev[0] != '\0') {
 		cachename = ct_md_get_cachename(md_prev);
 		CDBG("prev file %s cachename %s", md_prev, cachename);
 		if (!md_is_in_cache(cachename)) {
@@ -1019,7 +1019,10 @@ again:
 			mfile = mfilename = md_prev;
 			goto again;
 		}
-	}
+	} else
+		e_free(&md_prev);
+
+out:
 	if (mfile == mfilename) {
 		e_free(&mfile);
 	}
@@ -1060,6 +1063,8 @@ ct_md_extract_nextop(struct ct_op *op)
 		    op->op_excludelist, NULL, op->op_matchmode, 0);
 		break;
 	case CT_A_ARCHIVE:
+		if (op->op_remote_fname)
+			e_free(&op->op_remote_fname);
 		/*
 		 * Since we were searching for previous, original mdname
 		 * is stored in basis. Swap them.

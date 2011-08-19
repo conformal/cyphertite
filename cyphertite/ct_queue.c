@@ -908,6 +908,7 @@ ct_complete_normal(struct ct_trans *trans)
 			ct_file_extract_close(trans->tr_fl_node);
 			release_fnode = 1;
 		}
+		release_fnode = 1;
 		ct_stats->st_files_completed++;
 		break;
 	case TR_S_EX_READ:
