@@ -67,7 +67,8 @@ size_t				md_size, md_offset;
 time_t				md_mtime;
 
 int			strcompare(const void *, const void *);
-struct md_list_tree	*ct_md_list_complete(struct ct_op *);
+void			ct_md_list_complete(int, char **, char **,
+			    struct md_list_tree *);
 
 struct xmlsd_v_elements ct_xml_cmds[] = {
 	{ "ct_md_list", xe_ct_md_list },
@@ -614,23 +615,19 @@ ct_md_list_start(struct ct_op *op)
 	ct_assl_write_op(ct_assl_ctx, hdr, body);
 }
 
-struct md_list_tree *
-ct_md_list_complete(struct ct_op *op)
+void
+ct_md_list_complete(int matchmode, char **flist, char **excludelist,
+    struct md_list_tree *results)
 {
 	struct ct_match		*match, *ex_match = NULL;
-	struct md_list_tree	*results;
 	struct md_list_file	*file;
 
-	results = e_malloc(sizeof(*results));
-	RB_INIT(results);
-
 	if (SLIST_EMPTY(&ct_md_listfiles))
-		return (results);
+		return;
 
-	match = ct_match_compile(op->op_matchmode, op->op_filelist);
-	if (op->op_excludelist)
-		ex_match = ct_match_compile(op->op_matchmode,
-		    op->op_excludelist);
+	match = ct_match_compile(matchmode, flist);
+	if (excludelist)
+		ex_match = ct_match_compile(matchmode, excludelist);
 	while ((file = SLIST_FIRST(&ct_md_listfiles)) != NULL) {
 		SLIST_REMOVE_HEAD(&ct_md_listfiles, mlf_link);
 		if (ct_match(match, file->mlf_name) == 0 && (ex_match == NULL ||
@@ -643,8 +640,6 @@ ct_md_list_complete(struct ct_op *op)
 	if (ex_match != NULL)
 		ct_match_unwind(ex_match);
 	ct_match_unwind(match);
-
-	return (results);
 }
 
 int
@@ -684,23 +679,22 @@ printtime(time_t ftime)
 void
 ct_md_list_print(struct ct_op *op)
 {
-	struct md_list_tree	*results;
+	struct md_list_tree	 results;
 	struct md_list_file	*file;
 	long long		maxsz = 8;
 	int			numlen;
 
-	results = ct_md_list_complete(op);
-	if (results == NULL)
-		return;
-
-	RB_FOREACH(file, md_list_tree, results) {
+	RB_INIT(&results);
+	ct_md_list_complete(op->op_matchmode, op->op_filelist,
+	    op->op_excludelist, &results);
+	RB_FOREACH(file, md_list_tree, &results) {
 		if (maxsz < (long long)file->mlf_size)
 			maxsz  = (long long)file->mlf_size;
 	}
 	numlen = snprintf(NULL, 0, "%lld", maxsz);
 
-	while ((file = RB_MIN(md_list_tree, results)) != NULL) {
-		RB_REMOVE(md_list_tree, results, file);
+	while ((file = RB_MIN(md_list_tree, &results)) != NULL) {
+		RB_REMOVE(md_list_tree, &results, file);
 		/* XXX only the extras if verbose? */
 		printf("%*llu ", numlen, (unsigned long long)file->mlf_size);
 		printtime(file->mlf_mtime);
@@ -708,7 +702,6 @@ ct_md_list_print(struct ct_op *op)
 		printf("%s\n", file->mlf_name);
 		e_free(&file);
 	}
-	e_free(&results);
 }
 
 void
@@ -1089,17 +1082,19 @@ void
 ct_find_md_for_extract_complete(struct ct_op *op)
 {
 	struct ct_op		*list_fakeop = op->op_priv;
-	struct md_list_tree	*result;
+	struct md_list_tree	 result;
 	struct md_list_file	*tmp;
 	char	 		*best, *cachename = NULL;
 
-	result = ct_md_list_complete(list_fakeop);
+	RB_INIT(&result);
+	ct_md_list_complete(list_fakeop->op_matchmode, list_fakeop->op_filelist,
+	    list_fakeop->op_excludelist, &result);
 	e_free(list_fakeop->op_filelist);
 	e_free(&list_fakeop->op_filelist);
 	e_free(&list_fakeop);
 
 	/* grab the newest one */
-	if ((tmp = RB_MAX(md_list_tree, result)) == NULL) {
+	if ((tmp = RB_MAX(md_list_tree, &result)) == NULL) {
 		if (op->op_action == CT_A_ARCHIVE) {
 			goto do_operation;
 		} else  {
@@ -1112,11 +1107,10 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 	best = e_strdup(tmp->mlf_name);
 	CDBG("backup file is %s", best);
 
-	while((tmp = RB_ROOT(result)) != NULL) {
-		RB_REMOVE(md_list_tree, result, tmp);
+	while((tmp = RB_ROOT(&result)) != NULL) {
+		RB_REMOVE(md_list_tree, &result, tmp);
 		e_free(&tmp);
 	}
-	e_free(&result);
 
 	/*
 	 * if the metadata file is not in the cache directory then we
@@ -1315,34 +1309,32 @@ ct_check_crypto_secrets_nextop(struct ct_op *op)
 	char			*t, *remote_name = NULL;
 	char			 *dirp, dir[PATH_MAX], tmp[PATH_MAX];
 	const char		*errstr;
-	struct md_list_tree	*results;
+	struct md_list_tree	 results;
 	struct md_list_file	*file = NULL;
 	struct stat		 sb;
 	time_t			 mtime = 0, local_mtime = 0;
 
-	results = ct_md_list_complete(op);
-	if (results != NULL) {
-		/* grab newest */
-		if ((file = RB_MAX(md_list_tree, results)) == NULL)
-			goto check_local;
+	RB_INIT(&results);
+	ct_md_list_complete(op->op_matchmode, op->op_filelist,
+	    op->op_excludelist, &results);
+	/* We're interested in the newest. */
+	if ((file = RB_MAX(md_list_tree, &results)) == NULL)
+		goto check_local;
 
-		CDBG("latest secrets file on server: %s", file->mlf_name);
-		/* parse out mtime */
-		if ((t = strchr(file->mlf_name, '-')) == NULL)
-			CFATALX("invalid answer from server");
-		*t = '\0';
-		mtime = strtonum(file->mlf_name, LLONG_MIN, LLONG_MAX, &errstr);
-		if (errstr)
-			CFATALX("mtime %s from secrets file invalid: %s",
-			    file->mlf_name, errstr);
-		*t = '-'; /* put it back */
-		remote_name = e_strdup(file->mlf_name);
-		while((file = RB_ROOT(results)) != NULL) {
-			RB_REMOVE(md_list_tree, results, file);
-			e_free(&file);
-		}
-	} else {
-		CWARNX("no uploaded ct secrets files, using current");
+	CDBG("latest secrets file on server: %s", file->mlf_name);
+	/* parse out mtime */
+	if ((t = strchr(file->mlf_name, '-')) == NULL)
+		CFATALX("invalid answer from server");
+	*t = '\0';
+	mtime = strtonum(file->mlf_name, LLONG_MIN, LLONG_MAX, &errstr);
+	if (errstr)
+		CFATALX("mtime %s from secrets file invalid: %s",
+		    file->mlf_name, errstr);
+	*t = '-'; /* put it back */
+	remote_name = e_strdup(file->mlf_name);
+	while((file = RB_ROOT(&results)) != NULL) {
+		RB_REMOVE(md_list_tree, &results, file);
+		e_free(&file);
 	}
 
 check_local:
@@ -1467,17 +1459,17 @@ again:
 void
 ct_md_trigger_delete(struct ct_op *op)
 {
-	struct md_list_tree	*results;
+	struct md_list_tree	 results;
 	struct md_list_file	*file = NULL;
 
-	results = ct_md_list_complete(op);
-	if (results == NULL)
-		return;
-	while((file = RB_ROOT(results)) != NULL) {
+	RB_INIT(&results);
+	ct_md_list_complete(op->op_matchmode, op->op_filelist,
+	    op->op_excludelist, &results);
+	while((file = RB_ROOT(&results)) != NULL) {
 		CDBG("deleting remote crypto secrets file %s", file->mlf_name);
 		ct_add_operation_after(op, ct_md_delete, NULL, NULL,
 		    e_strdup(file->mlf_name), NULL, NULL, NULL, 0, 0);
-		RB_REMOVE(md_list_tree, results, file);
+		RB_REMOVE(md_list_tree, &results, file);
 		e_free(&file);
 	}
 }
