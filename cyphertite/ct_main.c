@@ -216,6 +216,7 @@ ct_main(int argc, char **argv)
 	int		ret = 0;
 	int		level0 = 0;
 	int		freeincludes = 0;
+	int		need_secrets;
 
 	while ((c = getopt(argc, argv,
 	    "B:C:DE:F:I:PRVXa:cdef:mprtvx0")) != -1) {
@@ -421,13 +422,19 @@ ct_main(int argc, char **argv)
 		bzero(pwd, sizeof pwd);
 	}
 
-	if (ct_crypto_secrets) {
-		if (ct_secrets_upload == 0 &&
-		    ct_create_or_unlock_secrets(ct_crypto_secrets,
-		        ct_crypto_password))
-			CFATALX("can't unlock secrets");
-	} else {
-		ctdb_setup(ct_localdb, 0);
+	need_secrets = (ct_action == CT_A_EXTRACT ||
+	    ct_action == CT_A_ARCHIVE || (ct_action == CT_A_LIST &&
+	    ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0));
+
+	if (need_secrets != 0) {
+		if (ct_crypto_secrets) {
+			if (ct_secrets_upload == 0 &&
+			    ct_create_or_unlock_secrets(ct_crypto_secrets,
+				ct_crypto_password))
+				CFATALX("can't unlock secrets");
+		} else {
+			ctdb_setup(ct_localdb, 0);
+		}
 	}
 
 	ct_event_init();
@@ -440,15 +447,19 @@ ct_main(int argc, char **argv)
 	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
 	ct_setup_wakeup_complete(ct_state, ct_process_completions);
 
-	if (ct_secrets_upload > 0) {
-		CDBG("doing list for crypto secrets");
-		ct_add_operation(ct_md_list_start,
-		    ct_check_crypto_secrets_nextop, ct_crypto_secrets,
-		    NULL, secrets_file_pattern, NULL, NULL, CT_MATCH_REGEX, 0);
-	} else {
-		ct_add_operation(ct_md_list_start,
-		    ct_md_trigger_delete, NULL, NULL, secrets_file_pattern,
-		    NULL, NULL, CT_MATCH_REGEX, 0);
+	if (need_secrets != 0) {
+		if (ct_secrets_upload > 0) {
+			CDBG("doing list for crypto secrets");
+			ct_add_operation(ct_md_list_start,
+			    ct_check_crypto_secrets_nextop, ct_crypto_secrets,
+			    NULL, secrets_file_pattern, NULL, NULL,
+			    CT_MATCH_REGEX, 0);
+		} else {
+			ct_add_operation(ct_md_list_start,
+			    ct_md_trigger_delete, NULL, NULL,
+			    secrets_file_pattern, NULL, NULL,
+			    CT_MATCH_REGEX, 0);
+		}
 	}
 
 	if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
