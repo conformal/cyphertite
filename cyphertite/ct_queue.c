@@ -906,7 +906,6 @@ ct_complete_normal(struct ct_trans *trans)
 				CWARNX("extract sha mismatch on %s",
 				    trans->tr_fl_node->fl_sname);
 			ct_file_extract_close(trans->tr_fl_node);
-			release_fnode = 1;
 		}
 		release_fnode = 1;
 		ct_stats->st_files_completed++;
