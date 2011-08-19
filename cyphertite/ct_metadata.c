@@ -1376,7 +1376,8 @@ check_local:
 		CDBG("uploading local file");
 		if (remote_name)
 			e_free(&remote_name);
-		e_asprintf(&remote_name, "%020lld-crypto.secrets", local_mtime);
+		e_asprintf(&remote_name, "%020lld-crypto.secrets",
+		    (long long)local_mtime);
 		ct_add_operation_after(op, ct_md_archive, ct_secrets_unlock,
 		    current_secrets, remote_name, NULL, NULL, NULL, 0, 0);
 	} else { /* mtime > local_mtime */
