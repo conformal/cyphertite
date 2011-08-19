@@ -137,6 +137,11 @@ ct_flnode_cleanup(void)
 		e_free(&dnode->d_name);
 		e_free(&dnode);
 	}
+	while ((dnode = RB_ROOT(&ct_dnum_head)) != NULL) {
+		RB_REMOVE(d_num_tree, &ct_dnum_head, dnode);
+		e_free(&dnode->d_name);
+		e_free(&dnode);
+	}
 
 }
 
