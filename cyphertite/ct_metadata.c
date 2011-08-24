@@ -247,10 +247,12 @@ void
 ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
     uint32_t chunkno)
 {
+	struct xmlsd_element_list xl;
+	struct xmlsd_element	*xe;
 	struct ct_header	*hdr = NULL;
 	char			*body = NULL;
 	char			*buf = NULL;
-	int			sz;
+	size_t			sz;
 
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_state = TR_S_XML_OPEN;
@@ -258,17 +260,31 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
 	CDBG("setting up XML");
 
 	if (mode == MD_O_WRITE) {
-		sz = e_asprintf(&buf, ct_md_open_create_fmt, file);
+		xe = xmlsd_create(&xl, "ct_md_open_create");
+		xmlsd_set_attr(xe, "version", CT_MD_OPEN_CREATE_VERSION);
+		xe = xmlsd_add_element(&xl, xe, "file");
+		xmlsd_set_attr(xe, "name", file);
 	} else if (mode == MD_O_APPEND) {
-		sz = e_asprintf(&buf, ct_md_open_create_chunkno_fmt,
-		    file, chunkno);
+		xe = xmlsd_create(&xl, "ct_md_open_create");
+		xmlsd_set_attr(xe, "version", "V2"); /* XXX compatibility */
+		xe = xmlsd_add_element(&xl, xe, "file");
+		xmlsd_set_attr(xe, "name", file);
+		xmlsd_set_attr_uint32(xe, "chunkno", chunkno);
 	} else if (chunkno) {
-		sz = e_asprintf(&buf, ct_md_open_read_chunkno_fmt,
-		    file, chunkno);
+		xe = xmlsd_create(&xl, "ct_md_open_read");
+		xmlsd_set_attr(xe, "version", "V2"); /* XXX compatibility */
+		xe = xmlsd_add_element(&xl, xe, "file");
+		xmlsd_set_attr(xe, "name", file);
+		xmlsd_set_attr_uint32(xe, "chunkno", chunkno);
 	} else {
-		sz = e_asprintf(&buf, ct_md_open_read_fmt, file);
+		xe = xmlsd_create(&xl, "ct_md_open_read");
+		xmlsd_set_attr(xe, "version", CT_MD_OPEN_READ_VERSION);
+		xe = xmlsd_add_element(&xl, xe, "file");
+		xmlsd_set_attr(xe, "name", file);
 	}
-	sz += 1;	/* include null */
+
+	buf = xmlsd_generate(&xl, malloc, &sz, 1);
+	xmlsd_unwind(&xl);
 
 	hdr = &trans->hdr;
 	hdr->c_version = C_HDR_VERSION;
@@ -309,23 +325,40 @@ ct_xml_file_open_polled(struct ct_assl_io_ctx *ct_assl_ctx,
 	extern uint64_t		 ct_packet_id;
 	struct ct_header	 hdr;
 
+	struct xmlsd_element_list xl;
+	struct xmlsd_element	*xe;
 	char			*body = NULL;
-	int			 sz, rv = 1;
+	size_t			 sz;
+	int			 rv = 1;
 
 	CDBG("setting up XML");
 
 	if (mode == MD_O_WRITE) {
-		sz = e_asprintf(&body, ct_md_open_create_fmt, file);
+		xe = xmlsd_create(&xl, "ct_md_open_create");
+		xmlsd_set_attr(xe, "version", CT_MD_OPEN_CREATE_VERSION);
+		xe = xmlsd_add_element(&xl, xe, "file");
+		xmlsd_set_attr(xe, "name", (char *)file);
 	} else if (mode == MD_O_APPEND) {
-		sz = e_asprintf(&body, ct_md_open_create_chunkno_fmt,
-		    file, chunkno);
+		xe = xmlsd_create(&xl, "ct_md_open_create");
+		xmlsd_set_attr(xe, "version", "V2"); /* XXX compatibility */
+		xe = xmlsd_add_element(&xl, xe, "file");
+		xmlsd_set_attr(xe, "name", (char *)file);
+		xmlsd_set_attr_uint32(xe, "chunkno", chunkno);
 	} else if (chunkno) {
-		sz = e_asprintf(&body, ct_md_open_read_chunkno_fmt,
-		    file, chunkno);
+		xe = xmlsd_create(&xl, "ct_md_open_read");
+		xmlsd_set_attr(xe, "version", "V2"); /* XXX compatibility */
+		xe = xmlsd_add_element(&xl, xe, "file");
+		xmlsd_set_attr(xe, "name", (char *)file);
+		xmlsd_set_attr_uint32(xe, "chunkno", chunkno);
 	} else {
-		sz = e_asprintf(&body, ct_md_open_read_fmt, file);
+		xe = xmlsd_create(&xl, "ct_md_open_read");
+		xmlsd_set_attr(xe, "version", CT_MD_OPEN_READ_VERSION);
+		xe = xmlsd_add_element(&xl, xe, "file");
+		xmlsd_set_attr(xe, "name", (char *)file);
 	}
-	sz += 1;	/* include NUL */
+
+	body = xmlsd_generate(&xl, malloc, &sz, 1);
+	xmlsd_unwind(&xl);
 
 	hdr.c_version = C_HDR_VERSION;
 	hdr.c_opcode = C_HDR_O_XML;
@@ -344,7 +377,7 @@ ct_xml_file_open_polled(struct ct_assl_io_ctx *ct_assl_ctx,
 		CWARNX("could not write body");
 		goto done;
 	}
-	e_free(&body);
+	free(body);
 
 	/* get server reply */
 	if (ct_assl_io_read_poll(ct_assl_ctx, &hdr, sizeof hdr, ASSL_TIMEOUT)
@@ -375,11 +408,13 @@ done:
 void
 ct_xml_file_close(void)
 {
+	struct xmlsd_element_list xl;
+	struct xmlsd_element	*xe;
 	struct ct_header	*hdr = NULL;
 	struct ct_trans		*trans;
 	char			*buf = NULL;
 	char			*body = NULL;
-	int			sz;
+	size_t			sz;
 
 	trans = ct_trans_alloc();
 	if (trans == NULL) {
@@ -394,26 +429,27 @@ ct_xml_file_close(void)
 
 	CDBG("setting up XML");
 
-	// XXX: Some flavors of gcc don't like externed strings with no
-	// arguments to printf style functions since the format specifiers
-	// can't be checked at compile time.
-	sz = e_asprintf(&buf, "%s", ct_md_close_fmt);
-	sz += 1;	/* include null */
-
+	xe = xmlsd_create(&xl, "ct_md_close");
+	xmlsd_set_attr(xe, "version", CT_MD_CLOSE_VERSION);
+	buf = xmlsd_generate(&xl, malloc, &sz, 1);
+	if (sz == -1)
+		sz = 0;
+	else {
+		/*
+		 * XXX - yes I think this should be seperate
+		 * so that xml size is independant of chunk size
+		 */
+		body = (char *)ct_body_alloc(NULL, hdr);
+		CDBG("got body %p", body);
+		bcopy(buf, body, sz);
+		free(buf);
+	}
+	
 	hdr = &trans->hdr;
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
 	hdr->c_flags = C_HDR_F_METADATA;
 	hdr->c_size = sz;
-
-	/*
-	 * XXX - yes I think this should be seperate
-	 * so that xml size is independant of chunk size
-	 */
-	body = (char *)ct_body_alloc(NULL, hdr);
-	CDBG("got body %p", body);
-	bcopy(buf, body, sz);
-	e_free(&buf);
 
 	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
 	ct_state->ct_queued_qlen++;
@@ -566,11 +602,13 @@ ct_complete_metadata(struct ct_trans *trans)
 void
 ct_md_list_start(struct ct_op *op)
 {
+	struct xmlsd_element_list xl;
+	struct xmlsd_element	*xe;
 	struct ct_header	*hdr;
 	struct ct_trans		*trans;
 	char			*body = NULL;
 	char			*buf = NULL;
-	int			 sz;
+	size_t			 sz;
 
 	ct_set_file_state(CT_S_FINISHED);
 
@@ -581,8 +619,10 @@ ct_md_list_start(struct ct_op *op)
 
 	CDBG("setting up XML");
 
-	sz = e_asprintf(&buf, ct_md_list_fmt_v2, "");
-	sz += 1;	/* include null */
+	xe = xmlsd_create(&xl, "ct_md_list");
+	xmlsd_set_attr(xe, "version", CT_MD_LIST_VERSION);
+	buf = xmlsd_generate(&xl, malloc, &sz, 1);
+	xmlsd_unwind(&xl);
 
 	hdr = &trans->hdr;
 	hdr->c_version = C_HDR_VERSION;
@@ -597,7 +637,7 @@ ct_md_list_start(struct ct_op *op)
 	body = (char *)ct_body_alloc(NULL, hdr);
 	CDBG("got body %p", body);
 	bcopy(buf, body, sz);
-	e_free(&buf);
+	free(buf);
 
 	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
 	ct_state->ct_queued_qlen++;
@@ -705,18 +745,24 @@ ct_md_list_print(struct ct_op *op)
 void
 ct_md_delete(struct ct_op *op)
 {
+	struct xmlsd_element_list xl;
+	struct xmlsd_element	*xe;
 	const char		*md = op->op_remote_fname;
 	struct ct_header	*hdr;
 	struct ct_trans		*trans;
 	char			*buf, *body = NULL;
-	int			 sz;
+	size_t			 sz;
 
 	CDBG("setting up XML");
 
 	md = ct_md_cook_filename(md);
 
-	sz = e_asprintf(&buf, ct_md_delete_fmt, md);
-	sz += 1;	/* include null */
+	xe = xmlsd_create(&xl, "ct_md_delete");
+	xmlsd_set_attr(xe, "version", CT_MD_DELETE_VERSION);
+	xe = xmlsd_add_element(&xl, xe, "file");
+	xmlsd_set_attr(xe, "name", (char *)md);
+	buf = xmlsd_generate(&xl, malloc, &sz, 1);
+	xmlsd_unwind(&xl);
 
 	e_free(&md);
 
@@ -731,7 +777,7 @@ ct_md_delete(struct ct_op *op)
 
 	body = ct_body_alloc(NULL, hdr);
 	bcopy(buf, body, sz);
-	e_free(&buf);
+	free(buf);
 
 	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
 	ct_state->ct_queued_qlen++;
