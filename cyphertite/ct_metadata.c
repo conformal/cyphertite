@@ -434,23 +434,22 @@ ct_xml_file_close(void)
 	buf = xmlsd_generate(&xl, malloc, &sz, 1);
 	if (sz == -1)
 		sz = 0;
-	else {
-		/*
-		 * XXX - yes I think this should be seperate
-		 * so that xml size is independant of chunk size
-		 */
-		body = (char *)ct_body_alloc(NULL, hdr);
-		CDBG("got body %p", body);
-		bcopy(buf, body, sz);
-		free(buf);
-	}
-	
+
 	hdr = &trans->hdr;
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
 	hdr->c_flags = C_HDR_F_METADATA;
 	hdr->c_size = sz;
 
+	/*
+	 * XXX - yes I think this should be seperate
+	 * so that xml size is independant of chunk size
+	 */
+	body = (char *)ct_body_alloc(NULL, hdr);
+	CDBG("got body %p", body);
+	bcopy(buf, body, sz);
+	free(buf);
+	
 	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
 	ct_state->ct_queued_qlen++;
 
