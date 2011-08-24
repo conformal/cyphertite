@@ -389,7 +389,7 @@ ct_main(int argc, char **argv)
 		if (ct_basisbackup != NULL)
 			CFATALX("differential basis in remote mode");
 		if (ct_md_cachedir == NULL)
-			CFATALX("remote mode needs a cachedir set");
+			CFATALX("remote mode needs a md_cachedir set");
 		if (ct_md_cachedir[strlen(ct_md_cachedir) - 1] != '/') {
 			int rv;
 
@@ -402,7 +402,7 @@ ct_main(int argc, char **argv)
 		}
 
 		if (ct_make_full_path(ct_md_cachedir, 0700) != 0)
-			CFATALX("can't create metadata cachedir");
+			CFATALX("can't create metadata md_cachedir");
 	}
 
 	/* Don't bother starting a connection if just listing local files. */
