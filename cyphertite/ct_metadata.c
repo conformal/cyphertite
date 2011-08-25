@@ -299,7 +299,7 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
 	body = (char *)ct_body_alloc(NULL, hdr);
 	CDBG("got body %p", body);
 	bcopy(buf, body, sz);
-	e_free(&buf);
+	free(buf);
 
 	CDBG("open trans %"PRIu64, trans->tr_trans_id);
 
