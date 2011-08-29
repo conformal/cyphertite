@@ -28,8 +28,8 @@
 /* versioning */
 #define CT_VERSION_MAJOR	0
 #define CT_VERSION_MINOR	4
-#define CT_VERSION_PATCH	1
-#define CT_VERSION		"0.4.1"
+#define CT_VERSION_PATCH	2
+#define CT_VERSION		"0.4.2"
 
 extern int		cflags;
 extern int		ct_debug;

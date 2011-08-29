@@ -1,7 +1,7 @@
 # $cyphertite$
 
 %define name		cyphertite
-%define version		0.4.1
+%define version		0.4.2
 %define release		1
 
 Name: 		%{name}
@@ -15,7 +15,7 @@ Source: 	%{name}-%{version}.tar.gz
 Buildroot:	%{_tmppath}/%{name}-%{version}-buildroot
 Prefix: 	/usr
 Requires:	assl >= 0.10.0, clog >= 0.3.4, exude >= 0.4.0, shrink >= 0.2.1
-Requires:	xmlsd >= 0.3.1, libbsd, libevent >= 1.4, sqlite >= 3.6.23
+Requires:	xmlsd >= 0.5.0, libbsd, libevent >= 1.4, sqlite >= 3.6.23
 
 %description
 Cyphertite is a high-security scalable solution for online backups.
@@ -50,6 +50,14 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertitectl
 
 %changelog
+* Mon Aug 29 2011 - dhill 0.4.2-1
+- New metadata format introduced; shrinks md archives for most users by
+  not storing redundant path names for each file
+- Speed up operations that do not need crypto secrets by not decrypting
+  secrets upon startup
+- Switch to xmlsd_generate in libxmlsd instead of using printf XML
+  generation
+- Minor fixes and improvements
 * Wed Aug 18 2011 - davec 0.4.1-1
 - Reimplement logic to prevent cyphertite from exiting immediately when
   a file or directory can't be written during extract

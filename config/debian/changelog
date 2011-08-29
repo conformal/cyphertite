@@ -1,3 +1,15 @@
+cyphertite (0.4.2-1) unstable; urgency=low
+
+  - New metadata format introduced; shrinks md archives for most users
+    by not storing redundant path names for each file
+  - Speed up operations that do not need crypto secrets by not
+    decrypting secrets upon startup
+  - Switch to xmlsd_generate in libxmlsd instead of using printf XML
+    generation
+  - Minor fixes and improvements
+
+ -- Conformal Systems <package-discuss@conformal.com>  Mon, 29 Aug 2011 16:00:00 -0500
+
 cyphertite (0.4.1-1) unstable; urgency=low
 
   - Reimplement logic to prevent cyphertite from exiting immediately when
