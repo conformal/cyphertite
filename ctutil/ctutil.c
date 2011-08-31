@@ -472,7 +472,7 @@ ct_cli_usage(struct ct_cli_cmd *cmd_list, struct ct_cli_cmd *c)
 			break;
 	}
 
-	CFATALX("usage: %s%s%s %s %s", __progname,
+	CFATALX("usage: %s %s%s%s %s", __progname,
 	    cc->cc_cmd ? cc->cc_cmd : "",
 	    cc->cc_cmd ? " " : "",
 	    c->cc_cmd, c->cc_usage);
