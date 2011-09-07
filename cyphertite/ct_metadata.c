@@ -280,8 +280,8 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
 		xmlsd_set_attr(xe, "name", file);
 	}
 
-	if ((trans->tr_data[2] = xmlsd_generate(&xl, ct_body_alloc_xml,
-	    &sz, 1)) == NULL)
+	if ((trans->tr_data[2] = (uint8_t *)xmlsd_generate(&xl,
+	    ct_body_alloc_xml, &sz, 1)) == NULL)
 		CFATALX("%s: Could not allocate xml body", __func__);
 	xmlsd_unwind(&xl);
 	trans->tr_dataslot = 2;
@@ -404,8 +404,8 @@ ct_xml_file_close(void)
 	xe = xmlsd_create(&xl, "ct_md_close");
 	xmlsd_set_attr(xe, "version", CT_MD_CLOSE_VERSION);
 
-	if ((trans->tr_data[2] = xmlsd_generate(&xl, ct_body_alloc_xml,
-	    &sz, 1)) == NULL)
+	if ((trans->tr_data[2] = (uint8_t *)xmlsd_generate(&xl,
+	    ct_body_alloc_xml, &sz, 1)) == NULL)
 		CFATALX("%s: Could not allocate xml body", __func__);
 	xmlsd_unwind(&xl);
 	trans->tr_dataslot = 2;
@@ -570,8 +570,8 @@ ct_md_list_start(struct ct_op *op)
 	xe = xmlsd_create(&xl, "ct_md_list");
 	xmlsd_set_attr(xe, "version", CT_MD_LIST_VERSION);
 
-	if ((trans->tr_data[2] = xmlsd_generate(&xl, ct_body_alloc_xml,
-	    &sz, 1)) == NULL)
+	if ((trans->tr_data[2] = (uint8_t *)xmlsd_generate(&xl,
+	    ct_body_alloc_xml, &sz, 1)) == NULL)
 		CFATALX("%s: Could not allocate xml body", __func__);
 	xmlsd_unwind(&xl);
 	trans->tr_dataslot = 2;
@@ -691,8 +691,8 @@ ct_md_delete(struct ct_op *op)
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_state = TR_S_XML_DELETE;
 
-	if ((trans->tr_data[2] = xmlsd_generate(&xl, ct_body_alloc_xml,
-	    &sz, 1)) == NULL)
+	if ((trans->tr_data[2] = (uint8_t *)xmlsd_generate(&xl,
+	    ct_body_alloc_xml, &sz, 1)) == NULL)
 		CFATALX("%s: Could not allocate xml body", __func__);
 	xmlsd_unwind(&xl);
 	trans->tr_dataslot = 2;
