@@ -589,3 +589,8 @@ int			ct_get_answer(char *, char *, char *, char *, char *,
 			    size_t, int);
 int			ct_prompt_password(char *, char *, size_t, char *,
 			    size_t);
+
+/* init/cleanup */
+void			ct_init(int, int, int);
+void			ct_update_secrets(void);
+void			ct_cleanup(void);

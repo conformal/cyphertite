@@ -161,6 +161,7 @@ ct_load_config(struct ct_settings *settings)
 {
 	char		*config_path = NULL;
 	int		config_try = 0;
+	static char	ct_fullcachedir[PATH_MAX];
 
 	if (ct_configfile) {
 		if (ct_config_parse(settings, ct_configfile))
@@ -191,6 +192,41 @@ ct_load_config(struct ct_settings *settings)
 		config_try++;
 	}
 
+	ct_mdmode_setup(ct_mdmode_str);
+	/* Fix up md cachedir: code requires it to end with a slash. */
+	if (ct_md_cachedir != NULL &&
+	    ct_md_cachedir[strlen(ct_md_cachedir) - 1] != '/') {
+		int rv;
+
+		if ((rv = snprintf(ct_fullcachedir, sizeof(ct_fullcachedir),
+		    "%s/", ct_md_cachedir)) == -1 || rv > PATH_MAX)
+			CFATALX("invalid metadata pathname");
+		ct_md_cachedir = ct_fullcachedir;
+
+	}
+	/* And make sure it exists. */
+	if (ct_md_cachedir != NULL &&
+	    ct_make_full_path(ct_md_cachedir, 0700) != 0)
+		CFATALX("can't create metadata md_cachedir");
+
+	/* Apply compression from config. */
+	if (ct_compression_type == NULL) {
+		ct_compress_enabled = 0;
+	} else if (strcmp("lzo", ct_compression_type) == 0) {
+		ct_compress_enabled = C_HDR_F_COMP_LZO;
+	} else if (strcmp("lzma", ct_compression_type) == 0) {
+		ct_compress_enabled = C_HDR_F_COMP_LZMA;
+	} else if (strcmp("lzw", ct_compression_type) == 0) {
+		ct_compress_enabled = C_HDR_F_COMP_LZW;
+	} else {
+		CFATAL("compression type %s not recognized",
+		    ct_compression_type);
+	}
+	if (ct_compress_enabled != 0) {
+		ct_init_compression(ct_compress_enabled);
+		ct_cur_compress_mode = ct_compress_enabled;
+	}
+
 	return (0);
 }
 
@@ -199,11 +235,85 @@ ct_unload_config(void)
 {
 }
 
+void
+ct_init(int foreground, int need_secrets, int only_metadata)
+{
+	/* Run with restricted umask as we create numerous sensitive files. */
+	umask(S_IRWXG|S_IRWXO);
+
+	/* XXX - scale bandwith limiting until the algorithm is improved */
+	if (ct_io_bw_limit) {
+		ct_io_bw_limit = ct_io_bw_limit * 10 / 7;
+	}
+
+	if (!foreground)
+		cflags |= CLOG_F_SYSLOG;
+	if (clog_set_flags(cflags))
+		errx(1, "illegal clog flags");
+
+	if (!foreground)
+		if (daemon(1, ct_debug) == -1)
+			errx(1, "failed to daemonize");
+
+	/* set polltype used by libevent */
+	ct_polltype_setup(ct_polltype);
+
+	if (ct_md_mode == CT_MDMODE_REMOTE && only_metadata == 0) {
+		if (ct_md_cachedir == NULL)
+			CFATALX("remote mode needs a md_cachedir set");
+	}
+
+	if (need_secrets != 0) {
+		if (ct_crypto_secrets) {
+			if (ct_secrets_upload == 0 &&
+			    ct_create_or_unlock_secrets(ct_crypto_secrets,
+				ct_crypto_password))
+				CFATALX("can't unlock secrets");
+		} else {
+			ctdb_setup(ct_localdb, 0);
+		}
+	}
+
+	ct_event_init();
+	ct_setup_assl();
+
+	ct_setup_wakeup_file(ct_state, ct_nextop);
+	ct_setup_wakeup_sha(ct_state, ct_compute_sha);
+	ct_setup_wakeup_compress(ct_state, ct_compute_compress);
+	ct_setup_wakeup_csha(ct_state, ct_compute_csha);
+	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
+	ct_setup_wakeup_complete(ct_state, ct_process_completions);
+}
+
+void
+ct_update_secrets(void)
+{
+	if (ct_secrets_upload > 0) {
+		CDBG("doing list for crypto secrets");
+		ct_add_operation(ct_md_list_start,
+		    ct_check_crypto_secrets_nextop, ct_crypto_secrets,
+		    NULL, secrets_file_pattern, NULL, NULL,
+		    CT_MATCH_REGEX, 0);
+	} else {
+		ct_add_operation(ct_md_list_start,
+		    ct_md_trigger_delete, NULL, NULL,
+		    secrets_file_pattern, NULL, NULL,
+		    CT_MATCH_REGEX, 0);
+	}
+}
+
+void
+ct_cleanup(void)
+{
+	ct_trans_cleanup();
+	ct_flnode_cleanup();
+	ct_ssl_cleanup();
+}
+
 int
 ct_main(int argc, char **argv)
 {
 	char		pwd[PASS_MAX];
-	char		ct_fullcachedir[PATH_MAX];
 	char		*ct_basisbackup = NULL;
 	char		*ct_mfile = NULL;
 	char		*ct_excludefile = NULL;
@@ -344,66 +454,12 @@ ct_main(int argc, char **argv)
 		ct_usage();
 	}
 
-	/* Run with restricted umask as we create numerous sensitive files. */
-	umask(S_IRWXG|S_IRWXO);
-
-	/* XXX - scale bandwith limiting until the algorithm is improved */
-	if (ct_io_bw_limit) {
-		ct_io_bw_limit = ct_io_bw_limit * 10 / 7;
-	}
-
-	if (ct_compression_type == NULL) {
-		ct_compress_enabled = 0;
-	} else if (strcmp("lzo", ct_compression_type) == 0) {
-		ct_compress_enabled = C_HDR_F_COMP_LZO;
-	} else if (strcmp("lzma", ct_compression_type) == 0) {
-		ct_compress_enabled = C_HDR_F_COMP_LZMA;
-	} else if (strcmp("lzw", ct_compression_type) == 0) {
-		ct_compress_enabled = C_HDR_F_COMP_LZW;
-	} else {
-		CFATAL("compression type %s not recognized",
-		    ct_compression_type);
-	}
-	if (ct_compress_enabled != 0) {
-		ct_init_compression(ct_compress_enabled);
-		ct_cur_compress_mode = ct_compress_enabled;
-	}
-
-	if (!foreground)
-		cflags |= CLOG_F_SYSLOG;
-	if (clog_set_flags(cflags))
-		errx(1, "illegal clog flags");
-
-	if (!foreground)
-		if (daemon(1, ct_debug) == -1)
-			errx(1, "failed to daemonize");
-
 	if (level0)
 		ct_auto_differential = 0; /* force differential off */
 
-	/* set polltype used by libevent */
-	ct_polltype_setup(ct_polltype);
-	ct_mdmode_setup(ct_mdmode_str);
-
-	if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
-		if (ct_basisbackup != NULL)
-			CFATALX("differential basis in remote mode");
-		if (ct_md_cachedir == NULL)
-			CFATALX("remote mode needs a md_cachedir set");
-		if (ct_md_cachedir[strlen(ct_md_cachedir) - 1] != '/') {
-			int rv;
-
-			if ((rv = snprintf(ct_fullcachedir,
-			    sizeof(ct_fullcachedir),
-			    "%s/", ct_md_cachedir)) == -1 || rv >
-			    PATH_MAX)
-				CFATALX("invalid metadata pathname");
-			ct_md_cachedir = ct_fullcachedir;
-		}
-
-		if (ct_make_full_path(ct_md_cachedir, 0700) != 0)
-			CFATALX("can't create metadata md_cachedir");
-	}
+	if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0 &&
+	    ct_basisbackup != NULL)
+		CFATALX("differential basis in remote mode");
 
 	/* Don't bother starting a connection if just listing local files. */
 	if (ct_action == CT_A_LIST && ct_md_mode == CT_MDMODE_LOCAL &&
@@ -426,41 +482,9 @@ ct_main(int argc, char **argv)
 	    ct_action == CT_A_ARCHIVE || (ct_action == CT_A_LIST &&
 	    ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0));
 
-	if (need_secrets != 0) {
-		if (ct_crypto_secrets) {
-			if (ct_secrets_upload == 0 &&
-			    ct_create_or_unlock_secrets(ct_crypto_secrets,
-				ct_crypto_password))
-				CFATALX("can't unlock secrets");
-		} else {
-			ctdb_setup(ct_localdb, 0);
-		}
-	}
-
-	ct_event_init();
-	ct_setup_assl();
-
-	ct_setup_wakeup_file(ct_state, ct_nextop);
-	ct_setup_wakeup_sha(ct_state, ct_compute_sha);
-	ct_setup_wakeup_compress(ct_state, ct_compute_compress);
-	ct_setup_wakeup_csha(ct_state, ct_compute_csha);
-	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
-	ct_setup_wakeup_complete(ct_state, ct_process_completions);
-
-	if (need_secrets != 0) {
-		if (ct_secrets_upload > 0) {
-			CDBG("doing list for crypto secrets");
-			ct_add_operation(ct_md_list_start,
-			    ct_check_crypto_secrets_nextop, ct_crypto_secrets,
-			    NULL, secrets_file_pattern, NULL, NULL,
-			    CT_MATCH_REGEX, 0);
-		} else {
-			ct_add_operation(ct_md_list_start,
-			    ct_md_trigger_delete, NULL, NULL,
-			    secrets_file_pattern, NULL, NULL,
-			    CT_MATCH_REGEX, 0);
-		}
-	}
+	ct_init(foreground, need_secrets, ct_metadata);
+	if (need_secrets != 0)
+		ct_update_secrets();
 
 	if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
 		switch (ct_action) {
@@ -542,9 +566,7 @@ ct_main(int argc, char **argv)
 		CWARNX("event_dispatch returned, %d %s", errno,
 		    strerror(errno));
 
-	ct_trans_cleanup();
-	ct_flnode_cleanup();
-	ct_ssl_cleanup();
+	ct_cleanup();
 out:
 	if (includelist && freeincludes == 1)
 		ct_matchlist_free(includelist);
