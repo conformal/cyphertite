@@ -1009,9 +1009,44 @@ link_again:
 			tries++;
 			goto link_again;
 		}
-		if (ret)
+		if (ret && errno == EEXIST) {
+			if (fnode->fl_hardlink) {
+				struct stat	tsb, lsb;
+
+				if (lstat(appath, &tsb) != 0) {
+					CWARN("can't stat %s", appath);
+					goto link_out;
+				}
+				if (lstat(ltpath, &lsb) != 0) {
+					CWARN("can't stat %s", ltpath);
+					goto link_out;
+				}
+				if (tsb.st_dev != lsb.st_dev) {
+					CWARNX("%s and %s no longer on same "
+					    "device: can't link",
+					    appath, ltpath);
+					goto link_out;
+				}
+				/*
+				 * If inodes match, then carry on, we're
+				 * already ok
+				 */
+				if (tsb.st_ino == lsb.st_ino) {
+					ret = 0;
+					goto link_out;
+				}
+			}
+
+			if (unlink(ltpath) == 0)
+				goto link_again;
+			CWARN("can't remove old link %s", ltpath);
+		}
+link_out:
+		if (ret) {
 			CWARN("%s failed: %s to %s", fnode->fl_hardlink ?
 			    "link" : "symlink", ltpath, appath);
+			return;
+		}
 	} else {
 		CFATALX("illegal file %s of type %d", ltpath, fnode->fl_mode);
 	}
