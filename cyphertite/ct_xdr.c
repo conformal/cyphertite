@@ -37,6 +37,8 @@
 __attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
 int ct_populate_fnode(struct fnode *, struct ct_md_header *, int *);
+int ct_populate_fnode2(struct fnode *, struct ct_md_header *,
+    struct ct_md_header *, int *);
 FILE *ct_extract_setup_queue(const char *);
 FILE *ct_metadata_open_next(void);
 
@@ -412,25 +414,16 @@ ct_list_op(struct ct_op *op)
 int
 ct_list(const char *file, char **flist, char **excludelist, int match_mode)
 {
-	FILE			*xdr_f;
-	struct ct_md_gheader	gh;
-	struct ct_md_header	hdr;
-	struct ct_md_trailer	trl;
+	struct ct_xdr_state	xs_ctx;
 	struct fnode		fnodestore;
 	struct fnode		*fnode = &fnodestore;
 	struct ct_match		*match, *ex_match = NULL;
+	char			*ct_next_filename, *ct_filename_free = NULL;
 	int			state;
-	int			doprint;
-
-	off_t			pos0, pos1;
-	int			sha_size = -1;
-	int64_t			sha_cnt;
+	int			doprint = 0;
 	int			ret;
-	uint8_t			sha[SHA_DIGEST_LENGTH];
-	uint8_t			csha[SHA_DIGEST_LENGTH];
-	uint8_t			iv[E_IV_LEN];
+	int			i;
 	char			shat[SHA_DIGEST_STRING_LENGTH];
-	char			*ct_next_filename;
 
 	match = ct_match_compile(match_mode, flist);
 	if (excludelist != NULL)
@@ -440,94 +433,88 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode)
 
 next_file:
 	ct_next_filename = NULL;
-	xdr_f = ct_metadata_open(file,  &gh);
-	if (xdr_f == NULL)
+
+	ret = ct_xdr_parse_init(&xs_ctx, file);
+	if (ret)
 		CFATALX("failed to open %s", file);
 
-	if (gh.cmg_prevlvl_filename) 
-		CDBG("previous backup file %s\n", gh.cmg_prevlvl_filename);
-	if (gh.cmg_paths != NULL)
-		e_free(&gh.cmg_paths);
+	if (ct_filename_free) {
+		free(ct_filename_free);
+		ct_filename_free = NULL;
+	}
+
+	if (xs_ctx.xs_gh.cmg_prevlvl_filename) {
+		if (xs_ctx.xs_gh.cmg_prevlvl_filename[0] != '\0') {
+			CDBG("previous backup file %s\n",
+			    xs_ctx.xs_gh.cmg_prevlvl_filename);
+			ct_next_filename = xs_ctx.xs_gh.cmg_prevlvl_filename;
+			ct_filename_free = ct_next_filename;
+		} else {
+			free(xs_ctx.xs_gh.cmg_prevlvl_filename);
+			xs_ctx.xs_gh.cmg_prevlvl_filename = NULL;
+		}
+	}
+	if (xs_ctx.xs_gh.cmg_paths != NULL) {
+		for (i = 0; i < xs_ctx.xs_gh.cmg_num_paths; i++)
+			free(xs_ctx.xs_gh.cmg_paths[i]);
+
+		e_free(&xs_ctx.xs_gh.cmg_paths);
+	}
 	bzero(&fnodestore, sizeof(fnodestore));
-	file = NULL;
 
-	ret = ct_read_header(&hdr);
-
-	while (ret == 0 && hdr.cmh_beacon != CT_HDR_EOF) {
-		doprint = !ct_match(match, hdr.cmh_filename);
-		if (doprint && ex_match != NULL &&
-		    !ct_match(ex_match, hdr.cmh_filename))
-			doprint = 0;
-		ct_populate_fnode(fnode, &hdr, &state);
-
-		if (doprint )
-			ct_pr_fmt_file(fnode);
-
-		if (C_ISREG(hdr.cmh_type)) {
-			sha_cnt = hdr.cmh_nr_shas;
-			if (sha_cnt == -1) {
-				goto skipped;
+	do {
+		ret = ct_xdr_parse(&xs_ctx);
+		switch (ret) {
+		case XS_RET_FILE:
+			doprint = !ct_match(match, xs_ctx.xs_hdr.cmh_filename);
+			if (doprint && ex_match != NULL &&
+			    !ct_match(ex_match, xs_ctx.xs_hdr.cmh_filename))
+				doprint = 0;
+			/* XXX - ct_populate_fnode2 is optional now */
+			ct_populate_fnode2(fnode, &xs_ctx.xs_hdr,
+			    &xs_ctx.xs_lnkhdr, &state);
+			if (doprint) {
+				ct_pr_fmt_file(fnode);
+				if (!C_ISREG(xs_ctx.xs_hdr.cmh_type) ||
+				    ct_verbose > 2)
+					printf("\n");
 			}
-			if (doprint && ct_verbose > 2) {
-				printf("\n");
-				while (sha_cnt--) {
-					if (ct_encrypt_enabled) {
-						ret = ct_xdr_dedup_sha_crypto(
-						    &xdr, sha, csha, iv);
-					} else {
-						ret = ct_xdr_dedup_sha(&xdr,
-						    sha);
-					}
-					if (ret == FALSE)
-						CFATALX("error deduping sha");
-					ct_sha1_encode(sha, shat);
-					printf(" sha %s\n", shat);
-				}
-			} else {
-				if (sha_size < 0) {
-					pos0 = ftello(xdr_f);
-					if (ct_encrypt_enabled) {
-						ret = ct_xdr_dedup_sha_crypto(
-						    &xdr, sha, csha, iv);
-					} else {
-						ret = ct_xdr_dedup_sha(&xdr,
-						    sha);
-					}
-					if (ret == FALSE)
-						CFATALX("error deduping sha");
-					pos1 = ftello(xdr_f);
-					sha_size = pos1 - pos0;
-					sha_cnt--;
-				}
-				fseek(xdr_f, sha_size * sha_cnt, SEEK_CUR);
-			}
-skipped:
-			if (ct_read_trailer(&trl))
-				CFATALX("can't read metadata trailer");
+			if (fnode->fl_hlname)
+				e_free(&fnode->fl_hlname);
+			if (fnode->fl_sname)
+				e_free(&fnode->fl_sname);
+			break;
+		case XS_RET_FILE_END:
 			if (doprint && ct_verbose > 1)
 				printf(" shas: %" PRIu64 " reduction: %" PRIu64
 				    "%%\n",
-				    hdr.cmh_nr_shas,
-				    trl.cmt_orig_size == 0 ? 0 :
-				    100 * (trl.cmt_orig_size-trl.cmt_comp_size)
-				    /trl.cmt_orig_size);
+				    xs_ctx.xs_hdr.cmh_nr_shas,
+				    xs_ctx.xs_trl.cmt_orig_size == 0 ? 0 :
+				    100 * (xs_ctx.xs_trl.cmt_orig_size -
+					xs_ctx.xs_trl.cmt_comp_size)
+				    / xs_ctx.xs_trl.cmt_orig_size);
 			else if (doprint)
 				printf("\n");
-		} else if (doprint)
-			printf("\n");
+			break;
+		case XS_RET_SHA:
+			if (!(doprint && ct_verbose > 2)) {
+				if (ct_xdr_parse_seek(&xs_ctx)) {
+					CFATALX("seek failed");
+				}
+			} else {
+				ct_sha1_encode(xs_ctx.xs_sha, shat);
+				printf(" sha %s\n", shat);
+			}
+			break;
+		case XS_RET_EOF:
+			break;
+		case XS_RET_FAIL:
+			;
+		}
 
-		/* give back memory associated with old fnode */
-		if (fnode->fl_sname)
-			e_free(&fnode->fl_sname);
-		if (fnode->fl_hlname)
-			e_free(&fnode->fl_hlname);
+	} while (ret != XS_RET_EOF && ret != XS_RET_FAIL);
 
-		ret = ct_read_header(&hdr);
-	}
-
-	ct_metadata_close(xdr_f);
-
-	if (hdr.cmh_beacon != CT_HDR_EOF) {
+	if (ret != XS_RET_EOF) {
 		CWARNX("end of archive not hit");
 	} else {
 		if (ct_next_filename) {
@@ -975,6 +962,62 @@ ct_populate_fnode(struct fnode *fnode, struct ct_md_header *hdr, int *state)
 }
 
 int
+ct_populate_fnode2(struct fnode *fnode, struct ct_md_header *hdr,
+    struct ct_md_header *hdrlnk, int *state)
+{
+	struct flist		flistnode;
+	struct dnode		*dnode;
+
+
+	if (C_ISLINK(hdr->cmh_type)) {
+		/* hardlink/symlink */
+		fnode->fl_hlname = e_strdup(hdrlnk->cmh_filename);
+		fnode->fl_hardlink = !C_ISLINK(hdrlnk->cmh_type);
+		*state = TR_S_EX_SPECIAL;
+
+	} else if (!C_ISREG(hdr->cmh_type)) {
+		/* special file/dir */
+		*state = TR_S_EX_SPECIAL;
+	} else {
+		/* regular file */
+		*state = TR_S_EX_FILE_START;
+	}
+
+	/* ino not preserved? */
+	fnode->fl_rdev = hdr->cmh_rdev;
+	fnode->fl_uid = hdr->cmh_uid;
+	fnode->fl_gid = hdr->cmh_gid;
+	fnode->fl_mode = hdr->cmh_mode;
+	fnode->fl_mtime = hdr->cmh_mtime;
+	fnode->fl_atime = hdr->cmh_atime;
+	fnode->fl_type = hdr->cmh_type;
+
+	if (hdr->cmh_parent_dir != -1) {
+		flistnode.fl_fname = hdr->cmh_filename;
+
+		flistnode.fl_parent_dir = gen_finddir(hdr->cmh_parent_dir);
+		CDBG("parent_dir %p %" PRId64, flistnode.fl_parent_dir,
+		    hdr->cmh_parent_dir);
+
+		fnode->fl_sname = gen_fname(&flistnode);
+	} else 
+		fnode->fl_sname = e_strdup(hdr->cmh_filename);
+	CDBG("name %s from %s %" PRId64, fnode->fl_sname, hdr->cmh_filename,
+	    hdr->cmh_parent_dir);
+
+	if (C_ISDIR(hdr->cmh_type)) {
+		dnode = e_calloc(1,sizeof (*dnode));
+		dnode->d_name = e_strdup(fnode->fl_sname);
+		dnode->d_num = ct_ex_dirnum++;
+		RB_INSERT(d_num_tree, &ct_dnum_head, dnode);
+		CDBG("inserting %s as %" PRId64, dnode->d_name, dnode->d_num );
+	}
+
+
+	return 0;
+}
+
+int
 ct_basis_setup(const char *basisbackup, char **filelist)
 {
 	struct ct_md_gheader	 gh;
@@ -1095,4 +1138,155 @@ ct_metadata_check_prev(const char *mdname)
 	}
 
 	return ret;
+}
+
+int 
+ct_xdr_parse_init(struct ct_xdr_state *ctx, const char *file)
+{
+	ctx->xs_f = ct_metadata_open(file,  &ctx->xs_gh);
+	if (ctx->xs_f == NULL)
+		return 2;
+	
+	ctx->xs_sha_sz = 0;
+	ctx->xs_state = XS_STATE_FILE;
+	return 0;
+}
+
+int 
+ct_xdr_parse(struct ct_xdr_state *ctx)
+{
+	off_t			pos0, pos1;
+	int			ret;
+	int			rv = XS_STATE_FAIL;
+
+	pos0 = pos1 = 0;
+
+	switch (ctx->xs_state) {
+	case XS_STATE_FILE:
+		/* actually between files, next expected object is hdr */
+		ret = ct_read_header(&ctx->xs_hdr);
+		if (ret) 
+			goto fail;
+
+		if (ctx->xs_hdr.cmh_beacon == CT_HDR_EOF) {
+			ctx->xs_state = XS_STATE_EOF;
+			rv = XS_RET_EOF;
+			break;
+		}
+
+		if (C_ISLINK(ctx->xs_hdr.cmh_type)) {
+			ret = ct_read_header(&ctx->xs_lnkhdr);
+			if (ret) 
+				goto fail;
+		}
+		if (C_ISREG(ctx->xs_hdr.cmh_type)) {
+			ctx->xs_sha_cnt = ctx->xs_hdr.cmh_nr_shas;
+			ctx->xs_state = XS_STATE_SHA;
+		} else
+			ctx->xs_state = XS_STATE_FILE;
+		rv = XS_RET_FILE;
+		break;
+	case XS_STATE_SHA:
+		/*
+		 * in the middle of a file, expecting shas or trailer based
+		 * based on sha cnt.
+		 */
+		 if (ctx->xs_sha_cnt > 0) {
+			ctx->xs_sha_cnt--;
+			/* XXX gh check? */
+			if (ctx->xs_sha_sz == 0)
+				pos0 = ftello(ctx->xs_f);
+
+			if (ctx->xs_gh.cmg_flags & CT_MD_CRYPTO) {
+				ret = ct_xdr_dedup_sha_crypto(
+				    &xdr, ctx->xs_sha, ctx->xs_csha,
+				    ctx->xs_iv);
+			} else {
+				ret = ct_xdr_dedup_sha(&xdr,
+				    ctx->xs_sha);
+			}
+			if (ret == FALSE)
+				goto fail;
+
+			if (ctx->xs_sha_sz == 0) {
+				pos1 = ftello(ctx->xs_f);
+				ctx->xs_sha_sz = pos1 - pos0;
+			}
+
+			/*
+			 * this stays in SHA state even if
+			 * xs_sha_cnt == 0 so that it will read the trailer
+			 */
+			rv = XS_RET_SHA;
+		 } else {
+			ret = ct_read_trailer(&ctx->xs_trl);
+			if (ret)
+				goto fail;
+
+			ctx->xs_state = XS_STATE_FILE;
+			rv = XS_RET_FILE_END;
+		 }
+
+		break;
+	case XS_STATE_EOF:
+		/*
+		 * fall thru to fail here, reading again after end of file
+		 * is not allowed
+		 */
+	case XS_STATE_FAIL:
+		goto fail;
+
+	}
+	
+	return rv;
+fail:
+	ctx->xs_state = XS_STATE_FAIL;
+	return XS_RET_FAIL;
+}
+
+/*
+ * If in SHA state, it is valid to tell the reader to seek to the end
+ * of the shas and read the file trailer
+ */
+int 
+ct_xdr_parse_seek(struct ct_xdr_state *ctx)
+{
+	off_t	pos0, pos1;
+
+	if (ctx->xs_state != XS_STATE_SHA)
+		return 1;
+	if (ctx->xs_sha_cnt <= 0)
+		return 0;
+
+	if (ctx->xs_sha_sz == 0) {
+		pos0 = ftello(ctx->xs_f);
+		if (ctx->xs_gh.cmg_flags & CT_MD_CRYPTO) {
+			if (ct_xdr_dedup_sha_crypto(&xdr, ctx->xs_sha,
+			    ctx->xs_csha, ctx->xs_iv) == FALSE) {
+				CFATALX("file corrupt: can't get sha");
+				ctx->xs_state = XS_STATE_FAIL;
+				return 1;
+			}
+		} else if (ct_xdr_dedup_sha(&xdr, ctx->xs_sha) == FALSE) {
+			ctx->xs_state = XS_STATE_FAIL;
+			return 1;
+		}
+
+		pos1 = ftello(ctx->xs_f);
+		ctx->xs_sha_sz = pos1 - pos0;
+		ctx->xs_sha_cnt--;
+	}
+	if (fseek(ctx->xs_f, ctx->xs_sha_sz * ctx->xs_sha_cnt, SEEK_CUR) != 0) {
+		ctx->xs_state = XS_STATE_FAIL;
+		return 1;
+	}
+	ctx->xs_sha_cnt = 0;
+	
+	return 0;
+}
+
+void
+ct_xdr_parse_close(struct ct_xdr_state *ctx)
+{
+	ct_metadata_close(ctx->xs_f);
 }

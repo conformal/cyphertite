@@ -594,3 +594,35 @@ int			ct_prompt_password(char *, char *, size_t, char *,
 void			ct_init(int, int, int);
 void			ct_update_secrets(void);
 void			ct_cleanup(void);
+
+/* XDR parser for cyphertite MD archives */
+struct ct_xdr_state {
+	FILE			*xs_f;
+	struct ct_md_gheader	 xs_gh;
+	struct ct_md_header	 xs_hdr;
+	struct ct_md_header	 xs_lnkhdr;
+	struct ct_md_trailer	 xs_trl;
+	int			 xs_state;
+	int			 xs_sha_cnt;
+	size_t			 xs_sha_sz;
+
+	uint8_t			 xs_sha[SHA_DIGEST_LENGTH];
+	uint8_t			 xs_csha[SHA_DIGEST_LENGTH];
+	uint8_t			 xs_iv[E_IV_LEN];
+#define	XS_STATE_FILE		0
+#define	XS_STATE_SHA		1
+#define	XS_STATE_EOF		2
+#define	XS_STATE_FAIL		3
+
+#define	XS_RET_FILE		0
+#define	XS_RET_SHA		1
+#define	XS_RET_FILE_END		2
+#define	XS_RET_EOF		3
+#define	XS_RET_FAIL		4
+};
+
+int ct_xdr_parse_init(struct ct_xdr_state *, const char *);
+int ct_xdr_parse(struct ct_xdr_state *);
+int ct_xdr_parse_seek(struct ct_xdr_state *);
+void ct_xdr_parse_close(struct ct_xdr_state *);
+
