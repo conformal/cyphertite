@@ -249,8 +249,6 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
 {
 	struct xmlsd_element_list	 xl;
 	struct xmlsd_element		*xe;
-	char				*body = NULL;
-	char				*buf = NULL;
 	size_t				 sz;
 
 	trans->tr_trans_id = ct_trans_id++;
@@ -282,18 +280,10 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
 		xmlsd_set_attr(xe, "name", file);
 	}
 
-	buf = xmlsd_generate(&xl, malloc, &sz, 1);
+	if ((trans->tr_data[2] = xmlsd_generate(&xl, ct_body_alloc_xml,
+	    &sz, 1)) == NULL)
+		CFATALX("%s: Could not allocate xml body", __func__);
 	xmlsd_unwind(&xl);
-
-	trans->hdr.c_opcode = C_HDR_O_XML;
-	trans->hdr.c_size = sz;
-	/* uses body alloc directly so xml size is independant of chunk size */
-	body = (char *)ct_body_alloc(NULL, &trans->hdr);
-	CDBG("got body %p", body);
-	bcopy(buf, body, sz);
-	free(buf);
-
-	trans->tr_data[2] = body;
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = sz;
 
@@ -396,8 +386,6 @@ ct_xml_file_close(void)
 	struct xmlsd_element_list	 xl;
 	struct xmlsd_element		*xe;
 	struct ct_trans			*trans;
-	char				*buf = NULL;
-	char				*body = NULL;
 	size_t				 sz;
 
 	trans = ct_trans_alloc();
@@ -415,19 +403,11 @@ ct_xml_file_close(void)
 
 	xe = xmlsd_create(&xl, "ct_md_close");
 	xmlsd_set_attr(xe, "version", CT_MD_CLOSE_VERSION);
-	buf = xmlsd_generate(&xl, malloc, &sz, 1);
-	if (sz == -1)
-		sz = 0;
 
-	trans->hdr.c_opcode = C_HDR_O_XML;
-	trans->hdr.c_size = sz;
-	/* uses body alloc directly so xml size is independant of chunk size */
-	body = (char *)ct_body_alloc(NULL, &trans->hdr);
-	CDBG("got body %p", body);
-	bcopy(buf, body, sz);
-	free(buf);
-
-	trans->tr_data[2] = body;
+	if ((trans->tr_data[2] = xmlsd_generate(&xl, ct_body_alloc_xml,
+	    &sz, 1)) == NULL)
+		CFATALX("%s: Could not allocate xml body", __func__);
+	xmlsd_unwind(&xl);
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = sz;
 
@@ -576,8 +556,6 @@ ct_md_list_start(struct ct_op *op)
 	struct xmlsd_element_list	 xl;
 	struct xmlsd_element		*xe;
 	struct ct_trans			*trans;
-	char				*body = NULL;
-	char				*buf = NULL;
 	size_t				 sz;
 
 	ct_set_file_state(CT_S_FINISHED);
@@ -591,18 +569,11 @@ ct_md_list_start(struct ct_op *op)
 
 	xe = xmlsd_create(&xl, "ct_md_list");
 	xmlsd_set_attr(xe, "version", CT_MD_LIST_VERSION);
-	buf = xmlsd_generate(&xl, malloc, &sz, 1);
+
+	if ((trans->tr_data[2] = xmlsd_generate(&xl, ct_body_alloc_xml,
+	    &sz, 1)) == NULL)
+		CFATALX("%s: Could not allocate xml body", __func__);
 	xmlsd_unwind(&xl);
-
-	trans->hdr.c_opcode = C_HDR_O_XML;
-	trans->hdr.c_size = sz;
-	/* uses body alloc directly so xml size is independant of chunk size */
-	body = (char *)ct_body_alloc(NULL, &trans->hdr);
-	CDBG("got body %p", body);
-	bcopy(buf, body, sz);
-	free(buf);
-
-	trans->tr_data[2] = body;
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = sz;
 
@@ -701,14 +672,11 @@ ct_md_list_print(struct ct_op *op)
 void
 ct_md_delete(struct ct_op *op)
 {
-	struct xmlsd_element_list xl;
-	struct xmlsd_element	*xe;
-	const char		*md = op->op_remote_fname;
-	struct ct_trans		*trans;
-	char			*buf, *body = NULL;
-	size_t			 sz;
-
-	CDBG("setting up XML");
+	struct xmlsd_element_list	 xl;
+	struct xmlsd_element		*xe;
+	const char			*md = op->op_remote_fname;
+	struct ct_trans			*trans;
+	size_t				 sz;
 
 	md = ct_md_cook_filename(md);
 
@@ -716,8 +684,6 @@ ct_md_delete(struct ct_op *op)
 	xmlsd_set_attr(xe, "version", CT_MD_DELETE_VERSION);
 	xe = xmlsd_add_element(&xl, xe, "file");
 	xmlsd_set_attr(xe, "name", (char *)md);
-	buf = xmlsd_generate(&xl, malloc, &sz, 1);
-	xmlsd_unwind(&xl);
 
 	e_free(&md);
 
@@ -725,14 +691,10 @@ ct_md_delete(struct ct_op *op)
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_state = TR_S_XML_DELETE;
 
-	trans->hdr.c_opcode = C_HDR_O_XML;
-	trans->hdr.c_size = sz;
-	/* uses body alloc directly so xml size is independant of chunk size */
-	body = (char *)ct_body_alloc(NULL, &trans->hdr);
-	bcopy(buf, body, sz);
-	free(buf);
-
-	trans->tr_data[2] = body;
+	if ((trans->tr_data[2] = xmlsd_generate(&xl, ct_body_alloc_xml,
+	    &sz, 1)) == NULL)
+		CFATALX("%s: Could not allocate xml body", __func__);
+	xmlsd_unwind(&xl);
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = sz;
 

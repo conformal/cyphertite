@@ -629,6 +629,21 @@ ct_body_alloc(void *vctx, struct ct_header *hdr)
 	return body;
 }
 
+/*
+ * For use with xmlsd_generate for allocating xml bodies.
+ * The body alloc is done directly instead of in another path so as to
+ * decouple xml size from chunk size.
+ */
+void *
+ct_body_alloc_xml(size_t sz)
+{
+	struct ct_header	 hdr;
+
+	hdr.c_opcode = C_HDR_O_XML;
+	hdr.c_size = sz;
+	return (ct_body_alloc(NULL, &hdr));
+}
+
 void
 ct_body_free(void *vctx, void *body, struct ct_header *hdr)
 {
