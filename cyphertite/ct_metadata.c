@@ -247,12 +247,11 @@ void
 ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
     uint32_t chunkno)
 {
-	struct xmlsd_element_list xl;
-	struct xmlsd_element	*xe;
-	struct ct_header	*hdr = NULL;
-	char			*body = NULL;
-	char			*buf = NULL;
-	size_t			sz;
+	struct xmlsd_element_list	 xl;
+	struct xmlsd_element		*xe;
+	char				*body = NULL;
+	char				*buf = NULL;
+	size_t				 sz;
 
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_state = TR_S_XML_OPEN;
@@ -286,35 +285,21 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
 	buf = xmlsd_generate(&xl, malloc, &sz, 1);
 	xmlsd_unwind(&xl);
 
-	hdr = &trans->hdr;
-	hdr->c_version = C_HDR_VERSION;
-	hdr->c_opcode = C_HDR_O_XML;
-	hdr->c_flags = C_HDR_F_METADATA;
-	hdr->c_size = sz;
-
-	/*
-	 * XXX - yes I think this should be seperate
-	 * so that xml size is independant of chunk size
-	 */
-	body = (char *)ct_body_alloc(NULL, hdr);
+	trans->hdr.c_opcode = C_HDR_O_XML;
+	trans->hdr.c_size = sz;
+	/* uses body alloc directly so xml size is independant of chunk size */
+	body = (char *)ct_body_alloc(NULL, &trans->hdr);
 	CDBG("got body %p", body);
 	bcopy(buf, body, sz);
 	free(buf);
 
+	trans->tr_data[2] = body;
+	trans->tr_dataslot = 2;
+	trans->tr_size[2] = sz;
+
 	CDBG("open trans %"PRIu64, trans->tr_trans_id);
+	ct_queue_transfer(trans);
 
-	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
-	ct_state->ct_queued_qlen++;
-
-	/* did we idle out? - something better?*/
-	while (ct_reconnect_pending) {
-		if (ct_reconnect_internal() != 0) {
-			sleep(30);
-		} else {
-			ct_reconnect_pending = 0;
-		}
-	}
-	ct_assl_write_op(ct_assl_ctx, hdr, body);
 }
 
 int
@@ -408,13 +393,12 @@ done:
 void
 ct_xml_file_close(void)
 {
-	struct xmlsd_element_list xl;
-	struct xmlsd_element	*xe;
-	struct ct_header	*hdr = NULL;
-	struct ct_trans		*trans;
-	char			*buf = NULL;
-	char			*body = NULL;
-	size_t			sz;
+	struct xmlsd_element_list	 xl;
+	struct xmlsd_element		*xe;
+	struct ct_trans			*trans;
+	char				*buf = NULL;
+	char				*body = NULL;
+	size_t				 sz;
 
 	trans = ct_trans_alloc();
 	if (trans == NULL) {
@@ -435,33 +419,19 @@ ct_xml_file_close(void)
 	if (sz == -1)
 		sz = 0;
 
-	hdr = &trans->hdr;
-	hdr->c_version = C_HDR_VERSION;
-	hdr->c_opcode = C_HDR_O_XML;
-	hdr->c_flags = C_HDR_F_METADATA;
-	hdr->c_size = sz;
-
-	/*
-	 * XXX - yes I think this should be seperate
-	 * so that xml size is independant of chunk size
-	 */
-	body = (char *)ct_body_alloc(NULL, hdr);
+	trans->hdr.c_opcode = C_HDR_O_XML;
+	trans->hdr.c_size = sz;
+	/* uses body alloc directly so xml size is independant of chunk size */
+	body = (char *)ct_body_alloc(NULL, &trans->hdr);
 	CDBG("got body %p", body);
 	bcopy(buf, body, sz);
 	free(buf);
-	
-	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
-	ct_state->ct_queued_qlen++;
 
-	/* did we idle out? - something better?*/
-	while (ct_reconnect_pending) {
-		if (ct_reconnect_internal() != 0) {
-			sleep(30);
-		} else {
-			ct_reconnect_pending = 0;
-		}
-	}
-	ct_assl_write_op(ct_assl_ctx, hdr, body);
+	trans->tr_data[2] = body;
+	trans->tr_dataslot = 2;
+	trans->tr_size[2] = sz;
+
+	ct_queue_transfer(trans);
 }
 
 void
@@ -581,6 +551,8 @@ ct_complete_metadata(struct ct_trans *trans)
 	case TR_S_WMD_READY:
 	case TR_S_XML_OPEN:
 	case TR_S_XML_CLOSING:
+	case TR_S_XML_CLOSED:
+	case TR_S_XML_OPENED:
 	case TR_S_READ:
 		break;
 	case TR_S_XML_CLOSE:
@@ -601,13 +573,12 @@ ct_complete_metadata(struct ct_trans *trans)
 void
 ct_md_list_start(struct ct_op *op)
 {
-	struct xmlsd_element_list xl;
-	struct xmlsd_element	*xe;
-	struct ct_header	*hdr;
-	struct ct_trans		*trans;
-	char			*body = NULL;
-	char			*buf = NULL;
-	size_t			 sz;
+	struct xmlsd_element_list	 xl;
+	struct xmlsd_element		*xe;
+	struct ct_trans			*trans;
+	char				*body = NULL;
+	char				*buf = NULL;
+	size_t				 sz;
 
 	ct_set_file_state(CT_S_FINISHED);
 
@@ -623,33 +594,19 @@ ct_md_list_start(struct ct_op *op)
 	buf = xmlsd_generate(&xl, malloc, &sz, 1);
 	xmlsd_unwind(&xl);
 
-	hdr = &trans->hdr;
-	hdr->c_version = C_HDR_VERSION;
-	hdr->c_opcode = C_HDR_O_XML;
-	hdr->c_flags = C_HDR_F_METADATA;
-	hdr->c_size = sz;
-
-	/*
-	 * XXX - yes I think this should be seperate
-	 * so that xml size is independant of chunk size
-	 */
-	body = (char *)ct_body_alloc(NULL, hdr);
+	trans->hdr.c_opcode = C_HDR_O_XML;
+	trans->hdr.c_size = sz;
+	/* uses body alloc directly so xml size is independant of chunk size */
+	body = (char *)ct_body_alloc(NULL, &trans->hdr);
 	CDBG("got body %p", body);
 	bcopy(buf, body, sz);
 	free(buf);
 
-	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
-	ct_state->ct_queued_qlen++;
+	trans->tr_data[2] = body;
+	trans->tr_dataslot = 2;
+	trans->tr_size[2] = sz;
 
-	/* did we idle out? - something better?*/
-	while (ct_reconnect_pending) {
-		if (ct_reconnect_internal() != 0) {
-			sleep(30);
-		} else {
-			ct_reconnect_pending = 0;
-		}
-	}
-	ct_assl_write_op(ct_assl_ctx, hdr, body);
+	ct_queue_transfer(trans);
 }
 
 void
@@ -747,7 +704,6 @@ ct_md_delete(struct ct_op *op)
 	struct xmlsd_element_list xl;
 	struct xmlsd_element	*xe;
 	const char		*md = op->op_remote_fname;
-	struct ct_header	*hdr;
 	struct ct_trans		*trans;
 	char			*buf, *body = NULL;
 	size_t			 sz;
@@ -768,28 +724,19 @@ ct_md_delete(struct ct_op *op)
 	trans = ct_trans_alloc();
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_state = TR_S_XML_DELETE;
-	hdr = &trans->hdr;
-	hdr->c_version = C_HDR_VERSION;
-	hdr->c_opcode = C_HDR_O_XML;
-	hdr->c_size = sz;
-	hdr->c_flags = C_HDR_F_METADATA;
 
-	body = ct_body_alloc(NULL, hdr);
+	trans->hdr.c_opcode = C_HDR_O_XML;
+	trans->hdr.c_size = sz;
+	/* uses body alloc directly so xml size is independant of chunk size */
+	body = (char *)ct_body_alloc(NULL, &trans->hdr);
 	bcopy(buf, body, sz);
 	free(buf);
 
-	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
-	ct_state->ct_queued_qlen++;
+	trans->tr_data[2] = body;
+	trans->tr_dataslot = 2;
+	trans->tr_size[2] = sz;
 
-	/* did we idle out? - something better?*/
-	while (ct_reconnect_pending) {
-		if (ct_reconnect_internal() != 0) {
-			sleep(30);
-		} else {
-			ct_reconnect_pending = 0;
-		}
-	}
-	ct_assl_write_op(ct_assl_ctx, hdr, body);
+	ct_queue_transfer(trans);
 }
 
 void
@@ -843,10 +790,9 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 				}
 			}
 		}
-		if (die) {
-			CWARNX("couldn't open md file");
-			ct_shutdown();
-		}
+		if (die)
+			CFATALX("couldn't open md file");
+		trans->tr_state = TR_S_XML_OPENED;
 	} else if (strcmp(xe->name, "ct_md_close") == 0) {
 		md_is_open = 0;
 		trans->tr_state = TR_S_DONE;

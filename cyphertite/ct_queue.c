@@ -223,15 +223,21 @@ skip_csha:
 	case TR_S_EX_SPECIAL:
 	case TR_S_EX_FILE_END:
 	case TR_S_DONE:
-	case TR_S_XML_OPEN:
+	case TR_S_XML_OPENED:
 	case TR_S_XML_CLOSE:
-	case TR_S_XML_CLOSING:
-	case TR_S_XML_LIST:
-	case TR_S_XML_DELETE:
+	case TR_S_XML_CLOSED:
 		RB_INSERT(ct_trans_lookup, &ct_state->ct_complete, trans);
 		ct_state->ct_complete_rblen++;
 
 		ct_wakeup_complete();
+		break;
+	case TR_S_XML_OPEN:
+	case TR_S_XML_LIST:
+	case TR_S_XML_CLOSING:
+	case TR_S_XML_DELETE:
+		ct_state->ct_write_qlen++;
+		TAILQ_INSERT_TAIL(&ct_state->ct_write_queue, trans, tr_next);
+		ct_wakeup_write();
 		break;
 	default:
 		CFATALX("state %d, not handled in ct_queue_transfer()",
@@ -292,6 +298,10 @@ ct_trans_free(struct ct_trans *trans)
 	/* This should come from preallocated shared memory freelist */
 	TAILQ_INSERT_HEAD(&ct_trans_free_head, trans, tr_next);
 	c_trans_free++;
+	if (trans->tr_dataslot == 2) {
+		ct_body_free(NULL, trans->tr_data[2], &trans->hdr);
+		trans->tr_data[2] = NULL;
+	}
 
 	/* XXX - should this wait for a low threshold? */
 	if (ct_state->ct_file_state == CT_S_WAITING_TRANS) {
@@ -354,13 +364,12 @@ ct_reconnect_internal(void)
 				 * restart will have closed it for us, so
 				 * just complete it and stop worrying
 				 */
-				if (trans->tr_state == TR_S_XML_CLOSING ||
-				    trans->tr_state == TR_S_XML_CLOSE) {
+				if (trans->tr_state == TR_S_XML_CLOSING) {
 					CDBG("found close in queue, completing");
-					/* Don't try and close again */
-					/* XXX should be S_DONE? */
-					trans->tr_state = TR_S_XML_CLOSING;
-					/* complete it and stop worrying */;
+					/*
+					 * Don't try and close again,
+					 * complete it and stop worrying.
+					 */
 					TAILQ_REMOVE(&ct_state->ct_write_queue,
 					    trans, tr_next);
 					ct_state->ct_write_qlen--;
@@ -1043,6 +1052,15 @@ ct_wakeup_write(void)
 			hdr->c_size = sizeof(trans->tr_sha);
 			data = trans->tr_sha;
 			break;
+		case TR_S_XML_OPEN:
+		case TR_S_XML_CLOSING:
+		case TR_S_XML_LIST:
+		case TR_S_XML_DELETE:
+			hdr->c_opcode = C_HDR_O_XML;
+			hdr->c_flags = C_HDR_F_METADATA;
+			hdr->c_size = trans->tr_size[2];
+			data = trans->tr_data[2];
+			break;
 		default:
 			CFATALX("unexpected state in wakeup_write %d",
 			    trans->tr_state);
@@ -1195,7 +1213,7 @@ ct_handle_read_reply(struct ct_trans *trans, struct ct_header *hdr,
 				 * We had two ios in flight when we hit eof.
 				 * We're already closing so just carry on
 				 */
-				trans->tr_state = TR_S_XML_CLOSING;
+				trans->tr_state = TR_S_XML_CLOSED;
 			}
 		} else {
 			ct_sha1_encode(trans->tr_sha, shat);
@@ -1268,6 +1286,10 @@ ct_compute_compress(void *vctx)
 			CFATALX("compression mode 0?");
 
 		slot = trans->tr_dataslot;
+		if (slot > 1) {
+			CFATALX("transaction with special slot in compress: %d",
+			    slot);
+		}
 		src = trans->tr_data[slot];
 		len = trans->tr_size[slot];
 		dst =  trans->tr_data[!slot];
@@ -1365,6 +1387,10 @@ ct_compute_encrypt(void *vctx)
 
 
 		slot = trans->tr_dataslot;
+		if (slot > 1) {
+			CFATALX("transaction with special slot in encrypt: %d",
+			    slot);
+		}
 		src = trans->tr_data[slot];
 		len = trans->tr_size[slot];
 		dst =  trans->tr_data[!slot];

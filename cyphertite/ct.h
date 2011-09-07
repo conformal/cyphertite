@@ -211,10 +211,12 @@ struct ct_trans {
 #define TR_S_EX_SPECIAL		(19)
 #define TR_S_EX_FILE_END	(20)
 #define TR_S_XML_OPEN		(21)
-#define TR_S_XML_CLOSE		(22)
-#define TR_S_XML_CLOSING	(23)
-#define TR_S_XML_LIST		(24)
-#define TR_S_XML_DELETE		(25)
+#define TR_S_XML_OPENED		(22)
+#define TR_S_XML_CLOSE		(23)
+#define TR_S_XML_CLOSING	(24)
+#define TR_S_XML_CLOSED		(25)
+#define TR_S_XML_LIST		(26)
+#define TR_S_XML_DELETE		(27)
 
 	char			tr_dataslot;
 	char			tr_eof;
@@ -225,9 +227,9 @@ struct ct_trans {
 
 
 	int			tr_chsize;
-	int			tr_size[2];
+	int			tr_size[3];
 
-	uint8_t			*tr_data[2];
+	uint8_t			*tr_data[3];
 	uint32_t		tr_md_chunkno;
 	const char		*tr_md_name;
 };
