@@ -1133,7 +1133,6 @@ ct_handle_exists_reply(struct ct_trans *trans, struct ct_header *hdr,
 	case C_HDR_S_EXISTS:
 		/* enter shas into local db */
 		trans->tr_state = TR_S_EXISTS;
-		slot = trans->tr_dataslot;
 		ct_stats->st_bytes_exists += trans->tr_chsize;
 		ct_queue_transfer(trans);
 		break;
