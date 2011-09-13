@@ -1,7 +1,7 @@
 # $cyphertite$
 
 %define name		cyphertite
-%define version		0.4.2
+%define version		0.4.3
 %define release		1
 
 Name: 		%{name}
@@ -50,6 +50,10 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertitectl
 
 %changelog
+* Tue Sep 13 2011 - davec 0.4.3-1
+- Add logic to better handle differential extracts over an existing file
+  system
+- Misc code cleanup and bug fixes
 * Mon Aug 29 2011 - dhill 0.4.2-1
 - New metadata format introduced; shrinks md archives for most users by
   not storing redundant path names for each file

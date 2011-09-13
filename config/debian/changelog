@@ -1,3 +1,11 @@
+cyphertite (0.4.3-1) unstable; urgency=low
+
+  - Add logic to better handle differential extracts over an existing file
+    system
+  - Misc code cleanup and bug fixes
+
+ -- Conformal Systems <package-discuss@conformal.com>  Tue, 13 Sep 2011 14:28:38 -0500
+
 cyphertite (0.4.2-1) unstable; urgency=low
 
   - New metadata format introduced; shrinks md archives for most users
