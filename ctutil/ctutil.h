@@ -243,7 +243,7 @@ struct ct_cli_cmd {
 };
 
 struct ct_cli_cmd	*ct_cli_cmd_find(struct ct_cli_cmd *, char *);
-void			ct_cli_usage(struct ct_cli_cmd *, struct ct_cli_cmd *);
+__dead void		ct_cli_usage(struct ct_cli_cmd *, struct ct_cli_cmd *);
 struct ct_cli_cmd	*ct_cli_validate(struct ct_cli_cmd *, int *, char ***);
 void			ct_cli_execute(struct ct_cli_cmd *, int *, char ***);
 
