@@ -453,7 +453,7 @@ ct_cli_cmd_find(struct ct_cli_cmd *cl, char *cmd)
 	return (found);
 }
 
-void
+__dead void
 ct_cli_usage(struct ct_cli_cmd *cmd_list, struct ct_cli_cmd *c)
 {
 	struct ct_cli_cmd	*cc, *found;
