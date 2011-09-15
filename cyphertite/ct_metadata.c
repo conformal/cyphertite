@@ -68,12 +68,25 @@ int			strcompare(const void *, const void *);
 void			ct_md_list_complete(int, char **, char **,
 			    struct md_list_tree *);
 
+void ct_cull_send_shas(struct ct_op *);
+void ct_cull_setup(struct ct_op *);
+void ct_cull_start_shas(struct ct_op *);
+void ct_cull_start_complete(struct ct_op *op);
+void ct_cull_send_complete(struct ct_op *op);
+void ct_cull_complete(struct ct_op *op);
+
 struct xmlsd_v_elements ct_xml_cmds[] = {
 	{ "ct_md_list", xe_ct_md_list },
 	{ "ct_md_open_read", xe_ct_md_open_read },
 	{ "ct_md_open_create", xe_ct_md_open_create },
 	{ "ct_md_delete", xe_ct_md_delete },
 	{ "ct_md_close", xe_ct_md_close },
+	{ "ct_cull_setup", xe_ct_cull_setup },
+	{ "ct_cull_shas", xe_ct_cull_shas },
+	{ "ct_cull_complete", xe_ct_cull_complete },
+	{ "ct_cull_setup_reply", xe_ct_cull_setup_reply },
+	{ "ct_cull_shas_reply", xe_ct_cull_shas_reply },
+	{ "ct_cull_complete_reply", xe_ct_cull_complete_reply },
 	{ NULL, NULL }
 };
 
@@ -542,6 +555,9 @@ ct_complete_metadata(struct ct_trans *trans)
 		ct_xml_file_close();
 		break;
 
+	case TR_S_XML_CULL_REPLIED:
+		ct_wakeup_file();
+		break;
 	default:
 		CFATALX("unexpected tr state in %s %d", __func__,
 		    trans->tr_state);
@@ -797,6 +813,20 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 			}
 		}
 		trans->tr_state = TR_S_DONE;
+	} else  if (strcmp(xe->name, "ct_cull_setup_reply") == 0) {
+		CDBG("cull_setup_reply");
+		trans->tr_state = TR_S_DONE;
+	} else  if (strcmp(xe->name, "ct_cull_shas_reply") == 0) {
+		CDBG("cull_shas_reply");
+		if (trans->tr_eof == 1)
+			trans->tr_state = TR_S_DONE;
+		else
+			trans->tr_state = TR_S_XML_CULL_REPLIED;
+	} else  if (strcmp(xe->name, "ct_cull_complete_reply") == 0) {
+		CDBG("cull_complete_reply");
+		trans->tr_state = TR_S_DONE;
+	} else {
+		CABORTX("unexpected XML returned [%s]", (char *)vbody);
 	}
 
 	ct_queue_transfer(trans);
@@ -1448,5 +1478,232 @@ ct_md_trigger_delete(struct ct_op *op)
 		    e_strdup(file->mlf_name), NULL, NULL, NULL, 0, 0);
 		RB_REMOVE(md_list_tree, &results, file);
 		e_free(&file);
+	}
+}
+
+
+/* 
+ * Data structures to hold cull data
+ * 
+ * Should this be stored in memory or build a temporary DB
+ * to hold it due to the number of shas involved?
+ */
+
+RB_HEAD(ct_sha_lookup, sha_entry) ct_sha_rb_head =
+     RB_INITIALIZER(&ct_sha_rb_head);
+uint64_t shacnt;
+uint64_t sha_payload_sz;
+
+struct sha_entry {
+	RB_ENTRY(sha_entry)      s_rb;
+	uint8_t sha[SHA_DIGEST_LENGTH];
+};
+
+int ct_cmp_sha(struct sha_entry *, struct sha_entry *);
+
+RB_PROTOTYPE(ct_sha_lookup, sha_entry, s_rb, ct_cmp_sha);
+RB_GENERATE(ct_sha_lookup, sha_entry, s_rb, ct_cmp_sha);
+
+int
+ct_cmp_sha(struct sha_entry *d1, struct sha_entry *d2)
+{
+	return bcmp(d1->sha, d2->sha, sizeof (d1->sha));
+}
+
+void
+ct_cull_sha_insert(const uint8_t *sha)
+{
+	//char			shat[SHA_DIGEST_STRING_LENGTH];
+	struct sha_entry	*node, *oldnode;
+
+	node = e_malloc(sizeof(*node));
+	bcopy (sha, node->sha, sizeof(node->sha));
+
+	//ct_sha1_encode((uint8_t *)sha, shat);
+	//printf("adding sha %s\n", shat);
+
+	oldnode = RB_INSERT(ct_sha_lookup, &ct_sha_rb_head, node);
+	if (oldnode != NULL) {
+		/* already present, throw away copy */
+		e_free(&node);
+	} else
+		shacnt++;
+
+}
+
+void
+ct_cull_kick(void)
+{
+
+	CDBG("add_op cull_setup");
+	CDBG("shacnt %" PRIu64 , shacnt);
+	ct_add_operation(ct_cull_setup, NULL,
+	    NULL, NULL, NULL, NULL, NULL, 0, 0);
+	ct_add_operation(ct_cull_send_shas, NULL,
+	    NULL, NULL, NULL, NULL, NULL, 0, 0);
+	ct_add_operation(ct_cull_send_complete, ct_cull_complete,
+	    NULL, NULL, NULL, NULL, NULL, 0, 0);
+}
+
+void
+ct_cull_complete(struct ct_op *op)
+{
+	CDBG("shacnt %" PRIu64 " shapayload %" PRIu64, shacnt, sha_payload_sz);
+	
+}
+
+uint64_t cull_uuid; /* set up with random number in ct_cull_setup() */
+/* tune this */
+int sha_per_packet = 1000;
+
+void
+ct_cull_setup(struct ct_op *op)
+{
+	struct xmlsd_element_list	xl;
+	struct xmlsd_element		*xp, *xe;
+	struct ct_trans			*trans;
+	size_t				sz;
+
+	arc4random_buf(&cull_uuid, sizeof(cull_uuid));
+
+	CDBG("cull_setup");
+	ct_set_file_state(CT_S_RUNNING);
+
+	trans = ct_trans_alloc();
+
+	if (trans == NULL) {
+		ct_set_file_state(CT_S_WAITING_TRANS);
+		return;
+	}
+
+	trans->tr_trans_id = ct_trans_id++;
+	trans->tr_state = TR_S_XML_CULL_SEND;
+
+	xp = xmlsd_create(&xl, "ct_cull_setup");
+	xmlsd_set_attr(xp, "version", CT_CULL_SETUP_VERSION);
+	xe = xmlsd_add_element(&xl, xp, "cull");
+	xmlsd_set_attr(xe, "type", "precious");
+	xmlsd_set_attr_uint64(xe, "uuid", cull_uuid);
+
+	if ((trans->tr_data[2] = (uint8_t *)xmlsd_generate(&xl,
+	    ct_body_alloc_xml, &sz, 1)) == NULL)
+		CFATALX("%s: Could not allocate xml body", __func__);
+	xmlsd_unwind(&xl);
+	trans->tr_dataslot = 2;
+	trans->tr_size[2] = sz;
+
+	ct_queue_transfer(trans);
+}
+
+int sent_complete;
+void
+ct_cull_send_complete(struct ct_op *op)
+{
+	struct xmlsd_element_list	xl;
+	struct xmlsd_element		*xp, *xe;
+	struct ct_trans			*trans;
+	size_t				sz;
+
+	if (sent_complete) {
+		return;
+	}
+	sent_complete = 1;
+
+	CDBG("send cull_complete");
+	trans = ct_trans_alloc();
+
+	if (trans == NULL) {
+		ct_set_file_state(CT_S_WAITING_TRANS);
+		return;
+	}
+
+	trans->tr_trans_id = ct_trans_id++;
+	trans->tr_state = TR_S_XML_CULL_SEND;
+
+	xp = xmlsd_create(&xl, "ct_cull_complete");
+	xmlsd_set_attr(xp, "version", CT_CULL_COMPLETE_VERSION);
+	xe = xmlsd_add_element(&xl, xp, "cull");
+	xmlsd_set_attr(xe, "type", "process");
+	xmlsd_set_attr_uint64(xe, "uuid", cull_uuid);
+
+	if ((trans->tr_data[2] = (uint8_t *)xmlsd_generate(&xl,
+	    ct_body_alloc_xml, &sz, 1)) == NULL)
+		CFATALX("%s: Could not allocate xml body", __func__);
+	xmlsd_unwind(&xl);
+	trans->tr_dataslot = 2;
+	trans->tr_size[2] = sz;
+	ct_set_file_state(CT_S_FINISHED);
+
+	ct_queue_transfer(trans);
+}
+
+
+void
+ct_cull_send_shas(struct ct_op *op)
+{
+	CDBG("cull_send_shas");
+	struct xmlsd_element_list	xl;
+	struct xmlsd_element		*xe, *xp;
+	struct ct_trans			*trans;
+	struct sha_entry		*node;
+	size_t				sz;
+	int				sha_add;
+	char				shat[SHA_DIGEST_STRING_LENGTH];
+
+	node = RB_ROOT(&ct_sha_rb_head);
+	if (shacnt == 0 || node == NULL) {
+		ct_set_file_state(CT_S_FINISHED);
+		return;
+	}
+	ct_set_file_state(CT_S_RUNNING);
+
+	trans = ct_trans_alloc();
+
+	if (trans == NULL) {
+
+		ct_set_file_state(CT_S_WAITING_TRANS);
+		return;
+	}
+
+	trans->tr_trans_id = ct_trans_id++;
+	trans->tr_state = TR_S_XML_CULL_SEND;
+
+	xp = xmlsd_create(&xl, "ct_cull_shas");
+	xmlsd_set_attr(xp, "version", CT_CULL_SHA_VERSION);
+
+	xe = xmlsd_add_element(&xl, xp, "uuid");
+	xmlsd_set_attr_uint64(xe, "value", cull_uuid);
+
+	sha_add = 0;
+
+	while (node != NULL && sha_add < sha_per_packet) {
+		xe = xmlsd_add_element(&xl, xp, "sha");
+		ct_sha1_encode(node->sha, shat);
+		//CDBG("adding sha %s\n", shat);
+		xmlsd_set_attr(xe, "sha", shat);
+		shacnt--;
+		sha_add++;
+		RB_REMOVE(ct_sha_lookup, &ct_sha_rb_head, node);
+		e_free(&node);
+
+		node = RB_ROOT(&ct_sha_rb_head);
+	}
+
+	if ((trans->tr_data[2] = (uint8_t *)xmlsd_generate(&xl,
+	    ct_body_alloc_xml, &sz, 1)) == NULL)
+		CFATALX("%s: Could not allocate xml body", __func__);
+	xmlsd_unwind(&xl);
+	trans->tr_dataslot = 2;
+	trans->tr_size[2] = sz;
+
+	CDBG("sending shas [%s]", (char *)trans->tr_data[2]);
+	CDBG("sending shas len %zu", sz);
+	sha_payload_sz += sz;
+	ct_queue_transfer(trans);
+
+	if (shacnt == 0 || node == NULL) {
+		ct_set_file_state(CT_S_FINISHED);
+		trans->tr_eof = 1;
+		CDBG("shacnt %lld", shacnt);
 	}
 }

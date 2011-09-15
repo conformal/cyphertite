@@ -217,6 +217,9 @@ struct ct_trans {
 #define TR_S_XML_LIST		(26)
 #define TR_S_XML_DELETE		(27)
 
+#define TR_S_XML_CULL_SEND	(28)
+#define TR_S_XML_CULL_REPLIED	(29)
+
 	char			tr_dataslot;
 	char			tr_eof;
 
@@ -629,3 +632,7 @@ int ct_xdr_parse(struct ct_xdr_state *);
 int ct_xdr_parse_seek(struct ct_xdr_state *);
 void ct_xdr_parse_close(struct ct_xdr_state *);
 
+/* cull  */
+int ct_cull_add_shafile(const char *);
+void ct_cull_sha_insert(const uint8_t *);
+void ct_cull_kick(void);

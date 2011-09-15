@@ -224,6 +224,7 @@ skip_csha:
 	case TR_S_XML_OPENED:
 	case TR_S_XML_CLOSE:
 	case TR_S_XML_CLOSED:
+	case TR_S_XML_CULL_REPLIED:
 		RB_INSERT(ct_trans_lookup, &ct_state->ct_complete, trans);
 		ct_state->ct_complete_rblen++;
 
@@ -233,6 +234,7 @@ skip_csha:
 	case TR_S_XML_LIST:
 	case TR_S_XML_CLOSING:
 	case TR_S_XML_DELETE:
+	case TR_S_XML_CULL_SEND:
 		ct_state->ct_write_qlen++;
 		TAILQ_INSERT_TAIL(&ct_state->ct_write_queue, trans, tr_next);
 		ct_wakeup_write();
@@ -954,6 +956,10 @@ ct_complete_normal(struct ct_trans *trans)
 		}
 		release_fnode = 1;
 		break;
+	case TR_S_XML_CULL_SEND:
+		slot = trans->tr_dataslot;
+		printf("message back state [%s]", (char *)trans->tr_data[slot]);
+
 	default:
 		CFATALX("process_normal unexpected state %d", trans->tr_state);
 	}
@@ -1069,6 +1075,7 @@ ct_wakeup_write(void)
 		case TR_S_XML_CLOSING:
 		case TR_S_XML_LIST:
 		case TR_S_XML_DELETE:
+		case TR_S_XML_CULL_SEND:
 			hdr->c_opcode = C_HDR_O_XML;
 			hdr->c_flags = C_HDR_F_METADATA;
 			hdr->c_size = trans->tr_size[2];

@@ -30,3 +30,21 @@ extern struct xmlsd_v_elem xe_ct_md_list[];
 
 #define CT_MD_DELETE_VERSION		"V1"
 extern struct xmlsd_v_elem xe_ct_md_delete[];
+
+#define CT_CULL_SETUP_VERSION		"V1"
+extern struct xmlsd_v_elem xe_ct_cull_setup[];
+
+#define CT_CULL_SHA_VERSION		"V1"
+extern struct xmlsd_v_elem xe_ct_cull_shas[];
+
+#define CT_CULL_COMPLETE_VERSION	"V1"
+extern struct xmlsd_v_elem xe_ct_cull_complete[];
+
+#define CT_CULL_SETUP_REPLY_VERSION	"V1"
+extern struct xmlsd_v_elem xe_ct_cull_setup_reply[];
+
+#define CT_CULL_SHAS_REPLY_VERSION	"V1"
+extern struct xmlsd_v_elem xe_ct_cull_shas_reply[];
+
+#define CT_CULL_COMPLETE_REPLY_VERSION	"V1"
+extern struct xmlsd_v_elem xe_ct_cull_complete_reply[];

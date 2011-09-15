@@ -32,6 +32,28 @@ struct xmlsd_v_attr		xa_ct_md_file_attr[] = {
 	{ "chunkno" },
 	{ NULL }
 };
+
+struct xmlsd_v_attr		xa_ct_cull_attr[] = {
+	{ "type" },
+	{ "uuid" },
+	{ NULL }
+};
+
+struct xmlsd_v_attr		xa_ct_sha_attr[] = {
+	{ "sha" },
+	{ NULL }
+};
+
+struct xmlsd_v_attr		xa_ct_uuid_attr[] = {
+	{ "value" },
+	{ NULL }
+};
+struct xmlsd_v_attr		xa_ct_reply_attr[] = {
+	{ "version" },
+	{ "success" },
+	{ NULL }
+};
+
  
 struct xmlsd_v_elem             xe_ct_md_open_create[] = {
 	{ "ct_md_open_create","",		ct_cmd_attr },
@@ -59,5 +81,39 @@ struct xmlsd_v_elem             xe_ct_md_list[] = {
 struct xmlsd_v_elem             xe_ct_md_delete[] = {
 	{ "ct_md_delete","",	ct_cmd_attr },
 	{ "file",		"file.ct_md_delete", xa_ct_md_file_attr },
+	{ NULL,		NULL,			NULL}
+};
+
+struct xmlsd_v_elem             xe_ct_cull_setup[] = {
+	{ "ct_cull_setup","",			ct_cmd_attr },
+	{ "cull", "cull.ct_cull_setup",	xa_ct_cull_attr },
+	{ NULL,		NULL,			NULL}
+};
+
+struct xmlsd_v_elem             xe_ct_cull_setup_reply[] = {
+	{ "ct_cull_setup_reply","",		xa_ct_reply_attr },
+	{ NULL,		NULL,			NULL}
+};
+
+struct xmlsd_v_elem             xe_ct_cull_shas[] = {
+	{ "ct_cull_shas","",	ct_cmd_attr },
+	{ "uuid", "uuid.ct_cull_shas",		xa_ct_uuid_attr },
+	{ "sha", "sha.ct_cull_shas",		xa_ct_sha_attr },
+	{ NULL,		NULL,			NULL}
+};
+
+struct xmlsd_v_elem             xe_ct_cull_shas_reply[] = {
+	{ "ct_cull_shas_reply","",		xa_ct_reply_attr },
+	{ NULL,		NULL,			NULL}
+};
+
+struct xmlsd_v_elem             xe_ct_cull_complete[] = {
+	{ "ct_cull_complete","",		ct_cmd_attr },
+	{ "cull", "cull.ct_cull_complete",	xa_ct_cull_attr },
+	{ NULL,		NULL,			NULL}
+};
+
+struct xmlsd_v_elem             xe_ct_cull_complete_reply[] = {
+	{ "ct_cull_complete_reply","",		xa_ct_reply_attr },
 	{ NULL,		NULL,			NULL}
 };

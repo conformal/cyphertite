@@ -37,6 +37,9 @@
 #include "ct_crypto.h"
 #include "ct_ctl.h"
 
+void cull(struct ct_cli_cmd *, int , char **);
+void cpasswd(struct ct_cli_cmd *, int , char **);
+
 void
 cpasswd(struct ct_cli_cmd *c, int argc, char **argv)
 {
@@ -166,6 +169,7 @@ struct ct_cli_cmd	cmd_cpasswd[] = {
 
 struct ct_cli_cmd	cmd_list[] = {
 	{ "cpasswd", NULL, 1, "<change>", cpasswd },
+	{ "cull", NULL, -1, "[list of MD archives to save]", cull },
 	{ NULL, NULL, 0, NULL, NULL }
 };
 
@@ -221,4 +225,46 @@ ctctl_main(int argc, char *argv[])
 	ct_cli_execute(cc, &argc, &argv);
 
 	return (0);
+}
+
+/* cull - sha deletion from server operation */
+void
+cull(struct ct_cli_cmd *c, int argc, char **argv)
+{
+	char			pwd[PASS_MAX];
+	int			need_secrets;
+	int			i, ret;
+
+	exude_enable();
+
+	/* XXX */
+
+	if (ct_password == NULL) {
+		if (ct_get_password(pwd, sizeof pwd, "Login password: ", 0))
+			CFATALX("invalid password");
+		ct_password = strdup(pwd);
+		if (ct_password == NULL)
+			CFATAL("ct_password");
+		bzero(pwd, sizeof pwd);
+	}
+
+	need_secrets = 1;
+
+	ct_init(1, need_secrets, 0);
+
+	/* XXX */
+
+	for (i = 0; i < argc; i++) {
+		ct_cull_add_shafile(argv[i]);
+	}
+	ct_cull_kick();
+	ct_wakeup_file();
+
+	ret = ct_event_dispatch();
+	if (ret != 0)
+		CWARNX("event_dispatch returned, %d %s", errno,
+		    strerror(errno));
+
+	ct_cleanup();
+	e_check_memory();
 }

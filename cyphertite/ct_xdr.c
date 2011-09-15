@@ -1288,3 +1288,83 @@ ct_xdr_parse_close(struct ct_xdr_state *ctx)
 {
 	ct_metadata_close(ctx->xs_f);
 }
+
+int
+ct_cull_add_shafile(const char *file)
+{
+	struct ct_xdr_state	xs_ctx;
+	char			*ct_next_filename, *ct_filename_free = NULL;
+	int			ret;
+	int			i;
+
+	CDBG("processing [%s]", file);
+
+	/*
+	 * XXX - should we keep a list of added files,
+	 * since we do files based on the list and 'referenced' files?
+	 * rather than operating on files multiple times?
+	 * might be useful for marking files at 'do not delete'
+	 * (depended on by other MD archives.
+	 */
+
+next_file:
+	ct_next_filename = NULL;
+
+	ret = ct_xdr_parse_init(&xs_ctx, file);
+	CDBG("opening [%s]", file);
+	if (ret)
+		CFATALX("failed to open %s", file);
+
+	if (ct_filename_free) {
+		free(ct_filename_free);
+		ct_filename_free = NULL;
+	}
+
+	if (xs_ctx.xs_gh.cmg_prevlvl_filename) {
+		if (xs_ctx.xs_gh.cmg_prevlvl_filename[0] != '\0') {
+			CDBG("previous backup file %s\n",
+			    xs_ctx.xs_gh.cmg_prevlvl_filename);
+			ct_next_filename = xs_ctx.xs_gh.cmg_prevlvl_filename;
+			ct_filename_free = ct_next_filename;
+		} else {
+			free(xs_ctx.xs_gh.cmg_prevlvl_filename);
+			xs_ctx.xs_gh.cmg_prevlvl_filename = NULL;
+		}
+	}
+	if (xs_ctx.xs_gh.cmg_paths != NULL) {
+		for (i = 0; i < xs_ctx.xs_gh.cmg_num_paths; i++)
+			free(xs_ctx.xs_gh.cmg_paths[i]);
+
+		e_free(&xs_ctx.xs_gh.cmg_paths);
+	}
+
+	do {
+		ret = ct_xdr_parse(&xs_ctx);
+		switch (ret) {
+		case XS_RET_FILE:
+			/* nothing to do, ct_populate_fnode2 is optional now */
+			break;
+		case XS_RET_FILE_END:
+			/* nothing to do */
+			break;
+		case XS_RET_SHA:
+			ct_cull_sha_insert(xs_ctx.xs_sha);
+			break;
+		case XS_RET_EOF:
+			break;
+		case XS_RET_FAIL:
+			;
+		}
+
+	} while (ret != XS_RET_EOF && ret != XS_RET_FAIL);
+
+	if (ret != XS_RET_EOF) {
+		CWARNX("end of archive not hit");
+	} else {
+		if (ct_next_filename) {
+			file = ct_next_filename;
+			goto next_file;
+		}
+	}
+	return (0);
+}
