@@ -344,7 +344,7 @@ ct_dump_block(uint8_t *p, size_t sz)
 	bsz = 16 * 4 + 3 + 2;
 	fp = buf = malloc(bsz);
 	char *sep = "";
-	CDBG("dumping %p %zu", p, sz);
+	CDBG("dumping %p %lu", p, (long unsigned) sz);
 	for (i = 0; i < sz; i += 16) {
 		sep = "";
 		for (j = 0; j < 16; j++) {

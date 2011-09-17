@@ -76,7 +76,7 @@ ct_event_assl_write(int fd_notused, short events, void *arg)
 	case 1: /* writing header */
 		wlen = sizeof(*hdr) - ioctx->io_o_off;
 		len = assl_write(c, (uint8_t *)hdr + ioctx->io_o_off, wlen);
-		CDBG("pid %d wlen %d len %zd", c_pid, wlen, len);
+		CDBG("pid %d wlen %d len %ld", c_pid, wlen, (long) len);
 		if (len == 0) {
 			/* lost socket */
 			ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
@@ -121,7 +121,7 @@ ct_event_assl_write(int fd_notused, short events, void *arg)
 
 		len = assl_write(c, body + ioctx->io_o_off, wlen);
 		s_errno = errno;
-		CDBG("pid %d wlen1 %d len %zd", c_pid, wlen, len);
+		CDBG("pid %d wlen1 %d len %ld", c_pid, wlen, (long) len);
 
 		if (len == 0 && wlen != 0) {
 			/* lost socket */
@@ -253,8 +253,8 @@ ct_event_assl_read(int fd, short events, void *arg)
 	case 2: /* reading body */
 		rlen = hdr->c_size - ioctx->io_i_off;
 		len = assl_read(c,  body + ioctx->io_i_off, rlen);
-		CDBG("pid %d op %d, body sz %d read %zd, rlen %d off %d",
-		    c_pid, hdr->c_opcode, hdr->c_size, len, rlen,
+		CDBG("pid %d op %d, body sz %d read %ld, rlen %d off %d",
+		    c_pid, hdr->c_opcode, hdr->c_size, (long) len, rlen,
 		    ioctx->io_i_off);
 
 		if (len == 0 && rlen != 0) {
@@ -327,7 +327,7 @@ ct_event_io_write(int fd, short events, void *arg)
 	case 1: /* writing header */
 		wlen = sizeof(*hdr) - ioctx->io_o_off;
 		len = write(fd, (uint8_t *)hdr + ioctx->io_o_off, wlen);
-		CDBG("pid %d wlen %d len %zd", c_pid, wlen, len);
+		CDBG("pid %d wlen %d len %ld", c_pid, wlen, (long) len);
 
 		if (len == 0) {
 			/* lost socket */
@@ -369,7 +369,7 @@ write_next_iov:
 		wlen = body_len - ioctx->io_o_off;
 		len = write(fd, body + ioctx->io_o_off, wlen);
 		s_errno = errno;
-		CDBG("pid %d wlen1 %d len %zd", c_pid, wlen, len);
+		CDBG("pid %d wlen1 %d len %ld", c_pid, wlen, (long) len);
 
 		if (len == 0 && wlen != 0) {
 			/* lost socket */
@@ -496,8 +496,9 @@ ct_event_io_read(int fd, short events, void *arg)
 	case 2: /* reading body */
 		rlen = hdr->c_size - ioctx->io_i_off;
 		len = read(fd, body + ioctx->io_i_off, rlen);
-		CDBG("pid %d op %d, body sz %d read %zd, rlen %d off %d", c_pid,
-		    hdr->c_opcode, hdr->c_size, len, rlen, ioctx->io_i_off);
+		CDBG("pid %d op %d, body sz %d read %ld, rlen %d off %d", c_pid,
+		    hdr->c_opcode, hdr->c_size, (long) len, rlen,
+		    ioctx->io_i_off);
 
 		if (len == 0 && rlen != 0) {
 			ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
@@ -808,7 +809,7 @@ ct_assl_disconnect(struct ct_assl_io_ctx *ioctx)
 void
 ct_assl_io_ctx_set_maxtrans(struct ct_assl_io_ctx *ctx, size_t newmax)
 {
-	CDBG("setting max to %zu", newmax);
+	CDBG("setting max to %lu", (unsigned long) newmax);
 	ctx->io_max_transfer = newmax;
 }
 
