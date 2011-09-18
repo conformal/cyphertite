@@ -1,4 +1,3 @@
-/* $cyphertite$ */
 /*
  * Copyright (c) 2011 Conformal Systems LLC <info@conformal.com>
  *
@@ -36,7 +35,6 @@
 
 #include "ct.h"
 
-__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
 struct flist_head	fl_list_head = TAILQ_HEAD_INITIALIZER(fl_list_head);
 struct fnode		*fl_curnode;

@@ -1,4 +1,3 @@
-# $cyphertite$
 
 MANDIR=${LOCALBASE}/man/man
 NO_PIC=

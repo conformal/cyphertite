@@ -1,4 +1,3 @@
-/* $cyphertite$ */
 /*
  * Copyright (c) 2011 Conformal Systems LLC <info@conformal.com>
  *
@@ -31,7 +30,6 @@
 
 #include "ct.h"
 
-__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
 struct ct_match_node {
 	RB_ENTRY(ct_match_node)	cmn_entry;

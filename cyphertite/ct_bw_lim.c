@@ -1,4 +1,3 @@
-/* $cyphertite$ */
 /*
  * Copyright (c) 2011 Conformal Systems LLC <info@conformal.com>
  *
@@ -21,7 +20,6 @@
 #include <assl.h>
 #include "ct.h"
 
-__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
 struct bw_debug {
 	struct timeval	io_time;

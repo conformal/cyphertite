@@ -1,4 +1,3 @@
-/* $cyphertite$ */
 /*
  * Copyright (c) 2011 Conformal Systems LLC <info@conformal.com>
  *
@@ -39,7 +38,6 @@
 #include "ct_crypto.h"
 #include "ct_ctl.h"
 
-__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 __attribute__((__unused__)) static const char *vertag = "version: " CT_VERSION;
 
 void			ct_usage(void);

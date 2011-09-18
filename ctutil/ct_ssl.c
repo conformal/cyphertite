@@ -1,4 +1,3 @@
-/* $cyphertite$ */
 /*
  * Copyright (c) 2011 Conformal Systems LLC <info@conformal.com>
  *
@@ -32,7 +31,6 @@
 
 #include "ctutil.h"
 
-__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
 void
 ct_sha1(uint8_t *src, uint8_t *dst, size_t len)

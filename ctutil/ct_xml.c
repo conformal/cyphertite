@@ -1,4 +1,3 @@
-/* $cyphertite$ */
 /*
  * Copyright (c) 2011 Conformal Systems LLC <info@conformal.com>
  *
@@ -18,7 +17,6 @@
 #include <xmlsd.h>
 #include <ct_xml.h>
 
-__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
 /* Cyphertite MD commands */
 

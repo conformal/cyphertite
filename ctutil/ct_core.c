@@ -1,4 +1,3 @@
-/* $cyphertite$ */
 /*
  * Copyright (c) 2004-2006 Daniel Hartmeier
  * All rights reserved.
@@ -42,7 +41,6 @@
 
 #include <time.h>
 
-__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
 extern char *__progname;
 

@@ -1,4 +1,3 @@
-# $cyphertite$
 
 NOPIC=
 .ifdef ROFF

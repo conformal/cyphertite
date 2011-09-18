@@ -1,4 +1,3 @@
-/* $cyphertite$ */
 /*
  * Copyright (c) 2011 Conformal Systems LLC <info@conformal.com>
  *
@@ -25,7 +24,6 @@
 
 #include "ct.h"
 
-__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
 #ifdef __linux__
 #define SIGINFO SIGUSR1

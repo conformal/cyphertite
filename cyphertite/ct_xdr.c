@@ -1,4 +1,3 @@
-/* $cyphertite$ */
 /*
  * Copyright (c) 2011 Conformal Systems LLC <info@conformal.com>
  *
@@ -34,7 +33,6 @@
 #include "ct.h"
 #include "ct_xdr.h"
 
-__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
 int ct_populate_fnode(struct fnode *, struct ct_md_header *, int *);
 int ct_populate_fnode2(struct fnode *, struct ct_md_header *,

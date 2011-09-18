@@ -1,4 +1,3 @@
-/* $cyphertite$ */
 /*
  * Copyright (c) 2011 Conformal Systems LLC <info@conformal.com>
  *
@@ -39,7 +38,6 @@
 #include "ct.h"
 #include "ct_crypto.h"
 
-__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
 struct md_list_file {
 	union {

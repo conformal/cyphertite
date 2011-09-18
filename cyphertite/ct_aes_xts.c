@@ -1,4 +1,3 @@
-/* $cyphertite$ */
 /*
  * Copyright (c) 2003 Markus Friedl <markus@openbsd.org>
  * Copyright (c) 2008 Damien Miller <djm@openbsd.org>
@@ -24,7 +23,6 @@
 #include <openssl/aes.h>
 #include <openssl/evp.h>
 
-__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
 #if OPENSSL_VERSION_NUMBER >= 0x10000000L
 #define SSL_CRYPT_SIZE_TYPE size_t

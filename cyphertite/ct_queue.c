@@ -1,4 +1,3 @@
-/* $cyphertite$ */
 /*
  * Copyright (c) 2011 Conformal Systems LLC <info@conformal.com>
  *
@@ -27,7 +26,6 @@
 #include "ct.h"
 #include "ct_crypto.h"
 
-__attribute__((__unused__)) static const char *cvstag = "$cyphertite$";
 
 void ct_handle_exists_reply(struct ct_trans *, struct ct_header *, void *);
 void ct_handle_write_reply(struct ct_trans *, struct ct_header *, void *);
