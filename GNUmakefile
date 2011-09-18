@@ -1,5 +1,3 @@
-# $cyphertite$
-
 SUBDIRS = ctutil cyphertite
 TARGETS = clean obj install uninstall depend
 

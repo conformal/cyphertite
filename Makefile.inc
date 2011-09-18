@@ -1,5 +1,3 @@
-# $cyphertite$
-
 LOCALBASE?=	/usr/local
 
 CFLAGS+=	-I${.CURDIR}/../ctutil -I${LOCALBASE}/include
