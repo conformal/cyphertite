@@ -22,7 +22,7 @@
 #include <pwd.h>
 #include <readpassphrase.h>
 
-#include <sys/stat.h>
+/* #include <sys/stat.h> */
 
 #ifndef NO_UTIL_H
 #include <util.h>
@@ -41,6 +41,7 @@ extern char		*__progname;
 
 int			ct_settings_add(struct ct_settings *, char *, char *);
 uint8_t			ct_getbyteval(char);
+void			ct_expand_tilde(struct ct_settings *, char **, char *);
 
 int
 ct_get_password(char *password, size_t passwordlen, char *prompt, int verify)
@@ -177,38 +178,6 @@ ct_wire_nop_reply(struct ct_nop_reply *n)
 		CFATALX("invalid pointer");
 
 	n->cnr_id = htonl(n->cnr_id);
-}
-
-void
-ct_expand_tilde(struct ct_settings *cs, char **s, char *val)
-{
-	char			*uid_s;
-	struct			passwd *pwd;
-	int			i;
-	uid_t			uid;
-
-	if (cs == NULL || s == NULL)
-		CFATALX("invalid parameter");
-
-	if (val[0] == '~' && strlen(val) > 1) {
-		if ((uid = getuid()) == 0) {
-			/* see if we are using sudo and get caller uid */
-			uid_s = getenv("SUDO_UID");
-			if (uid_s)
-				uid = atoi(uid_s);
-		}
-		pwd = getpwuid(uid);
-		if (pwd == NULL)
-			CFATALX("invalid user %d", uid);
-
-		i = 1;
-		while (val[i] == '/' && val[i] != '\0')
-			i++;
-
-		if (asprintf(s, "%s/%s", pwd->pw_dir, &val[i]) == -1)
-			CFATALX("no memory for %s", cs->cs_name);
-	} else
-		*s = strdup(val);
 }
 
 int
@@ -387,39 +356,6 @@ ct_polltype_setup(const char *type)
 		CFATALX("unknown poll type %s", type);
 
 	CDBG("polltype: %s\n", type);
-}
-
-/*
- * make all directories in the full path provided in ``path'' if they don't
- * exist.
- * returns 0 on success.
- */
-int
-ct_make_full_path(char *path, mode_t mode)
-{
-	char		*nxt = path;
-	struct stat	 st;
-
-	/* deal with full paths */
-	if (*nxt == '/')
-		nxt++;
-	for (;;) {
-		if ((nxt = strchr(nxt, '/')) == NULL)
-			break;
-		*nxt = '\0';
-
-		if (lstat(path, &st) == 0) {
-			*(nxt++) = '/';
-			continue;
-		}
-
-		if (mkdir(path, mode) == -1)
-			return (1);
-		*(nxt++) = '/';
-		/* XXX stupid umask? */
-	}
-
-	return (0);
 }
 
 /* opcode to error string tables; see ctutil.h/ct_header_strerror(); */

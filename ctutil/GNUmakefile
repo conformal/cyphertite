@@ -38,7 +38,8 @@ LDFLAGS += -lclens
 SHARED_OBJ_EXT ?= o
 
 LIB.NAME = ctutil
-LIB.SRCS = ctutil.c ct_socket.c ct_core.c ct_compress.c ct_ssl.c ct_xml.c
+LIB.SRCS  = ctutil.c ct_files.c ct_socket.c ct_core.c ct_compress.c ct_ssl.c
+LIB.SRCS += ct_xml.c
 LIB.HEADERS = ctutil.h ct_socket.h ct_xml.h
 LIB.OBJS = $(addprefix $(OBJPREFIX), $(LIB.SRCS:.c=.o))
 LIB.DEPS = $(addsuffix .depend, $(LIB.OBJS))
