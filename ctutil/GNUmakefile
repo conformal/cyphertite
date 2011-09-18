@@ -59,7 +59,7 @@ $(OBJPREFIX)%.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ -c $< 
 
 depend: 
-	@echo "Dependencies are automatically generated.  This target is not necessary."	
+	@echo "Dependencies are automatically generated.  This target is not necessary."
 
 install:
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(LIBDIR)/
