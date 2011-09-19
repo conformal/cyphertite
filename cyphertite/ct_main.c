@@ -165,29 +165,29 @@ ct_load_config(struct ct_settings *settings)
 		if (ct_config_parse(settings, ct_configfile))
 			CFATALX("Unable to open specified config file %s",
 			   ct_configfile);
-		return (0);
-	}
+	} else {
 
-	for (;;) {
-		if (config_path != NULL)
-			e_free(&config_path);
+		for (;;) {
+			if (config_path != NULL)
+				e_free(&config_path);
 
-		switch(config_try) {
-		case 0:
-			config_path = ct_user_config();
-			break;
-		case 1:
-			config_path = ct_system_config();
-			break;
-		default:
-			return (1);
-			break;
+			switch(config_try) {
+			case 0:
+				config_path = ct_user_config();
+				break;
+			case 1:
+				config_path = ct_system_config();
+				break;
+			default:
+				return (1);
+				break;
+			}
+			if (ct_config_parse(settings, config_path) == 0) {
+				ct_configfile = config_path;
+				break;
+			}
+			config_try++;
 		}
-		if (ct_config_parse(settings, config_path) == 0) {
-			ct_configfile = config_path;
-			break;
-		}
-		config_try++;
 	}
 
 	ct_mdmode_setup(ct_mdmode_str);
