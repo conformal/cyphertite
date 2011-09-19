@@ -41,7 +41,7 @@ extern char		*__progname;
 
 int			ct_settings_add(struct ct_settings *, char *, char *);
 uint8_t			ct_getbyteval(char);
-void			ct_expand_tilde(struct ct_settings *, char **, char *);
+void			ct_expand_tilde(char **, char *, char *);
 
 int
 ct_get_password(char *password, size_t passwordlen, char *prompt, int verify)
@@ -216,7 +216,7 @@ ct_settings_add(struct ct_settings *settings, char *var, char *val)
 				if (*s)
 					free(*s);
 				if (cs->cs_type == CT_S_DIR)
-					ct_expand_tilde(cs, s, val);
+					ct_expand_tilde(s, cs->cs_name, val);
 				else
 					*s = strdup(val);
 

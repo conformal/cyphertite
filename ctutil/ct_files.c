@@ -25,17 +25,15 @@
 
 #include <clog.h>
 
-#include "ctutil.h"
-
 void
-ct_expand_tilde(struct ct_settings *cs, char **s, char *val)
+ct_expand_tilde(char **dst, char *key, char *val)
 {
 	char			*uid_s;
 	struct			passwd *pwd;
 	int			i;
 	uid_t			uid;
 
-	if (cs == NULL || s == NULL)
+	if (dst == NULL || key == NULL || val == NULL)
 		CFATALX("invalid parameter");
 
 	if (val[0] == '~' && strlen(val) > 1) {
@@ -53,10 +51,10 @@ ct_expand_tilde(struct ct_settings *cs, char **s, char *val)
 		while (val[i] == '/' && val[i] != '\0')
 			i++;
 
-		if (asprintf(s, "%s/%s", pwd->pw_dir, &val[i]) == -1)
-			CFATALX("no memory for %s", cs->cs_name);
+		if (asprintf(dst, "%s/%s", pwd->pw_dir, &val[i]) == -1)
+			CFATALX("no memory for %s", key);
 	} else
-		*s = strdup(val);
+		*dst = strdup(val);
 }
 
 /*
