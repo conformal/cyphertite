@@ -712,7 +712,7 @@ ct_metadata_open_next()
 			e_free(&gh.cmg_paths);
 		if (next->filename)
 			e_free(&next->filename);
-		if (next);
+		if (next)
 			e_free(&next);
 
 	} else {
