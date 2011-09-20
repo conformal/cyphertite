@@ -1,6 +1,6 @@
 
 %define name		cyphertite
-%define version		0.4.4
+%define version		0.4.5
 %define release		1
 
 Name: 		%{name}
@@ -49,6 +49,9 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertitectl
 
 %changelog
+* Tue Sep 20 2011 - drahn 0.4.5-1
+- Fix bug where config file specified with -F will not activate properly
+- Fix memory leak.
 * Tue Sep 20 2011 - drahn 0.4.4-1
 - Source code cleanup for CVS -> git migration
 - General code cleanup and bug fixes

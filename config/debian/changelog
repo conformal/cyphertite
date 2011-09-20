@@ -1,3 +1,10 @@
+cyphertite (0.4.5-1) unstable; urgency=low
+
+  - Fix bug where config file specified with -F will not activate properly
+  - Fix memory leak.
+
+ -- Conformal Systems <package-discuss@conformal.com>  Tue, 20 Sep 2011 15:07:04 -0500
+
 cyphertite (0.4.4-1) unstable; urgency=low
 
   - Source code cleanup for CVS -> git migration
