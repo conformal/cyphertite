@@ -1,6 +1,6 @@
 
 %define name		cyphertite
-%define version		0.4.3
+%define version		0.4.4
 %define release		1
 
 Name: 		%{name}
@@ -49,6 +49,9 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertitectl
 
 %changelog
+* Tue Sep 13 2011 - drahn 0.4.4-1
+- Source code cleanup for CVS -> git migration.
+- General code cleanup and bug fixes.
 * Tue Sep 13 2011 - davec 0.4.3-1
 - Add logic to better handle differential extracts over an existing file
   system

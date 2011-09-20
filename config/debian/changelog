@@ -1,3 +1,8 @@
+cyphertite (0.4.4-1) unstable; urgency=low
+
+  - Source code cleanup for CVS -> git migration.
+  - General code cleanup and bug fixes.
+
 cyphertite (0.4.3-1) unstable; urgency=low
 
   - Add logic to better handle differential extracts over an existing file
