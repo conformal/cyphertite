@@ -1,7 +1,9 @@
 cyphertite (0.4.4-1) unstable; urgency=low
 
-  - Source code cleanup for CVS -> git migration.
-  - General code cleanup and bug fixes.
+  - Source code cleanup for CVS -> git migration
+  - General code cleanup and bug fixes
+
+ -- Conformal Systems <package-discuss@conformal.com>  Tue, 20 Sep 2011 10:16:29 -0500
 
 cyphertite (0.4.3-1) unstable; urgency=low
 
