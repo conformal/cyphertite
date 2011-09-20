@@ -22,8 +22,6 @@
 #include <pwd.h>
 #include <readpassphrase.h>
 
-/* #include <sys/stat.h> */
-
 #ifndef NO_UTIL_H
 #include <util.h>
 #endif
