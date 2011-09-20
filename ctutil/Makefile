@@ -11,7 +11,8 @@ INCDIR=${LOCALBASE}/include
 
 #WANTLINT=
 LIB= ctutil
-SRCS= ctutil.c ct_files.c ct_socket.c ct_core.c ct_ssl.c ct_compress.c ct_xml.c
+SRCS= ctutil.c ct_fileops.c ct_socket.c ct_core.c ct_ssl.c ct_compress.c
+SRCS+= ct_xml.c
 HDRS= ctutil.h ct_socket.h ct_xml.h
 
 CFLAGS+=-I${.CURDIR}
