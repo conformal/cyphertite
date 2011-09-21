@@ -146,8 +146,6 @@ int			ct_assl_writev_op(struct ct_assl_io_ctx *,
 int			ct_io_writev_op(struct ct_io_ctx *, struct ct_header *,
 			    struct ct_iovec *, int);
 int			ct_io_connect_fd_pair(struct ct_io_ctx *ctx, int, int);
-int			ct_io_fork_child(struct ct_io_ctx *,
-			int (*)(void *, int, int), void *);
 void			ct_io_disconnect(struct ct_io_ctx *);
 void			ct_assl_disconnect(struct ct_assl_io_ctx *);
 

@@ -645,67 +645,6 @@ ct_io_writev_op(struct ct_io_ctx *ioctx, struct ct_header *hdr,
 }
 
 /*
- * ct_io_fork_child
- *
- * return value
- *   0 on success
- *   non-zero on failure errno will have status of failure cause
- *      pipe failure
- *      fork failure
- *      event_add failure
- *
- *
- * ctx should already have io_rd_cb and io_cb_arg initialized
- * to proper values.
- */
-int
-ct_io_fork_child(struct ct_io_ctx *ctx, int (*new_main)(void *, int,
-    int), void *childctx)
-{
-	pid_t			pid;
-	/* pipe's in/out with respect to the parent */
-	int			infd[2];
-	int			outfd[2];
-	int			i, f;
-
-
-	if (pipe(outfd))
-		return 1; /* errno is valid */
-
-	if (pipe(infd))
-		return 1; /* errno is valid */
-
-	/* make pipes nonblocking */
-	for (i= 0; i < 2; i++) {
-		f = fcntl(outfd[i], F_GETFL);
-		f |= O_NONBLOCK;
-		fcntl(outfd[i], F_SETFL, f);
-	}
-
-	for (i= 0; i < 2; i++) {
-		f = fcntl(infd[i], F_GETFL);
-		f |= O_NONBLOCK;
-		fcntl(infd[i], F_SETFL, f);
-	}
-
-	pid = fork();
-
-	switch (pid) {
-	case 0:
-		close(infd[0]);
-		close(outfd[0]);
-		exit(new_main(childctx, outfd[1], infd[1])); /* child in/out */
-	case -1:
-		return 1; /* errno is valid */
-	default:
-		close(infd[1]);
-		close(outfd[1]);
-	}
-
-	return ct_io_connect_fd_pair(ctx, infd[0], outfd[0]);
-}
-
-/*
  * ct_io_connect_fd_pair
  * return value
  *  0 on success
