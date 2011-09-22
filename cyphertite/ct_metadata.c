@@ -1704,6 +1704,6 @@ ct_cull_send_shas(struct ct_op *op)
 	if (shacnt == 0 || node == NULL) {
 		ct_set_file_state(CT_S_FINISHED);
 		trans->tr_eof = 1;
-		CDBG("shacnt %lld", shacnt);
+		CDBG("shacnt %" PRIu64, shacnt);
 	}
 }
