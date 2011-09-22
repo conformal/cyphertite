@@ -169,7 +169,6 @@ struct ct_cli_cmd	cmd_cpasswd[] = {
 
 struct ct_cli_cmd	cmd_list[] = {
 	{ "cpasswd", NULL, 1, "<change>", cpasswd },
-	{ "cull", NULL, -1, "[list of MD archives to save]", cull },
 	{ NULL, NULL, 0, NULL, NULL }
 };
 
