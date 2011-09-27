@@ -464,13 +464,12 @@ next_file:
 		ret = ct_xdr_parse(&xs_ctx);
 		switch (ret) {
 		case XS_RET_FILE:
-			doprint = !ct_match(match, xs_ctx.xs_hdr.cmh_filename);
-			if (doprint && ex_match != NULL &&
-			    !ct_match(ex_match, xs_ctx.xs_hdr.cmh_filename))
-				doprint = 0;
-			/* XXX - ct_populate_fnode2 is optional now */
 			ct_populate_fnode2(fnode, &xs_ctx.xs_hdr,
 			    &xs_ctx.xs_lnkhdr, &state);
+			doprint = !ct_match(match, fnode->fl_sname);
+			if (doprint && ex_match != NULL &&
+			    !ct_match(ex_match, fnode->fl_sname))
+				doprint = 0;
 			if (doprint) {
 				ct_pr_fmt_file(fnode);
 				if (!C_ISREG(xs_ctx.xs_hdr.cmh_type) ||
@@ -802,12 +801,6 @@ ct_extract(struct ct_op *op)
 				CFATALX("invalid archive");
 			}
 
-			ct_doextract = !ct_match(ex_priv->inc_match,
-			    hdr.cmh_filename);
-			if (ct_doextract && ex_priv->ex_match != NULL &&
-			    !ct_match(ex_priv->ex_match, hdr.cmh_filename))
-				ct_doextract = 0;
-
 			if (C_ISREG(hdr.cmh_type)) {
 				ct_num_shas = hdr.cmh_nr_shas;
 				if (ct_num_shas == -1) {
@@ -825,6 +818,11 @@ ct_extract(struct ct_op *op)
 
 			ct_populate_fnode(fnode, &hdr, &trans->tr_state);
 
+			ct_doextract = !ct_match(ex_priv->inc_match,
+			    fnode->fl_sname);
+			if (ct_doextract && ex_priv->ex_match != NULL &&
+			    !ct_match(ex_priv->ex_match, fnode->fl_sname))
+				ct_doextract = 0;
 			if (ct_doextract == 0) {
 				ct_free_fnode(fnode);
 				fnode = NULL;
@@ -965,7 +963,6 @@ ct_populate_fnode2(struct fnode *fnode, struct ct_md_header *hdr,
 {
 	struct flist		flistnode;
 	struct dnode		*dnode;
-
 
 	if (C_ISLINK(hdr->cmh_type)) {
 		/* hardlink/symlink */
