@@ -808,7 +808,10 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 		TAILQ_FOREACH(xe, &xl, entry) {
 			if (strcmp(xe->name, "file") == 0) {
 				filename = xmlsd_get_attr(xe, "name");
-				if (filename)
+				if (filename == NULL || filename[0] == '\0')
+					printf("specified tag does not "
+					    "exist\n");
+				else
 					printf("%s deleted\n", filename);
 			}
 		}
