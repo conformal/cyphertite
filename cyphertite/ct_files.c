@@ -923,10 +923,9 @@ void
 ct_file_extract_close(struct fnode *fnode)
 {
 	struct timeval          tv[2];
+	int                     safe_mode;
 
-	if (fchmod(ct_extract_fd, fnode->fl_mode) == -1)
-		CFATAL("chmod failed on %s", tpath);
-
+	safe_mode = S_IRWXU | S_IRWXG | S_IRWXO;
 	if (ct_attr) {
 		if (fchown(ct_extract_fd, fnode->fl_uid, fnode->fl_gid) == -1) {
 			if (errno == EPERM && geteuid() != 0) {
@@ -936,6 +935,13 @@ ct_file_extract_close(struct fnode *fnode)
 				CFATAL("chown failed %s", tpath);
 			}
 		}
+		safe_mode = ~0;
+	}
+
+	if (fchmod(ct_extract_fd, fnode->fl_mode & safe_mode) == -1)
+		CFATAL("chmod failed on %s", tpath);
+
+	if (ct_attr) {
 
 		tv[0].tv_sec = fnode->fl_atime;
 		tv[1].tv_sec = fnode->fl_mtime;
@@ -959,6 +965,7 @@ ct_file_extract_special(struct fnode *fnode)
 	char			*appath;
 	char			ltpath[PATH_MAX];
 	int			tries = 0, ret = 0;
+	int                     safe_mode;
 
 	snprintf(ltpath, sizeof ltpath, "%s%s%s",
 	    ct_tdir ? ct_tdir : "", ct_tdir ? "/" : "", fnode->fl_sname);
@@ -1089,9 +1096,7 @@ link_out:
 			;
 		}
 	} else {
-		if (chmod(ltpath, fnode->fl_mode) == -1)
-			CFATAL("chmod failed on %s", ltpath);
-
+		safe_mode = S_IRWXU | S_IRWXG | S_IRWXO;
 		if (ct_attr) {
 			if (chown(ltpath, fnode->fl_uid, fnode->fl_gid) == -1) {
 				if (errno == EPERM && geteuid() != 0) {
@@ -1102,7 +1107,13 @@ link_out:
 					CFATAL("chown failed %s", ltpath);
 				}
 			}
+			safe_mode = ~0;
+		}
 
+		if (chmod(ltpath, fnode->fl_mode & safe_mode) == -1)
+			CFATAL("chmod failed on %s", ltpath);
+
+		if (ct_attr) {
 			tv[0].tv_sec = fnode->fl_atime;
 			tv[1].tv_sec = fnode->fl_mtime;
 			tv[0].tv_usec = tv[1].tv_usec = 0;
@@ -1118,6 +1129,7 @@ ct_file_extract_fixup(void)
 	struct dir_stat		*dsn;
 	struct timeval		tv[2];
 	char			tpath[PATH_MAX];
+	int                     safe_mode;
 
 	while(!SIMPLEQ_EMPTY(&dirlist)) {
 		dsn = SIMPLEQ_FIRST(&dirlist);
@@ -1127,9 +1139,7 @@ ct_file_extract_fixup(void)
 		snprintf(tpath, sizeof tpath, "%s%s%s",
 		    ct_tdir ? ct_tdir : "", ct_tdir ? "/" : "", dsn->ds_name);
 
-		if (chmod(tpath, dsn->ds_mode) == -1)
-			CFATAL("chmod failed on %s", dsn->ds_name);
-
+		safe_mode = S_IRWXU | S_IRWXG | S_IRWXO;
 		if (ct_attr) {
 			if (chown(tpath, dsn->ds_uid,
 			    dsn->ds_gid) == -1) {
@@ -1141,7 +1151,13 @@ ct_file_extract_fixup(void)
 					CFATAL("chown failed %s", tpath);
 				}
 			}
+			safe_mode = ~0;
+		}
 
+		if (chmod(tpath, dsn->ds_mode & safe_mode) == -1)
+			CFATAL("chmod failed on %s", dsn->ds_name);
+
+		if (ct_attr) {
 			tv[0].tv_sec = dsn->ds_atime;
 			tv[1].tv_sec = dsn->ds_mtime;
 			tv[0].tv_usec = tv[1].tv_usec = 0;
