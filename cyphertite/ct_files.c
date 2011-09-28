@@ -934,8 +934,8 @@ ct_file_extract_close(struct fnode *fnode)
 			} else {
 				CFATAL("chown failed %s", tpath);
 			}
-		}
-		safe_mode = ~0;
+		} else
+			safe_mode = ~0;
 	}
 
 	if (fchmod(ct_extract_fd, fnode->fl_mode & safe_mode) == -1)
@@ -1106,8 +1106,8 @@ link_out:
 				} else {
 					CFATAL("chown failed %s", ltpath);
 				}
-			}
-			safe_mode = ~0;
+			} else
+				safe_mode = ~0;
 		}
 
 		if (chmod(ltpath, fnode->fl_mode & safe_mode) == -1)
@@ -1150,8 +1150,8 @@ ct_file_extract_fixup(void)
 				} else {
 					CFATAL("chown failed %s", tpath);
 				}
-			}
-			safe_mode = ~0;
+			} else
+				safe_mode = ~0;
 		}
 
 		if (chmod(tpath, dsn->ds_mode & safe_mode) == -1)
