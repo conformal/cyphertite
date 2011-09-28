@@ -129,7 +129,8 @@ ct_xdr_stdin(XDR *xdrs, struct ct_md_stdin *objp)
 bool_t
 ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp, int write)
 {
-	int	i;
+	char	 *basep, base[PATH_MAX], *prevlvl;
+	int	 i;
 
 	if (!xdr_int(xdrs, &objp->cmg_beacon))
 		return (FALSE);
@@ -143,8 +144,30 @@ ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp, int write)
 		return (FALSE);
 	if (!xdr_int(xdrs, &objp->cmg_flags))
 		return (FALSE);
-	if (!xdr_string(xdrs, &objp->cmg_prevlvl_filename, PATH_MAX))
+	if (md_dir  == XDR_ENCODE && ct_md_mode == CT_MDMODE_REMOTE &&
+	    objp->cmg_prevlvl_filename != NULL &&
+	    objp->cmg_prevlvl_filename[0] != '\0') {
+		strlcpy(base, objp->cmg_prevlvl_filename, sizeof(base));
+		if ((basep = basename(base)) == NULL)
+			CFATALX("can't basename %s",
+			    objp->cmg_prevlvl_filename);
+		prevlvl = basep;
+	} else {
+		prevlvl = objp->cmg_prevlvl_filename;
+	}
+	if (!xdr_string(xdrs, &prevlvl, PATH_MAX))
 		return (FALSE);
+	if (md_dir == XDR_DECODE && ct_md_mode == CT_MDMODE_REMOTE &&
+	    prevlvl != NULL && prevlvl[0] != '\0') {
+		strlcpy(base, prevlvl, sizeof(base));
+		if ((basep = basename(base)) == NULL)
+			CFATALX("can't basename %s", prevlvl);
+		if (asprintf(&objp->cmg_prevlvl_filename, "%s%s",
+		    ct_md_cachedir, basep) == -1)
+			CFATALX("out of memory");
+	} else {
+		objp->cmg_prevlvl_filename = prevlvl;
+	}
 	if (objp->cmg_version >= CT_MD_V2) {
 		if (!xdr_int(xdrs, &objp->cmg_cur_lvl))
 			return (FALSE);
