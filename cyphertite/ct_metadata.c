@@ -1449,6 +1449,7 @@ again:
 		 * Set mtime to the mtime we downloaded.
 		 * XXX futimens() would be nice here since atime doesn't matter
 		 */
+		times[0].tv_usec = times[1].tv_usec = 0;
 		if (utimes(old_secrets, times) != 0)
 			CWARN("couldn't set mtime on new secrets file");
 		e_free(&crypto_secrets);

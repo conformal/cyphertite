@@ -939,6 +939,7 @@ ct_file_extract_close(struct fnode *fnode)
 
 		tv[0].tv_sec = fnode->fl_atime;
 		tv[1].tv_sec = fnode->fl_mtime;
+		tv[0].tv_usec = tv[1].tv_usec = 0;
 		if (futimes(ct_extract_fd, tv) == -1)
 			CFATAL("utimes failed");
 	}
@@ -1104,6 +1105,7 @@ link_out:
 
 			tv[0].tv_sec = fnode->fl_atime;
 			tv[1].tv_sec = fnode->fl_mtime;
+			tv[0].tv_usec = tv[1].tv_usec = 0;
 			if (utimes(ltpath, tv) == -1)
 				CFATAL("utimes failed");
 		}
@@ -1142,6 +1144,7 @@ ct_file_extract_fixup(void)
 
 			tv[0].tv_sec = dsn->ds_atime;
 			tv[1].tv_sec = dsn->ds_mtime;
+			tv[0].tv_usec = tv[1].tv_usec = 0;
 			if (utimes(tpath, tv) == -1)
 				CFATAL("futimes failed");
 		}
