@@ -1,6 +1,6 @@
 
 %define name		cyphertite
-%define version		0.4.5
+$define version		0.4.6
 %define release		1
 
 Name: 		%{name}
@@ -49,6 +49,15 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertitectl
 
 %changelog
+* Thu Sep 29 2011 - davec 0.4.6-1
+- Handle case where none of the specified backup objects exist
+- Modify inclusion/exclusion processing to use full paths instead
+  of only the filename on Linux
+- Properly restore suid bits with and without -p option
+- Store basename of backup file in remote mode incremental backups
+- Fix error when a symlink exists in the backup prefix
+- Add framework for upcoming features
+- General improvements and bug fixes
 * Tue Sep 20 2011 - drahn 0.4.5-1
 - Fix bug where config file specified with -F will not activate properly
 - Fix memory leak.

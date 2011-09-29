@@ -1,3 +1,16 @@
+clog (0.4.6-1) unstable; urgency=low
+
+  * Handle case where none of the specified backup objects exist
+  * Modify inclusion/exclusion processing to use full paths instead
+    of only the filename on Linux
+  * Properly restore suid bits with and without -p option
+  * Store basename of backup file in remote mode incremental backups
+  * Fix error when a symlink exists in the backup prefix
+  * Add framework for upcoming features
+  * General improvements and bug fixes
+
+ -- Conformal Systems LLC <package-discuss@conformal.com>  Thu, 29 Sep 2011 14:42:26 -0500
+
 cyphertite (0.4.5-1) unstable; urgency=low
 
   - Fix bug where config file specified with -F will not activate properly
