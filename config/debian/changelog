@@ -1,4 +1,4 @@
-clog (0.4.6-1) unstable; urgency=low
+cyphertite (0.4.6-1) unstable; urgency=low
 
   * Handle case where none of the specified backup objects exist
   * Modify inclusion/exclusion processing to use full paths instead

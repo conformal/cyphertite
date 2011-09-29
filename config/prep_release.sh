@@ -138,7 +138,7 @@ DATE=$(date "+%a %b %d %Y")
 AUTHOR=$(whoami)
 awk -v D="$DATE" -v VER="$PROJ_VER" -v A="$AUTHOR" '
 /%define version/ {
-	print "$define version		"VER
+	print "%define version		"VER
 	next
 }
 /%changelog/ {
@@ -160,7 +160,7 @@ after_cl == 1 { print $0 }
 # modify deb changelog with release notes and version information
 # RFC 2822 formatted date
 DATE=$(date "+%a, %d %b %Y %H:%M:%S %z")
-echo "clog (${PROJ_VER}-1) unstable; urgency=low
+echo "$PROJECT (${PROJ_VER}-1) unstable; urgency=low
 " >"${DEB_CHANGELOG}.tmp"
 cat "$RELEASE_NOTES" | sed 's/^\-/*/; s/^/  /' >>"${DEB_CHANGELOG}.tmp"
 echo "
