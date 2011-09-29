@@ -1354,7 +1354,6 @@ check_local:
 		if (ct_create_or_unlock_secrets(current_secrets,
 		    ct_crypto_password))
 			CFATALX("can't unlock secrets file");
-		ctdb_setup(ct_localdb, ct_encrypt_enabled);
 	} else if (mtime < local_mtime) {
 		/* XXX verify local file before upload? */
 		CDBG("uploading local file");
@@ -1458,7 +1457,6 @@ again:
 		e_free(&crypto_secrets);
 	}
 	ct_encrypt_enabled = 1;
-	ctdb_setup(ct_localdb, ct_encrypt_enabled);
 	/* Free remote name */
 	if (op->op_remote_fname)
 		e_free(&op->op_remote_fname);

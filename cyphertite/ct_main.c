@@ -267,10 +267,10 @@ ct_init(int foreground, int need_secrets, int only_metadata)
 			    ct_create_or_unlock_secrets(ct_crypto_secrets,
 				ct_crypto_password))
 				CFATALX("can't unlock secrets");
-		} else {
-			ctdb_setup(ct_localdb, 0);
 		}
 	}
+
+	ctdb_setup(ct_localdb, ct_crypto_secrets != NULL);
 
 	ct_event_init();
 	ct_setup_assl();
