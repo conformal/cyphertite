@@ -164,7 +164,7 @@ echo "$PROJECT (${PROJ_VER}-1) unstable; urgency=low
 " >"${DEB_CHANGELOG}.tmp"
 cat "$RELEASE_NOTES" | sed 's/^\-/*/; s/^/  /' >>"${DEB_CHANGELOG}.tmp"
 echo "
- -- Conformal Systems LLC <package-discuss@conformal.com>  $DATE
+ -- Conformal Systems <package-discuss@conformal.com>  $DATE
 " >>"${DEB_CHANGELOG}.tmp"
 cat "${DEB_CHANGELOG}" >>"${DEB_CHANGELOG}.tmp"
 
