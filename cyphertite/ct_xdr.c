@@ -437,9 +437,11 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode)
 {
 	struct ct_xdr_state	xs_ctx;
 	struct fnode		fnodestore;
+	uint64_t		reduction;
 	struct fnode		*fnode = &fnodestore;
 	struct ct_match		*match, *ex_match = NULL;
 	char			*ct_next_filename, *ct_filename_free = NULL;
+	char			*sign;
 	int			state;
 	int			doprint = 0;
 	int			ret;
@@ -505,14 +507,29 @@ next_file:
 				e_free(&fnode->fl_sname);
 			break;
 		case XS_RET_FILE_END:
+			sign = " ";
+			if (xs_ctx.xs_trl.cmt_comp_size == 0)
+				reduction = 100;
+			else {
+				uint64_t orig, comp;
+				orig = xs_ctx.xs_trl.cmt_orig_size;
+				comp = xs_ctx.xs_trl.cmt_comp_size;
+
+				if (comp <= orig) {
+					reduction = 100 * (orig - comp) / orig;
+				} else  {
+					reduction = 100 * (comp - orig) / orig;
+					if (reduction != 0)
+						sign = "-";
+				}
+			
+			}
 			if (doprint && ct_verbose > 1)
-				printf(" shas: %" PRIu64 " reduction: %" PRIu64
-				    "%%\n",
+				printf(" sz: %" PRIu64 " shas: %" PRIu64
+				    " reduction: %s%" PRIu64 "%%\n",
+				    xs_ctx.xs_trl.cmt_orig_size,
 				    xs_ctx.xs_hdr.cmh_nr_shas,
-				    xs_ctx.xs_trl.cmt_orig_size == 0 ? 0 :
-				    100 * (xs_ctx.xs_trl.cmt_orig_size -
-					xs_ctx.xs_trl.cmt_comp_size)
-				    / xs_ctx.xs_trl.cmt_orig_size);
+				    sign, reduction);
 			else if (doprint)
 				printf("\n");
 			break;

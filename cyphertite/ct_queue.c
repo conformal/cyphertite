@@ -1326,6 +1326,7 @@ ct_compute_compress(void *vctx)
 				CDBG("use uncompressed buffer %d %zu", len,
 				    newlen);
 				rv = 1; /* act like compression failed */
+				newlen = len;
 			}
 			if (rv == 0)
 				trans->hdr.c_flags |= ncompmode;
