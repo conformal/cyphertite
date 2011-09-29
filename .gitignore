@@ -1,0 +1,6 @@
+*.o
+*.depend
+*.po
+*.a
+*.cat[1-9]
+cyphertite
