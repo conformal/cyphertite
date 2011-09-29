@@ -405,6 +405,9 @@ ct_archive(struct ct_op *op)
 
 		if (getcwd(cwd, PATH_MAX) == NULL)
 			CFATAL("can't get current working directory");
+
+		ct_traverse(filelist, op->op_excludelist, op->op_matchmode);
+
 		/* XXX - deal with stdin */
 		/* XXX - if basisbackup should the type change ? */
 		ct_setup_write_md(mfile, CT_MD_REGULAR, basisbackup, nextlvl,
@@ -412,8 +415,6 @@ ct_archive(struct ct_op *op)
 
 		if (basisbackup != NULL)
 			e_free(&basisbackup);
-
-		ct_traverse(filelist, op->op_excludelist, op->op_matchmode);
 
 		/*
 		 * it is possible the first files may have been deleted
@@ -641,6 +642,7 @@ ct_traverse(char **paths, char **exclude, int match_mode)
 	struct ct_match		*include_match = NULL, *exclude_match = NULL;
 	char			 clean[PATH_MAX];
 	int			 fts_options;
+	int			 cnt;
 
 	if (ct_includefile)
 		include_match = ct_match_fromfile(ct_includefile, match_mode);
@@ -654,6 +656,7 @@ ct_traverse(char **paths, char **exclude, int match_mode)
 	if (ftsp == NULL)
 		CFATAL("fts_open failed");
 
+	cnt = 0;
 	while ((fe = fts_read(ftsp)) != NULL) {
 		switch (fe->fts_info) {
 		case FTS_D:
@@ -661,6 +664,7 @@ ct_traverse(char **paths, char **exclude, int match_mode)
 		case FTS_F:
 		case FTS_SL:
 		case FTS_SLNONE:
+			cnt++;
 			/* these are ok */
 			break;
 		case FTS_DP:
@@ -705,6 +709,9 @@ ct_traverse(char **paths, char **exclude, int match_mode)
 			CFATAL("backup_file failed: %s", clean);
 
 	}
+
+	if (cnt == 0)
+		CFATALX("can't access any of the specified file(s)");
 
 	if (fe == NULL && errno)
 		CFATAL("fts_read failed");
