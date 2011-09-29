@@ -94,7 +94,6 @@ fi
 # verify there are no uncommitted modifications prior to release modifications
 NUM_MODIFIED=$(git diff 2>/dev/null | wc -l | sed 's/^[ \t]*//')
 NUM_STAGED=$(git diff --cached 2>/dev/null | wc -l | sed 's/^[ \t]*//')
-echo "nm: $NUM_MODIFIED, ns: $NUM_STAGED"
 if [ "$NUM_MODIFIED" != "0" -o "$NUM_STAGED" != "0" ]; then
 	echo -n "$SCRIPT: error: the working directory contains uncommitted "
 	echo    "modifications"
@@ -183,5 +182,5 @@ echo "If everything is accurate, use the following commands to commit, tag,"
 echo "and push the changes"
 echo "  git commit -am \"Prepare for release ${PROJ_VER}.\""
 echo -n "  git tag -a \"${PROJECT_UC}_${MAJOR}_${MINOR}_${PATCH}\" -m "
-echo    "\"Release $(PROJ_VER}\""
+echo    "\"Release ${PROJ_VER}\""
 echo "  git push --tags origin master"
