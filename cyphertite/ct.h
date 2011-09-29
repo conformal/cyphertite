@@ -119,6 +119,7 @@ struct flist {
 	struct fnode		*fl_node;
 	dev_t			fl_dev;
 	ino_t			fl_ino;
+	int			fl_forcedir;
 };
 
 struct dnode * gen_finddir(int64_t idx);

@@ -160,7 +160,7 @@ int				stop;
 
 char *eat_double_dots(char *, char *);
 int backup_prefix(char *);
-int ct_sched_backup_file(struct stat *, char *);
+int ct_sched_backup_file(struct stat *, char *, int);
 int s_to_e_type(int);
 
 int current_fd = -1;
@@ -276,6 +276,10 @@ ct_populate_fnode_from_flist(struct flist *flnode)
 	fnode->fl_size = sb->st_size;
 	fnode->fl_offset = 0;
 
+	if (flnode->fl_forcedir) {
+		fnode->fl_type = C_TY_DIR;
+	}
+
 	/* either the parent is NULL (which is fine) or is our parent */
 	fnode->fl_parent_dir = flnode->fl_parent_dir;
 
@@ -304,7 +308,7 @@ ct_populate_fnode_from_flist(struct flist *flnode)
 }
 
 int
-ct_sched_backup_file(struct stat *sb, char *filename)
+ct_sched_backup_file(struct stat *sb, char *filename, int forcedir)
 {
 	struct flist		*flnode;
 	const char		*safe;
@@ -318,7 +322,7 @@ ct_sched_backup_file(struct stat *sb, char *filename)
 	if (safe == NULL)
 		return 0;
 
-	if (S_ISDIR(sb->st_mode)) {
+	if (forcedir || S_ISDIR(sb->st_mode)) {
 		dnode = e_calloc(1, sizeof(*dnode));
 		dnode->d_name = e_strdup(filename);
 		dnode->d_num = -1; /* numbers are allocated on xdr write */
@@ -359,6 +363,7 @@ ct_sched_backup_file(struct stat *sb, char *filename)
 	}
 
 	flnode->fl_hlnode = NULL;
+	flnode->fl_forcedir = forcedir;
 
 	/* deal with hardlink */
 	flnode_exists = RB_INSERT(fl_tree, &fl_rb_head, flnode);
@@ -705,7 +710,7 @@ ct_traverse(char **paths, char **exclude, int match_mode)
 		}
 
 		/* backup all other files */
-		if (ct_sched_backup_file(fe->fts_statp, clean))
+		if (ct_sched_backup_file(fe->fts_statp, clean, 0))
 			CFATAL("backup_file failed: %s", clean);
 
 	}
@@ -842,7 +847,7 @@ backup_prefix(char *root)
 			return (1);
 		}
 
-		if (ct_sched_backup_file(&sb, dir))
+		if (ct_sched_backup_file(&sb, dir, 1))
 			return (1);
 	}
 
