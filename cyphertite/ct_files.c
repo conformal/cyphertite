@@ -812,11 +812,13 @@ done:
 int
 backup_prefix(char *root)
 {
-	char			dir[PATH_MAX], pfx[PATH_MAX], *cp, *p;
+	char			dir[PATH_MAX], rbuf[PATH_MAX], pfx[PATH_MAX];
+	char			*cp, *p;
 	struct stat		sb;
 
 	/* it is just the prefix that needs to be parsed */
-	strlcpy(pfx, dirname(root), sizeof pfx);
+	strlcpy(rbuf, root, sizeof rbuf);
+	strlcpy(pfx, dirname(rbuf), sizeof pfx);
 
 	/* archive each leading dir */
 	p = pfx;
