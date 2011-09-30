@@ -912,7 +912,7 @@ again:
 		    ct_make_full_path(tpath, 0777) == 0)
 			goto again;
 		/* XXX make_full_path may modify the path we want */
-		CWARN("unable to open file for writing %s%s%s", 
+		CWARN("unable to open file for writing %s%s%s",
 		    ct_tdir ? ct_tdir : "", ct_tdir ? "/" : "",
 		    fnode->fl_sname);
 		return (1);

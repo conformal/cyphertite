@@ -19,7 +19,7 @@ License:
     Permission to use, copy, modify, and distribute this software for any
     purpose with or without fee is hereby granted, provided that the above
     copyright notice and this permission notice appear in all copies.
-    . 
+    .
     THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
     WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
     MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -30,5 +30,5 @@ License:
 
 The Debian packaging is:
 
-    Copyright (C) 2011 Conformal Systems LLC <package-discuss@conformal.com> 
+    Copyright (C) 2011 Conformal Systems LLC <package-discuss@conformal.com>
     and is licensed under the ISC license.

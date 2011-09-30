@@ -103,7 +103,7 @@ ctdb_create(const char *filename, sqlite3 **db, int crypto)
 		    " csha BLOB(%d), iv BLOB(%d));",
 		    SHA_DIGEST_LENGTH, SHA_DIGEST_LENGTH,
 		    CT_IV_LEN);
-	else 
+	else
 		snprintf(sql, sizeof sql,
 		    "CREATE TABLE digests (sha BLOB(%d)"
 		    " PRIMARY KEY UNIQUE);",

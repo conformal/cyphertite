@@ -74,7 +74,7 @@ check_external_libs()
 		LIB_EXTS="a so.*"
 	fi
 
-	
+
 	# allow extra libs depending on os
 	[ -n "$EXTRA_LIBS" ] && EXTERNAL_LIBS="$EXTERNAL_LIBS $EXTRA_LIBS"
 
@@ -97,7 +97,7 @@ check_external_libs()
 		fi
 	done
 	if [ -n "$MISSING_LIBS" ]; then
-		ERRMSG="Unable to find the following required external libraries:\n" 
+		ERRMSG="Unable to find the following required external libraries:\n"
 		ERRMSG="$ERRMSG $MISSING_LIBS"
 		report_err "$ERRMSG"
 	fi
@@ -124,7 +124,7 @@ ct_build_and_install()
 		make depend || report_err "Unable to make dependencies for '$pkg'."
 		make || report_err "Make failed for '$pkg'."
 		make install || report_err "Install failed for '$pkg'."
-		cd ..	
+		cd ..
 	done
 }
 

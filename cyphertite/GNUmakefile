@@ -16,7 +16,7 @@ MANDIR ?= $(LOCALBASE)/share/man
 # Use obj directory if it exists.
 OBJPREFIX ?= obj/
 ifeq "$(wildcard $(OBJPREFIX))" ""
-	OBJPREFIX =	
+	OBJPREFIX =
 endif
 
 # System utils.
@@ -54,25 +54,25 @@ BIN.MANPAGES = cyphertite.1 cyphertite.conf.5
 BIN.OBJS = $(addprefix $(OBJPREFIX), $(BIN.SRCS:.c=.o))
 BIN.DEPS = $(addsuffix .depend, $(BIN.OBJS))
 BIN.LDFLAGS = $(LDFLAGS.EXTRA) $(LDFLAGS) $(LDADD)
-BIN.MDIRS = $(foreach page, $(BIN.MANPAGES), $(subst ., man, $(suffix $(page)))) 
+BIN.MDIRS = $(foreach page, $(BIN.MANPAGES), $(subst ., man, $(suffix $(page))))
 
-all: $(OBJPREFIX)$(BIN.NAME) 
+all: $(OBJPREFIX)$(BIN.NAME)
 
 obj:
 	-$(MKDIR) obj
 
 $(OBJPREFIX)$(BIN.NAME): $(BIN.OBJS)
 	$(CC) $^ $(BIN.LDFLAGS) -o $@
-	
+
 
 $(OBJPREFIX)%.o: %.c
 	@echo "Generating $@.depend"
 	@$(CC) $(INCFLAGS) -MM $(CPPFLAGS) $< | \
 	sed 's,$*\.o[ :]*,$@ $@.depend : ,g' >> $@.depend
-	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ -c $< 
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ -c $<
 
-depend: 
-	@echo "Dependencies are automatically generated.  This target is not necessary."	
+depend:
+	@echo "Dependencies are automatically generated.  This target is not necessary."
 
 install:
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(BINDIR)/

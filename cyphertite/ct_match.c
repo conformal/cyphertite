@@ -320,7 +320,7 @@ ct_matchlist_fromfile(const char *file)
 	while ((line = fparseln(f, &len, &lineno, NULL, 0)) != NULL) {
 		flist[n++] = line;
 	}
-	
+
 	(void)fclose(f);
 
 	return flist;

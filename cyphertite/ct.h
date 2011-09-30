@@ -436,7 +436,7 @@ struct ct_md_gheader {
 #define CT_MD_V1		(1)
 #define CT_MD_V2		(2)
 #define CT_MD_V3		(3)
-#define CT_MD_VERSION		CT_MD_V3		
+#define CT_MD_VERSION		CT_MD_V3
 	int			cmg_chunk_size;	/* chunk size */
 	int64_t			cmg_created;	/* date created */
 	int			cmg_type;	/* normal, stdin or crypto */

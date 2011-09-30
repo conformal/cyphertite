@@ -15,7 +15,7 @@ INCDIR ?= ${LOCALBASE}/include
 # Use obj directory if it exists.
 OBJPREFIX ?= obj/
 ifeq "$(wildcard $(OBJPREFIX))" ""
-	OBJPREFIX =	
+	OBJPREFIX =
 endif
 
 # System utils.
@@ -56,9 +56,9 @@ $(OBJPREFIX)%.o: %.c
 	@echo "Generating $@.depend"
 	@$(CC) $(INCFLAGS) -MM $(CPPFLAGS) $< | \
 	sed 's,$*\.o[ :]*,$@ $@.depend : ,g' >> $@.depend
-	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ -c $< 
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ -c $<
 
-depend: 
+depend:
 	@echo "Dependencies are automatically generated.  This target is not necessary."
 
 install:

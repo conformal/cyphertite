@@ -105,7 +105,7 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 - Improve error reporting
 - Other misc bug fixes
 * Wed Jul 27 2011 - davec 0.3.1-1
-- Man page updates 
+- Man page updates
 * Tue Jul 26 2011 - davec 0.3.0-1
 - Modify wizard to create the configuration path and to run it at more
   expected times

@@ -175,7 +175,7 @@ ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp, int write)
 			return (FALSE);
 		if (!xdr_int(xdrs, &objp->cmg_num_paths))
 			return (FALSE);
-		if (write == 0) { 
+		if (write == 0) {
 			objp->cmg_paths = e_calloc(objp->cmg_num_paths,
 			    sizeof(*objp->cmg_paths));
 		}
@@ -276,7 +276,7 @@ ct_alloc_dirnum(struct dnode *dnode, struct dnode *parentdir)
 	}
 
 	/*
-	 * lazy directory header writing 
+	 * lazy directory header writing
 	 */
 	fnode_dir = ct_populate_fnode_from_flist(dnode->d_flnode);
 	CDBG("alloc_dirnum dir %"PRId64" %s", dnode->d_num,
@@ -319,7 +319,7 @@ ct_write_header(struct fnode *fnode, char *filename, int base)
 			}
 			return 0;
 		}
-		CDBG("WRITING %s tag %" PRId64, 
+		CDBG("WRITING %s tag %" PRId64,
 		    fnode->fl_curdir_dir->d_name,
 		    fnode->fl_curdir_dir->d_num);
 	} else if (fnode->fl_skip_file)
@@ -336,7 +336,7 @@ ct_write_header(struct fnode *fnode, char *filename, int base)
 			    fnode->fl_parent_dir->d_parent);
 		}
 		hdr.cmh_parent_dir = fnode->fl_parent_dir->d_num;
-	} else 
+	} else
 		hdr.cmh_parent_dir = -1;
 	hdr.cmh_beacon = CT_HDR_BEACON;
 	hdr.cmh_uid = fnode->fl_uid;
@@ -963,7 +963,7 @@ ct_populate_fnode(struct fnode *fnode, struct ct_md_header *hdr, int *state)
 		    hdr->cmh_parent_dir);
 
 		fnode->fl_sname = gen_fname(&flistnode);
-	} else 
+	} else
 		fnode->fl_sname = e_strdup(hdr->cmh_filename);
 	CDBG("name %s from %s %" PRId64, fnode->fl_sname, hdr->cmh_filename,
 	    hdr->cmh_parent_dir);
@@ -1018,7 +1018,7 @@ ct_populate_fnode2(struct fnode *fnode, struct ct_md_header *hdr,
 		    hdr->cmh_parent_dir);
 
 		fnode->fl_sname = gen_fname(&flistnode);
-	} else 
+	} else
 		fnode->fl_sname = e_strdup(hdr->cmh_filename);
 	CDBG("name %s from %s %" PRId64, fnode->fl_sname, hdr->cmh_filename,
 	    hdr->cmh_parent_dir);
@@ -1068,7 +1068,7 @@ ct_basis_setup(const char *basisbackup, char **filelist)
 	}
 
 	/*
-	 * if we have the list of dirs in this previous backup, check that 
+	 * if we have the list of dirs in this previous backup, check that
 	 * our cwd matches and the list of dirs we care about are a strict
 	 * superset of the previous backup
 	 */
@@ -1158,19 +1158,19 @@ ct_metadata_check_prev(const char *mdname)
 	return ret;
 }
 
-int 
+int
 ct_xdr_parse_init(struct ct_xdr_state *ctx, const char *file)
 {
 	ctx->xs_f = ct_metadata_open(file,  &ctx->xs_gh);
 	if (ctx->xs_f == NULL)
 		return 2;
-	
+
 	ctx->xs_sha_sz = 0;
 	ctx->xs_state = XS_STATE_FILE;
 	return 0;
 }
 
-int 
+int
 ct_xdr_parse(struct ct_xdr_state *ctx)
 {
 	off_t			pos0, pos1;
@@ -1183,7 +1183,7 @@ ct_xdr_parse(struct ct_xdr_state *ctx)
 	case XS_STATE_FILE:
 		/* actually between files, next expected object is hdr */
 		ret = ct_read_header(&ctx->xs_hdr);
-		if (ret) 
+		if (ret)
 			goto fail;
 
 		if (ctx->xs_hdr.cmh_beacon == CT_HDR_EOF) {
@@ -1194,7 +1194,7 @@ ct_xdr_parse(struct ct_xdr_state *ctx)
 
 		if (C_ISLINK(ctx->xs_hdr.cmh_type)) {
 			ret = ct_read_header(&ctx->xs_lnkhdr);
-			if (ret) 
+			if (ret)
 				goto fail;
 		}
 		if (C_ISREG(ctx->xs_hdr.cmh_type)) {
@@ -1255,7 +1255,7 @@ ct_xdr_parse(struct ct_xdr_state *ctx)
 		goto fail;
 
 	}
-	
+
 	return rv;
 fail:
 	ctx->xs_state = XS_STATE_FAIL;
@@ -1266,7 +1266,7 @@ fail:
  * If in SHA state, it is valid to tell the reader to seek to the end
  * of the shas and read the file trailer
  */
-int 
+int
 ct_xdr_parse_seek(struct ct_xdr_state *ctx)
 {
 	off_t	pos0, pos1;
@@ -1299,7 +1299,7 @@ ct_xdr_parse_seek(struct ct_xdr_state *ctx)
 		return 1;
 	}
 	ctx->xs_sha_cnt = 0;
-	
+
 	return 0;
 }
 

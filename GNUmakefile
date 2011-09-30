@@ -6,7 +6,7 @@ all: $(SUBDIRS)
 $(TARGETS):
 	@for i in $(SUBDIRS); do echo "===> $$i ($@)"; $(MAKE) -C $$i/ $@; done
 
-$(SUBDIRS): 
+$(SUBDIRS):
 	@echo "===> $@"
 	$(MAKE) -C $@
 

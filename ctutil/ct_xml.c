@@ -48,13 +48,14 @@ struct xmlsd_v_attr		xa_ct_uuid_attr[] = {
 	{ "value" },
 	{ NULL }
 };
+
 struct xmlsd_v_attr		xa_ct_reply_attr[] = {
 	{ "version" },
 	{ "success" },
 	{ NULL }
 };
 
- 
+
 struct xmlsd_v_elem             xe_ct_md_open_create[] = {
 	{ "ct_md_open_create","",		ct_cmd_attr },
 	{ "file",	"file.ct_md_open_create", xa_ct_md_file_attr },

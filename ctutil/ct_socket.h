@@ -80,10 +80,10 @@ struct ct_io_ctx {
 	int				io_write_io_enabled;
 
 	/* stats */
-	uint64_t			io_write_bytes;				
-	uint64_t			io_write_count;				
-	uint64_t			io_read_bytes;				
-	uint64_t			io_read_count;				
+	uint64_t			io_write_bytes;
+	uint64_t			io_write_count;
+	uint64_t			io_read_bytes;
+	uint64_t			io_read_count;
 };
 
 struct ct_assl_io_ctx {
@@ -115,10 +115,10 @@ struct ct_assl_io_ctx {
 	int				io_write_io_enabled;
 
 	/* stats */
-	uint64_t			io_write_bytes;				
-	uint64_t			io_write_count;				
-	uint64_t			io_read_bytes;				
-	uint64_t			io_read_count;				
+	uint64_t			io_write_bytes;
+	uint64_t			io_write_count;
+	uint64_t			io_read_bytes;
+	uint64_t			io_read_count;
 };
 
 eventcb_ty		ct_event_assl_write, ct_event_assl_read;

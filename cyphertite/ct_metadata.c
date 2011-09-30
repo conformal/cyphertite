@@ -1010,7 +1010,7 @@ again:
 			e_free(&cachename);
 			ct_add_operation_after(op, ct_md_extract,
 			    ct_md_download_next, (char *)md_prev, md_prev,
-				NULL, NULL, NULL, 0, 0); 
+				NULL, NULL, NULL, 0, 0);
 		} else {
 			if (mfile == mfilename)
 				e_free(&mfile);
@@ -1047,7 +1047,7 @@ ct_md_extract_nextop(struct ct_op *op)
 
 	/*
 	 * Any recursive download after here will be placed after the
-	 * current operation in the queue of ops. So we can now add the final 
+	 * current operation in the queue of ops. So we can now add the final
 	 * operation to the end of the queue without difficulty.
 	 */
 	switch (op->op_action) {
@@ -1484,9 +1484,9 @@ ct_md_trigger_delete(struct ct_op *op)
 }
 
 
-/* 
+/*
  * Data structures to hold cull data
- * 
+ *
  * Should this be stored in memory or build a temporary DB
  * to hold it due to the number of shas involved?
  */
@@ -1551,7 +1551,6 @@ void
 ct_cull_complete(struct ct_op *op)
 {
 	CDBG("shacnt %" PRIu64 " shapayload %" PRIu64, shacnt, sha_payload_sz);
-	
 }
 
 uint64_t cull_uuid; /* set up with random number in ct_cull_setup() */
