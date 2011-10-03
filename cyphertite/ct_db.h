@@ -15,14 +15,17 @@
  */
 
 /* db functions */
-sqlite3			*ctdb_open(const char *, int crypt);
+sqlite3			*ctdb_open(const char *, int crypt, int *);
+sqlite3			*ctdb_reopendb(int genid);
 void			ctdb_cleanup(sqlite3 *);
 int			ctdb_lookup_sha(sqlite3 *, uint8_t *, uint8_t *,
 			    uint8_t *);
 int			ctdb_insert_sha(sqlite3 *, uint8_t *, uint8_t *,
 			    uint8_t *);
-int			ctdb_create(const char *, sqlite3 **, int);
-int			ctdb_query_db_mode(sqlite3 *, int);
+int			ctdb_create(const char *, sqlite3 **, int, int);
+int			ctdb_query_db_mode(sqlite3 *, int, int *);
 
 void			ctdb_setup(const char *, int);
 void			ctdb_shutdown(void);
+
+extern int		ctdb_genid;

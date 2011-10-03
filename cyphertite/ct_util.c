@@ -1,4 +1,4 @@
-/*
+ /*
  * Copyright (c) 2011 Conformal Systems LLC <info@conformal.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -32,9 +32,12 @@
 #include <clog.h>
 #include <assl.h>
 #include <exude.h>
+#include <xmlsd.h>
+#include <sqlite3.h>
 
 #include "ct.h"
 #include "ct_socket.h"
+#include "ct_db.h"
 
 #ifndef MIN
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
@@ -54,7 +57,8 @@ struct ct_io_queue	*ct_ioctx_alloc(void);
 void			ct_ioctx_free(struct ct_io_queue *);
 void			ct_print_scaled_stat(FILE *, const char *, int64_t,
 			    int64_t, int);
-
+int			ct_validate_xml_negotiate_xml(struct ct_header *,
+			    char *);
 
 
 struct ct_op *
@@ -244,14 +248,17 @@ ct_header_free(void *vctx, struct ct_header *hdr)
 int
 ct_assl_negotiate_poll(struct ct_assl_io_ctx *asslctx)
 {
-	char			b64_digest[128];
-	uint8_t			pwd_digest[SHA512_DIGEST_LENGTH];
-	uint8_t			buf[20];
-	uint8_t			*body;
-	struct ct_header	hdr;
-	int			rv = 1;
-	int			user_len, payload_sz;
-	ssize_t			sz;
+	struct xmlsd_element		*xe;
+	struct xmlsd_element_list	 xl;
+	char				 b64_digest[128];
+	uint8_t				 pwd_digest[SHA512_DIGEST_LENGTH];
+	uint8_t				 *body;
+	struct ct_header		 hdr;
+	size_t				 orig_size;
+	ssize_t				 sz;
+	int				 rv = 1;
+	int				 user_len, payload_sz;
+	uint8_t				 buf[20];
 
 	/* send server request */
 	hdr.c_version = C_HDR_VERSION;
@@ -367,10 +374,123 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *asslctx)
 		goto done;
 	}
 
+	/* XML negotiation */
+	hdr.c_version = C_HDR_VERSION;
+	hdr.c_opcode = C_HDR_O_XML;
+	hdr.c_tag = 0;
+
+	xe = xmlsd_create(&xl, "ct_negotiate");
+	xe = xmlsd_add_element(&xl, xe, "clientdbgenid");
+	xmlsd_set_attr_int32(xe, "value", ctdb_genid);
+
+	body = xmlsd_generate(&xl, malloc, &orig_size, 1);
+	hdr.c_size = payload_sz = orig_size;
+
+	ct_wire_header(&hdr);
+	if (ct_assl_io_write_poll(ct_assl_ctx, &hdr, sizeof hdr, ASSL_TIMEOUT)
+	    != sizeof hdr) {
+		CWARNX("could not write header");
+		goto done;
+	}
+	if (ct_assl_io_write_poll(ct_assl_ctx, body, payload_sz,  ASSL_TIMEOUT)
+	    != payload_sz) {
+		CWARNX("could not write body");
+		goto done;
+	}
+	free(body); /* XXX - malloc allocated */
+
+	/* get server reply */
+	sz = ct_assl_io_read_poll(ct_assl_ctx, &hdr, sizeof hdr, ASSL_TIMEOUT);
+	if (sz != sizeof hdr) {
+		CWARNX("invalid header size %zd", sz);
+		goto done;
+	}
+	ct_unwire_header(&hdr);
+
+	if (hdr.c_size == 0) {
+		goto done;
+	}
+	/* get server reply body */
+	body = e_calloc(1, hdr.c_size);
+	sz = ct_assl_io_read_poll(ct_assl_ctx, body, hdr.c_size, ASSL_TIMEOUT);
+	if (sz != hdr.c_size) {
+		CWARNX("invalid xml body size %zd %d", sz, hdr.c_size);
+		goto done;
+	}
+	/* XXX check xml data */
+	if (ct_validate_xml_negotiate_xml(&hdr, body)) {
+		e_free(&body);
+		goto done;
+	}
+
+	e_free(&body);
+
 	CNDBG(CT_LOG_NET, "login successful");
 	rv = 0;
 done:
 	return (rv);
+}
+int
+ct_validate_xml_negotiate_xml(struct ct_header *hdr, char *xml_body)
+{
+	struct xmlsd_element_list xl;
+	struct xmlsd_element	*xe;
+	char			*attrval;
+	const char		*err;
+	int			attrval_i = -1;
+	int			r, rv = -1;
+
+	TAILQ_INIT(&xl);
+
+	r = xmlsd_parse_mem(xml_body, hdr->c_size - 1, &xl);
+	if (r != XMLSD_ERR_SUCCES) {
+		CNDBG(CT_LOG_NET, "xml reply '[%s]'", xml_body ? xml_body :
+		    "<NULL>");
+		CWARN("XML parse fail on XML negotiate");
+		goto done;
+	}
+
+	/*
+	 * XXX - do we want to validate the results?
+	 * - other than validating it parses correctly, seems that
+	 *   additional validation would just complicate future
+	 *   client-server communication.
+	 * - because of this assumption, any non-recognised 
+	 *   elements must be ignored.
+	 */
+
+	xe = TAILQ_FIRST(&xl);
+	if (strcmp (xe->name, "ct_negotiate_reply") != 0) {
+		CWARNX("Invalid xml reply type %s, [%s]", xe->name, xml_body);
+		goto done;
+	}
+
+	TAILQ_FOREACH(xe, &xl, entry) {
+		if (strcmp (xe->name, "clientdbgenid") == 0) {
+			attrval = xmlsd_get_attr(xe, "value");
+			err = NULL;
+			attrval_i = strtonum(attrval, -1, INT_MAX, &err);
+			if (err) {
+				CWARNX("unable to parse clientdbgenid [%s]",
+				    attrval);
+				goto done;
+			}
+			CNDBG(CT_LOG_NET, "got cliendbgenid value %d",
+			    attrval_i);
+			break;
+		}
+	}
+
+	if (attrval_i != -1 && attrval_i != ctdb_genid) {
+		CINFO("need to recreate localdb");
+		ctdb_reopendb(attrval_i);
+	}
+
+
+	xmlsd_unwind(&xl);
+	rv = 0;
+done:
+	return rv; /* success */
 }
 
 void

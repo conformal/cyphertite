@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <clog.h>
+#include <exude.h>
 #include <sqlite3.h>
 #include "ct.h"
 
@@ -27,6 +28,7 @@
 
 int		ctdb_verbose = 1;
 int		ctdb_crypt = 0;
+int		ctdb_genid = -1;
 
 int		ctdb_in_transaction;
 int		ctdb_trans_commit_rem;
@@ -36,6 +38,7 @@ sqlite3_stmt		*ctdb_stmt_lookup;
 sqlite3_stmt		*ctdb_stmt_insert;
 
 sqlite3			*ctdb_db;
+char			*ctdb_dbfile;
 
 void
 ctdb_setup(const char *path, int crypt_enabled)
@@ -47,7 +50,7 @@ ctdb_setup(const char *path, int crypt_enabled)
 		}
 	}
 
-	ctdb_db = ctdb_open(path, crypt_enabled);
+	ctdb_db = ctdb_open(path, crypt_enabled, &ctdb_genid);
 }
 
 void
@@ -84,7 +87,7 @@ ctdb_insert(struct ct_trans *trans)
 }
 
 int
-ctdb_create(const char *filename, sqlite3 **db, int crypto)
+ctdb_create(const char *filename, sqlite3 **db, int crypto, int genid)
 {
 	int			rc;
 	char			*errmsg = NULL;
@@ -93,6 +96,8 @@ ctdb_create(const char *filename, sqlite3 **db, int crypto)
 	if (db == NULL)
 		CFATALX("no db");
 
+	if (genid == -1)
+		genid = 0;
 	rc = sqlite3_open_v2(filename, db,
 	    SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL);
 	if (rc)
@@ -120,7 +125,7 @@ ctdb_create(const char *filename, sqlite3 **db, int crypto)
 		return (rc);
 	}
 	snprintf(sql, sizeof sql,
-	    "CREATE TABLE mode (crypto TEXT);");
+	    "CREATE TABLE mode (crypto TEXT, version INTEGER);");
 	rc = sqlite3_exec(*db, sql, NULL, 0, &errmsg);
 	if (rc) {
 		CWARNX("mode table creation failed");
@@ -139,18 +144,37 @@ ctdb_create(const char *filename, sqlite3 **db, int crypto)
 		return (rc);
 	}
 
+	snprintf(sql, sizeof sql,
+	    "CREATE TABLE genid (value INTEGER);");
+	rc = sqlite3_exec(*db, sql, NULL, 0, &errmsg);
+	if (rc) {
+		CWARNX("gendi table creation failed");
+		sqlite3_close(*db);
+		*db = NULL;
+		return (rc);
+	}
+	snprintf(sql, sizeof sql,
+	    "insert into genid (value) VALUES (%d);", genid);
+	rc = sqlite3_exec(*db, sql, NULL, 0, &errmsg);
+	if (rc) {
+		CWARNX("mode table init failed");
+		sqlite3_close(*db);
+		*db = NULL;
+		return (rc);
+	}
+
 	return (SQLITE_OK);
 }
 
 int
-ctdb_query_db_mode(sqlite3 *db, int crypto)
+ctdb_query_db_mode(sqlite3 *db, int crypto, int *genid)
 {
 	sqlite3_stmt		*stmt;
 	char			*p, wanted;
-	int			rc, rv = 0;
+	int			rc, rv = 0, curgenid;
 
 	CNDBG(CT_LOG_DB, "ctdb mode %d\n", crypto);
-	if (sqlite3_prepare_v2(db, "select crypto from mode",
+	if (sqlite3_prepare_v2(db, "SELECT crypto FROM mode",
 	    -1, &stmt, NULL))
 		CFATALX("can't prepare mode query statement");
 	rc = sqlite3_step(stmt);
@@ -158,7 +182,8 @@ ctdb_query_db_mode(sqlite3 *db, int crypto)
 		CNDBG(CT_LOG_DB, "ctdb mode not found");
 		goto fail;
 	} else if (rc != SQLITE_ROW)
-		CFATALX("could not step %d %d %s",
+		CFATALX("could not step(%d) %d %d %s",
+		    __LINE__,
 		    rc,
 		    sqlite3_extended_errcode(db),
 		    sqlite3_errmsg(db));
@@ -177,16 +202,60 @@ ctdb_query_db_mode(sqlite3 *db, int crypto)
 			goto fail;
 		}
 	}
+	if (sqlite3_finalize(stmt))
+		goto fail;
+
+	if (sqlite3_prepare_v2(db, "SELECT value FROM genid",
+	    -1, &stmt, NULL)) {
+		CWARNX("old format db detected, reseting db");
+		goto fail;
+	}
+	rc = sqlite3_step(stmt);
+	if (rc == SQLITE_DONE) {
+		CINFO("ctdb genid not found");
+		goto fail;
+	} else if (rc != SQLITE_ROW)
+		CFATALX("could not step(%d) %d %d %s",
+		    __LINE__,
+		    rc,
+		    sqlite3_extended_errcode(db),
+		    sqlite3_errmsg(db));
+	curgenid = sqlite3_column_int(stmt, 0);
+
+	if (*genid == -1)
+		*genid = curgenid;
+	else if (curgenid != *genid) {
+		*genid = curgenid;
+		goto fail;
+	}
+
+	CINFO("genid from db %d", *genid);
 
 	rv = 1;
 fail:
 	if (sqlite3_finalize(stmt))
 		CFATALX("can't finalize verification lookup");
+	if (rv != 1) {
+		ctdb_shutdown();
+	}
 	return rv;
 }
 
 sqlite3 *
-ctdb_open(const char *dbfile, int crypto)
+ctdb_reopendb(int genid)
+{
+	sqlite3 *db;
+	char *dbfile = e_strdup(ctdb_dbfile);
+	int crypto = ctdb_crypt;
+	ctdb_shutdown();
+	unlink(dbfile);
+	db = ctdb_open(dbfile, crypto, &genid);
+	e_free(&dbfile);
+	return db;
+}
+
+sqlite3 *
+ctdb_open(const char *dbfile, int crypto, int *genid)
 {
 	sqlite3			*db;
 	int			rc;
@@ -200,11 +269,11 @@ do_retry:
 	rc = sqlite3_open_v2(dbfile, &db, SQLITE_OPEN_READWRITE, NULL);
 	if (rc == SQLITE_CANTOPEN) {
 		CWARNX("db file doesn't exist, creating it");
-		rc = ctdb_create(dbfile, &db, crypto);
+		rc = ctdb_create(dbfile, &db, crypto, *genid);
 		if (rc != SQLITE_OK)
 			return NULL;
 	}
-	if (ctdb_query_db_mode(db, crypto) == 0) {
+	if (ctdb_query_db_mode(db, crypto, genid) == 0) {
 		if (retry) {
 			retry = 0;
 			/* db is in incorrect mode, delete it and try again */
@@ -220,12 +289,13 @@ do_retry:
 	}
 
 	ctdb_crypt = crypto;
+	ctdb_dbfile = e_strdup(dbfile);
 
 	/* prepare query here based on crypt mode */
 	if (crypto) {
-		psql = "select csha, iv from digests where sha=?";
+		psql = "SELECT csha, iv FROM digests WHERE sha=?";
 	} else {
-		psql = "select sha from digests where sha=?";
+		psql = "SELECT sha FROM digests WHERE sha=?";
 	}
 
 	if (sqlite3_prepare(db, psql,
@@ -259,6 +329,9 @@ ctdb_cleanup(sqlite3 *db)
 	}
 
 	sqlite3_close(db);
+
+	if (ctdb_dbfile)
+		e_free(&ctdb_dbfile);
 }
 
 int
@@ -303,7 +376,8 @@ ctdb_lookup_sha(sqlite3 *db, uint8_t *sha_k, uint8_t *sha_v, uint8_t *iv)
 		sqlite3_reset(stmt);
 		return rv;
 	} else if (rc != SQLITE_ROW)
-		CFATALX("could not step %d %d %s",
+		CFATALX("could not step(%d) %d %d %s",
+		    __LINE__,
 		    rc,
 		    sqlite3_extended_errcode(db),
 		    sqlite3_errmsg(db));
