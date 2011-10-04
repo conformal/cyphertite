@@ -442,6 +442,8 @@ ct_dump_stats(FILE *outfh)
 	struct timeval time_end, scan_delta, time_delta;
 	long long sec;
 	long long val;
+	char *sign;
+	uint64_t sent, total;
 
 	gettimeofday(&time_end, NULL);
 
@@ -484,13 +486,21 @@ ct_dump_stats(FILE *outfh)
 		fprintf(outfh, "Bytes sent\t\t\t%12" PRIu64 "\n",
 		    ct_stats->st_bytes_sent);
 
-		if (ct_stats->st_bytes_tot != 0)
-			val = ((ct_stats->st_bytes_tot -
-			    ct_stats->st_bytes_sent) * 100 /
-			    ct_stats->st_bytes_tot);
-		else
+		sign = " ";
+		if (ct_stats->st_bytes_tot != 0) {
+			total = ct_stats->st_bytes_tot;
+			sent = ct_stats->st_bytes_sent;
+
+			if (sent <= total) {
+				val = 100 * (total - sent) / total;
+			} else {
+				val = 100 * (sent - total) / sent;
+				if (val != 0)
+					sign = "-";
+			}
+		} else
 			val = 0;
-		fprintf(outfh, "Reduction ratio\t\t\t\t%4lld%%\n", val);
+		fprintf(outfh, "Reduction ratio\t\t\t\t%s%lld%%\n", sign, val);
 	}
 	print_time_scaled(outfh, "Total Time\t\t\t    ",  &time_delta);
 
