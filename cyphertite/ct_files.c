@@ -411,7 +411,12 @@ ct_archive(struct ct_op *op)
 		if (getcwd(cwd, PATH_MAX) == NULL)
 			CFATAL("can't get current working directory");
 
+		if (ct_tdir && chdir(ct_tdir) != 0)
+			CFATALX("can't chdir to %s", ct_tdir);
 		ct_traverse(filelist, op->op_excludelist, op->op_matchmode);
+
+		if (ct_tdir && chdir(cwd) != 0)
+			CFATALX("can't chdir back to %s", cwd);
 
 		/* XXX - deal with stdin */
 		/* XXX - if basisbackup should the type change ? */
@@ -420,6 +425,10 @@ ct_archive(struct ct_op *op)
 
 		if (basisbackup != NULL)
 			e_free(&basisbackup);
+
+		/* change back to -C directory so relative paths work again */
+		if (ct_tdir && chdir(ct_tdir) != 0)
+			CFATALX("can't chdir to %s", ct_tdir);
 
 		/*
 		 * it is possible the first files may have been deleted
