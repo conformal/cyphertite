@@ -18,7 +18,7 @@
 .Os
 .Sh NAME
 .Nm cyphertite
-.Nd remote encrypting archiving client 
+.Nd remote encrypting archiving client
 .Sh SYNOPSIS
 .Nm cyphertite
 .Bk -words
@@ -27,7 +27,7 @@
 .Op Fl B Ar ctfile
 .Op Fl C Ar tmpdir
 .Op Fl E Ar excludefile
-.Op Fl F Ar conffile  
+.Op Fl F Ar conffile
 .Op Fl I Ar includefile
 .Op Fl f Ar ctfile
 .Op Ar file ...
@@ -61,15 +61,15 @@ providing a number of additional features:
 .Pp
 DEDUPLICATION
 .Bd -filled -offset 3n
-Through the process of 
+Through the process of
 DEDUPLICATION,
 .Nm
-chunks 
+chunks
 are stored only once and subsequent instances of
 the same data are stored as references to the existing data.
 Files (called "archive metadata files") reference the chunks needed to
 retrieve any archived file.
-Each chunk is identified by its SHA1 hash. 
+Each chunk is identified by its SHA1 hash.
 Many archive metadata files may reference the same chunk.
 .Ed
 .Pp
@@ -77,8 +77,8 @@ COMPRESSION
 .Bd -filled -offset 3n
 After files are split into chunks, those chunks are then compressed.
 The default compression algorithm is LZO because it is the fastest
-of the 3 algorithms available, but LZW or LZMA can be 
-configured in 
+of the 3 algorithms available, but LZW or LZMA can be
+configured in
 .Xr cyphertite.conf 5 .
 If a chunk increases in size on compression, the uncompressed
 chunk is used.
@@ -93,11 +93,11 @@ with a variation on the usual disk encryption method suggested
 in IEEE 1619-2007: the 256-bit tweak key, K2, is normally taken
 as the sector number on a hard drive, here it is generated as an
 HMAC SHA1 of the chunk itself using a separate 256-bit key.
-
+.Pp
 All locally stored metadata is unencrypted. Metadata stored on
-a remote machine is encrypted using standard AES-XTS, with the 
+a remote machine is encrypted using standard AES-XTS, with the
 chunk number used as the tweak key.
-
+.Pp
 Network traffic is encrypted using per-user certificates signed
 by a 521-bit ECDSA CA key and a corresponding per-user 521-bit
 ECDSA key.
@@ -105,9 +105,9 @@ These certificates and keys are used to setup a 256-bit AES
 session key for SSL.
 The relevant client certificates and key are provided by the
 remote server administrator.
-
+.Pp
 The keys used to perform all the chunk-level encryption are
-stored in the crypto_secrets file specified in 
+stored in the crypto_secrets file specified in
 .Xr cyphertite.conf 5 .
 The file ~/.cyphertite.crypto is the default.
 The AES-XTS and IV keys are stored protected by PBKDF2 with a
@@ -124,7 +124,7 @@ If multiple machines share
 and cyphertite.crypto files in common, deduplication can be
 achieved across several machines in a realm.
 These machines must share an account to obtain the benefit
-of deduplication. 
+of deduplication.
 .Ed
 .Pp
 In all cases except those involving metadata (
@@ -151,8 +151,8 @@ arguments may be specified as
 .Xr glob 7
 patterns (or, with the
 .Fl r
-option, 
-.Xr regex 3 
+option,
+.Xr regex 3
 patterns) and
 .Nm
 will list all archive members that match that pattern.
@@ -162,12 +162,12 @@ If any files are named on the command line, only those files will
 be extracted from the archive.
 The
 .Ar file
-arguments may be specified as 
+arguments may be specified as
 .Xr glob 7
 patterns (or, with the
 .Fl r
-option, 
-.Xr regex 3 
+option,
+.Xr regex 3
 patterns) and
 .Nm
 will extract all archive members that match that pattern.
@@ -180,7 +180,7 @@ used:
 Generate a level 0 (full) backup. Only applicable to remote metadata archive
 mode.
 .It Fl B Ar ctfile
-Specify the archive to be used as the basis of a differential backup. 
+Specify the archive to be used as the basis of a differential backup.
 Files with a modification time (mtime) newer than the previous backup
 will be archived.
 The behavior is dump-like and helps limit the size of the archive metadata
@@ -212,7 +212,7 @@ The default is to strip leading slashes.
 Display statistics at the end of operation.
 These include compression ratios, transfer speeds, byte details, etc.
 .It Fl X
-The option prevents 
+The option prevents
 .Nm
 from descending into directories that have a different device number
 than the file from which the descent began.
@@ -243,7 +243,7 @@ Display version information.  All other options are ignored.
 .Sh METADATA MODE
 If
 .Fl m
-is provided on the command mode then 
+is provided on the command mode then
 .Nm
 will operate in metadata mode.
 The
@@ -264,7 +264,7 @@ and
 In
 .Em local
 mode,
-.Nm 
+.Nm
 operates similarly to
 .Xr tar 1
 with the archive metadata files operating analgously to the tar archive
@@ -282,12 +282,12 @@ They are stored on the remote server with the form:
 YYYYMMDD-HHMMSS-tag .
 Extract commands will operate on the newest archive metadata file on the
 server unless the full metadata name is provided.
-The cache directory defined in the 
-.Xr cyphertite.conf 5 
+The cache directory defined in the
+.Xr cyphertite.conf 5
 configuration file will be used to store
 local copies of the archive metadata files.
 .Sh EXAMPLES
-Create an archive named 
+Create an archive named
 .Pa accounting-2010.md
 containing the directory
 .Pa /data/accounting/2010 :
@@ -332,13 +332,12 @@ Default crypto secrets file.
 .Sh SEE ALSO
 .Xr cyphertite.conf 5 ,
 .Xr glob 7 ,
-.Xr regex 3 
+.Xr regex 3
 .Sh AUTHORS
 .Nm
 was written by
 .An Conformal Systems, LLC. Aq info@conformal.com .
 .Sh CAVEATS
-.Pp
 .Nm
 is currently in beta testing.  Some of the above options
 may change before official release.
@@ -347,17 +346,17 @@ Before executing the first backup on a system, run
 with no parameters to allow cyphertite to prompt for the
 information needed to setup the account as follows:
 .Dl $ cyphertite
-.Dl cyphertite config file not found. Create one? [yes]: 
-.Dl Target conf file [/root/.cyphertite.conf]: 
+.Dl cyphertite config file not found. Create one? [yes]:
+.Dl Target conf file [/root/.cyphertite.conf]:
 .Dl cyphertite login username: mylogin
-.Dl Save cyphertite login password to configuration file? [yes]: 
-.Dl login password: 
-.Dl confirm: 
-.Dl Save cyphertite crypto passphrase to configuration file? [yes]: 
-.Dl Automatically generate crypto passphrase? [yes]: 
-.Dl Choose a metadata operation mode (remote/local) [remote]: 
-.Dl Target metadata cache directory [/root/.cyphertite_md_cachedir]: 
-.Dl Use automatic remote differentials? [no]: 
+.Dl Save cyphertite login password to configuration file? [yes]:
+.Dl login password:
+.Dl confirm:
+.Dl Save cyphertite crypto passphrase to configuration file? [yes]:
+.Dl Automatically generate crypto passphrase? [yes]:
+.Dl Choose a metadata operation mode (remote/local) [remote]:
+.Dl Target metadata cache directory [/root/.cyphertite_md_cachedir]:
+.Dl Use automatic remote differentials? [no]:
 .Dl Configuration file created.
 .Pp
 Using the built-in configuration file generator simplifies

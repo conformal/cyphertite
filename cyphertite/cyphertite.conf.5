@@ -14,11 +14,11 @@
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
 .Dd $Mdocdate$
-.Dt CYPHERTITE.CONF 5 
+.Dt CYPHERTITE.CONF 5
 .Os
 .Sh NAME
 .Nm cyphertite.conf
-.Nd Cyphertite configuration file 
+.Nd Cyphertite configuration file
 .Sh DESCRIPTION
 The
 .Nm
@@ -34,7 +34,7 @@ Lines beginning with
 are comments. Blank lines are ignored.
 .Sh CONFIGURATION
 There are a few settings that affect the operation of
-.Xr cyphertite 1 
+.Xr cyphertite 1
 .
 .Pp
 .Bl -tag -width Ds -compact
@@ -47,13 +47,13 @@ If not set, the default is to not limit upload speed.
 .Pp
 .It Ic cache_db = Ar file
 Specify the location of the cache database.
-If not set, caching will be disabled. 
+If not set, caching will be disabled.
 (It is advantageous to run with caching enabled, except when running
-multiple concurrent instances of 
+multiple concurrent instances of
 .Xr cyphertite 1 ,
-in which case caching should be disabled to prevent database 
+in which case caching should be disabled to prevent database
 conflicts.)
-.Pp 
+.Pp
 .It Ic ca_cert = Ar file
 Specify the path to the certificate authority file.
 .Pp
@@ -63,12 +63,12 @@ Specify the path to the client certificate file.
 .It Ic crypto_password = Ar password
 Specify the password of your crypto_secrets file.  Optional.
 .Xr cyphertite 1
-will prompt for this if it is not specified. 
+will prompt for this if it is not specified.
 .Pp
 .It Ic crypto_secrets = Ar file
 Specify the file that will hold your secrets.
 .Pp
-.It Ic host = Ar hostname 
+.It Ic host = Ar hostname
 Specify the hostname to connect to.
 .Pp
 .It Ic hostport = portnum
@@ -104,7 +104,7 @@ mode is set then the
 .Op md_cachedir
 option is required.
 See
-.Xr cyphertite 1 
+.Xr cyphertite 1
 for a description of the different metadata modes.
 .Pp
 .It Xo
