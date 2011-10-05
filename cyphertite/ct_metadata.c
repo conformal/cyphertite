@@ -431,6 +431,7 @@ ct_md_extract(struct ct_op *op)
 {
 	const char		*mfile = op->op_local_fname;
 	const char		*mdname = op->op_remote_fname;
+	char			 tpath[PATH_MAX];
 	struct ct_trans		*trans;
 	struct ct_header	*hdr;
 
@@ -453,9 +454,12 @@ ct_md_extract(struct ct_op *op)
 
 		/* XXX -chmod when done */
 		if (md_backup_fd == -1) { /* may have been opened for us */
-			if ((md_backup_fd = open(mfile,
+			snprintf(tpath, sizeof tpath, "%s%s%s",
+			    ct_tdir ? ct_tdir : "", ct_tdir ? "/" : "",
+			     mfile);
+			if ((md_backup_fd = open(tpath,
 			    O_WRONLY|O_TRUNC|O_CREAT, 0600)) == -1)
-				CFATALX("unable to open file %s", mfile);
+				CFATALX("unable to open file %s", tpath);
 		}
 		md_block_no = 0;
 
