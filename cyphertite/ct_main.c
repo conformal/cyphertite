@@ -506,7 +506,8 @@ ct_main(int argc, char **argv)
 			else   {
 				ct_mfile = ct_find_md_for_archive(ct_mfile);
 				ct_add_operation(ct_archive, NULL, ct_mfile,
-				    NULL, argv, excludelist, NULL, 0, 0);
+				    NULL, argv, excludelist, NULL,
+				    ct_match_mode, 0);
 				ct_add_operation(ct_md_archive, NULL, ct_mfile,
 				    NULL, NULL, NULL, NULL, ct_match_mode, 0);
 			}
