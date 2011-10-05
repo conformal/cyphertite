@@ -22,14 +22,27 @@
 .Sh SYNOPSIS
 .Nm cyphertite
 .Bk -words
-.Op Fl 0PRVXcdemprtvx
-.Op Fl B Ar mdfile
+.Fl ctxV
+.Op Fl 0PRXdpr
+.Op Fl B Ar ctfile
 .Op Fl C Ar tmpdir
 .Op Fl E Ar excludefile
 .Op Fl F Ar conffile  
 .Op Fl I Ar includefile
-.Op Fl f Ar mdfile
+.Op Fl f Ar ctfile
 .Op Ar file ...
+.Ek
+.Pp
+.Nm
+.Bk -words
+.Fl m
+.Fl cetx
+.Op Fl dr
+.Op Fl C Ar tmpdir
+.Op Fl F Ar conffile
+.Op Fl f Ar metadata-tag
+.Op Ar pattern
+.Ek
 .Sh DESCRIPTION
 The
 .Nm
@@ -166,7 +179,7 @@ used:
 .It Fl 0
 Generate a level 0 (full) backup. Only applicable to remote metadata archive
 mode.
-.It Fl B Ar mdfile
+.It Fl B Ar ctfile
 Specify the archive to be used as the basis of a differential backup. 
 Files with a modification time (mtime) newer than the previous backup
 will be archived.

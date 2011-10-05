@@ -123,7 +123,11 @@ struct ct_settings	settings[] = {
 void
 ct_usage(void)
 {
-	fprintf(stderr, "%s {-ctxV} [-0BCDEFIPRXademprv] -f <archive> [filelist]\n",
+	fprintf(stderr,
+	    "usage: %s {-ctxV} [-0BCDEFIPRXadprv] -f <ctfile> [filelist]\n",
+	    __progname);
+	fprintf(stderr,
+	    "       %s -m {-cetx} [-CFdr] -f <metadata-tag> [pattern]\n",
 	    __progname);
 	exit(1);
 }
@@ -448,7 +452,7 @@ ct_main(int argc, char **argv)
 	}
 
 	if (ct_mfile == NULL && !(ct_metadata && ct_action == CT_A_LIST)) {
-		CWARNX("archive file is required");
+		CWARNX("ctfile is required");
 		ct_usage();
 	}
 
