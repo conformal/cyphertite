@@ -718,6 +718,7 @@ ct_traverse(char **paths, char **exclude, int match_mode)
 			continue;
 		}
 
+		CDBG("scheduling backup of %s", clean);
 		/* backup all other files */
 		if (ct_sched_backup_file(fe->fts_statp, clean, 0))
 			CFATAL("backup_file failed: %s", clean);
