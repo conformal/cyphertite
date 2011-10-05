@@ -315,7 +315,7 @@ ct_cleanup(void)
 int
 ct_main(int argc, char **argv)
 {
-	char		pwd[PASS_MAX];
+	char		pwd[PASS_MAX], tpath[PATH_MAX];
 	char		*ct_basisbackup = NULL;
 	char		*ct_mfile = NULL;
 	char		*ct_excludefile = NULL;
@@ -518,14 +518,22 @@ ct_main(int argc, char **argv)
 			break;
 		}
 	} else if (ct_metadata != 0) {
+		if (ct_action == CT_A_ARCHIVE || ct_action == CT_A_EXTRACT) {
+			if (ct_tdir) {
+				snprintf(tpath, sizeof tpath, "%s/%s",
+				    ct_tdir, ct_mfile);
+			} else {
+				strlcpy(tpath, ct_mfile, sizeof(tpath));
+			}
+		}
 		switch (ct_action) {
 		case CT_A_ARCHIVE:
 			ct_add_operation(ct_md_archive, ct_free_remotename,
-			    ct_mfile, NULL, NULL, NULL, NULL, 0, 0);
+			    tpath, NULL, NULL, NULL, NULL, 0, 0);
 			break;
 		case CT_A_EXTRACT:
 			ct_add_operation(ct_md_extract, ct_free_remotename,
-			    ct_mfile, NULL, NULL, NULL, NULL, 0, 0);
+			    tpath, NULL, NULL, NULL, NULL, 0, 0);
 			break;
 		case CT_A_LIST:
 			ct_add_operation(ct_md_list_start, ct_md_list_print,
