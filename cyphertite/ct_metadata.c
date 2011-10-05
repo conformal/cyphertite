@@ -176,6 +176,7 @@ loop:
 		CDBG("setting eof on trans %" PRIu64, ct_trans->tr_trans_id);
 		ct_trans->hdr.c_flags = C_HDR_F_METADATA;
 		ct_trans->tr_md_name = mdname;
+		ct_stats->st_bytes_tot += md_size;
 		ct_queue_transfer(ct_trans);
 		return;
 	}
