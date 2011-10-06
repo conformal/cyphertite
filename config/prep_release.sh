@@ -37,7 +37,7 @@ if [ $(echo $RELEASE_NOTES | cut -c1) != "/" ]; then
 fi
 
 # verify valid release type
-if [ "$RTYPE" != "major" -a "$RYPTE" != "minor" -a "$RTYPE" != "patch" ]; then
+if [ "$RTYPE" != "major" -a "$RTYPE" != "minor" -a "$RTYPE" != "patch" ]; then
 	echo "$SCRIPT: error: release type must be major, minor, or patch"
 	exit 1
 fi
