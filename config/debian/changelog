@@ -1,3 +1,14 @@
+cyphertite (0.4.7-1) unstable; urgency=low
+
+  * Fix -E flag when used with -0 flag and non-differential backups - FS#169
+  * Make -C flag work as intended in all modes
+  * Fix local database initialization - FS#164
+  * Correct reduction ratio displayed in stats - FS#167
+  * Add debug print for scheduled files - FS#161
+  * Other minor cleanup and bug fixes
+
+ -- Conformal Systems <package-discuss@conformal.com>  Thu, 06 Oct 2011 18:39:27 -0500
+
 cyphertite (0.4.6-1) unstable; urgency=low
 
   * Handle case where none of the specified backup objects exist

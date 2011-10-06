@@ -1,6 +1,6 @@
 
 %define name		cyphertite
-%define version		0.4.6
+%define version		0.4.7
 %define release		1
 
 Name: 		%{name}
@@ -49,6 +49,13 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertitectl
 
 %changelog
+* Thu Oct 06 2011 - davec 0.4.7-1
+- Fix -E flag when used with -0 flag and non-differential backups - FS#169
+- Make -C flag work as intended in all modes
+- Fix local database initialization - FS#164
+- Correct reduction ratio displayed in stats - FS#167
+- Add debug print for scheduled files - FS#161
+- Other minor cleanup and bug fixes
 * Thu Sep 29 2011 - davec 0.4.6-1
 - Handle case where none of the specified backup objects exist
 - Modify inclusion/exclusion processing to use full paths instead
