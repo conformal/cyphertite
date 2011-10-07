@@ -14,6 +14,9 @@ HEADER=../${PROJECT}/ct.h
 VER_PREFIX=CT
 RPM_SPEC=${PROJECT}.spec
 DEB_CHANGELOG=debian/changelog
+PORT_CATEGORY=security
+PORT_NAME=${PROJECT}
+PORT_MAKEFILE=openbsd/${PORT_CATEGORY}/${PORT_NAME}/Makefile
 
 # verify params
 if [ $# -lt 2 ]; then
@@ -168,10 +171,16 @@ echo "
 " >>"${DEB_CHANGELOG}.tmp"
 cat "${DEB_CHANGELOG}" >>"${DEB_CHANGELOG}.tmp"
 
+#modify OpenBSD package files with new release number
+sed -E "
+    s/(DISTNAME=[[:space:]]+${PROJECT}-)[0-9]+\.[0-9]+\.[0-9]+/\1${PROJ_VER}/;
+" <"$PORT_MAKEFILE" >"${PORT_MAKEFILE}.tmp"
+
 # Apply changes
 mv "${HEADER}.tmp" "$HEADER"
 mv "${RPM_SPEC}.tmp" "$RPM_SPEC"
 mv "${DEB_CHANGELOG}.tmp" "$DEB_CHANGELOG"
+mv "${PORT_MAKEFILE}.tmp" "$PORT_MAKEFILE"
 
 echo "All files have been prepared for release."
 echo "Use the following commands to review the changes for accuracy:"
