@@ -121,7 +121,6 @@ fi
 # get version
 PAT_PREFIX="(^#define[[:space:]]+${VER_PREFIX}_VERSION"
 PAT_SUFFIX='[[:space:]]+)[0-9]+$'
-PAT_STR_SUFFIX='[[:space:]]+)"[0-9]+\.[0-9]+\.[0-9]+"$'
 MAJOR=$(egrep "${PAT_PREFIX}_MAJOR${PAT_SUFFIX}" $HEADER | awk '{print $3}')
 MINOR=$(egrep "${PAT_PREFIX}_MINOR${PAT_SUFFIX}" $HEADER | awk '{print $3}')
 PATCH=$(egrep "${PAT_PREFIX}_PATCH${PAT_SUFFIX}" $HEADER | awk '{print $3}')
@@ -148,7 +147,6 @@ sed -E "
     s/${PAT_PREFIX}_MAJOR${PAT_SUFFIX}/\1${MAJOR}/;
     s/${PAT_PREFIX}_MINOR${PAT_SUFFIX}/\1${MINOR}/;
     s/${PAT_PREFIX}_PATCH${PAT_SUFFIX}/\1${PATCH}/;
-    s/${PAT_PREFIX}${PAT_STR_SUFFIX}/\1\"$PROJ_VER\"/;
 " <"$HEADER" >"${HEADER}.tmp"
 
 # modify RPM spec with release notes and version information
