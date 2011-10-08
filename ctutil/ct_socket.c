@@ -15,15 +15,18 @@
  */
 
 #include <sys/queue.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
-#include <clog.h>
 #include <event.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include <assl.h>
+#include <clog.h>
 #include <ctutil.h>
+
 #include "ct_socket.h"
 
 #if 1

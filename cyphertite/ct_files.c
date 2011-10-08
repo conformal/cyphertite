@@ -20,10 +20,12 @@
 #include <sys/queue.h>
 
 #include <inttypes.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <string.h>
+#include <errno.h>
 #include <libgen.h>
 #include <fts.h>
 #include <pwd.h>

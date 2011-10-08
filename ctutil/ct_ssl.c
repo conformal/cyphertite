@@ -22,6 +22,7 @@
 #include <util.h>
 #endif
 
+#include <string.h>
 #include <openssl/sha.h>
 #include <openssl/bio.h>
 #include <openssl/evp.h>
