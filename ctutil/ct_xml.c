@@ -44,7 +44,7 @@ struct xmlsd_v_attr		xa_ct_sha_attr[] = {
 	{ NULL }
 };
 
-struct xmlsd_v_attr		xa_ct_uuid_attr[] = {
+struct xmlsd_v_attr		xa_ct_value_attr[] = {
 	{ "value" },
 	{ NULL }
 };
@@ -98,7 +98,7 @@ struct xmlsd_v_elem             xe_ct_cull_setup_reply[] = {
 
 struct xmlsd_v_elem             xe_ct_cull_shas[] = {
 	{ "ct_cull_shas","",	ct_cmd_attr },
-	{ "uuid", "uuid.ct_cull_shas",		xa_ct_uuid_attr },
+	{ "uuid", "uuid.ct_cull_shas",		xa_ct_value_attr },
 	{ "sha", "sha.ct_cull_shas",		xa_ct_sha_attr },
 	{ NULL,		NULL,			NULL}
 };
@@ -116,5 +116,19 @@ struct xmlsd_v_elem             xe_ct_cull_complete[] = {
 
 struct xmlsd_v_elem             xe_ct_cull_complete_reply[] = {
 	{ "ct_cull_complete_reply","",		xa_ct_reply_attr },
+	{ NULL,		NULL,			NULL}
+};
+
+struct xmlsd_v_elem		xe_ct_negotiate[] = {
+	{ "ct_negotiate","",			ct_cmd_attr },
+	{ "clientdbgenid", "clientdbgenid.ct_negotiate",
+	    xa_ct_value_attr },
+	{ NULL,		NULL,			NULL}
+};
+
+struct xmlsd_v_elem		xe_ct_negotiate_reply[] = {
+	{ "ct_negoitate_reply","",		xa_ct_reply_attr },
+	{ "clientdbgenid", "clientdbgenid.ct_negoitate_reply",
+	    xa_ct_value_attr },
 	{ NULL,		NULL,			NULL}
 };
