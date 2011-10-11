@@ -74,6 +74,8 @@ void ct_cull_start_shas(struct ct_op *);
 void ct_cull_start_complete(struct ct_op *op);
 void ct_cull_send_complete(struct ct_op *op);
 void ct_cull_complete(struct ct_op *op);
+void ct_cull_collect_md_files(struct ct_op *op);
+void ct_fetch_all_md_parse(struct ct_op *op);
 
 struct xmlsd_v_elements ct_xml_cmds[] = {
 	{ "ct_md_list", xe_ct_md_list },
@@ -1424,6 +1426,11 @@ ct_cull_kick(void)
 
 	CNDBG(CT_LOG_TRANS, "add_op cull_setup");
 	CNDBG(CT_LOG_SHA, "shacnt %" PRIu64 , shacnt);
+
+	ct_add_operation(ct_md_list_start, ct_fetch_all_md_parse, 
+              NULL, NULL, NULL, NULL, NULL, 0, 0);
+	ct_add_operation(ct_cull_collect_md_files, NULL, 
+              NULL, NULL, NULL, NULL, NULL, 0, 0);
 	ct_add_operation(ct_cull_setup, NULL,
 	    NULL, NULL, NULL, NULL, NULL, 0, 0);
 	ct_add_operation(ct_cull_send_shas, NULL,
@@ -1593,4 +1600,57 @@ ct_cull_send_shas(struct ct_op *op)
 		trans->tr_eof = 1;
 		CNDBG(CT_LOG_SHA, "shacnt %" PRIu64, shacnt);
 	}
+}
+
+/*
+ * Code to get all metadata files on the server.
+ * to be used for cull.
+ */
+struct md_list	 ct_cull_all_mds = SLIST_HEAD_INITIALIZER(&ct_cull_all_mds);
+char		*all_mds_pattern[] = {
+			"^[[:digit:]]{8}-[[:digit:]]{6}-.*",
+			NULL,
+		 };
+
+void
+ct_fetch_all_md_parse(struct ct_op *op)
+{
+	struct md_list_tree	 results;
+	struct md_list_file	*file;
+	char			*cachename;
+
+	RB_INIT(&results);
+	ct_md_list_complete(CT_MATCH_REGEX, all_mds_pattern, NULL, &results);
+	while ((file = RB_ROOT(&results)) != NULL) {
+		RB_REMOVE(md_list_tree, &results, file);
+		CDBG("looking for file %s ", file->mlf_name);
+		if (!md_is_in_cache(file->mlf_name)) {
+			cachename = ct_md_get_cachename(file->mlf_name);
+			CDBG("getting %s to %s", file->mlf_name,
+			    cachename);
+			ct_add_operation_after(op, ct_md_extract,
+			    ct_free_mdname_and_remote, cachename,
+			    e_strdup(file->mlf_name), NULL, NULL, NULL, 0, 0);
+	CINFO("downloading %s", file->mlf_name);
+			SLIST_INSERT_HEAD(&ct_cull_all_mds, file, mlf_link);
+		} else {
+	CINFO("already got %s", file->mlf_name);
+			CDBG("already got %s", file->mlf_name);
+			SLIST_INSERT_HEAD(&ct_cull_all_mds, file, mlf_link);
+		}
+	}
+}
+
+void
+ct_cull_collect_md_files(struct ct_op *op)
+{
+	struct md_list_file *file;
+	CINFO("collect_md_files\n");
+
+	while ((file = SLIST_FIRST(&ct_cull_all_mds)) != NULL) {
+		ct_cull_add_shafile(file->mlf_name);
+		SLIST_REMOVE_HEAD(&ct_cull_all_mds, mlf_link);
+		e_free(&file);
+	}
+	ct_op_complete();
 }

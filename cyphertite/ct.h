@@ -286,6 +286,7 @@ void			ct_check_crypto_secrets_nextop(struct ct_op *);
 void			ct_free_remotename(struct ct_op *);
 void			ct_md_trigger_delete(struct ct_op *);
 int			ct_md_verify_mfile(char *);
+void			ct_fetch_all_md_parse(struct ct_op *);
 
 /* CT context state */
 

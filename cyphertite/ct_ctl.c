@@ -247,7 +247,7 @@ cull(struct ct_cli_cmd *c, int argc, char **argv)
 {
 	char			pwd[PASS_MAX];
 	int			need_secrets;
-	int			i, ret;
+	int			ret;
 
 	/* XXX */
 
@@ -264,11 +264,6 @@ cull(struct ct_cli_cmd *c, int argc, char **argv)
 
 	ct_init(1, need_secrets, 0);
 
-	/* XXX */
-
-	for (i = 0; i < argc; i++) {
-		ct_cull_add_shafile(argv[i]);
-	}
 	ct_cull_kick();
 	ct_wakeup_file();
 
