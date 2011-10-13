@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate$
+.Dd $Mdocdate: October 12 2011 $
 .Dt CYPHERTITE 1
 .Os
 .Sh NAME
@@ -286,6 +286,15 @@ The cache directory defined in the
 .Xr cyphertite.conf 5
 configuration file will be used to store
 local copies of the archive metadata files.
+.Sh FILES
+.Bl -tag -width "cyphertite" -compact
+.It Pa /etc/cyphertite/cyphertite.conf
+Default configuration file.
+.It Pa ~/.cyphertite.conf
+User configuration file.
+.It Pa ~/.cyphertite.crypto
+Default crypto secrets file.
+.El
 .Sh EXAMPLES
 Create an archive named
 .Pa accounting-2010.md
@@ -320,15 +329,6 @@ into directory
 .Pa restore .
 .Pp
 .Dl $ cyphertite -C restore -xf backup.md
-.Sh FILES
-.Bl -tag -width "cyphertite" -compact
-.It Pa /etc/cyphertite/cyphertite.conf
-Default configuration file.
-.It Pa ~/.cyphertite.conf
-User configuration file.
-.It Pa ~/.cyphertite.crypto
-Default crypto secrets file.
-.El
 .Sh SEE ALSO
 .Xr cyphertite.conf 5 ,
 .Xr glob 7 ,
