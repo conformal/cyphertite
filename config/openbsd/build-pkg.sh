@@ -66,8 +66,7 @@ fi
 
 rm -f ${name}-${VERSION}.tar.gz
 rm -f ${name}-${VERSION}
-rm -rf $(uname -m)
-rm -rf bld
+${SUDO} rm -rf bld
 mkdir bld
 export WRKOBJDIR=${PWD}/bld
 
@@ -96,9 +95,17 @@ else
     prevision=""
 fi
 
+# SHARED_LIBS ?
+SUDOENV="PORTSDIR=${PORTSDIR}"
+SUDOENV="${SUDOENV} WRKOBJDIR=${WRKOBJDIR}"
+SUDOENV="${SUDOENV} PORTSDIR_PATH=${PORTSDIR_PATH}"
+SUDOENV="${SUDOENV} DESTDIR=${DESTDIR}"
+SUDOENV="${SUDOENV} PACKAGE_REPOSITORY=${PACKAGE_REPOSITORY}"
+SUDOENV="${SUDOENV} REVISION=${REVISION}"
+
 (cd ${category}/${port} && rm distinfo && touch distinfo && make makesum)
-(cd ${category}/${port} && make)
-(cd ${category}/${port} && make package install)
+(cd ${category}/${port} && ${SUDO} env ${SUDOENV} make)
+(cd ${category}/${port} && ${SUDO} env ${SUDOENV} make package install)
 (cd ${category}/${port} && rm -f distinfo && touch distinfo)
 
 echo "version=${VERSION}" >${rev_file}
@@ -109,12 +116,24 @@ fi
 rm -rf ${PACKAGE_DATA_DIR}/${category}/${port}
 cp -r ${category} ${PACKAGE_DATA_DIR}
 
-if [ "${PACKAGE_DEST_DIR}" != "" ]
+for dest in ${PACKAGE_DEST_DIR}
+do
+	scp $(uname -m)/all/${port}-${VERSION}${prevision}${epoch}.tgz ${dest}
+done
+
+# clean up
+${SUDO} rm -rf ${WRKOBJDIR}
+if [ "${PACKAGE_DEST_DIR}" == "" ]
 then
-	scp $(uname -m)/all/${port}-${VERSION}${prevision}${epoch}.tgz  \
-	    ${PACKAGE_DEST_DIR}
+	if [ "${SUDO}" != "" ]
+	then
+		${SUDO} chown -R ${USER} $(arch -s)
+	fi
+else
+	${SUDO} rm -rf $(arch -s)
 fi
 
-ls -l $(uname -m)/all/${port}-${VERSION}${prevision}${epoch}.tgz
+rm -f ${name}-${VERSION}.tar.gz
+rm -f ${name}-${VERSION}
 
 rm -f ${name}-${VERSION}
