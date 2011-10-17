@@ -40,7 +40,12 @@
 #include "ct_crypto.h"
 #include "ct_ctl.h"
 
+#ifdef BUILDSTR
+__attribute__((__unused__)) static const char *vertag = "version: " CT_VERSION\
+    " " BUILDSTR;
+#else
 __attribute__((__unused__)) static const char *vertag = "version: " CT_VERSION;
+#endif
 
 void			ct_usage(void);
 void			ctctl_usage(void);
@@ -137,27 +142,19 @@ ct_usage(void)
 void
 show_version(void)
 {
-	int major, minor, patch;
-	const char *fmt = " %s: %u.%u.%u\n";
+	const char *fmt = " %s: %s\n";
 
-	fprintf(stderr, "%s version %u.%u.%u\n", __progname, CT_VERSION_MAJOR,
-	    CT_VERSION_MINOR, CT_VERSION_PATCH);
+	fprintf(stderr, "%s %s\n", __progname, vertag);
 
 	fprintf(stderr, "Run-time versions:\n");
-	assl_version(&major, &minor, &patch);
-	fprintf(stderr, fmt, "assl", major, minor, patch);
+	fprintf(stderr, fmt, "assl", assl_verstring());
 #ifdef NEED_LIBCLENS
-	clens_version(&major, &minor, &patch);
-	fprintf(stderr, fmt, "clens", major, minor, patch);
+	fprintf(stderr, fmt, "clens", clens_verstring());
 #endif /* NEED_LIBCLENS */
-	clog_version(&major, &minor, &patch);
-	fprintf(stderr, fmt, "clog", major, minor, patch);
-	exude_version(&major, &minor, &patch);
-	fprintf(stderr, fmt, "exude", major, minor, patch);
-	shrink_version(&major, &minor, &patch);
-	fprintf(stderr, fmt, "shrink", major, minor, patch);
-	xmlsd_version(&major, &minor, &patch);
-	fprintf(stderr, fmt, "xmlsd", major, minor, patch);
+	fprintf(stderr, fmt, "clog", clog_verstring());
+	fprintf(stderr, fmt, "exude", exude_verstring());
+	fprintf(stderr, fmt, "shrink", shrink_verstring());
+	fprintf(stderr, fmt, "xmlsd", xmlsd_verstring());
 }
 
 int

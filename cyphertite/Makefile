@@ -23,8 +23,14 @@ LDADD+= -L${.CURDIR}/../ctutil/obj
 LDADD+= -L${.OBJDIR}/../ctutil
 .endif
 
+BUILDVERSION != sh "${.CURDIR}/../buildver.sh"
+
 COPT+= -O2
 CFLAGS+= -Wall -Werror -ggdb3
+.if !${BUILDVERSION} == ""
+CPPFLAGS+= -DBUILDSTR=\"$(BUILDVERSION)\"
+.endif
+
 LDADD+= -L${LOCALBASE}/lib
 LDADD+=	-lassl -lclog -lcrypto -levent -lexpat -lexude -lshrink
 LDADD+=	-lsqlite3 -lssl -lutil -lxmlsd -lctutil
