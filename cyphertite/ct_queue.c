@@ -1325,8 +1325,8 @@ ct_compute_compress(void *vctx)
 			newlen = len;
 			rv = ct_compress(src, dst, len, &newlen);
 			if (newlen >= len) {
-				CDBG("use uncompressed buffer %d %zu", len,
-				    newlen);
+				CDBG("use uncompressed buffer %d %lu", len,
+				    (unsigned long) newlen);
 				rv = 1; /* act like compression failed */
 				newlen = len;
 			}
@@ -1343,7 +1343,8 @@ ct_compute_compress(void *vctx)
 				    len);
 		}
 
-		CDBG("compress block of %d to %zu, rv %d", len, newlen, rv);
+		CDBG("compress block of %d to %lu, rv %d", len,
+		    (unsigned long) newlen, rv);
 
 		/* if compression failed for whatever reason use input data */
 		if (rv == 0) {
@@ -1444,8 +1445,8 @@ ct_compute_encrypt(void *vctx)
 			CFATALX("failed to %scrypt files",
 			    encrypt ? "en" : "de");
 
-		CDBG("%scrypt block of %d to %zu", encrypt ? "en" : "de",
-		    len, newlen);
+		CDBG("%scrypt block of %d to %lu", encrypt ? "en" : "de",
+		    len, (unsigned long) newlen);
 
 		ct_stats->st_bytes_crypted += newlen;
 
