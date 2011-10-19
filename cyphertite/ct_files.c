@@ -500,9 +500,9 @@ loop:
 		fl_curnode->fl_state = CT_FILE_PROCESSING;
 		if (current_fd != -1) {
 			CFATALX("state error, new file open,"
-			    " sz %zu offset %zu",
-			    fl_curnode->fl_size,
-			    fl_curnode->fl_offset);
+			    " sz %lu offset %lu",
+			    (unsigned long) fl_curnode->fl_size,
+			    (unsigned long) fl_curnode->fl_offset);
 		}
 		current_fd = open(fl_curnode->fl_fname, O_RDONLY);
 
@@ -548,15 +548,15 @@ loop:
 	} else {
 		if (current_fd == -1) {
 			CFATALX("state error, old file not open,"
-			    " sz %zu offset %zu",
-			    fl_curnode->fl_size,
-			    fl_curnode->fl_offset);
+			    " sz %lu offset %lu",
+			    (unsigned long) fl_curnode->fl_size,
+			    (unsigned long) fl_curnode->fl_offset);
 		}
 	}
 
 	/* perform read */
 	rsz = fl_curnode->fl_size - fl_curnode->fl_offset;
-	CDBG("rsz %zu max %d", rsz, ct_max_block_size);
+	CDBG("rsz %lu max %d", (unsigned long) rsz, ct_max_block_size);
 	if (rsz > ct_max_block_size) {
 		rsz = ct_max_block_size;
 	}
@@ -573,7 +573,7 @@ loop:
 	ct_trans->tr_trans_id = ct_trans_id++;
 	ct_trans->tr_eof = 0;
 	ct_trans->hdr.c_flags = 0;
-	CDBG("read %zd for block %" PRIu64, rlen, ct_trans->tr_trans_id);
+	CDBG("read %ld for block %" PRIu64, (long) rlen, ct_trans->tr_trans_id);
 
 	/* update offset */
 	if (rsz != rlen || rlen == 0 ||

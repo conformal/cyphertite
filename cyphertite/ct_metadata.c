@@ -185,7 +185,7 @@ loop:
 	/* perform read */
 	rsz = md_size - md_offset;
 
-	CDBG("rsz %zd max %d", rsz, ct_max_block_size);
+	CDBG("rsz %ld max %d", (long) rsz, ct_max_block_size);
 	if (rsz > ct_max_block_size) {
 		rsz = ct_max_block_size;
 	}
@@ -193,7 +193,7 @@ loop:
 	ct_trans->tr_dataslot = 0;
 	rlen = read(md_backup_fd, ct_trans->tr_data[0], rsz);
 
-	CDBG("read %zd", rlen);
+	CDBG("read %ld", (long) rlen);
 
 	ct_stats->st_bytes_read += rlen;
 
@@ -208,8 +208,9 @@ loop:
 	ct_trans->tr_md_chunkno = md_block_no;
 	ct_trans->tr_md_name = mdname;
 
-	CDBG(" trans %"PRId64", read size %zd, into %p rlen %zd",
-	    ct_trans->tr_trans_id, rsz, ct_trans->tr_data[0], rlen);
+	CDBG(" trans %"PRId64", read size %ld, into %p rlen %ld",
+	    ct_trans->tr_trans_id, (long) rsz, ct_trans->tr_data[0],
+	    (long) rlen);
 
 	/*
 	 * init iv to something that can be recreated, used if hdr->c_flags
@@ -228,7 +229,8 @@ loop:
 
 	md_block_no++;
 
-	CDBG("sizes rlen %zd offset %zd size %zd", rlen, md_offset, md_size);
+	CDBG("sizes rlen %ld offset %ld size %ld", (long) rlen,
+	    (long) md_offset, (long) md_size);
 
 	if (rsz != rlen || (rlen + md_offset) == md_size) {
 		/* short read, file truncated or EOF */
@@ -1701,7 +1703,7 @@ ct_cull_send_shas(struct ct_op *op)
 	trans->tr_size[2] = sz;
 
 	CDBG("sending shas [%s]", (char *)trans->tr_data[2]);
-	CDBG("sending shas len %zu", sz);
+	CDBG("sending shas len %lu", (unsigned long) sz);
 	sha_payload_sz += sz;
 	ct_queue_transfer(trans);
 

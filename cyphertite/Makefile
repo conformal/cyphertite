@@ -4,6 +4,13 @@ SYSTEM != uname -s
 .  include "${.CURDIR}/../config/Makefile.$(SYSTEM:L)"
 .endif
 
+.if ${.TARGETS:M*analyze*}
+CC=clang
+CFLAGS+=--analzye
+.elif ${.TARGETS:M*clang*}
+CC=clang
+.endif
+
 LOCALBASE?=/usr/local
 BINDIR?=${LOCALBASE}/bin
 INCDIR?=${LOCALBASE}/include
@@ -43,5 +50,8 @@ LINKS=${BINDIR}/cyphertite ${BINDIR}/ct
 LINKS+=${BINDIR}/cyphertite ${BINDIR}/cyphertitectl
 LINKS+=${BINDIR}/cyphertite ${BINDIR}/ctctl
 MLINKS=cyphertite.1 ct.1
+
+analyze: all
+clang: all
 
 .include <bsd.prog.mk>
