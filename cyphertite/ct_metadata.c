@@ -666,6 +666,8 @@ ct_md_list_print(struct ct_op *op)
 	struct md_list_tree	 results;
 	struct md_list_file	*file;
 	int64_t			maxsz = 8;
+	ssize_t			ret;
+	char			unvised[CT_MAX_MD_FILENAME];
 	int			numlen;
 
 	RB_INIT(&results);
@@ -680,10 +682,17 @@ ct_md_list_print(struct ct_op *op)
 	while ((file = RB_MIN(md_list_tree, &results)) != NULL) {
 		RB_REMOVE(md_list_tree, &results, file);
 		/* XXX only the extras if verbose? */
+		ret = strnunvis(unvised, file->mlf_name, sizeof(unvised));
+		if (ret >= sizeof(unvised) || ret == -1) {
+			CWARNX("can't unvis filename %s", file->mlf_name);
+			e_free(&file);
+			continue;
+		}
+
 		printf("%*llu ", numlen, (unsigned long long)file->mlf_size);
 		printtime(file->mlf_mtime);
 		printf("\t");
-		printf("%s\n", file->mlf_name);
+		printf("%s\n", unvised);
 		e_free(&file);
 	}
 }
