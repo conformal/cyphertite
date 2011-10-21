@@ -665,15 +665,15 @@ ct_md_list_print(struct ct_op *op)
 {
 	struct md_list_tree	 results;
 	struct md_list_file	*file;
-	long long		maxsz = 8;
+	int64_t			maxsz = 8;
 	int			numlen;
 
 	RB_INIT(&results);
 	ct_md_list_complete(op->op_matchmode, op->op_filelist,
 	    op->op_excludelist, &results);
 	RB_FOREACH(file, md_list_tree, &results) {
-		if (maxsz < (long long)file->mlf_size)
-			maxsz  = (long long)file->mlf_size;
+		if (maxsz < (int64_t)file->mlf_size)
+			maxsz  = (int64_t)file->mlf_size;
 	}
 	numlen = snprintf(NULL, 0, "%" PRId64, maxsz);
 
