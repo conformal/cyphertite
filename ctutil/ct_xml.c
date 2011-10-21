@@ -55,6 +55,12 @@ struct xmlsd_v_attr		xa_ct_reply_attr[] = {
 	{ NULL }
 };
 
+struct xmlsd_v_attr		xa_ct_clientdb_newver_attr[] = {
+	{ "version" },
+	{ "clientdbgenid" },
+	{ NULL }
+};
+
 
 struct xmlsd_v_elem             xe_ct_md_open_create[] = {
 	{ "ct_md_open_create","",		ct_cmd_attr },
@@ -130,5 +136,15 @@ struct xmlsd_v_elem		xe_ct_negotiate_reply[] = {
 	{ "ct_negotiate_reply","",		xa_ct_reply_attr },
 	{ "clientdbgenid", "clientdbgenid.ct_negotiate_reply",
 	    xa_ct_value_attr },
+	{ NULL,		NULL,			NULL}
+};
+
+struct xmlsd_v_elem		xe_ct_clientdb_newver[] = {
+	{ "ct_clientdb_newver","",		xa_ct_clientdb_newver_attr },
+	{ NULL,		NULL,			NULL}
+};
+
+struct xmlsd_v_elem		xe_ct_clientdb_newver_reply[] = {
+	{ "ct_clientdb_newver_reply","",		xa_ct_reply_attr },
 	{ NULL,		NULL,			NULL}
 };

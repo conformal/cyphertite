@@ -54,3 +54,9 @@ extern struct xmlsd_v_elem xe_ct_negotiate[];
 
 #define CT_NEGOTIATE_REPLY_VERSION	"V1"
 extern struct xmlsd_v_elem xe_ct_negotiate_reply[];
+
+#define CT_CLIENTDB_NEWVER_VERSION		"V1"
+extern struct xmlsd_v_elem xe_ct_clientdb_newver[];
+
+#define CT_CLIENTDB_NEWVER_REPLY_VERSION	"V1"
+extern struct xmlsd_v_elem xe_ct_clientdb_newver_reply[];
