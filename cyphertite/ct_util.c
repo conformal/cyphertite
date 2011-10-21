@@ -422,7 +422,7 @@ ct_print_scaled_stat(FILE *outfh, const char *label, long long val,
 {
 	char rslt[FMT_SCALED_STRSIZE];
 
-	fprintf(outfh, "%s%12lld", label, val);
+	fprintf(outfh, "%s%12" PRId64, label, val);
 	if (val == 0 || sec == 0) {
 		if (newline)
 			fprintf(outfh, "\n");
@@ -472,12 +472,13 @@ ct_dump_stats(FILE *outfh)
 	if (ct_action == CT_A_ARCHIVE) {
 		ct_print_scaled_stat(outfh, "Bytes compressed\t\t",
 		    (long long)ct_stats->st_bytes_compressed, sec, 0);
-		fprintf(outfh, "\t(%lld%%)\n",
+		fprintf(outfh, "\t(%" PRId64 "%%)\n",
 		    (ct_stats->st_bytes_uncompressed == 0) ? 0LL :
 		    (long long)(ct_stats->st_bytes_compressed * 100 /
 		    ct_stats->st_bytes_uncompressed));
 
-		fprintf(outfh, "Bytes exists\t\t\t%12" PRIu64 "\t(%lld%%)\n",
+		fprintf(outfh,
+		    "Bytes exists\t\t\t%12" PRIu64 "\t(%" PRId64 "%%)\n",
 		    ct_stats->st_bytes_exists,
 		    (ct_stats->st_bytes_exists == 0) ? 0LL :
 		    (long long)(ct_stats->st_bytes_exists * 100 /
@@ -500,7 +501,8 @@ ct_dump_stats(FILE *outfh)
 			}
 		} else
 			val = 0;
-		fprintf(outfh, "Reduction ratio\t\t\t\t%s%lld%%\n", sign, val);
+		fprintf(outfh, "Reduction ratio\t\t\t\t%s%" PRId64 "%%\n",
+		    sign, val);
 	}
 	print_time_scaled(outfh, "Total Time\t\t\t    ",  &time_delta);
 
@@ -538,14 +540,14 @@ ct_display_assl_stats(FILE *outfh)
 	    ct_assl_ctx->io_write_bytes);
 	fprintf(outfh, "ssl writes        %" PRIu64 "\n",
 	    ct_assl_ctx->io_write_count);
-	fprintf(outfh, "avg write len     %lld\n",
+	fprintf(outfh, "avg write len     %" PRId64 "\n",
 	    ct_assl_ctx->io_write_count == 0 ?  0LL :
 	    ct_assl_ctx->io_write_bytes / ct_assl_ctx->io_write_count);
 	fprintf(outfh, "ssl bytes read    %" PRIu64 "\n",
 	    ct_assl_ctx->io_read_bytes);
 	fprintf(outfh, "ssl reads         %" PRIu64 "\n",
 	    ct_assl_ctx->io_read_count);
-	fprintf(outfh, "avg read len      %lld\n",
+	fprintf(outfh, "avg read len      %" PRId64 "\n",
 	    ct_assl_ctx->io_read_count == 0 ?  0LL :
 	    ct_assl_ctx->io_read_bytes / ct_assl_ctx->io_read_count);
 }

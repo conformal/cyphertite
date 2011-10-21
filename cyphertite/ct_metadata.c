@@ -675,7 +675,7 @@ ct_md_list_print(struct ct_op *op)
 		if (maxsz < (long long)file->mlf_size)
 			maxsz  = (long long)file->mlf_size;
 	}
-	numlen = snprintf(NULL, 0, "%lld", maxsz);
+	numlen = snprintf(NULL, 0, "%" PRId64, maxsz);
 
 	while ((file = RB_MIN(md_list_tree, &results)) != NULL) {
 		RB_REMOVE(md_list_tree, &results, file);
@@ -1364,7 +1364,7 @@ check_local:
 		CDBG("uploading local file");
 		if (remote_name)
 			e_free(&remote_name);
-		e_asprintf(&remote_name, "%020lld-crypto.secrets",
+		e_asprintf(&remote_name, "%020" PRId64 "-crypto.secrets",
 		    (long long)local_mtime);
 		ct_add_operation_after(op, ct_md_archive, ct_secrets_unlock,
 		    current_secrets, remote_name, NULL, NULL, NULL, 0, 0);
