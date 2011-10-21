@@ -98,8 +98,8 @@ struct fnode {
 	uint32_t		fl_uid;
 	uint32_t		fl_gid;
 	int			fl_mode;
-	uint64_t		fl_atime;
-	uint64_t		fl_mtime;
+	int64_t			fl_atime;
+	int64_t			fl_mtime;
 	int			fl_type;
 	size_t			fl_size;
 	size_t			fl_offset;

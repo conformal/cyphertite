@@ -53,8 +53,8 @@ int			ct_trans_id = 0;
 void ct_setup_assl(void);
 struct ct_io_queue	*ct_ioctx_alloc(void);
 void			ct_ioctx_free(struct ct_io_queue *);
-void			ct_print_scaled_stat(FILE *, const char *, long long,
-			    long long, int);
+void			ct_print_scaled_stat(FILE *, const char *, int64_t,
+			    int64_t, int);
 
 
 void
@@ -417,8 +417,8 @@ print_time_scaled(FILE *outfh, char *s, struct timeval *t)
 }
 
 void
-ct_print_scaled_stat(FILE *outfh, const char *label, long long val,
-    long long sec, int newline)
+ct_print_scaled_stat(FILE *outfh, const char *label, int64_t val,
+    int64_t sec, int newline)
 {
 	char rslt[FMT_SCALED_STRSIZE];
 
@@ -440,15 +440,15 @@ void
 ct_dump_stats(FILE *outfh)
 {
 	struct timeval time_end, scan_delta, time_delta;
-	long long sec;
-	long long val;
+	int64_t sec;
+	int64_t val;
 	char *sign;
 	uint64_t sent, total;
 
 	gettimeofday(&time_end, NULL);
 
 	timersub(&time_end, &ct_stats->st_time_start, &time_delta);
-	sec = (long long)time_delta.tv_sec;
+	sec = (int64_t)time_delta.tv_sec;
 	timersub(&ct_stats->st_time_scan_end, &ct_stats->st_time_start,
 		    &scan_delta);
 
@@ -457,31 +457,31 @@ ct_dump_stats(FILE *outfh)
 		    ct_stats->st_files_scanned);
 
 		ct_print_scaled_stat(outfh, "Total bytes\t\t\t",
-		    (long long)ct_stats->st_bytes_tot, sec, 1);
+		    (int64_t)ct_stats->st_bytes_tot, sec, 1);
 	}
 
 	if (ct_action == CT_A_ARCHIVE &&
 	    ct_stats->st_bytes_tot != ct_stats->st_bytes_read)
 		ct_print_scaled_stat(outfh, "Bytes read\t\t\t",
-		    (long long)ct_stats->st_bytes_read, sec, 1);
+		    (int64_t)ct_stats->st_bytes_read, sec, 1);
 
 	if (ct_action == CT_A_EXTRACT)
 		ct_print_scaled_stat(outfh, "Bytes written\t\t\t",
-		    (long long)ct_stats->st_bytes_written, sec, 1);
+		    (int64_t)ct_stats->st_bytes_written, sec, 1);
 
 	if (ct_action == CT_A_ARCHIVE) {
 		ct_print_scaled_stat(outfh, "Bytes compressed\t\t",
-		    (long long)ct_stats->st_bytes_compressed, sec, 0);
+		    (int64_t)ct_stats->st_bytes_compressed, sec, 0);
 		fprintf(outfh, "\t(%" PRId64 "%%)\n",
-		    (ct_stats->st_bytes_uncompressed == 0) ? 0LL :
-		    (long long)(ct_stats->st_bytes_compressed * 100 /
+		    (ct_stats->st_bytes_uncompressed == 0) ? (int64_t)0 :
+		    (int64_t)(ct_stats->st_bytes_compressed * 100 /
 		    ct_stats->st_bytes_uncompressed));
 
 		fprintf(outfh,
 		    "Bytes exists\t\t\t%12" PRIu64 "\t(%" PRId64 "%%)\n",
 		    ct_stats->st_bytes_exists,
-		    (ct_stats->st_bytes_exists == 0) ? 0LL :
-		    (long long)(ct_stats->st_bytes_exists * 100 /
+		    (ct_stats->st_bytes_exists == 0) ? (int64_t)0 :
+		    (int64_t)(ct_stats->st_bytes_exists * 100 /
 		    ct_stats->st_bytes_tot));
 
 		fprintf(outfh, "Bytes sent\t\t\t%12" PRIu64 "\n",
@@ -540,15 +540,15 @@ ct_display_assl_stats(FILE *outfh)
 	    ct_assl_ctx->io_write_bytes);
 	fprintf(outfh, "ssl writes        %" PRIu64 "\n",
 	    ct_assl_ctx->io_write_count);
-	fprintf(outfh, "avg write len     %" PRId64 "\n",
-	    ct_assl_ctx->io_write_count == 0 ?  0LL :
+	fprintf(outfh, "avg write len     %" PRIu64 "\n",
+	    ct_assl_ctx->io_write_count == 0 ?  (int64_t)0 :
 	    ct_assl_ctx->io_write_bytes / ct_assl_ctx->io_write_count);
 	fprintf(outfh, "ssl bytes read    %" PRIu64 "\n",
 	    ct_assl_ctx->io_read_bytes);
 	fprintf(outfh, "ssl reads         %" PRIu64 "\n",
 	    ct_assl_ctx->io_read_count);
-	fprintf(outfh, "avg read len      %" PRId64 "\n",
-	    ct_assl_ctx->io_read_count == 0 ?  0LL :
+	fprintf(outfh, "avg read len      %" PRIu64 "\n",
+	    ct_assl_ctx->io_read_count == 0 ?  (int64_t)0 :
 	    ct_assl_ctx->io_read_bytes / ct_assl_ctx->io_read_count);
 }
 
