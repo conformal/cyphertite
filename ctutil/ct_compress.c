@@ -55,7 +55,7 @@ ct_uncompress(uint8_t *src, uint8_t *dst, size_t len, size_t *uncomp_sz)
 {
 	int			rv;
 
-	if ((rv = s_decompress(src, dst, len, uncomp_sz, NULL)) != S_OK) {
+	if ((rv = s_decompress(src, dst, len, uncomp_sz, NULL)) != SHRINK_OK) {
 		CDBG("rv = %d", rv);
 		return (1);
 	}
@@ -67,7 +67,7 @@ ct_compress(uint8_t *src, uint8_t *dst, size_t len, size_t *comp_sz)
 {
 	int			rv;
 
-	if ((rv = s_compress(src, dst, len, comp_sz, NULL) != S_OK)) {
+	if ((rv = s_compress(src, dst, len, comp_sz, NULL) != SHRINK_OK)) {
 		CDBG("rv = %d", rv);
 		return (1);
 	}
