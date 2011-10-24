@@ -306,6 +306,8 @@ ct_update_secrets(void)
 void
 ct_cleanup(void)
 {
+	if (ct_configfile)
+		e_free(&ct_configfile);
 	ct_trans_cleanup();
 	ct_flnode_cleanup();
 	ct_ssl_cleanup();
@@ -586,9 +588,6 @@ out:
 		ct_mdcache_trim(ct_md_cachedir, ct_max_mdcache_size);
 
 #ifdef notyet
-	if (ct_configfile != NULL)
-		e_free(&ct_configfile);
-
 	e_check_memory();
 #endif
 	return (ret);
