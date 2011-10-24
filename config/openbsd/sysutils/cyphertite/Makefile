@@ -19,7 +19,7 @@ WANTLIB =		assl>=3 c clog crypto event expat exude>=2 \
 
 MASTER_SITES =		http://opensource.conformal.com/snapshots/cyphertite/
 
-LIB_DEPENDS =		archivers/libshrink>=0.2.1	\
+LIB_DEPENDS =		archivers/libshrink>=0.3.0	\
 			databases/sqlite3		\
 			devel/libclog>=0.3.4		\
 			devel/libexude>=0.4.0		\

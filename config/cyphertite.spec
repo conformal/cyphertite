@@ -13,7 +13,7 @@ URL:		http://opensource.conformal.com/wiki/cyphertite
 Source: 	%{name}-%{version}.tar.gz
 Buildroot:	%{_tmppath}/%{name}-%{version}-buildroot
 Prefix: 	/usr
-Requires:	assl >= 0.10.0, clog >= 0.3.4, exude >= 0.4.0, shrink >= 0.2.1
+Requires:	assl >= 0.10.0, clog >= 0.3.4, exude >= 0.4.0, shrink >= 0.3.0
 Requires:	xmlsd >= 0.5.0, libbsd, libevent >= 1.4, sqlite >= 3.6.23
 
 %description
