@@ -35,18 +35,23 @@
 #include "ct_xdr.h"
 
 
+TAILQ_HEAD(ct_extract_head, ct_extract_stack);
+struct ct_extract_stack   {
+	TAILQ_ENTRY(ct_extract_stack)	next;
+	char		*filename;
+};
+
 int	ct_populate_fnode(struct fnode *, struct ct_md_header *,
 	    struct ct_md_header *, int *);
-void	ct_extract_setup(struct ct_xdr_state *, const char *);
-void	ct_extract_setup_queue(struct ct_xdr_state *, const char *);
-void	ct_extract_open_next(struct ct_xdr_state *);
+void	ct_extract_setup(struct ct_extract_head *, struct ct_xdr_state *,
+	    const char *);
+void	ct_extract_setup_queue(struct ct_extract_head *, struct ct_xdr_state *,
+	    const char *);
+void	ct_extract_open_next(struct ct_extract_head *, struct ct_xdr_state *);
 
 XDR				xdr;
-struct ct_xdr_state		ct_xdr_ctx;
 time_t				ct_prev_backup_time;
 int				md_dir = -1;
-struct fnode			*fl_ex_node;
-int				ct_doextract;
 int				ct_xdr_version;
 
 /* metadata */
@@ -637,15 +642,9 @@ ct_read_trailer(struct ct_md_trailer *trl)
 	return (ret == FALSE);
 }
 
-struct ct_extract_stack   {
-	TAILQ_ENTRY(ct_extract_stack)	next;
-	char		*filename;
-};
-TAILQ_HEAD(, ct_extract_stack) ct_file_extract_head =
-    TAILQ_HEAD_INITIALIZER(ct_file_extract_head);
-
 void
-ct_extract_setup(struct ct_xdr_state *ctx, const char *file)
+ct_extract_setup(struct ct_extract_head *extract_head,
+    struct ct_xdr_state *ctx, const char *file)
 {
 	struct ct_extract_stack	*nfile;
 	char			*prevlvl;
@@ -661,19 +660,19 @@ ct_extract_setup(struct ct_xdr_state *ctx, const char *file)
 	if (ctx->xs_gh.cmg_prevlvl_filename) {
 		nfile = e_malloc(sizeof(*nfile));
 		nfile->filename = e_strdup(file);
-		TAILQ_INSERT_HEAD(&ct_file_extract_head, nfile, next);
+		TAILQ_INSERT_HEAD(extract_head, nfile, next);
 
 		prevlvl = e_strdup(ctx->xs_gh.cmg_prevlvl_filename);
 
 		ct_xdr_parse_close(ctx);
-		ct_extract_setup_queue(ctx, prevlvl);
+		ct_extract_setup_queue(extract_head, ctx, prevlvl);
 
 		e_free(&prevlvl);
 
 		if (ct_multilevel_allfiles) {
 			ct_xdr_parse_close(ctx);
 			/* reopen first file */
-			ct_extract_open_next(ctx);
+			ct_extract_open_next(extract_head, ctx);
 		} 
 	}
 
@@ -681,7 +680,8 @@ ct_extract_setup(struct ct_xdr_state *ctx, const char *file)
 }
 
 void
-ct_extract_setup_queue(struct ct_xdr_state *ctx, const char *file)
+ct_extract_setup_queue(struct ct_extract_head *extract_head,
+    struct ct_xdr_state *ctx, const char *file)
 {
 	char			*prevlvl;
 	struct ct_extract_stack	*nfile;
@@ -699,34 +699,35 @@ ct_extract_setup_queue(struct ct_xdr_state *ctx, const char *file)
 		nfile->filename = e_strdup(file);
 
 		if (ct_multilevel_allfiles)
-			TAILQ_INSERT_TAIL(&ct_file_extract_head, nfile, next);
+			TAILQ_INSERT_TAIL(extract_head, nfile, next);
 		else
-			TAILQ_INSERT_HEAD(&ct_file_extract_head, nfile, next);
+			TAILQ_INSERT_HEAD(extract_head, nfile, next);
 
 		prevlvl = e_strdup(ctx->xs_gh.cmg_prevlvl_filename);
 		ct_xdr_parse_close(ctx);
 
-		ct_extract_setup_queue(ctx, prevlvl);
+		ct_extract_setup_queue(extract_head, ctx, prevlvl);
 		e_free(&prevlvl);
 
 	} else {
 		if (ct_multilevel_allfiles) {
 			nfile = e_malloc(sizeof(*nfile));
 			nfile->filename = e_strdup(file);
-			TAILQ_INSERT_TAIL(&ct_file_extract_head, nfile, next);
+			TAILQ_INSERT_TAIL(extract_head, nfile, next);
 		}
 	}
 }
 
 void
-ct_extract_open_next(struct ct_xdr_state *ctx)
+ct_extract_open_next(struct ct_extract_head *extract_head,
+    struct ct_xdr_state *ctx)
 {
 	struct ct_extract_stack *next;
 
-	if (!TAILQ_EMPTY(&ct_file_extract_head)) {
-		next = TAILQ_FIRST(&ct_file_extract_head);
+	if (!TAILQ_EMPTY(extract_head)) {
+		next = TAILQ_FIRST(extract_head);
 		CDBG("should start restoring [%s]", next->filename);
-		TAILQ_REMOVE(&ct_file_extract_head, next, next);
+		TAILQ_REMOVE(extract_head, next, next);
 
 		if (ct_xdr_parse_init(ctx, next->filename))
 			CFATALX("failed to open %s", next->filename);
@@ -743,8 +744,12 @@ ct_extract_open_next(struct ct_xdr_state *ctx)
 }
 
 struct ct_extract_priv {
-	struct ct_match	*inc_match;
-	struct ct_match	*ex_match;
+	struct ct_extract_head	 extract_head;
+	struct ct_xdr_state	 xdr_ctx;
+	struct ct_match		*inc_match;
+	struct ct_match		*ex_match;
+	struct fnode		*fl_ex_node;
+	int			 doextract;
 };
 
 void
@@ -763,6 +768,8 @@ ct_extract(struct ct_op *op)
 	if (ct_state->ct_file_state == CT_S_STARTING) {
 		if (ex_priv == NULL) {
 			ex_priv = e_calloc(1, sizeof(*ex_priv));
+			TAILQ_INIT(&ex_priv->extract_head);
+
 			ex_priv->inc_match = ct_match_compile(match_mode,
 			    filelist);
 			if (op->op_excludelist != NULL)
@@ -770,7 +777,8 @@ ct_extract(struct ct_op *op)
 				    op->op_excludelist);
 			op->op_priv = ex_priv;
 		}
-		ct_extract_setup(&ct_xdr_ctx, mfile);
+		ct_extract_setup(&ex_priv->extract_head,
+		    &ex_priv->xdr_ctx, mfile);
 	} else if (ct_state->ct_file_state == CT_S_FINISHED) {
 		return;
 	}
@@ -785,30 +793,30 @@ ct_extract(struct ct_op *op)
 			return;
 		}
 		/* Correct unless new file or EOF. Will fix in those cases  */
-		trans->tr_fl_node = fl_ex_node;
+		trans->tr_fl_node = ex_priv->fl_ex_node;
 
-		switch ((ret = ct_xdr_parse(&ct_xdr_ctx))) {
+		switch ((ret = ct_xdr_parse(&ex_priv->xdr_ctx))) {
 		case XS_RET_FILE:
 			/* won't hit this until we start using allfiles */
-			if (ct_xdr_ctx.xs_hdr.cmh_nr_shas == -1) {
+			if (ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas == -1) {
 				CINFO("mark file %s as restore from "
 				    "previous backup",
-				    ct_xdr_ctx.xs_hdr.cmh_filename);
-				ct_doextract = 0;
+				    ex_priv->xdr_ctx.xs_hdr.cmh_filename);
+				ex_priv->doextract = 0;
 				goto skip; /* skip ze file for now */
 			}
-			trans->tr_fl_node = fl_ex_node = fnode =
+			trans->tr_fl_node = ex_priv->fl_ex_node = fnode =
 			    e_calloc(1, sizeof(*fnode));
 
-			ct_populate_fnode(fnode, &ct_xdr_ctx.xs_hdr,
-			    &ct_xdr_ctx.xs_lnkhdr, &trans->tr_state);
+			ct_populate_fnode(fnode, &ex_priv->xdr_ctx.xs_hdr,
+			    &ex_priv->xdr_ctx.xs_lnkhdr, &trans->tr_state);
 
-			ct_doextract = !ct_match(ex_priv->inc_match,
+			ex_priv->doextract = !ct_match(ex_priv->inc_match,
 			    fnode->fl_sname);
-			if (ct_doextract && ex_priv->ex_match != NULL &&
+			if (ex_priv->doextract && ex_priv->ex_match != NULL &&
 			    !ct_match(ex_priv->ex_match, fnode->fl_sname))
-				ct_doextract = 0;
-			if (ct_doextract == 0) {
+				ex_priv->doextract = 0;
+			if (ex_priv->doextract == 0) {
 				ct_free_fnode(fnode);
 skip:
 				fnode = NULL;
@@ -817,33 +825,33 @@ skip:
 			}
 
 			CDBG("file %s numshas %" PRId64, fnode->fl_sname,
-			    ct_xdr_ctx.xs_hdr.cmh_nr_shas);
+			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas);
 
 			trans->tr_trans_id = ct_trans_id++;
 			ct_queue_transfer(trans);
 			break;
 		case XS_RET_SHA:
-			if (ct_doextract == 0 ||
+			if (ex_priv->doextract == 0 ||
 			    trans->tr_fl_node->fl_skip_file != 0) {
-				if (ct_xdr_parse_seek(&ct_xdr_ctx))
+				if (ct_xdr_parse_seek(&ex_priv->xdr_ctx))
 					CFATALX("can't seek past shas");
 				ct_trans_free(trans);
 				continue;
 			}
-			if (ct_xdr_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO) {
+			if (ex_priv->xdr_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO) {
 				/*
 				 * yes csha and sha are reversed, we want
 				 * to download csha, but putting it in sha
 				 * simplifies the code
 				 */
-				bcopy(ct_xdr_ctx.xs_sha, trans->tr_csha,
+				bcopy(ex_priv->xdr_ctx.xs_sha, trans->tr_csha,
 				    sizeof(trans->tr_csha));
-				bcopy(ct_xdr_ctx.xs_csha, trans->tr_sha,
+				bcopy(ex_priv->xdr_ctx.xs_csha, trans->tr_sha,
 				    sizeof(trans->tr_sha));
-				bcopy(ct_xdr_ctx.xs_iv, trans->tr_iv,
+				bcopy(ex_priv->xdr_ctx.xs_iv, trans->tr_iv,
 				    sizeof(trans->tr_iv));
 			} else {
-				bcopy(ct_xdr_ctx.xs_sha, trans->tr_sha,
+				bcopy(ex_priv->xdr_ctx.xs_sha, trans->tr_sha,
 				    sizeof(trans->tr_sha));
 			}
 			if (ct_verbose) {
@@ -856,26 +864,27 @@ skip:
 			ct_queue_transfer(trans);
 			break;
 		case XS_RET_FILE_END:
-			if (ct_doextract == 0 ||
+			if (ex_priv->doextract == 0 ||
 			    trans->tr_fl_node->fl_skip_file != 0) {
 				ct_trans_free(trans);
 				continue;
 			}
-			bcopy(ct_xdr_ctx.xs_trl.cmt_sha, trans->tr_sha,
+			bcopy(ex_priv->xdr_ctx.xs_trl.cmt_sha, trans->tr_sha,
 			    sizeof(trans->tr_sha));
 			trans->tr_state = TR_S_EX_FILE_END;
 			trans->tr_fl_node->fl_size =
-			    ct_xdr_ctx.xs_trl.cmt_orig_size;
+			    ex_priv->xdr_ctx.xs_trl.cmt_orig_size;
 			trans->tr_trans_id = ct_trans_id++;
 			ct_queue_transfer(trans);
 			break;
 		case XS_RET_EOF:
 			CDBG("Hit end of md");
-			ct_xdr_parse_close(&ct_xdr_ctx);
-			if (!TAILQ_EMPTY(&ct_file_extract_head)) {
+			ct_xdr_parse_close(&ex_priv->xdr_ctx);
+			if (!TAILQ_EMPTY(&ex_priv->extract_head)) {
 				ct_trans_free(trans);
-				/* reinits ct_xdr_ctx */
-				ct_extract_open_next(&ct_xdr_ctx);
+				/* reinits ex_priv->xdr_ctx */
+				ct_extract_open_next(&ex_priv->extract_head,
+				    &ex_priv->xdr_ctx);
 
 				/* poke file into action */
 				ct_wakeup_file();
