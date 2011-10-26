@@ -511,7 +511,6 @@ int			ct_write_trailer(struct ct_trans *);
 void			ct_cleanup_md(void);
 int			ct_read_header(struct ct_md_header *hdr);
 struct ct_assl_io_ctx	*ct_assl_ctx;
-void			ct_extract_setup(const char *);
 int			ct_basis_setup(const char *, char **);
 
 /* ct_file.c: extract functions */
