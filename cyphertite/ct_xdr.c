@@ -784,6 +784,8 @@ ct_extract(struct ct_op *op)
 			ct_set_file_state(CT_S_WAITING_TRANS);
 			return;
 		}
+		/* Correct unless new file or EOF. Will fix in those cases  */
+		trans->tr_fl_node = fl_ex_node;
 
 		switch ((ret = ct_xdr_parse(&ct_xdr_ctx))) {
 		case XS_RET_FILE:
@@ -828,7 +830,6 @@ skip:
 				ct_trans_free(trans);
 				continue;
 			}
-			trans->tr_fl_node = fl_ex_node;
 			if (ct_xdr_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO) {
 				/*
 				 * yes csha and sha are reversed, we want
@@ -855,7 +856,6 @@ skip:
 			ct_queue_transfer(trans);
 			break;
 		case XS_RET_FILE_END:
-			trans->tr_fl_node = fl_ex_node;
 			if (ct_doextract == 0 ||
 			    trans->tr_fl_node->fl_skip_file != 0) {
 				ct_trans_free(trans);
@@ -961,31 +961,22 @@ ct_populate_fnode(struct fnode *fnode, struct ct_md_header *hdr,
 int
 ct_basis_setup(const char *basisbackup, char **filelist)
 {
-	struct ct_md_gheader	 gh;
-	struct ct_md_header	 hdr, hdr2;
-	struct ct_md_trailer	 trl;
-	int			 sha_size = -1;
-	off_t			 pos0, pos1;
-	FILE			*xdr_f;
+	struct ct_xdr_state	 xs_ctx;
 	char			 cwd[PATH_MAX], **fptr;
-	int			 alldata, nextlvl, i, rooted = 1;
-	uint8_t			 sha[SHA_DIGEST_LENGTH];
-	uint8_t			 csha[SHA_DIGEST_LENGTH];
-	uint8_t			 iv[E_IV_LEN];
+	int			 alldata, nextlvl, i, rooted = 1, ret;
 
 	alldata = ct_multilevel_allfiles;
-	xdr_f = ct_metadata_open(basisbackup,  &gh);
-	if (xdr_f == NULL)
+	if (ct_xdr_parse_init(&xs_ctx, basisbackup))
 		CFATALX("unable to open/parse previous backup %s",
 		    basisbackup);
 	ct_multilevel_allfiles = alldata; /* dont whack this flag from client */
 
 	if (ct_max_differentials == 0 ||
-	    gh.cmg_cur_lvl < ct_max_differentials) {
-		ct_prev_backup_time = gh.cmg_created;
+	    xs_ctx.xs_gh.cmg_cur_lvl < ct_max_differentials) {
+		ct_prev_backup_time = xs_ctx.xs_gh.cmg_created;
 		CINFO("prev backup time %s %s", ctime(&ct_prev_backup_time),
 		    basisbackup);
-		nextlvl = ++gh.cmg_cur_lvl;
+		nextlvl = ++xs_ctx.xs_gh.cmg_cur_lvl;
 	} else {
 		nextlvl = 0;
 	}
@@ -995,69 +986,48 @@ ct_basis_setup(const char *basisbackup, char **filelist)
 	 * our cwd matches and the list of dirs we care about are a strict
 	 * superset of the previous backup
 	 */
-	if (gh.cmg_version >= CT_MD_V2) {
+	if (xs_ctx.xs_gh.cmg_version >= CT_MD_V2) {
 		if (getcwd(cwd, sizeof(cwd)) == NULL)
 			CFATAL("can't get current working directory");
 
 		for (i = 0, fptr = filelist; *fptr != NULL &&
-		    i < gh.cmg_num_paths; fptr++, i++) {
-			if (strcmp(gh.cmg_paths[i], *fptr) != 0)
+		    i < xs_ctx.xs_gh.cmg_num_paths; fptr++, i++) {
+			if (strcmp(xs_ctx.xs_gh.cmg_paths[i], *fptr) != 0)
 				break;
-			if (gh.cmg_paths[i][0] != '/')
+			if (xs_ctx.xs_gh.cmg_paths[i][0] != '/')
 				rooted = 0;
 		}
-		if (i < gh.cmg_num_paths || *fptr != NULL) {
+		if (i < xs_ctx.xs_gh.cmg_num_paths || *fptr != NULL) {
 			if (ct_verbose == 0) {
 				CFATALX("list of directories provided does not"
 				    " match list of directories in basis");
 			} else {
 				CWARNX("list of directories provided does not"
 				    " match list of directories in basis:");
-				for (i = 0; i < gh.cmg_num_paths; i++)
-					CWARNX("%s", gh.cmg_paths[i]);
+				for (i = 0; i < xs_ctx.xs_gh.cmg_num_paths; i++)
+					CWARNX("%s", xs_ctx.xs_gh.cmg_paths[i]);
 				exit(1);
 			}
 
 		}
 
-		if (rooted == 0 && strcmp(cwd, gh.cmg_cwd) != 0)
+		if (rooted == 0 && strcmp(cwd, xs_ctx.xs_gh.cmg_cwd) != 0)
 			CFATALX("current working directory %s differs from "
-			    " basis %s", cwd, gh.cmg_cwd);
+			    " basis %s", cwd, xs_ctx.xs_gh.cmg_cwd);
 		/* done with the paths now, don't leak them */
-		e_free(&gh.cmg_paths);
+		e_free(&xs_ctx.xs_gh.cmg_paths);
 	}
 
-	while (ct_read_header(&hdr) == 0 && hdr.cmh_beacon != CT_HDR_EOF) {
-		if (C_ISLINK(hdr.cmh_type)) {
-			if (ct_read_header(&hdr2))
-				CFATALX("basis corrupt: couldn't read link");
+	while ((ret = ct_xdr_parse(&xs_ctx)) != XS_RET_EOF) {
+		if (ret == XS_RET_SHA)  {
+			if (ct_xdr_parse_seek(&xs_ctx))
+				CFATALX("seek failed");
+		} else if (ret == XS_RET_FAIL) {
+			CFATALX("basis corrupt: EOF not found");
 		}
-		if (!C_ISREG(hdr.cmh_type))
-			continue;
-		if (hdr.cmh_nr_shas == -1)
-			goto skip;
-		if (sha_size < 0) {
-			pos0 = ftello(xdr_f);
-			if (ct_encrypt_enabled) {
-				if (ct_xdr_dedup_sha_crypto(&xdr, sha,
-				    csha, iv) == FALSE)
-					CFATALX("basis corrupt: can't get sha");
-			} else if (ct_xdr_dedup_sha(&xdr, sha) == FALSE) {
-				CFATALX("basis corrupt: can't get sha");
-			}
-			pos1 = ftello(xdr_f);
-			sha_size = pos1 - pos0;
-			hdr.cmh_nr_shas--;
-		}
-		if (fseek(xdr_f, sha_size * hdr.cmh_nr_shas, SEEK_CUR) != 0)
-			CFATAL("basis corrupt: can't seek to end of shas");
-skip:
-		if (ct_read_trailer(&trl))
-			CFATALX("basis corrupt: can't read trailer");
+
 	}
-	if (hdr.cmh_beacon != CT_HDR_EOF)
-		CFATALX("basis corrupt: EOF not found");
-	ct_metadata_close(xdr_f);
+	ct_xdr_parse_close(&xs_ctx);
 
 	return (nextlvl);
 }
