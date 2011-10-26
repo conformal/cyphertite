@@ -225,6 +225,8 @@ next_file:
 
 	} while (ret != XS_RET_EOF && ret != XS_RET_FAIL);
 
+	ct_xdr_parse_close(&xs_ctx);
+
 	if (ret != XS_RET_EOF) {
 		CWARNX("end of archive not hit");
 	} else {
@@ -569,6 +571,8 @@ next_file:
 		}
 
 	} while (ret != XS_RET_EOF && ret != XS_RET_FAIL);
+
+	ct_xdr_parse_close(&xs_ctx);
 
 	if (ret != XS_RET_EOF) {
 		CWARNX("end of archive not hit");
