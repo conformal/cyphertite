@@ -67,9 +67,6 @@ extern unsigned char		ct_crypto_key[CT_KEY_LEN];
 
 extern struct ct_settings	settings[];
 
-#define CT_ALLOC_NORMAL		(0)
-#define CT_ALLOC_CLEAR		(1)
-
 void			ct_shutdown(void);
 void			ct_unload_config(void);
 
