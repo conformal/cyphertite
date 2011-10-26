@@ -49,7 +49,7 @@ BIN.NAME = cyphertite
 BIN.LINKS = ct cyphertitectl ctctl
 BIN.SRCS = ct_main.c ct_metadata.c ct_files.c ct_util.c ct_queue.c ct_event.c
 BIN.SRCS += ct_aes_xts.c ct_crypto.c ct_match.c
-BIN.SRCS += ct_db.c ct_xdr.c ct_bw_lim.c ct_ctl.c ct_md.c
+BIN.SRCS += ct_db.c ct_xdr.c ct_bw_lim.c ct_ctl.c ct_md_xdr.c
 BIN.MANPAGES = cyphertite.1 cyphertite.conf.5
 BIN.OBJS = $(addprefix $(OBJPREFIX), $(BIN.SRCS:.c=.o))
 BIN.DEPS = $(addsuffix .depend, $(BIN.OBJS))
