@@ -450,7 +450,6 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode)
 	int			state;
 	int			doprint = 0;
 	int			ret;
-	int			i;
 	char			shat[SHA_DIGEST_STRING_LENGTH];
 
 	match = ct_match_compile(match_mode, flist);
@@ -472,21 +471,10 @@ next_file:
 	}
 
 	if (xs_ctx.xs_gh.cmg_prevlvl_filename) {
-		if (xs_ctx.xs_gh.cmg_prevlvl_filename[0] != '\0') {
-			CDBG("previous backup file %s\n",
-			    xs_ctx.xs_gh.cmg_prevlvl_filename);
-			ct_next_filename = xs_ctx.xs_gh.cmg_prevlvl_filename;
-			ct_filename_free = ct_next_filename;
-		} else {
-			free(xs_ctx.xs_gh.cmg_prevlvl_filename);
-			xs_ctx.xs_gh.cmg_prevlvl_filename = NULL;
-		}
-	}
-	if (xs_ctx.xs_gh.cmg_paths != NULL) {
-		for (i = 0; i < xs_ctx.xs_gh.cmg_num_paths; i++)
-			free(xs_ctx.xs_gh.cmg_paths[i]);
-
-		e_free(&xs_ctx.xs_gh.cmg_paths);
+		CDBG("previous backup file %s\n",
+		    xs_ctx.xs_gh.cmg_prevlvl_filename);
+		ct_next_filename = xs_ctx.xs_gh.cmg_prevlvl_filename;
+		ct_filename_free = ct_next_filename;
 	}
 	bzero(&fnodestore, sizeof(fnodestore));
 
@@ -1023,8 +1011,6 @@ ct_basis_setup(const char *basisbackup, char **filelist)
 		if (rooted == 0 && strcmp(cwd, xs_ctx.xs_gh.cmg_cwd) != 0)
 			CFATALX("current working directory %s differs from "
 			    " basis %s", cwd, xs_ctx.xs_gh.cmg_cwd);
-		/* done with the paths now, don't leak them */
-		e_free(&xs_ctx.xs_gh.cmg_paths);
 	}
 
 	while ((ret = ct_xdr_parse(&xs_ctx)) != XS_RET_EOF) {
@@ -1045,14 +1031,19 @@ char *
 ct_metadata_check_prev(const char *mdname)
 {
 	FILE			*md_file;
+	char			*ret = NULL;
 	struct ct_md_gheader	 gh;
-	char			 *ret = NULL;
+	int			 i;
 
 	if ((md_file = ct_metadata_open(mdname, &gh)) != NULL) {
 		if (gh.cmg_prevlvl_filename)
 			ret = e_strdup(gh.cmg_prevlvl_filename);
-		if (gh.cmg_paths != NULL)
+		if (gh.cmg_paths != NULL) {
+			for (i = 0; i < gh.cmg_num_paths; i++)
+				free(gh.cmg_paths[i]);
+
 			e_free(&gh.cmg_paths);
+		}
 
 		ct_metadata_close(md_file);
 	}
@@ -1214,10 +1205,17 @@ ct_xdr_parse_seek(struct ct_xdr_state *ctx)
 void
 ct_xdr_parse_close(struct ct_xdr_state *ctx)
 {
+	int	i;
+
 	if (ctx->xs_gh.cmg_prevlvl_filename)
 		free(ctx->xs_gh.cmg_prevlvl_filename);
-	if (ctx->xs_gh.cmg_paths != NULL)
+	if (ctx->xs_gh.cmg_paths != NULL) {
+		for (i = 0; i < ctx->xs_gh.cmg_num_paths; i++)
+			free(ctx->xs_gh.cmg_paths[i]);
+
 		e_free(&ctx->xs_gh.cmg_paths);
+	}
+
 	ct_metadata_close(ctx->xs_f);
 }
 
@@ -1227,7 +1225,6 @@ ct_cull_add_shafile(const char *file)
 	struct ct_xdr_state	xs_ctx;
 	char			*ct_next_filename, *ct_filename_free = NULL;
 	int			ret;
-	int			i;
 
 	CDBG("processing [%s]", file);
 
@@ -1253,21 +1250,10 @@ next_file:
 	}
 
 	if (xs_ctx.xs_gh.cmg_prevlvl_filename) {
-		if (xs_ctx.xs_gh.cmg_prevlvl_filename[0] != '\0') {
-			CDBG("previous backup file %s\n",
-			    xs_ctx.xs_gh.cmg_prevlvl_filename);
-			ct_next_filename = xs_ctx.xs_gh.cmg_prevlvl_filename;
-			ct_filename_free = ct_next_filename;
-		} else {
-			free(xs_ctx.xs_gh.cmg_prevlvl_filename);
-			xs_ctx.xs_gh.cmg_prevlvl_filename = NULL;
-		}
-	}
-	if (xs_ctx.xs_gh.cmg_paths != NULL) {
-		for (i = 0; i < xs_ctx.xs_gh.cmg_num_paths; i++)
-			free(xs_ctx.xs_gh.cmg_paths[i]);
-
-		e_free(&xs_ctx.xs_gh.cmg_paths);
+		CDBG("previous backup file %s\n",
+		    xs_ctx.xs_gh.cmg_prevlvl_filename);
+		ct_next_filename = xs_ctx.xs_gh.cmg_prevlvl_filename;
+		ct_filename_free = ct_next_filename;
 	}
 
 	do {
