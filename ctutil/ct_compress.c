@@ -34,17 +34,17 @@ ct_init_compression(uint16_t comp_type)
 
 	/* this is a little clunky */
 	if ((comp_type & C_HDR_F_COMPRESSED_MASK) == C_HDR_F_COMP_LZO) {
-		comp = S_ALG_LZO;
+		comp = SHRINK_ALG_LZO;
 	} else if ((comp_type & C_HDR_F_COMPRESSED_MASK) == C_HDR_F_COMP_LZW) {
-		comp = S_ALG_LZW;
+		comp = SHRINK_ALG_LZW;
 	} else if ((comp_type & C_HDR_F_COMPRESSED_MASK) == C_HDR_F_COMP_LZMA) {
-		comp = S_ALG_LZMA;
+		comp = SHRINK_ALG_LZMA;
 	} else {
-		comp = S_ALG_LZW;
+		comp = SHRINK_ALG_LZW;
 		CWARNX("defaulting to LZW compression");
 	}
 
-	if (s_init(comp, S_L_MID))
+	if (s_init(comp, SHRINK_L_MID))
 		return (1);
 
 	return (0);
