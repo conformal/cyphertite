@@ -127,8 +127,8 @@ struct xmlsd_v_elem		xe_ct_negotiate[] = {
 };
 
 struct xmlsd_v_elem		xe_ct_negotiate_reply[] = {
-	{ "ct_negoitate_reply","",		xa_ct_reply_attr },
-	{ "clientdbgenid", "clientdbgenid.ct_negoitate_reply",
+	{ "ct_negotiate_reply","",		xa_ct_reply_attr },
+	{ "clientdbgenid", "clientdbgenid.ct_negotiate_reply",
 	    xa_ct_value_attr },
 	{ NULL,		NULL,			NULL}
 };
