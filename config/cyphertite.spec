@@ -1,6 +1,6 @@
 
 %define name		cyphertite
-%define version		0.4.7
+%define version		0.4.8
 %define release		1
 
 Name: 		%{name}
@@ -49,6 +49,13 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertitectl
 
 %changelog
+* Fri Oct 28 2011 - davec 0.4.8-1
+- Add infrastructure for automatic feature negotiation
+- Fix metadata tag list output to allow copy/pasting with special chars
+- Update to use latest versions of several dependency libraries
+- Add build versioning
+- Improve code portability
+- Other minor cleanup and bug fixes
 * Thu Oct 06 2011 - davec 0.4.7-1
 - Fix -E flag when used with -0 flag and non-differential backups - FS#169
 - Make -C flag work as intended in all modes

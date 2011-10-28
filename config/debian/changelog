@@ -1,3 +1,14 @@
+cyphertite (0.4.8-1) unstable; urgency=low
+
+  * Add infrastructure for automatic feature negotiation
+  * Fix metadata tag list output to allow copy/pasting with special chars
+  * Update to use latest versions of several dependency libraries
+  * Add build versioning
+  * Improve code portability
+  * Other minor cleanup and bug fixes
+
+ -- Conformal Systems <package-discuss@conformal.com>  Fri, 28 Oct 2011 14:30:03 -0500
+
 cyphertite (0.4.7-1) unstable; urgency=low
 
   * Fix -E flag when used with -0 flag and non-differential backups - FS#169
