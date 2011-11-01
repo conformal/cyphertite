@@ -823,7 +823,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 			if (strcmp(xe->name, "file") == 0) {
 				filename = xmlsd_get_attr(xe, "name");
 				if (filename == NULL || filename[0] == '\0')
-					printf("specified tag does not "
+					printf("specified archive does not "
 					    "exist\n");
 				else
 					printf("%s deleted\n", filename);
