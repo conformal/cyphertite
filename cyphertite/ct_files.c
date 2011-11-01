@@ -122,7 +122,6 @@ void
 ct_flnode_cleanup(void)
 {
 	struct flist *flnode;
-	struct dnode *dnode;
 
 	while (!TAILQ_EMPTY(&fl_list_head)) {
 		flnode = TAILQ_FIRST(&fl_list_head);
@@ -132,17 +131,25 @@ ct_flnode_cleanup(void)
 		e_free(&flnode);
 	}
 
+	ct_dnode_cleanup();
+}
+
+void
+ct_dnode_cleanup(void)
+{
+	struct dnode *dnode;
+
 	while ((dnode = RB_ROOT(&ct_dname_head)) != NULL) {
 		RB_REMOVE(d_name_tree, &ct_dname_head, dnode);
 		e_free(&dnode->d_name);
 		e_free(&dnode);
 	}
+
 	while ((dnode = RB_ROOT(&ct_dnum_head)) != NULL) {
 		RB_REMOVE(d_num_tree, &ct_dnum_head, dnode);
 		e_free(&dnode->d_name);
 		e_free(&dnode);
 	}
-
 }
 
 void

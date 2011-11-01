@@ -242,6 +242,7 @@ struct ct_trans		*ct_trans_alloc(void);
 void			ct_trans_free(struct ct_trans *trans);
 void			ct_trans_cleanup(void);
 void			ct_flnode_cleanup(void);
+void			ct_dnode_cleanup(void);
 void			ct_free_fnode(struct fnode *);
 void			ct_ssl_cleanup(void);
 

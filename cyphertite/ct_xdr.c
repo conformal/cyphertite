@@ -38,6 +38,10 @@ XDR				xdr;
 time_t				ct_prev_backup_time;
 int				md_dir = -1;
 int				ct_xdr_version;
+int64_t				ct_dirnum = -1;
+
+void ct_alloc_dirnum(struct dnode *, struct dnode *);
+
 
 /* metadata */
 bool_t
@@ -217,7 +221,6 @@ ct_metadata_create(const char *filename, int intype, const char *basis, int lvl,
 		gh.cmg_num_paths++;
 	gh.cmg_paths = filelist;
 
-
 	md_dir = XDR_ENCODE;
 	/* write global header */
 	xdrstdio_create(&xdr, f, XDR_ENCODE);
@@ -230,6 +233,7 @@ ct_metadata_create(const char *filename, int intype, const char *basis, int lvl,
 void
 ct_metadata_close(FILE *file)
 {
+	extern int64_t		ct_ex_dirnum;
 	struct ct_md_header	hdr;
 	char			fake[1];
 
@@ -243,12 +247,14 @@ ct_metadata_close(FILE *file)
 			CWARNX("Failed to write archive footer");
 	}
 
+	 /* These counters only apply for the file in question. reset. */
+	ct_dnode_cleanup();
+	ct_dirnum = -1;
+	ct_ex_dirnum = 0;
+
 	xdr_destroy(&xdr);
 	fclose(file);
 }
-
-int64_t ct_dirnum = -1;
-void ct_alloc_dirnum(struct dnode *, struct dnode *);
 
 void
 ct_alloc_dirnum(struct dnode *dnode, struct dnode *parentdir)

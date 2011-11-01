@@ -36,6 +36,7 @@ void	ct_extract_setup_queue(struct ct_extract_head *, struct ct_xdr_state *,
 	    const char *);
 void	ct_extract_open_next(struct ct_extract_head *, struct ct_xdr_state *);
 
+int64_t		ct_ex_dirnum = 0;
 /*
  * Helper functions
  */
@@ -43,7 +44,6 @@ int
 ct_populate_fnode(struct fnode *fnode, struct ct_md_header *hdr,
     struct ct_md_header *hdrlnk, int *state)
 {
-	static int64_t		ct_ex_dirnum = 0;
 	struct flist		flistnode;
 	struct dnode		*dnode;
 
@@ -338,7 +338,6 @@ ct_extract_open_next(struct ct_extract_head *extract_head,
 			e_free(&next->filename);
 		if (next)
 			e_free(&next);
-
 	} else {
 		CFATALX("open next with no next archive");
 	}
