@@ -633,10 +633,12 @@ struct ct_xdr_state {
 #define	XS_RET_FAIL		4
 };
 
-int ct_xdr_parse_init(struct ct_xdr_state *, const char *);
+int ct_xdr_parse_init_at(struct ct_xdr_state *, const char *, off_t);
+#define ct_xdr_parse_init(ctx, file) ct_xdr_parse_init_at(ctx, file, 0)
 int ct_xdr_parse(struct ct_xdr_state *);
 int ct_xdr_parse_seek(struct ct_xdr_state *);
 void ct_xdr_parse_close(struct ct_xdr_state *);
+off_t ct_xdr_parse_tell(struct ct_xdr_state *);
 
 /*
  * Functions for queueing differentials for extract or similar.

@@ -578,7 +578,7 @@ ct_metadata_check_prev(const char *mdname)
 }
 
 int
-ct_xdr_parse_init(struct ct_xdr_state *ctx, const char *file)
+ct_xdr_parse_init_at(struct ct_xdr_state *ctx, const char *file, off_t offset)
 {
 	ctx->xs_f = ct_metadata_open(file,  &ctx->xs_gh);
 	if (ctx->xs_f == NULL)
@@ -588,6 +588,12 @@ ct_xdr_parse_init(struct ct_xdr_state *ctx, const char *file)
 	    ctx->xs_gh.cmg_prevlvl_filename[0] == '\0') {
 		free(ctx->xs_gh.cmg_prevlvl_filename);
 		ctx->xs_gh.cmg_prevlvl_filename = NULL;
+	}
+
+	if (offset != 0 && fseek(ctx->xs_f, offset, SEEK_SET) == -1) {
+		CWARN("failed to seek in file %s", file);
+		ct_xdr_parse_close(ctx);
+		return (3);
 	}
 
 	ctx->xs_sha_sz = 0;
@@ -726,6 +732,12 @@ ct_xdr_parse_seek(struct ct_xdr_state *ctx)
 	ctx->xs_sha_cnt = 0;
 
 	return 0;
+}
+
+off_t
+ct_xdr_parse_tell(struct ct_xdr_state *ctx)
+{
+	return (ftello(ctx->xs_f));
 }
 
 void
