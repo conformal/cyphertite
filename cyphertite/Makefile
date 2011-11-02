@@ -20,8 +20,8 @@ PROG= cyphertite
 SRCS= ct_main.c ct_files.c ct_util.c ct_queue.c ct_event.c
 SRCS+= ct_aes_xts.c ct_crypto.c ct_match.c ct_metadata.c
 SRCS+= ct_db.c ct_xdr.c ct_xml.c ct_bw_lim.c ct_ctl.c ct_md_xdr.c
-SRCS+= ct_config.c ct_md_traverse.c
-MAN= cyphertite.1 cyphertite.conf.5
+SRCS+= ct_config.c ct_md_traverse.c ct_fb.c
+MAN= cyphertite.1 cyphertite.conf.5 cyphertitefb.1
 
 .if ${.CURDIR} == ${.OBJDIR}
 LDADD+= -L${.CURDIR}/../ctutil
@@ -41,7 +41,7 @@ CPPFLAGS+= -DBUILDSTR=\"$(BUILDVERSION)\"
 
 LDADD+= -L${LOCALBASE}/lib
 LDADD+=	-lassl -lclog -lcrypto -levent -lexpat -lexude -lshrink
-LDADD+=	-lsqlite3 -lssl -lutil -lxmlsd -lctutil
+LDADD+=	-lsqlite3 -lssl -lutil -lxmlsd -lctutil -ledit -lcurses
 LDADD+= ${LDADDSSL}
 CLEANFILES= cyphertite.cat1 cyphertite.conf.cat5
 
@@ -50,7 +50,10 @@ CFLAGS+= -I${.CURDIR}/../libshrink -I.
 LINKS=${BINDIR}/cyphertite ${BINDIR}/ct
 LINKS+=${BINDIR}/cyphertite ${BINDIR}/cyphertitectl
 LINKS+=${BINDIR}/cyphertite ${BINDIR}/ctctl
+LINKS+=${BINDIR}/cyphertite ${BINDIR}/cyphertitefb
+LINKS+=${BINDIR}/cyphertite ${BINDIR}/ctfb
 MLINKS=cyphertite.1 ct.1
+MLINKS+=cyphertitefb.1 ctfb.1
 
 analyze: all
 clang: all

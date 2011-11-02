@@ -990,7 +990,8 @@ ct_md_extract_nextop(struct ct_op *op)
 	 * need to determine if this is a layered backup, if so, we need to
 	 * queue download of that file
 	 */
-	if (op->op_action == CT_A_EXTRACT || op->op_action == CT_A_LIST)
+	if (op->op_action == CT_A_EXTRACT || op->op_action == CT_A_LIST ||
+	    op->op_action == CT_A_JUSTDL)
 		ct_md_download_next(op);
 
 	/*
@@ -1024,6 +1025,14 @@ ct_md_extract_nextop(struct ct_op *op)
 		    op->op_matchmode, 0);
 		ct_add_operation(ct_md_archive, ct_free_mdname_and_remote,
 		    mfile, NULL, NULL, NULL, NULL, 0, 0);
+		break;
+	case CT_A_JUSTDL:
+		{
+		extern char * ct_fb_filename; 
+		ct_fb_filename = op->op_local_fname; /* XXX ick */
+		ct_add_operation(ct_shutdown_op, NULL, NULL, NULL, NULL, NULL,
+		    NULL, 0, 0);
+		}
 		break;
 	default:
 		CFATALX("invalid action");

@@ -271,6 +271,7 @@ extern int		ct_action;
 #define CT_A_LIST	(2)
 #define CT_A_EXTRACT	(3)
 #define CT_A_ERASE	(4)
+#define CT_A_JUSTDL	(5)	/* fake option for ctfb */
 
 /* assl */
 struct ct_assl_io_ctx	*ct_assl_ctx;

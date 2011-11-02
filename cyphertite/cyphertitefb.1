@@ -1,0 +1,118 @@
+.\"
+.\" Copyright (c) 2011 Conformal Systems LLC <info@conformal.com>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate: October 12 2011 $
+.Dt CYPHERTITEFB 1
+.Os
+.Sh NAME
+.Nm cyphertitefb
+.Nd cyphertite file browser
+.Sh SYNOPSIS
+.Nm cyphertitefb
+.Bk -words
+.Fl ctxV
+.Op Fl d
+.Op Fl F Ar conffile
+.Op Fl f Ar ctfile
+.Op Ar file ...
+.Ek
+.Pp
+.Sh DESCRIPTION
+The
+.Nm
+command allows the user to browse through the files stored in a
+.Xr cyphertite 1
+metadata file, viewing each files attributes and selectively downloading
+individual files.
+
+The options are as follows. The archive metadata file argument is always
+required:
+.Bl -tag -width Ds
+.It Fl f Ar metadata
+Filename where the archive metadata is stored.
+If the
+.Op  md_mode
+in the configuration is set to remote then only the metadata tag is required.
+.El
+.Pp
+In addition to the aforementioned flag, the following flags may be
+used:
+.Bl -tag -width Ds
+.It Fl F Ar config
+Specify the location of the configuration file to use, overriding
+the default values.
+.It Fl d
+Run in debug mode.
+.El
+.Sh COMMANDS
+After
+.Nm
+is invoked, the user will be presented with a command line interface.
+The following commands are valid:
+.Bl -tag -width Ds - compact
+.It pwd
+Display the current working directory relative to the file root.
+.Pp
+.It ls
+Display data about the files and directories present on the command line.
+If no arguments are present then do the above for the current directory.
+.Pp
+.It get
+Download the file (with optional version) referenced by the first argument.
+The second argument optionally provides an alternative destination for the file
+to be downloaded to.
+.Pp
+.It cd
+Change the current working directory to the path provided on the command line.
+In the absense of any options return to the root directory.
+.Pp
+.It lcd
+Change the current working directory on the local machine.
+.Pp
+.It lpwd
+Print the current working directory on the local machine.
+.Pp
+.It lmkdir
+Make a directory on the local filesystem.
+.Pp
+.It lumask
+Change the umask for creating local files.
+.Pp
+.El
+.Sh FILES
+.Bl -tag -width "cyphertite" -compact
+.It Pa /etc/cyphertite/cyphertite.conf
+Default configuration file.
+.It Pa ~/.cyphertite/cyphertite.conf
+User configuration file.
+.It Pa ~/.cyphertite/ct_crypto
+Default crypto secrets file.
+.El
+.Sh EXAMPLES
+None currently
+.Sh SEE ALSO
+.Xr cyphertite 1
+.Xr cyphertite.conf 5 ,
+.Xr glob 7 ,
+.Sh AUTHORS
+.Nm
+was written by
+.An Conformal Systems, LLC. Aq info@conformal.com .
+.Sh CAVEATS
+Please see
+.Xr cyphertite 1
+for a list of general caveats for the
+.Xr cyphertite 1
+suite of software.

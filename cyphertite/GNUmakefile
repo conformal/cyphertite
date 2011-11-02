@@ -42,15 +42,15 @@ CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(DEBUG)
 LDFLAGS += -L$(LOCALBASE)/ssl/lib
 LDFLAGS += -L../ctutil/obj -L../ctutil -lctutil -lassl -lclog -levent -lexude
 LDFLAGS += -lshrink -lxmlsd -lexpat -lsqlite3 -llzma -llzo2 -lz -lclens -lbsd
-LDFLAGS += -Wl,-Bstatic -lssl -lcrypto -Wl,-Bdynamic -ldl
+LDFLAGS += -Wl,-Bstatic -lssl -lcrypto -Wl,-Bdynamic -ldl -ledit -lcurses
 
 BIN.NAME = cyphertite
-BIN.LINKS = ct cyphertitectl ctctl
+BIN.LINKS = ct cyphertitectl ctctl cyphertitefb ctfb
 BIN.SRCS = ct_main.c ct_metadata.c ct_files.c ct_util.c ct_queue.c ct_event.c
 BIN.SRCS += ct_aes_xts.c ct_crypto.c ct_match.c
 BIN.SRCS += ct_db.c ct_xdr.c ct_bw_lim.c ct_ctl.c ct_md_xdr.c
-BIN.SRCS += ct_config.c ct_md_traverse.c
-BIN.MANPAGES = cyphertite.1 cyphertite.conf.5
+BIN.SRCS += ct_config.c ct_md_traverse.c ct_fb.c
+BIN.MANPAGES = cyphertite.1 cyphertite.conf.5 cyphertitefb.1
 BIN.OBJS = $(addprefix $(OBJPREFIX), $(BIN.SRCS:.c=.o))
 BIN.DEPS = $(addsuffix .depend, $(BIN.OBJS))
 BIN.LDFLAGS = $(LDFLAGS.EXTRA) $(LDFLAGS) $(LDADD)

@@ -1,4 +1,3 @@
-
 %define name		cyphertite
 %define version		0.5.0
 %define release		1
@@ -15,6 +14,7 @@ Buildroot:	%{_tmppath}/%{name}-%{version}-buildroot
 Prefix: 	/usr
 Requires:	assl >= 0.11.0, clog >= 0.4.0, exude >= 0.5.0, shrink >= 0.3.0
 Requires:	xmlsd >= 0.6.0, libbsd, libevent >= 1.4, sqlite >= 3.6.23
+Requires:	libedit >= 3.0
 
 %description
 Cyphertite is a high-security scalable solution for online backups.
@@ -47,6 +47,8 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/ct
 /usr/bin/ctctl
 /usr/bin/cyphertitectl
+/usr/bin/ctfb
+/usr/bin/cyphertitefb
 
 %changelog
 * Wed Nov 09 2011 - davec 0.5.0-1
