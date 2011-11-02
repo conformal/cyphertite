@@ -610,6 +610,7 @@ void			ct_cleanup(void);
 /* XDR parser for cyphertite MD archives */
 struct ct_xdr_state {
 	FILE			*xs_f;
+	const char		*xs_filename;
 	struct ct_md_gheader	 xs_gh;
 	struct ct_md_header	 xs_hdr;
 	struct ct_md_header	 xs_lnkhdr;

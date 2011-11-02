@@ -584,6 +584,8 @@ ct_xdr_parse_init_at(struct ct_xdr_state *ctx, const char *file, off_t offset)
 	if (ctx->xs_f == NULL)
 		return 2;
 
+	ctx->xs_filename  = e_strdup(file);
+
 	if (ctx->xs_gh.cmg_prevlvl_filename &&
 	    ctx->xs_gh.cmg_prevlvl_filename[0] == '\0') {
 		free(ctx->xs_gh.cmg_prevlvl_filename);
@@ -753,6 +755,8 @@ ct_xdr_parse_close(struct ct_xdr_state *ctx)
 
 		e_free(&ctx->xs_gh.cmg_paths);
 	}
+	if (ctx->xs_filename != NULL)
+		e_free(&ctx->xs_filename);
 
 	ct_metadata_close(ctx->xs_f);
 }
