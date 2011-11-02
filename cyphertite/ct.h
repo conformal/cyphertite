@@ -638,6 +638,20 @@ int ct_xdr_parse(struct ct_xdr_state *);
 int ct_xdr_parse_seek(struct ct_xdr_state *);
 void ct_xdr_parse_close(struct ct_xdr_state *);
 
+/*
+ * Functions for queueing differentials for extract or similar.
+ */
+TAILQ_HEAD(ct_extract_head, ct_extract_stack);
+struct ct_extract_stack   {
+	TAILQ_ENTRY(ct_extract_stack)	next;
+	char		*filename;
+};
+void	ct_extract_setup(struct ct_extract_head *, struct ct_xdr_state *,
+	    const char *);
+void	ct_extract_setup_queue(struct ct_extract_head *, struct ct_xdr_state *,
+	    const char *);
+void	ct_extract_open_next(struct ct_extract_head *, struct ct_xdr_state *);
+
 /* cull  */
 int ct_cull_add_shafile(const char *);
 void ct_cull_sha_insert(const uint8_t *);

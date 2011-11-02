@@ -23,19 +23,8 @@
 
 #include "ct.h"
 
-TAILQ_HEAD(ct_extract_head, ct_extract_stack);
-struct ct_extract_stack   {
-	TAILQ_ENTRY(ct_extract_stack)	next;
-	char		*filename;
-};
-
 int	ct_populate_fnode(struct fnode *, struct ct_md_header *,
 	    struct ct_md_header *, int *);
-void	ct_extract_setup(struct ct_extract_head *, struct ct_xdr_state *,
-	    const char *);
-void	ct_extract_setup_queue(struct ct_extract_head *, struct ct_xdr_state *,
-	    const char *);
-void	ct_extract_open_next(struct ct_extract_head *, struct ct_xdr_state *);
 
 int64_t		ct_ex_dirnum = 0;
 /*
