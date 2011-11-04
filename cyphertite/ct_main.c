@@ -158,14 +158,14 @@ show_version(void)
 }
 
 int
-ct_load_config(struct ct_settings *settings)
+ct_load_config(struct ct_settings *mysettings)
 {
 	char		*config_path = NULL;
 	int		config_try = 0;
 	static char	ct_fullcachedir[PATH_MAX];
 
 	if (ct_configfile) {
-		if (ct_config_parse(settings, ct_configfile))
+		if (ct_config_parse(mysettings, ct_configfile))
 			CFATALX("Unable to open specified config file %s",
 			   ct_configfile);
 	} else {
@@ -185,7 +185,7 @@ ct_load_config(struct ct_settings *settings)
 				return (1);
 				break;
 			}
-			if (ct_config_parse(settings, config_path) == 0) {
+			if (ct_config_parse(mysettings, config_path) == 0) {
 				ct_configfile = config_path;
 				break;
 			}

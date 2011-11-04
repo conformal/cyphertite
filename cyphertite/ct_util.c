@@ -257,7 +257,7 @@ ct_header_free(void *vctx, struct ct_header *hdr)
 
 #define ASSL_TIMEOUT 20
 int
-ct_assl_negotiate_poll(struct ct_assl_io_ctx *ct_assl_ctx)
+ct_assl_negotiate_poll(struct ct_assl_io_ctx *asslctx)
 {
 	char			b64_digest[128];
 	uint8_t			pwd_digest[SHA512_DIGEST_LENGTH];
@@ -283,18 +283,18 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *ct_assl_ctx)
 	buf[6] = (ct_max_block_size >> 16) & 0xff;
 	buf[7] = (ct_max_block_size >> 24) & 0xff;
 	ct_wire_header(&hdr);
-	if (ct_assl_io_write_poll(ct_assl_ctx, &hdr, sizeof hdr, ASSL_TIMEOUT)
+	if (ct_assl_io_write_poll(asslctx, &hdr, sizeof hdr, ASSL_TIMEOUT)
 	    != sizeof hdr) {
 		CWARNX("could not write header");
 		goto done;
 	}
-	if (ct_assl_io_write_poll(ct_assl_ctx, buf, 8,  ASSL_TIMEOUT) != 8) {
+	if (ct_assl_io_write_poll(asslctx, buf, 8,  ASSL_TIMEOUT) != 8) {
 		CWARNX("could not write body");
 		goto done;
 	}
 
 	/* get server reply */
-	sz = ct_assl_io_read_poll(ct_assl_ctx, &hdr, sizeof hdr, ASSL_TIMEOUT);
+	sz = ct_assl_io_read_poll(asslctx, &hdr, sizeof hdr, ASSL_TIMEOUT);
 	if (sz != sizeof hdr) {
 		CWARNX("invalid header size %ld", (long) sz);
 		goto done;
@@ -304,7 +304,7 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *ct_assl_ctx)
 	if (hdr.c_version == C_HDR_VERSION &&
 	    hdr.c_opcode == C_HDR_O_NEG_REPLY) {
 		if (hdr.c_size == 8) {
-			if (ct_assl_io_read_poll(ct_assl_ctx, buf, hdr.c_size,
+			if (ct_assl_io_read_poll(asslctx, buf, hdr.c_size,
 			    ASSL_TIMEOUT) != hdr.c_size) {
 				CWARNX("couldn't read neg parameters");
 				goto done;
@@ -352,19 +352,19 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *ct_assl_ctx)
 	hdr.c_flags = ct_compress_enabled;
 
 	ct_wire_header(&hdr);
-	if (ct_assl_io_write_poll(ct_assl_ctx, &hdr, sizeof hdr, ASSL_TIMEOUT)
+	if (ct_assl_io_write_poll(asslctx, &hdr, sizeof hdr, ASSL_TIMEOUT)
 	    != sizeof hdr) {
 		CWARNX("could not write header");
 		goto done;
 	}
-	if (ct_assl_io_write_poll(ct_assl_ctx, body, payload_sz,  ASSL_TIMEOUT)
+	if (ct_assl_io_write_poll(asslctx, body, payload_sz,  ASSL_TIMEOUT)
 	    != payload_sz) {
 		CWARNX("could not write body");
 		goto done;
 	}
 
 	/* get server reply */
-	sz = ct_assl_io_read_poll(ct_assl_ctx, &hdr, sizeof hdr, ASSL_TIMEOUT);
+	sz = ct_assl_io_read_poll(asslctx, &hdr, sizeof hdr, ASSL_TIMEOUT);
 	if (sz != sizeof hdr) {
 		CWARNX("invalid header size %ld", (long) sz);
 		goto done;

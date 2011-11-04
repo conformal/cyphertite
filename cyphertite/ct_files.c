@@ -1161,7 +1161,7 @@ ct_file_extract_fixup(void)
 {
 	struct dir_stat		*dsn;
 	struct timeval		tv[2];
-	char			tpath[PATH_MAX];
+	char			tp[PATH_MAX];
 	int                     safe_mode;
 
 	while(!SIMPLEQ_EMPTY(&dirlist)) {
@@ -1169,32 +1169,32 @@ ct_file_extract_fixup(void)
 		SIMPLEQ_REMOVE_HEAD(&dirlist, ds_list);
 		RB_REMOVE(ct_dir_lookup, &ct_dir_rb_head, dsn);
 
-		snprintf(tpath, sizeof tpath, "%s%s%s",
+		snprintf(tp, sizeof tp, "%s%s%s",
 		    ct_tdir ? ct_tdir : "", ct_tdir ? "/" : "", dsn->ds_name);
 
 		safe_mode = S_IRWXU | S_IRWXG | S_IRWXO;
 		if (ct_attr) {
-			if (chown(tpath, dsn->ds_uid,
+			if (chown(tp, dsn->ds_uid,
 			    dsn->ds_gid) == -1) {
 				if (errno == EPERM && geteuid() != 0) {
 					if (ct_verbose)
 						CWARN("chown failed: %s",
-						    tpath);
+						    tp);
 				} else {
-					CFATAL("chown failed %s", tpath);
+					CFATAL("chown failed %s", tp);
 				}
 			} else
 				safe_mode = ~0;
 		}
 
-		if (chmod(tpath, dsn->ds_mode & safe_mode) == -1)
+		if (chmod(tp, dsn->ds_mode & safe_mode) == -1)
 			CFATAL("chmod failed on %s", dsn->ds_name);
 
 		if (ct_attr) {
 			tv[0].tv_sec = dsn->ds_atime;
 			tv[1].tv_sec = dsn->ds_mtime;
 			tv[0].tv_usec = tv[1].tv_usec = 0;
-			if (utimes(tpath, tv) == -1)
+			if (utimes(tp, tv) == -1)
 				CFATAL("futimes failed");
 		}
 		e_free(&dsn);
