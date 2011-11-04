@@ -121,7 +121,7 @@ ct_xdr_stdin(XDR *xdrs, struct ct_md_stdin *objp)
 }
 
 bool_t
-ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp, int write)
+ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp, int dowrite)
 {
 	char	 *basep, base[PATH_MAX], *prevlvl;
 	int	 i;
@@ -169,7 +169,7 @@ ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp, int write)
 			return (FALSE);
 		if (!xdr_int(xdrs, &objp->cmg_num_paths))
 			return (FALSE);
-		if (write == 0) {
+		if (dowrite == 0) {
 			objp->cmg_paths = e_calloc(objp->cmg_num_paths,
 			    sizeof(*objp->cmg_paths));
 		}

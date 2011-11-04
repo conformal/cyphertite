@@ -110,10 +110,10 @@ ct_event_assl_write(int fd_notused, short events, void *arg)
 			body = iob->io_data;
 			body_len = hdr->c_size;
 		} else {
-			int index  = ioctx->io_o_state - 2;
+			int idx  = ioctx->io_o_state - 2;
 			const struct ct_iovec *iov = iob->io_data;
-			body = iov[index].iov_base;
-			body_len = iov[index].iov_len;
+			body = iov[idx].iov_base;
+			body_len = iov[idx].iov_len;
 		}
 		wlen = body_len - ioctx->io_o_off;
 		if (ioctx->io_max_transfer != 0 &&
@@ -360,10 +360,10 @@ write_next_iov:
 			body = iob->io_data;
 			body_len = hdr->c_size;
 		} else {
-			int index  = ioctx->io_o_state - 2;
+			int idx  = ioctx->io_o_state - 2;
 			const struct ct_iovec *iov = iob->io_data;
-			body = iov[index].iov_base;
-			body_len = iov[index].iov_len;
+			body = iov[idx].iov_base;
+			body_len = iov[idx].iov_len;
 		}
 	CDBG("writing body state %d sz %d count %d",
 	ioctx->io_o_state, body_len, iob->iovcnt);

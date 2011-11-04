@@ -755,7 +755,7 @@ void
 ct_write_md_special(struct ct_trans *trans)
 {
 	struct fnode		*fnode = trans->tr_fl_node;
-	char			link[PATH_MAX];
+	char			mylink[PATH_MAX];
 	char			*plink;
 	int			type = fnode->fl_type;
 	int			ret;
@@ -773,15 +773,15 @@ ct_write_md_special(struct ct_trans *trans)
 		if (fnode->fl_hardlink) {
 			plink = fnode->fl_hlname;
 		} else {
-			ret = readlink(fnode->fl_fname, link, sizeof(link));
-			if (ret == -1 || ret == sizeof(link)) {
+			ret = readlink(fnode->fl_fname, mylink, sizeof(mylink));
+			if (ret == -1 || ret == sizeof(mylink)) {
 				/* readlink failed, do not record */
-				CWARNX("unable to read link for %s",
+				CWARNX("unable to read mylink for %s",
 				    fnode->fl_sname);
 				return;
 			}
-			link[ret] = '\0';
-			plink = link;
+			mylink[ret] = '\0';
+			plink = mylink;
 		}
 		if (fnode->fl_sname == NULL &&
 		    plink == NULL) {
@@ -797,7 +797,7 @@ ct_write_md_special(struct ct_trans *trans)
 			    fnode->fl_hardlink ? "hard" : "sym");
 			return;
 		}
-		CDBG("link %s %s", fnode->fl_sname, plink);
+		CDBG("mylink %s %s", fnode->fl_sname, plink);
 		if (ct_write_header(fnode, fnode->fl_sname, 1))
 			CWARNX("header write failed");
 
@@ -1380,7 +1380,7 @@ ct_compute_encrypt(void *vctx)
 	size_t			keysz = -1;
 	ssize_t			newlen;
 	int			slot;
-	int			encrypt;
+	int			encr;
 	int			len;
 
 	#ifdef LOW_PRI_COMPUTE
@@ -1396,22 +1396,22 @@ ct_compute_encrypt(void *vctx)
 		switch(trans->tr_state) {
 		case TR_S_EX_READ:
 			/* decrypt */
-			encrypt = 0;
+			encr = 0;
 			break;
 		case TR_S_READ: /* uncompressed md data */
 		case TR_S_UNCOMPSHA_ED:
 		case TR_S_COMPRESSED:
-			encrypt = 1;
+			encr = 1;
 			break;
 		default:
-			CFATALX("unexpected state for encrypt %d",
+			CFATALX("unexpected state for encr %d",
 			    trans->tr_state);
 		}
 
 
 		slot = trans->tr_dataslot;
 		if (slot > 1) {
-			CFATALX("transaction with special slot in encrypt: %d",
+			CFATALX("transaction with special slot in encr: %d",
 			    slot);
 		}
 		src = trans->tr_data[slot];
@@ -1424,8 +1424,8 @@ ct_compute_encrypt(void *vctx)
 		iv = trans->tr_iv;
 		ivlen = sizeof trans->tr_iv;
 
-		if (encrypt) {
-			/* encrypt the chunk, if metadata, iv is alread valid */
+		if (encr) {
+			/* encr the chunk, if metadata, iv is alread valid */
 			if ((trans->hdr.c_flags & C_HDR_F_METADATA) == 0) {
 				if (ct_create_iv(ct_iv, sizeof(ct_iv), src,
 				    len, iv, ivlen))
@@ -1443,9 +1443,9 @@ ct_compute_encrypt(void *vctx)
 
 		if (newlen < 0)
 			CFATALX("failed to %scrypt files",
-			    encrypt ? "en" : "de");
+			    encr ? "en" : "de");
 
-		CDBG("%scrypt block of %d to %lu", encrypt ? "en" : "de",
+		CDBG("%scrypt block of %d to %lu", encr ? "en" : "de",
 		    len, (unsigned long) newlen);
 
 		ct_stats->st_bytes_crypted += newlen;
@@ -1453,7 +1453,7 @@ ct_compute_encrypt(void *vctx)
 		trans->tr_size[!slot] = newlen;
 		trans->tr_dataslot = !slot;
 
-		if (encrypt)
+		if (encr)
 			trans->tr_state = TR_S_ENCRYPTED;
 		else
 			trans->tr_state = TR_S_EX_DECRYPTED;
