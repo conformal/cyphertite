@@ -1222,6 +1222,20 @@ ct_user_config(void)
 	if (pwd == NULL)
 		CFATALX("invalid user %d", getuid());
 
+	e_asprintf(&conf, "%s/.cyphertite/cyphertite.conf", pwd->pw_dir);
+	return (conf);
+}
+
+char *
+ct_user_config_old(void)
+{
+	char			*conf;
+	struct			passwd *pwd;
+
+	pwd = getpwuid(getuid());
+	if (pwd == NULL)
+		CFATALX("invalid user %d", getuid());
+
 	e_asprintf(&conf, "%s/.cyphertite.conf", pwd->pw_dir);
 	return (conf);
 }
@@ -1435,7 +1449,7 @@ ct_create_config(void)
 	if (conf_buf == NULL)
 		CFATALX("strdup");
 	dir = dirname(conf_buf);
-	if (asprintf(&md_cachedir, "%s/.cyphertite_md_cachedir", dir) == -1)
+	if (asprintf(&md_cachedir, "%s/ct_cachedir", dir) == -1)
 		CFATALX("default md_cachedir");
 
 	snprintf(prompt, sizeof prompt,
@@ -1475,24 +1489,24 @@ ct_create_config(void)
 	else
 		fprintf(f, "#crypto_password\t\t=\n");
 
-	fprintf(f, "cache_db\t\t\t= %s/.cyphertite.db\n", dir);
+	fprintf(f, "cache_db\t\t\t= %s/ct_db\n", dir);
 	fprintf(f, "session_compression\t\t= lzo\n");
 	fprintf(f, "host\t\t\t\t= beta.cyphertite.com\n");
 	fprintf(f, "hostport\t\t\t= 31337\n");
-	fprintf(f, "crypto_secrets\t\t\t= %s/.cyphertite.crypto\n", dir);
-	fprintf(f, "ca_cert\t\t\t\t= %s/cyphertite/ct_ca.crt\n", dir);
-	fprintf(f, "cert\t\t\t\t= %s/cyphertite/ct_%s.crt\n", dir, user);
-	fprintf(f, "key\t\t\t\t= %s/cyphertite/private/ct_%s.key\n", dir, user);
+	fprintf(f, "crypto_secrets\t\t\t= %s/ct_crypto\n", dir);
+	fprintf(f, "ca_cert\t\t\t\t= %s/ct_certs/ct_ca.crt\n", dir);
+	fprintf(f, "cert\t\t\t\t= %s/ct_certs/ct_%s.crt\n", dir, user);
+	fprintf(f, "key\t\t\t\t= %s/ct_certs/private/ct_%s.key\n", dir, user);
 
 	fprintf(f, "md_mode\t\t\t\t= %s\n", md_mode);
 	if (strcmp(md_mode, "remote") == 0) {
 		fprintf(f, "md_cachedir\t\t\t= %s\n", md_cachedir);
-		fprintf(f, "md_remote_auto_differential\t= %d", md_remote_diff);
+		fprintf(f, "md_remote_auto_differential\t= %d\n", md_remote_diff);
 	}
 	else
 	{
 		fprintf(f, "#md_cachedir\t\t\t= %s\n", md_cachedir);
-		fprintf(f, "#md_remote_auto_differential\t= %d",
+		fprintf(f, "#md_remote_auto_differential\t= %d\n",
 		    md_remote_diff);
 	}
 

@@ -520,6 +520,7 @@ void ct_file_extract_fixup(void);
 void ct_create_config(void);
 char *ct_system_config(void);
 char *ct_user_config(void);
+char *ct_user_config_old(void);
 
 /* print file data nicely */
 void			ct_pr_fmt_file(struct fnode *fnode);

@@ -109,7 +109,7 @@ remote server administrator.
 The keys used to perform all the chunk-level encryption are
 stored in the crypto_secrets file specified in
 .Xr cyphertite.conf 5 .
-The file ~/.cyphertite.crypto is the default.
+The file ~/.cyphertite/ct_crypto is the default.
 The AES-XTS and IV keys are stored protected by PBKDF2 with a
 default of 256,000 rounds and a 128-byte salt.
 The password to unlock the AES-XTS and IV keys is specified as
@@ -121,7 +121,7 @@ REALM DEDUPLICATION
 .Bd -filled -offset 3n
 If multiple machines share
 .Xr cyphertite.conf 5
-and cyphertite.crypto files in common, deduplication can be
+and ct_crypto files in common, deduplication can be
 achieved across several machines in a realm.
 These machines must share an account to obtain the benefit
 of deduplication.
@@ -290,9 +290,9 @@ local copies of the archive metadata files.
 .Bl -tag -width "cyphertite" -compact
 .It Pa /etc/cyphertite/cyphertite.conf
 Default configuration file.
-.It Pa ~/.cyphertite.conf
+.It Pa ~/.cyphertite/cyphertite.conf
 User configuration file.
-.It Pa ~/.cyphertite.crypto
+.It Pa ~/.cyphertite/ct_crypto
 Default crypto secrets file.
 .El
 .Sh EXAMPLES
@@ -347,7 +347,7 @@ with no parameters to allow cyphertite to prompt for the
 information needed to setup the account as follows:
 .Dl $ cyphertite
 .Dl cyphertite config file not found. Create one? [yes]:
-.Dl Target conf file [/root/.cyphertite.conf]:
+.Dl Target conf file [/root/.cyphertite/cyphertite.conf]:
 .Dl cyphertite login username: mylogin
 .Dl Save cyphertite login password to configuration file? [yes]:
 .Dl login password:
@@ -355,7 +355,7 @@ information needed to setup the account as follows:
 .Dl Save cyphertite crypto passphrase to configuration file? [yes]:
 .Dl Automatically generate crypto passphrase? [yes]:
 .Dl Choose a metadata operation mode (remote/local) [remote]:
-.Dl Target metadata cache directory [/root/.cyphertite_md_cachedir]:
+.Dl Target metadata cache directory [/root/.cyphertite/ct_cachedir]:
 .Dl Use automatic remote differentials? [no]:
 .Dl Configuration file created.
 .Pp

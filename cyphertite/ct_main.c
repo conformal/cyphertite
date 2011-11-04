@@ -179,6 +179,9 @@ ct_load_config(struct ct_settings *mysettings)
 				config_path = ct_user_config();
 				break;
 			case 1:
+				config_path = ct_user_config_old();
+				break;
+			case 2:
 				config_path = ct_system_config();
 				break;
 			default:
