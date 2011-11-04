@@ -297,10 +297,11 @@ ct_fscanfhex(char *src, uint8_t *dst, size_t dstlen)
  * key) and d) hmac of uncrypted mask key
  */
 int
-ct_create_secrets(char *passphrase, char *filename, uint8_t *myaeskey,
-    uint8_t *myivkey)
+ct_create_secrets(const char *passphrase, const char *filename, 
+    uint8_t *myaeskey, uint8_t *myivkey)
 {
-	char			pwd[PASS_MAX], *p;
+	const char		*p;
+	char			pwd[PASS_MAX];
 	uint8_t			salt[C_SALT_LEN];
 	uint8_t			key[C_PWDKEY_LEN], maskkey[C_PWDKEY_LEN];
 	uint8_t			aeskey[CT_KEY_LEN], ivkey[CT_IV_LEN];
@@ -457,8 +458,9 @@ done:
  * 5. decrypt data key with mask key
  */
 int
-ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
-    size_t outaeskeylen, uint8_t *outivkey, size_t outivkeylen)
+ct_unlock_secrets(const char *passphrase, const char *filename,
+    uint8_t *outaeskey, size_t outaeskeylen, uint8_t *outivkey,
+    size_t outivkeylen)
 {
 	char			old_crypto_secrets[PATH_MAX];
 	uint8_t			salt[C_SALT_LEN];
@@ -473,7 +475,8 @@ ct_unlock_secrets(char *passphrase, char *filename, uint8_t *outaeskey,
 	uint8_t			digest_v[SHA512_DIGEST_LENGTH];
 	uint32_t		rounds = 0, f_version = 0;
 	uint32_t		rounds_load = 0, f_version_load = 0;
-	char			pwd[PASS_MAX], *p;
+	const char		*p;
+	char			pwd[PASS_MAX];
 	char			line[1024], *s;
 	FILE			*f;
 	HMAC_CTX		hctx;
@@ -717,7 +720,7 @@ done:
 }
 
 int
-ct_create_or_unlock_secrets(char *secrets, char *password)
+ct_create_or_unlock_secrets(const char *secrets, const char *password)
 {
 	struct stat	sb;
 
