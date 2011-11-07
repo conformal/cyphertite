@@ -4,6 +4,7 @@
 OSNAME ?= $(shell uname -s)
 OSNAME := $(shell echo $(OSNAME) | tr A-Z a-z)
 -include ../config/Makefile.$(OSNAME)
+-include ../config/Makefile.common
 
 # Default paths.
 DESTDIR ?=
@@ -37,8 +38,6 @@ endif
 # Compiler and linker flags.
 CPPFLAGS += -DNEED_LIBCLENS
 INCFLAGS += -I../ctutil -I$(INCDIR)/clens -I$(LOCALBASE)/ssl/include
-WARNFLAGS ?= -Wall -Werror
-DEBUG += -g
 CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(DEBUG)
 LDFLAGS += -L$(LOCALBASE)/ssl/lib
 LDFLAGS += -L../ctutil/obj -L../ctutil -lctutil -lassl -lclog -levent -lexude

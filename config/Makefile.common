@@ -1,0 +1,3 @@
+WARNFLAGS += -Wall -Werror
+DEBUG += -g
+CFLAGS += -O2
