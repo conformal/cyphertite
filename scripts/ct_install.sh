@@ -107,7 +107,7 @@ ct_build_and_install()
 {
 	# build and install openssl source with ECDSA base system package
         # doesn't have it.
-	pkg="openssl-1.0.0d-with-ec-patch"
+	pkg="openssl-1.0.0e"
 	if ! openssl ciphers | grep ECDSA >/dev/null 2>&1; then
 		cd "$pkg"
 		./config || report_err "config script failed for '$pkg'."
