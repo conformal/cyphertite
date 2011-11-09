@@ -1,6 +1,6 @@
 
 %define name		cyphertite
-%define version		0.4.8
+%define version		0.5.0
 %define release		1
 
 Name: 		%{name}
@@ -49,6 +49,13 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertitectl
 
 %changelog
+* Wed Nov 09 2011 - davec 0.5.0-1
+- Fix certain scenarios where extracting incremental backups
+  could cause files to be restored to the wrong directory
+- Update to use latest version of openssl (1.0.0e)
+- Consolidate configuration and operational files into a single
+  directory by default
+- Other misc code cleanup and improvements
 * Fri Oct 28 2011 - davec 0.4.8-1
 - Add infrastructure for automatic feature negotiation
 - Fix metadata tag list output to allow copy/pasting with special chars
