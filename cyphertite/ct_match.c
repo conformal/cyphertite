@@ -303,11 +303,14 @@ ct_matchlist_fromfile(const char *file)
 	if ((f = fopen(file, "r")) == NULL)
 		CFATAL("can't open match file %s", file);
 
-	/* XXX wish there was a nicer way to count these lines */
-	/* XXX comments? empty lines? */
+	/* XXX:
+	 * Wish there was a nicer way to count these lines.
+	 * Handle comments ?
+	 */
 	while ((line = fparseln(f, &len, NULL, NULL, 0)) != NULL) {
+		if (len != 0)	/* skip emptry lines */
+			n++;
 		free(line);
-		n++;
 	}
 
 	if (n == 0)
@@ -319,6 +322,10 @@ ct_matchlist_fromfile(const char *file)
 	/* do it again actually parsing this time */
 	n = 0;
 	while ((line = fparseln(f, &len, &lineno, NULL, 0)) != NULL) {
+		if (len == 0) {
+			free(line);
+			continue;
+		}
 		flist[n++] = line;
 	}
 
