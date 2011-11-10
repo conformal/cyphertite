@@ -16,6 +16,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef NEED_LIBCLENS
+#include <clens.h>
+#endif
+
 #include <stdint.h>
 #include <string.h>
 #include <sys/types.h>
