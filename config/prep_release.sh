@@ -20,6 +20,7 @@
 #   - Updates all necessary headers and package control files with new version
 #   - Performs some basic validation on specified release notes
 #   - Updates package control files with release notes
+#   - Updates project changes file with release notes
 #
 
 PROJECT=cyphertite
@@ -27,6 +28,7 @@ PROJECT_UC=$(echo $PROJECT | tr '[:lower:]' '[:upper:]')
 SCRIPT=$(basename $0)
 HEADER=../${PROJECT}/ct.h
 VER_PREFIX=CT
+PROJ_CHANGES=../CHANGES
 RPM_SPEC=${PROJECT}.spec
 DEB_CHANGELOG=debian/changelog
 PORT_CATEGORY=security
@@ -45,6 +47,24 @@ cd "$(dirname $0)"
 # verify header exists
 if [ ! -f "$HEADER" ]; then
 	echo "$SCRIPT: error: $HEADER does not exist" 1>&2
+	exit 1
+fi
+
+# verify changes file exists
+if [ ! -f "$PROJ_CHANGES" ]; then
+	echo "$SCRIPT: error: $PROJ_CHANGES does not exist" 1>&2
+	exit 1
+fi
+
+# verify spec file exists
+if [ ! -f "$RPM_SPEC" ]; then
+	echo "$SCRIPT: error: $RPM_SPEC does not exist" 1>&2
+	exit 1
+fi
+
+# verify debian changelog file exists
+if [ ! -f "$DEB_CHANGELOG" ]; then
+	echo "$SCRIPT: error: $DEB_CHANGELOG does not exist" 1>&2
 	exit 1
 fi
 
@@ -102,7 +122,7 @@ if ! type git >/dev/null 2>&1; then
 	exit 1
 fi
 
-# verify the git repository is on the master brnanch
+# verify the git repository is on the master branch
 BRANCH=$(git branch | grep '\*' | cut -c3-)
 if [ "$BRANCH" != "master" ]; then
 	echo "$SCRIPT: error: git repository must be on the master branch."
@@ -141,6 +161,36 @@ elif [ "$RTYPE" = "patch" ]; then
 	PATCH=$(expr $PATCH + 1)
 fi
 PROJ_VER="$MAJOR.$MINOR.$PATCH"
+
+# update project changes with release notes
+DATE=$(date "+%a %b %d %Y")
+awk -v D="$DATE" -v VER="$PROJ_VER" '
+/=======/ && first_line==0 {
+	first_line=1
+	print $0
+	next
+}
+/=======/ && first_line==1 {
+	print $0
+	print ""
+	print "Changes in "VER" ("D")"
+	change_header=1
+	exit
+}
+{ print $0 }
+' <"$PROJ_CHANGES" >"${PROJ_CHANGES}.tmp"
+cat "$RELEASE_NOTES" | sed 's/^/  /' >>"${PROJ_CHANGES}.tmp"
+awk '
+/=======/ && first_line==0 {
+	first_line=1
+	next
+}
+/=======/ && first_line==1 {
+	second_line=1
+	next
+}
+second_line==1 { print $0 }
+' <"$PROJ_CHANGES" >>"${PROJ_CHANGES}.tmp"
 
 # update header with new version
 sed -E "
@@ -190,6 +240,7 @@ sed -E "
 " <"$PORT_MAKEFILE" >"${PORT_MAKEFILE}.tmp"
 
 # Apply changes
+mv "${PROJ_CHANGES}.tmp" "$PROJ_CHANGES"
 mv "${HEADER}.tmp" "$HEADER"
 mv "${RPM_SPEC}.tmp" "$RPM_SPEC"
 mv "${DEB_CHANGELOG}.tmp" "$DEB_CHANGELOG"
