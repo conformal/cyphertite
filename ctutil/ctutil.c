@@ -245,14 +245,14 @@ ct_settings_add(struct ct_settings *settings, char *var, char *val)
 	return (rv);
 }
 
-#define	WS	"\n=\t"
+#define	WS	"\n= \t"
 int
 ct_config_parse(struct ct_settings *settings, const char *filename)
 {
 	FILE			*config;
 	char			*line, *cp, *var, *val;
-	int			 i;
 	size_t			len, lineno = 0;
+	char			*v1, *v2;
 
 	CDBG("filename %s\n", filename);
 
@@ -283,14 +283,11 @@ ct_config_parse(struct ct_settings *settings, const char *filename)
 		if ((val = strsep(&cp, "\0")) == NULL)
 			break;
 
-		/* remove the leading and trailing spaces */
-		while (isspace(*val))
-			val++;
-
-		i = strlen(val) - 1;
-		while (isspace(val[i]))
-			i--;
-		val[++i] = '\0';
+		for (v1 = v2 = val; *v1 != '\0'; v1++) {
+			if (!isspace(*v1))
+				*v2++ = *v1;
+		}
+		*v2 = '\0';
 
 		CDBG("config_parse: %s=%s\n",var ,val);
 		if (ct_settings_add(settings, var, val))
