@@ -427,6 +427,18 @@ FILE				*ct_metadata_create(const char *, int,
 void				ct_metadata_close(FILE *);
 char				*ct_metadata_check_prev(const char *);
 
+struct md_list_file {
+	union {
+		RB_ENTRY(md_list_file)		nxt;
+		SLIST_ENTRY(md_list_file)	lnk;
+	}					mlf_entries;
+#define mlf_next	mlf_entries.nxt
+#define mlf_link	mlf_entries.lnk
+	char					mlf_name[CT_MAX_MD_FILENAME];
+	off_t					mlf_size;
+	time_t					mlf_mtime;
+};
+
 struct dedup_digest {
 	char		dd_digest[SHA_DIGEST_LENGTH];
 	char		dd_digest_crypto[SHA_DIGEST_LENGTH];
