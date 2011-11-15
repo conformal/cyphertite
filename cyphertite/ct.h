@@ -608,8 +608,10 @@ int			ct_prompt_password(char *, char *, size_t, char *,
 
 /* init/cleanup */
 void			ct_init(int, int, int);
+void			ct_init_eventloop(void);
 void			ct_update_secrets(void);
 void			ct_cleanup(void);
+void			ct_cleanup_eventloop(void);
 
 /* XDR parser for cyphertite MD archives */
 struct ct_xdr_state {

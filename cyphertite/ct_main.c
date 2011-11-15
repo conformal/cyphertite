@@ -138,6 +138,12 @@ ct_init(int foreground, int need_secrets, int only_metadata)
 		}
 	}
 
+	ct_init_eventloop();
+}
+
+void
+ct_init_eventloop(void)
+{
 	ctdb_setup(ct_localdb, ct_crypto_secrets != NULL);
 
 	assl_initialize();
@@ -178,13 +184,19 @@ ct_update_secrets(void)
 }
 
 void
+ct_cleanup_eventloop(void)
+{
+	ct_trans_cleanup();
+	ct_flnode_cleanup();
+	ct_ssl_cleanup();
+}
+
+void
 ct_cleanup(void)
 {
 	if (ct_configfile)
 		e_free(&ct_configfile);
-	ct_trans_cleanup();
-	ct_flnode_cleanup();
-	ct_ssl_cleanup();
+	ct_cleanup_eventloop();
 }
 
 int
