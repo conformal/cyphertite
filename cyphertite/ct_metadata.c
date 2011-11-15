@@ -39,6 +39,18 @@
 #include "ct.h"
 #include "ct_crypto.h"
 
+struct md_list_file {
+	union {
+		RB_ENTRY(md_list_file)		nxt;
+		SLIST_ENTRY(md_list_file)	lnk;
+	}					mlf_entries;
+#define mlf_next	mlf_entries.nxt
+#define mlf_link	mlf_entries.lnk
+	char					mlf_name[CT_MAX_MD_FILENAME];
+	off_t					mlf_size;
+	time_t					mlf_mtime;
+};
+
 SLIST_HEAD(md_list, md_list_file);
 RB_HEAD(md_list_tree, md_list_file);
 RB_PROTOTYPE(md_list_tree, md_list_file, next, ct_cmp_md);
