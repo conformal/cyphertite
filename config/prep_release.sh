@@ -31,7 +31,7 @@ VER_PREFIX=CT
 PROJ_CHANGES=../CHANGES
 RPM_SPEC=${PROJECT}.spec
 DEB_CHANGELOG=debian/changelog
-PORT_CATEGORY=security
+PORT_CATEGORY=sysutils
 PORT_NAME=${PROJECT}
 PORT_MAKEFILE=openbsd/${PORT_CATEGORY}/${PORT_NAME}/Makefile
 
@@ -65,6 +65,12 @@ fi
 # verify debian changelog file exists
 if [ ! -f "$DEB_CHANGELOG" ]; then
 	echo "$SCRIPT: error: $DEB_CHANGELOG does not exist" 1>&2
+	exit 1
+fi
+
+# verify openbsd port file exists
+if [ ! -f "$PORT_MAKEFILE" ]; then
+	echo "$SCRIPT: error: $PORT_MAKEFILE does not exist" 1>&2
 	exit 1
 fi
 
@@ -234,9 +240,10 @@ echo "
 " >>"${DEB_CHANGELOG}.tmp"
 cat "${DEB_CHANGELOG}" >>"${DEB_CHANGELOG}.tmp"
 
-#modify OpenBSD package files with new release number
+# modify OpenBSD package files with new release number
+DIST_PAT="(DISTNAME[[:space:]]+=[[:space:]]+${PROJECT}-)[0-9]+\.[0-9]+\.[0-9]+"
 sed -E "
-    s/(DISTNAME=[[:space:]]+${PROJECT}-)[0-9]+\.[0-9]+\.[0-9]+/\1${PROJ_VER}/;
+    s/${DIST_PAT}/\1${PROJ_VER}/;
 " <"$PORT_MAKEFILE" >"${PORT_MAKEFILE}.tmp"
 
 # Apply changes
