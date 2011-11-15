@@ -68,9 +68,6 @@ extern unsigned char		ct_crypto_key[CT_KEY_LEN];
 extern struct ct_settings	settings[];
 
 void			ct_shutdown(void);
-void			ct_unload_config(void);
-
-int			ct_load_config(struct ct_settings *);
 void			ct_process_input(void *);
 void			ct_process_file(void *);
 void			ct_process_md(void *);
@@ -249,6 +246,9 @@ void			ct_ssl_cleanup(void);
 void			ct_queue_transfer(struct ct_trans *);
 
 /* config */
+void			ct_unload_config(void);
+int			ct_load_config(struct ct_settings *);
+
 extern int		ct_max_trans;
 extern int		ct_max_block_size;
 extern int		ct_io_bw_limit;
@@ -261,6 +261,10 @@ extern char		*ct_key;
 extern char		*ct_username;
 extern char		*ct_password;
 extern char		*ct_crypto_secrets;
+extern char		*ct_polltype;
+extern int		 ct_secrets_upload;
+extern int		 ct_auto_differential;
+extern long long	 ct_max_mdcache_size;
 
 /* what are we doing? */
 extern int		ct_action;
