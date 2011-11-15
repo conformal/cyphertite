@@ -56,7 +56,8 @@ void			ct_print_scaled_stat(FILE *, const char *, int64_t,
 			    int64_t, int);
 
 
-void
+
+struct ct_op *
 ct_add_operation(ct_op_cb *start, ct_op_cb *complete, char *localname,
     char *remotename, char **flist, char **exlist, char *basis, int matchmode,
     int action)
@@ -75,9 +76,11 @@ ct_add_operation(ct_op_cb *start, ct_op_cb *complete, char *localname,
 	op->op_action = action;
 
 	TAILQ_INSERT_TAIL(&ct_state->ct_operations, op, op_link);
+
+	return (op);
 }
 
-void
+struct ct_op *
 ct_add_operation_after(struct ct_op *after, ct_op_cb *start, ct_op_cb *complete,
     char *localname, char *remotename, char **flist, char **exlist, char *basis,
     int matchmode, int action)
@@ -96,6 +99,8 @@ ct_add_operation_after(struct ct_op *after, ct_op_cb *start, ct_op_cb *complete,
 	op->op_action = action;
 
 	TAILQ_INSERT_AFTER(&ct_state->ct_operations, after, op, op_link);
+
+	return (op);
 }
 
 void

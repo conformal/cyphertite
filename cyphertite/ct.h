@@ -314,12 +314,16 @@ struct ct_op {
 	void			*op_priv;	/* operation private data */
 };
 
-void	ct_add_operation(ct_op_cb *, ct_op_cb *, char *, char *,
-	    char **, char **, char *, int, int);
-void	ct_add_operation_after(struct ct_op *, ct_op_cb *, ct_op_cb *,
-	    char *, char *, char **, char **, char *, int, int);
-void	ct_nextop(void *);
-int	ct_op_complete(void);
+struct ct_op	*ct_add_operation(ct_op_cb *, ct_op_cb *, char *, char *,
+		    char **, char **, char *, int, int);
+struct ct_op	*ct_add_operation_after(struct ct_op *, ct_op_cb *, ct_op_cb *,
+		    char *, char *, char **, char **, char *, int, int);
+void		 ct_nextop(void *);
+int		 ct_op_complete(void);
+ct_op_cb	 ct_shutdown_op;
+ct_op_cb	 ct_free_mdname;
+ct_op_cb	 ct_free_remotename;
+ct_op_cb	 ct_free_mdname_and_remote;
 
 struct ct_global_state{
 	/* PADs? */
