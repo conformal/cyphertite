@@ -326,6 +326,7 @@ ct_trans_cleanup(void)
 		e_free(&trans);
 		count++;
 	}
+	c_trans_free = ct_numalloc = 0;
 	CDBG("freed %d transactions", count);
 }
 
