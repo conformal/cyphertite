@@ -251,8 +251,8 @@ ct_config_parse(struct ct_settings *settings, const char *filename)
 {
 	FILE			*config;
 	char			*line, *cp, *var, *val;
+	int			i;
 	size_t			len, lineno = 0;
-	char			*v1, *v2;
 
 	CDBG("filename %s\n", filename);
 
@@ -283,11 +283,11 @@ ct_config_parse(struct ct_settings *settings, const char *filename)
 		if ((val = strsep(&cp, "\0")) == NULL)
 			break;
 
-		for (v1 = v2 = val; *v1 != '\0'; v1++) {
-			if (!isspace(*v1))
-				*v2++ = *v1;
-		}
-		*v2 = '\0';
+		/* strip trailing spaces */
+		i = strlen(val) - 1;
+		while (i >= 0 && isspace(val[i]))
+			i--;
+		val[++i] = '\0';
 
 		CDBG("config_parse: %s=%s\n",var ,val);
 		if (ct_settings_add(settings, var, val))
