@@ -232,6 +232,9 @@ char	*ct_remove_ext(char *path);
 /* directory handling */
 int     ct_make_full_path(char *, mode_t);
 
+/* pipe handling */
+int	 ct_set_pipe_nonblock(int);
+
 /* cli parsing */
 struct ct_cli_cmd {
 	char			*cc_cmd;	/* command name */

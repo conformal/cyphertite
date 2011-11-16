@@ -56,7 +56,7 @@ void ct_pipe_sig(int, short, void *);
 void
 ct_setup_wakeup(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb)
 {
-	int i, f;
+	int i;
 	ctx->ctx_varg = vctx;
 	ctx->ctx_fn = func_cb;
 
@@ -64,11 +64,8 @@ ct_setup_wakeup(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb)
 		CFATAL("pipe create failed");
 
 	/* make pipes nonblocking - both sides of pipe */
-	for (i= 0; i < 2; i++) {
-		f = fcntl((ctx->ctx_pipe)[i], F_GETFL);
-		f |= O_NONBLOCK;
-		fcntl((ctx->ctx_pipe)[i], F_SETFL, f);
-	}
+	for (i= 0; i < 2; i++)
+		ct_set_pipe_nonblock((ctx->ctx_pipe)[i]);
 
 	/* master side of pipe - no config */
 	/* client side of pipe */

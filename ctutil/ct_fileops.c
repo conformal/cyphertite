@@ -22,6 +22,7 @@
 #include <pwd.h>
 #include <string.h>
 #include <stdio.h>
+#include <fcntl.h>
 
 #include <clog.h>
 
@@ -123,3 +124,23 @@ ct_remove_ext(char *path)
 	return (ret);
 }
 
+int
+ct_set_pipe_nonblock(int fd)
+{
+	int			val, rv = 1;
+
+	val = fcntl(fd, F_GETFL, 0);
+	if (val < 0)
+		goto done;
+
+	if (val & O_NONBLOCK)
+		return (0);
+
+	val |= O_NONBLOCK;
+	if (fcntl(fd, F_SETFL, val) == -1)
+		goto done;
+
+	rv = 0;
+done:
+	return (rv);
+}
