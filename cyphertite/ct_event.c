@@ -217,10 +217,14 @@ ct_event_init(void)
 	signal_set(&ct_ev_sig_info, SIGINFO, ct_info_sig, NULL);
 	signal_add(&ct_ev_sig_info, NULL);
 #endif
+#if defined(SIGUSR1)
 	signal_set(&ct_ev_sig_usr1, SIGUSR1, ct_info_sig, NULL);
 	signal_add(&ct_ev_sig_usr1, NULL);
+#endif
+#if defined(SIGPIPE)
 	signal_set(&ct_ev_sig_pipe, SIGPIPE, ct_pipe_sig, NULL);
 	signal_add(&ct_ev_sig_pipe, NULL);
+#endif
 
 }
 
