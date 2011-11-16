@@ -90,4 +90,36 @@ ct_make_full_path(char *path, mode_t mode)
 	return (0);
 }
 
+char *
+ct_remove_ext(char *path)
+{
+	char *ret = NULL, *dot = NULL, *sep = NULL;
+
+	if (path == NULL)
+		CFATALX("invalid parameter to ct_remove_ext");
+
+	if ((ret = strdup(path)) == NULL)
+		CFATALX("strdup path in ct_remove_ext");
+
+	dot = strrchr(ret, '.');
+	sep = strrchr(ret, '/');
+
+	/* no extension */
+	if (dot == NULL)
+		return (ret);
+
+	/* extension with no path separators */
+	if (sep == NULL) {
+		*dot = '\0';
+		return (ret);
+	}
+
+	/* extension after last separator */
+	if (dot > sep) {
+		*dot = '\0';
+		return (ret);
+	}
+
+	return (ret);
+}
 

@@ -226,6 +226,9 @@ int		ct_base64_encode(int, uint8_t *, size_t, uint8_t *, size_t);
 /* Metadata */
 #define CT_MAX_MD_FILENAME	(256)
 
+/* filename handling */
+char	*ct_remove_ext(char *path);
+
 /* directory handling */
 int     ct_make_full_path(char *, mode_t);
 

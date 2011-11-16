@@ -460,7 +460,7 @@ out:
 int
 main(int argc, char *argv[])
 {
-	char		*executablepath, *executablename;
+	char		*executablepath, *executablename, *executablestem;
 
 	ct_savecore();
 
@@ -471,15 +471,17 @@ main(int argc, char *argv[])
 
 	executablepath = strdup(argv[0]);
 	executablename = basename(executablepath);
+	executablestem = ct_remove_ext(executablename);
 
-	if (!strcmp(executablename, "ct") ||
-	    !strcmp(executablename, "cyphertite"))
+	if (!strcmp(executablestem, "ct") ||
+	    !strcmp(executablestem, "cyphertite"))
 		return (ct_main(argc, argv));
-	if (!strcmp(executablename, "ctctl") ||
-	    !strcmp(executablename, "cyphertitectl"))
+	if (!strcmp(executablestem, "ctctl") ||
+	    !strcmp(executablestem, "cyphertitectl"))
 		return (ctctl_main(argc, argv));
 	else
 		CFATALX("invalid executable name");
+
 
 	/* NOTREACHED */
 	return (0);
