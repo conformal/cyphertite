@@ -50,31 +50,11 @@ struct ct_assl_io_ctx	*ct_assl_ctx;
 /* next transaction id */
 int			ct_trans_id = 0;
 
-void ct_setup_assl(void);
 struct ct_io_queue	*ct_ioctx_alloc(void);
 void			ct_ioctx_free(struct ct_io_queue *);
 void			ct_print_scaled_stat(FILE *, const char *, int64_t,
 			    int64_t, int);
 
-
-void
-ct_setup_assl(void)
-{
-	/* dont connect to server on list operation */
-	assl_initialize();
-
-	ct_setup_state();
-
-	gettimeofday(&ct_stats->st_time_start, NULL);
-
-	ct_assl_ctx = ct_ssl_connect(0);
-	if (ct_assl_negotiate_poll(ct_assl_ctx))
-		CFATALX("negotiate failed");
-
-	CDBG("assl data: as bits %d, protocol [%s]", ct_assl_ctx->c->as_bits,
-	    ct_assl_ctx->c->as_protocol);
-
-}
 
 void
 ct_add_operation(ct_op_cb *start, ct_op_cb *complete, char *localname,

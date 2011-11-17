@@ -274,7 +274,6 @@ extern int		ct_action;
 #define CT_A_ERASE	(4)
 
 /* assl */
-void ct_setup_assl(void);
 struct ct_assl_io_ctx	*ct_assl_ctx;
 
 struct ct_op;

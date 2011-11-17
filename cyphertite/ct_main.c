@@ -139,8 +139,17 @@ ct_init(int foreground, int need_secrets, int only_metadata)
 
 	ctdb_setup(ct_localdb, ct_crypto_secrets != NULL);
 
+	assl_initialize();
 	ct_event_init();
-	ct_setup_assl();
+	ct_setup_state();
+
+	gettimeofday(&ct_stats->st_time_start, NULL);
+	ct_assl_ctx = ct_ssl_connect(0);
+	if (ct_assl_negotiate_poll(ct_assl_ctx))
+		CFATALX("negotiate failed");
+
+	CDBG("assl data: as bits %d, protocol [%s]", ct_assl_ctx->c->as_bits,
+	    ct_assl_ctx->c->as_protocol);
 
 	ct_setup_wakeup_file(ct_state, ct_nextop);
 	ct_setup_wakeup_sha(ct_state, ct_compute_sha);
