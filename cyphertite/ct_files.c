@@ -665,7 +665,7 @@ ct_traverse(char **paths, char **exclude, int match_mode)
 	struct ct_match		*include_match = NULL, *exclude_match = NULL;
 	char			 clean[PATH_MAX];
 	int			 fts_options;
-	int			 cnt;
+	int			 cnt, ecnt;
 
 	if (ct_includefile)
 		include_match = ct_match_fromfile(ct_includefile, match_mode);
@@ -679,7 +679,7 @@ ct_traverse(char **paths, char **exclude, int match_mode)
 	if (ftsp == NULL)
 		CFATAL("fts_open failed");
 
-	cnt = 0;
+	ecnt = cnt = 0;
 	while ((fe = fts_read(ftsp)) != NULL) {
 		switch (fe->fts_info) {
 		case FTS_D:
@@ -724,6 +724,7 @@ ct_traverse(char **paths, char **exclude, int match_mode)
 		}
 		if (exclude_match && !ct_match(exclude_match, clean)) {
 			CINFO("failing %s: in exclude list", clean);
+			ecnt++;
 			continue;
 		}
 
@@ -736,6 +737,9 @@ ct_traverse(char **paths, char **exclude, int match_mode)
 
 	if (cnt == 0)
 		CFATALX("can't access any of the specified file(s)");
+
+	if (ecnt == cnt)
+		CFATALX("all specified files are excluded");
 
 	if (fe == NULL && errno)
 		CFATAL("fts_read failed");
