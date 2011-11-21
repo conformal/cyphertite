@@ -220,6 +220,8 @@ void		ct_dump_block(uint8_t *p, size_t sz);
 #define CT_B64_INVALID		(0)
 #define CT_B64_ENCODE		(1)
 #define CT_B64_DECODE		(2)
+#define CT_B64_M_ENCODE		(3)
+#define CT_B64_M_DECODE		(4)
 
 int		ct_base64_encode(int, uint8_t *, size_t, uint8_t *, size_t);
 

@@ -109,25 +109,33 @@ ct_base64_encode(int mode, uint8_t *src, size_t src_len, uint8_t *dst,
 	int			rv = -1;
 	BIO			*b64 = NULL, *rwbio = NULL;
 	BUF_MEM			*p;
+	size_t			i;
 
 	if (src == NULL || dst == NULL || src_len < 1 || dst_len < 1) {
 		CWARNX("invalid parameters");
 		return (-1);
 	}
-	if (!(mode != CT_B64_ENCODE || mode != CT_B64_DECODE)) {
+	if (!(mode != CT_B64_ENCODE || mode != CT_B64_DECODE) ||
+	    !(mode != CT_B64_M_ENCODE || mode != CT_B64_M_DECODE)) {
 		CWARNX("invalid mode");
 		return (-1);
 	}
 
 	bzero(dst, dst_len);
 
-	if (mode == CT_B64_ENCODE) {
+	if (mode == CT_B64_ENCODE || mode == CT_B64_M_ENCODE) {
 		rwbio = BIO_new(BIO_s_mem());
 		if (rwbio == NULL) {
 			CWARNX("no rwbio");
 			return (-1);
 		}
 	} else {
+		if (mode == CT_B64_M_DECODE) {
+			for (i = 0; i < src_len; i++) {
+				if (src[i] == '-')
+					src[i] = '/';
+			}
+		}
 		rwbio = BIO_new_mem_buf(src, src_len);
 		if (rwbio == NULL) {
 			CWARNX("no rwbio");
@@ -145,7 +153,7 @@ ct_base64_encode(int mode, uint8_t *src, size_t src_len, uint8_t *dst,
 	BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
 	rwbio = BIO_push(b64, rwbio);
 
-	if (mode == CT_B64_ENCODE) {
+	if (mode == CT_B64_ENCODE || mode == CT_B64_M_ENCODE) {
 		if (BIO_write(rwbio, src, src_len) <= 0) {
 			CWARNX("BIO_write base64 encode");
 			goto done;
@@ -160,6 +168,14 @@ ct_base64_encode(int mode, uint8_t *src, size_t src_len, uint8_t *dst,
 			goto done;
 		}
 		bcopy(p->data, dst, p->length);
+
+		if (mode == CT_B64_M_ENCODE) {
+			for (i = 0; i < p->length; i++) {
+				if (dst[i] == '/')
+					dst[i] = '-';
+			}
+		}
+
 	} else {
 		if (BIO_read(rwbio, dst, dst_len) <= 0) {
 			CWARNX("BIO_read base64 decode");
