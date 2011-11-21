@@ -272,24 +272,24 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
 
 	if (mode == MD_O_WRITE) {
 		xe = xmlsd_create(&xl, "ct_md_open_create");
-		xmlsd_set_attr(xe, "version", CT_MD_OPEN_CREATE_VERSION);
+		xmlsd_set_attr(xe, "version", "V1");
 		xe = xmlsd_add_element(&xl, xe, "file");
 		xmlsd_set_attr(xe, "name", file);
 	} else if (mode == MD_O_APPEND) {
 		xe = xmlsd_create(&xl, "ct_md_open_create");
-		xmlsd_set_attr(xe, "version", "V2"); /* XXX compatibility */
+		xmlsd_set_attr(xe, "version", CT_MD_OPEN_CREATE_VERSION);
 		xe = xmlsd_add_element(&xl, xe, "file");
 		xmlsd_set_attr(xe, "name", file);
 		xmlsd_set_attr_uint32(xe, "chunkno", chunkno);
 	} else if (chunkno) {
 		xe = xmlsd_create(&xl, "ct_md_open_read");
-		xmlsd_set_attr(xe, "version", "V2"); /* XXX compatibility */
+		xmlsd_set_attr(xe, "version", CT_MD_OPEN_READ_VERSION);
 		xe = xmlsd_add_element(&xl, xe, "file");
 		xmlsd_set_attr(xe, "name", file);
 		xmlsd_set_attr_uint32(xe, "chunkno", chunkno);
 	} else {
 		xe = xmlsd_create(&xl, "ct_md_open_read");
-		xmlsd_set_attr(xe, "version", CT_MD_OPEN_READ_VERSION);
+		xmlsd_set_attr(xe, "version", "V1");
 		xe = xmlsd_add_element(&xl, xe, "file");
 		xmlsd_set_attr(xe, "name", file);
 	}
@@ -324,24 +324,24 @@ ct_xml_file_open_polled(struct ct_assl_io_ctx *asslctx,
 
 	if (mode == MD_O_WRITE) {
 		xe = xmlsd_create(&xl, "ct_md_open_create");
-		xmlsd_set_attr(xe, "version", CT_MD_OPEN_CREATE_VERSION);
+		xmlsd_set_attr(xe, "version", "V1");
 		xe = xmlsd_add_element(&xl, xe, "file");
 		xmlsd_set_attr(xe, "name", (char *)file);
 	} else if (mode == MD_O_APPEND) {
 		xe = xmlsd_create(&xl, "ct_md_open_create");
-		xmlsd_set_attr(xe, "version", "V2"); /* XXX compatibility */
+		xmlsd_set_attr(xe, "version", CT_MD_OPEN_CREATE_VERSION);
 		xe = xmlsd_add_element(&xl, xe, "file");
 		xmlsd_set_attr(xe, "name", (char *)file);
 		xmlsd_set_attr_uint32(xe, "chunkno", chunkno);
 	} else if (chunkno) {
 		xe = xmlsd_create(&xl, "ct_md_open_read");
-		xmlsd_set_attr(xe, "version", "V2"); /* XXX compatibility */
+		xmlsd_set_attr(xe, "version", CT_MD_OPEN_READ_VERSION);
 		xe = xmlsd_add_element(&xl, xe, "file");
 		xmlsd_set_attr(xe, "name", (char *)file);
 		xmlsd_set_attr_uint32(xe, "chunkno", chunkno);
 	} else {
 		xe = xmlsd_create(&xl, "ct_md_open_read");
-		xmlsd_set_attr(xe, "version", CT_MD_OPEN_READ_VERSION);
+		xmlsd_set_attr(xe, "version", "V1");
 		xe = xmlsd_add_element(&xl, xe, "file");
 		xmlsd_set_attr(xe, "name", (char *)file);
 	}

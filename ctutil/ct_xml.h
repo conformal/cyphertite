@@ -16,10 +16,10 @@
 
 /* XML transactions for Cyphertite MD. */
 
-#define CT_MD_OPEN_CREATE_VERSION	"V1"
+#define CT_MD_OPEN_CREATE_VERSION	"V2"
 extern struct xmlsd_v_elem xe_ct_md_open_create[];
 
-#define CT_MD_OPEN_READ_VERSION		"V1"
+#define CT_MD_OPEN_READ_VERSION		"V2"
 extern struct xmlsd_v_elem xe_ct_md_open_read[];
 
 #define CT_MD_CLOSE_VERSION		"V1"
