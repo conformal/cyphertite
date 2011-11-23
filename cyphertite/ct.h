@@ -49,7 +49,6 @@ extern struct ct_stat	*ct_stats;
 extern int		ct_no_cross_mounts;
 extern time_t		ct_prev_backup_time;
 extern int		ct_trans_id;
-extern int		md_backup_fd;
 extern int		ct_md_mode;
 extern char		*ct_md_cachedir;
 extern int		ct_max_differentials;

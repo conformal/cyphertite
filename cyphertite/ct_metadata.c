@@ -57,7 +57,7 @@ RB_PROTOTYPE(md_list_tree, md_list_file, next, ct_cmp_md);
 
 struct md_list			ct_md_listfiles =
 				     SLIST_HEAD_INITIALIZER(&ct_md_listfiles);
-int				md_backup_fd = -1;
+FILE				*md_backup_file = NULL;
 int				md_block_no = 0;
 int				md_is_open = 0;
 int				md_open_inflight = 0;
@@ -142,14 +142,14 @@ loop:
 		}
 
 		CDBG("opening md file for archive %s", mfile);
-		md_backup_fd = open(mfile, O_RDONLY);
-		if (md_backup_fd == -1)
+		md_backup_file = fopen(mfile, "rb");
+		if (md_backup_file == NULL)
 			CFATAL("can't open %s for reading", mfile);
 
 		md_offset = 0;
 		md_block_no = 0;
 
-		error = fstat(md_backup_fd, &sb);
+		error = fstat(fileno(md_backup_file), &sb);
 		if (error) {
 			CFATAL("can't stat backup file %s", mfile);
 		} else {
@@ -189,7 +189,7 @@ loop:
 	}
 
 	ct_trans->tr_dataslot = 0;
-	rlen = read(md_backup_fd, ct_trans->tr_data[0], rsz);
+	rlen = fread(ct_trans->tr_data[0], sizeof(char), rsz, md_backup_file);
 
 	CDBG("read %ld", (long) rlen);
 
@@ -233,7 +233,7 @@ loop:
 	if (rsz != rlen || (rlen + md_offset) == md_size) {
 		/* short read, file truncated or EOF */
 		CDBG("DONE");
-		error = fstat(md_backup_fd, &sb);
+		error = fstat(fileno(md_backup_file), &sb);
 		if (error) {
 			CWARNX("file stat error %s %d %s",
 			    mdname, errno, strerror(errno));
@@ -454,9 +454,8 @@ ct_md_extract(struct ct_op *op)
 		}
 
 		/* XXX -chmod when done */
-		if (md_backup_fd == -1) { /* may have been opened for us */
-			if ((md_backup_fd = open(mfile,
-			    O_WRONLY|O_TRUNC|O_CREAT, 0600)) == -1)
+		if (md_backup_file == NULL) { /* may have been opened for us */
+			if ((md_backup_file = fopen(mfile, "wb")) == NULL)
 				CFATALX("unable to open file %s", mfile);
 		}
 		md_block_no = 0;
@@ -516,8 +515,8 @@ ct_complete_metadata(struct ct_trans *trans)
 			slot = trans->tr_dataslot;
 			CDBG("writing packet sz %d",
 			    trans->tr_size[slot]);
-			wlen = write(md_backup_fd, trans->tr_data[slot],
-			    trans->tr_size[slot]);
+			wlen = fwrite(trans->tr_data[slot], sizeof(char),
+			    trans->tr_size[slot], md_backup_file);
 			if (wlen != trans->tr_size[slot])
 				CWARN("unable to write to md file");
 		} else {
@@ -551,9 +550,9 @@ ct_complete_metadata(struct ct_trans *trans)
 		break;
 	case TR_S_XML_CLOSE:
 		CDBG("eof reached, closing file");
-		if (md_backup_fd != -1) {
-			close(md_backup_fd);
-			md_backup_fd = -1;
+		if (md_backup_file != NULL) {
+			fclose(md_backup_file);
+			md_backup_file = NULL;
 		}
 		ct_xml_file_close();
 		break;
@@ -1150,6 +1149,7 @@ ct_check_crypto_secrets_nextop(struct ct_op *op)
 	struct md_list_file	*file = NULL;
 	struct stat		 sb;
 	time_t			 mtime = 0, local_mtime = 0;
+	int			 crypto_fd;
 
 	RB_INIT(&results);
 	ct_md_list_complete(op->op_matchmode, op->op_filelist,
@@ -1203,8 +1203,10 @@ check_local:
 			CFATALX("can't get dirname of secrets file");
 		strlcpy(tmp, dirp, sizeof(tmp));
 		strlcat(tmp, "/.ctcrypto.XXXXXXXX", sizeof(tmp));
-		if ((md_backup_fd = mkstemp(tmp)) == -1)
+		if ((crypto_fd = mkstemp(tmp)) == -1)
 			CFATAL("can't make temporary file");
+		if ((md_backup_file = fdopen(crypto_fd, "w+")) == NULL)
+			CFATAL("can't associate stream with temporary file");
 		CDBG("temp file: %s", tmp);
 		/* stash current name in basis in case we need to fallback */
 		ct_add_operation_after(op, ct_md_extract, ct_secrets_unlock,
