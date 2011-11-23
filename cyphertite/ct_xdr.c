@@ -458,8 +458,6 @@ ct_metadata_open(const char *filename, struct ct_md_gheader *gh)
 	}
 
 	ct_max_block_size = gh->cmg_chunk_size;
-	ct_encrypt_enabled = (gh->cmg_flags & CT_MD_CRYPTO);
-	ct_multilevel_allfiles = (gh->cmg_flags & CT_MD_MLB_ALLFILES);
 	ct_xdr_version = gh->cmg_version;
 
 	return (f);
@@ -524,13 +522,11 @@ ct_basis_setup(const char *basisbackup, char **filelist)
 {
 	struct ct_xdr_state	 xs_ctx;
 	char			 cwd[PATH_MAX], **fptr;
-	int			 alldata, nextlvl, i, rooted = 1, ret;
+	int			 nextlvl, i, rooted = 1, ret;
 
-	alldata = ct_multilevel_allfiles;
 	if (ct_xdr_parse_init(&xs_ctx, basisbackup))
 		CFATALX("unable to open/parse previous backup %s",
 		    basisbackup);
-	ct_multilevel_allfiles = alldata; /* dont whack this flag from client */
 
 	if (ct_max_differentials == 0 ||
 	    xs_ctx.xs_gh.cmg_cur_lvl < ct_max_differentials) {
