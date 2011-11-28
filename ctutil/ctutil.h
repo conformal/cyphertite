@@ -226,7 +226,9 @@ void		ct_dump_block(uint8_t *p, size_t sz);
 int		ct_base64_encode(int, uint8_t *, size_t, uint8_t *, size_t);
 
 /* Metadata */
-#define CT_MAX_MD_FILENAME	(256)
+#define CT_MAX_MD_FILENAME	(256)	/* 255 + terminating NUL */
+#define	CT_MD_TAG_MAXLEN	(129)	/* 128 + terminating NUL */
+#define	CT_MD_TAG_REJECTCHRS	"?!*/\\\'\""
 
 /* filename handling */
 char	*ct_remove_ext(char *path);

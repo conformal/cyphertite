@@ -47,6 +47,8 @@
 The
 .Nm
 command creates, lists, or extracts files using an archive metadata file
+commonly known as a
+.Ar ctfile
 and remotely stored blocks of data, called
 .Dq chunks .
 A
@@ -131,11 +133,14 @@ In all cases except those involving metadata (
 .Fl m
 ), the path to the archive metadata file is required:
 .Bl -tag -width Ds
-.It Fl f Ar metadata
+.It Fl f Ar ctfile 
 Filename where the archive metadata is stored.
 For list and extract commands this is the existing archive metadata file
 to extract from. For create commands it is the archive metadata file to
-create.
+create. There are limitations placed on the
+.Ar ctfile
+in terms of length (128 bytes) and that it may not include certain special
+characters, e.g. ?, *, !, \\, / etc.
 .El
 .Pp
 One of the following flags must be present:

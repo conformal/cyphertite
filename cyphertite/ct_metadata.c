@@ -46,7 +46,7 @@ struct md_list_file {
 	}					mlf_entries;
 #define mlf_next	mlf_entries.nxt
 #define mlf_link	mlf_entries.lnk
-	char					mlf_name[CT_MAX_MD_FILENAME];
+	char					mlf_name[CT_MD_TAG_MAXLEN];
 	off_t					mlf_size;
 	time_t					mlf_mtime;
 };
@@ -95,7 +95,7 @@ ct_md_cook_filename(const char *path)
 {
 	char	*bname, *fname, *pdup;
 
-	fname = e_calloc(1, CT_MAX_MD_FILENAME);
+	fname = e_calloc(1, CT_MD_TAG_MAXLEN);
 
 	pdup = e_strdup(path);
 	bname = basename(pdup);
@@ -104,8 +104,8 @@ ct_md_cook_filename(const char *path)
 	if (bname[0] == '/')
 		CFATALX("invalid metadata filename");
 
-	if (strnvis(fname, bname, CT_MAX_MD_FILENAME, VIS_GLOB |
-	    VIS_WHITE | VIS_SAFE) >= CT_MAX_MD_FILENAME)
+	if (strnvis(fname, bname, CT_MD_TAG_MAXLEN, VIS_GLOB |
+	    VIS_WHITE | VIS_SAFE) >= CT_MD_TAG_MAXLEN)
 		CFATALX("metadata filename too long");
 	e_free(&pdup);
 	return (fname);
@@ -1318,6 +1318,33 @@ ct_md_trigger_delete(struct ct_op *op)
 	}
 }
 
+/*
+ * Verify that the mfile name is kosher.
+ *
+ * Size considerations:
+ * The maximum md file length is CT_MAX_MD_FILENAME (256 bytes) before
+ * encoding (modified base64). We however clamp that to an effective
+ * tag length CT_MD_TAG_MAXLEN for both remote and local modes.
+ *
+ * To help with interoperability, a few special characters are banned,
+ * see CT_MD_TAG_REJECTCHRS.
+ */
+int
+ct_md_verify_mfile(char *mfile)
+{
+	const char	*set = CT_MD_TAG_REJECTCHRS;
+	size_t		 span, mfilelen;
+
+	if (mfile == NULL)
+		return 1;
+
+	mfilelen = strlen(mfile);
+	if (mfilelen >= CT_MD_TAG_MAXLEN)
+		return 1;
+
+	span = strcspn(mfile, set);
+	return !(span == mfilelen);
+}
 
 /*
  * Data structures to hold cull data

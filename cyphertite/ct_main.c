@@ -325,9 +325,14 @@ ct_main(int argc, char **argv)
 			    "to generate one.", __progname);
 	}
 
-	if (ct_mfile == NULL && !(ct_metadata && ct_action == CT_A_LIST)) {
-		CWARNX("ctfile is required");
-		ct_usage();
+	if (!(ct_metadata && ct_action == CT_A_LIST)) {
+		if (ct_mfile == NULL) {
+			CWARNX("ctfile is required");
+			ct_usage();
+		}
+
+		if (ct_md_verify_mfile(ct_mfile))
+			CFATALX("invalid ctfile: %s", ct_mfile);
 	}
 
 	if (level0)
