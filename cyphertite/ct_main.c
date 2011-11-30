@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <err.h>
 #include <errno.h>
+#include <locale.h>
 #include <libgen.h>
 
 #include <assl.h>
@@ -475,6 +476,8 @@ int
 main(int argc, char *argv[])
 {
 	char		*executablepath, *executablename, *executablestem;
+
+	setlocale(LC_ALL, "");
 
 	ct_savecore();
 
