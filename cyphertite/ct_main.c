@@ -194,6 +194,7 @@ ct_cleanup_eventloop(void)
 	ct_trans_cleanup();
 	ct_flnode_cleanup();
 	ct_ssl_cleanup();
+	ctdb_shutdown();
 }
 
 void

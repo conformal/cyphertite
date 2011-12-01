@@ -229,8 +229,6 @@ ctdb_query_db_mode(sqlite3 *db, int crypto, int *genid)
 		goto fail;
 	}
 
-	CINFO("genid from db %d", *genid);
-
 	rv = 1;
 fail:
 	if (sqlite3_finalize(stmt))
@@ -249,7 +247,7 @@ ctdb_reopendb(int genid)
 	int crypto = ctdb_crypt;
 	ctdb_shutdown();
 	unlink(dbfile);
-	db = ctdb_open(dbfile, crypto, &genid);
+	ctdb_db = db = ctdb_open(dbfile, crypto, &genid);
 	e_free(&dbfile);
 	return db;
 }
@@ -330,8 +328,9 @@ ctdb_cleanup(sqlite3 *db)
 
 	sqlite3_close(db);
 
-	if (ctdb_dbfile)
+	if (ctdb_dbfile) {
 		e_free(&ctdb_dbfile);
+	}
 }
 
 int

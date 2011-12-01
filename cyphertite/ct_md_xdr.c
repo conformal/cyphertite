@@ -653,7 +653,12 @@ ct_cull_add_shafile(const char *file)
 next_file:
 	ct_next_filename = NULL;
 
-	e_asprintf(&cachename, "%s%s", ct_md_cachedir, file);
+	/* filename may be absolute, or in cache dir */
+	if (file[0] == '/') {
+		cachename = e_strdup(file);
+	} else {
+		e_asprintf(&cachename, "%s%s", ct_md_cachedir, file);
+	}
 
 	ret = ct_xdr_parse_init(&xs_ctx, cachename);
 	e_free(&cachename);
@@ -663,14 +668,13 @@ next_file:
 		CFATALX("failed to open %s", file);
 
 	if (ct_filename_free) {
-		free(ct_filename_free);
-		ct_filename_free = NULL;
+		e_free(&ct_filename_free);
 	}
 
 	if (xs_ctx.xs_gh.cmg_prevlvl_filename) {
 		CNDBG(CT_LOG_CTFILE, "previous backup file %s\n",
 		    xs_ctx.xs_gh.cmg_prevlvl_filename);
-		ct_next_filename = xs_ctx.xs_gh.cmg_prevlvl_filename;
+		ct_next_filename = e_strdup(xs_ctx.xs_gh.cmg_prevlvl_filename);
 		ct_filename_free = ct_next_filename;
 	}
 

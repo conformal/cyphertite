@@ -61,6 +61,12 @@ struct xmlsd_v_attr		xa_ct_clientdb_newver_attr[] = {
 	{ NULL }
 };
 
+struct xmlsd_v_attr		xa_ct_cull_reply_attr[] = {
+	{ "version" },
+	{ "success" },
+	{ "clientdbgenid" },
+	{ NULL }
+};
 
 struct xmlsd_v_elem             xe_ct_md_open_create[] = {
 	{ "ct_md_open_create","",		ct_cmd_attr },
@@ -121,7 +127,7 @@ struct xmlsd_v_elem             xe_ct_cull_complete[] = {
 };
 
 struct xmlsd_v_elem             xe_ct_cull_complete_reply[] = {
-	{ "ct_cull_complete_reply","",		xa_ct_reply_attr },
+	{ "ct_cull_complete_reply","",		xa_ct_cull_reply_attr },
 	{ NULL,		NULL,			NULL}
 };
 
