@@ -60,7 +60,6 @@ void			ct_print_scaled_stat(FILE *, const char *, int64_t,
 int			ct_validate_xml_negotiate_xml(struct ct_header *,
 			    char *);
 
-
 struct ct_op *
 ct_add_operation(ct_op_cb *start, ct_op_cb *complete, char *localname,
     char *remotename, char **flist, char **exlist, char *basis, int matchmode,
@@ -492,12 +491,15 @@ ct_validate_xml_negotiate_xml(struct ct_header *hdr, char *xml_body)
 done:
 	return rv; /* success */
 }
+<<<<<<< HEAD
 
 void
 ct_shutdown_op(struct ct_op *unused)
 {
 	ct_shutdown();
 }
+=======
+>>>>>>> a354a39... negotiate with server version of localdb, if found out of date, remove
 
 void
 ct_shutdown()

@@ -171,6 +171,7 @@ struct ct_cli_cmd	cmd_cpasswd[] = {
 
 struct ct_cli_cmd	cmd_list[] = {
 	{ "cpasswd", NULL, 1, "<change>", cpasswd },
+	{ "cull", NULL, 0, "", cull },
 	{ NULL, NULL, 0, NULL, NULL }
 };
 
