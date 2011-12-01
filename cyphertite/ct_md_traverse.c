@@ -48,7 +48,7 @@ struct md_list_file {
 	}					mlf_entries;
 #define mlf_next	mlf_entries.nxt
 #define mlf_link	mlf_entries.lnk
-	char					mlf_name[CT_MD_TAG_MAXLEN];
+	char					mlf_name[CT_MAX_MD_FILENAME];
 	off_t					mlf_size;
 	time_t					mlf_mtime;
 };
@@ -91,7 +91,7 @@ ct_md_list_print(struct ct_op *op)
 	struct md_list_file	*file;
 	int64_t			maxsz = 8;
 	ssize_t			ret;
-	char			unvised[CT_MD_TAG_MAXLEN];
+	char			unvised[CT_MAX_MD_FILENAME];
 	int			numlen;
 
 	RB_INIT(&results);
