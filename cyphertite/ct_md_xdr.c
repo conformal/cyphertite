@@ -637,6 +637,7 @@ ct_cull_add_shafile(const char *file)
 {
 	struct ct_xdr_state	xs_ctx;
 	char			*ct_next_filename, *ct_filename_free = NULL;
+	char			*cachename;
 	int			ret;
 
 	CNDBG(CT_LOG_TRANS, "processing [%s]", file);
@@ -652,8 +653,12 @@ ct_cull_add_shafile(const char *file)
 next_file:
 	ct_next_filename = NULL;
 
-	ret = ct_xdr_parse_init(&xs_ctx, file);
+	e_asprintf(&cachename, "%s%s", ct_md_cachedir, file);
+
+	ret = ct_xdr_parse_init(&xs_ctx, cachename);
+	e_free(&cachename);
 	CNDBG(CT_LOG_CTFILE, "opening [%s]", file);
+
 	if (ret)
 		CFATALX("failed to open %s", file);
 
