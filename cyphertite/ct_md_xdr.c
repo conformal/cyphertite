@@ -59,7 +59,11 @@ ct_populate_fnode(struct fnode *fnode, struct ct_md_header *hdr,
 	fnode->fl_atime = hdr->cmh_atime;
 	fnode->fl_type = hdr->cmh_type;
 
-	if (hdr->cmh_parent_dir != -1) {
+	if (hdr->cmh_parent_dir == -2) {
+		/* rooted directory */
+		flistnode.fl_fname = hdr->cmh_filename;
+		e_asprintf(&fnode->fl_sname , "/%s", flistnode.fl_fname);
+	} else if (hdr->cmh_parent_dir != -1) {
 		flistnode.fl_fname = hdr->cmh_filename;
 
 		flistnode.fl_parent_dir = gen_finddir(hdr->cmh_parent_dir);

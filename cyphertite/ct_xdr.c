@@ -332,8 +332,14 @@ ct_write_header(struct fnode *fnode, char *filename, int base)
 			    fnode->fl_parent_dir->d_parent);
 		}
 		hdr.cmh_parent_dir = fnode->fl_parent_dir->d_num;
-	} else
-		hdr.cmh_parent_dir = -1;
+	} else {
+		if (base && filename[0] == '/') {
+			/* this is a rooted directory element */
+			hdr.cmh_parent_dir = -2;
+		} else {
+			hdr.cmh_parent_dir = -1;
+		}
+	}
 	hdr.cmh_beacon = CT_HDR_BEACON;
 	hdr.cmh_uid = fnode->fl_uid;
 	hdr.cmh_gid = fnode->fl_gid;
