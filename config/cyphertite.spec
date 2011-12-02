@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		0.5.0
+%define version		0.6.0
 %define release		1
 
 Name: 		%{name}
@@ -51,6 +51,14 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Fri Dec 02 2011 - davec 0.6.0-1
+- Enable UTF-8 support for file names
+- Add a new file browser utility (cyphertitefb)
+- Implement logic to validate the specified 'ctfile'
+- Fix an issue when all specified files are excluded via the -E option
+- Correct -P behavior
+- Add change log in root directory
+- General code cleanup and improvements
 * Wed Nov 09 2011 - davec 0.5.0-1
 - Fix certain scenarios where extracting incremental backups
   could cause files to be restored to the wrong directory

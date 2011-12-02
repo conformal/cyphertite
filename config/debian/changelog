@@ -1,3 +1,15 @@
+cyphertite (0.6.0-1) unstable; urgency=low
+
+  * Enable UTF-8 support for file names
+  * Add a new file browser utility (cyphertitefb)
+  * Implement logic to validate the specified 'ctfile'
+  * Fix an issue when all specified files are excluded via the -E option
+  * Correct -P behavior
+  * Add change log in root directory
+  * General code cleanup and improvements
+
+ -- Conformal Systems <package-discuss@conformal.com>  Fri, 02 Dec 2011 15:06:27 -0600
+
 cyphertite (0.5.0-1) unstable; urgency=low
 
   * Fix certain scenarios where extracting incremental backups

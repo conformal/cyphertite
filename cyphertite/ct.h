@@ -28,7 +28,7 @@
 #define CT_STRINGIFY(x)		#x
 #define CT_STR(x)		CT_STRINGIFY(x)
 #define CT_VERSION_MAJOR	0
-#define CT_VERSION_MINOR	5
+#define CT_VERSION_MINOR	6
 #define CT_VERSION_PATCH	0
 #define CT_VERSION		CT_STR(CT_VERSION_MAJOR) "." \
 				CT_STR(CT_VERSION_MINOR) "." \

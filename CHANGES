@@ -3,6 +3,15 @@ User visible changes for cyphertite
   A high-security scalable solution for online backups
 ============================================================================
 
+Changes in 0.6.0 (Fri Dec 02 2011)
+  - Enable UTF-8 support for file names
+  - Add a new file browser utility (cyphertitefb)
+  - Implement logic to validate the specified 'ctfile'
+  - Fix an issue when all specified files are excluded via the -E option
+  - Correct -P behavior
+  - Add change log in root directory
+  - General code cleanup and improvements
+
 Changes in 0.5.0 (Wed Nov 09 2011)
   - Fix certain scenarios where extracting incremental backups
     could cause files to be restored to the wrong directory
