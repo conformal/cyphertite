@@ -42,7 +42,7 @@ CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(DEBUG)
 LDFLAGS += -L$(LOCALBASE)/ssl/lib
 LDFLAGS += -L../ctutil/obj -L../ctutil -lctutil -lassl -lclog -levent -lexude
 LDFLAGS += -lshrink -lxmlsd -lexpat -lsqlite3 -llzma -llzo2 -lz -lclens -lbsd
-LDFLAGS += -Wl,-Bstatic -lssl -lcrypto -Wl,-Bdynamic -ldl -ledit -lcurses
+LDFLAGS += -Wl,-Bstatic -lssl -lcrypto -Wl,-Bdynamic -ldl -ledit -lncurses
 
 BIN.NAME = cyphertite
 BIN.LINKS = ct cyphertitectl ctctl cyphertitefb ctfb
