@@ -200,7 +200,7 @@ skip_csha:
 		ct_wakeup_write();
 		break;
 	case TR_S_EX_READ:
-		/* smash trans header with recieved header, flags, sz, op */
+		/* smash trans header with received header, flags, sz, op */
 		if (trans->hdr.c_flags & C_HDR_F_ENCRYPTED) {
 			ct_state->ct_crypt_qlen++;
 			TAILQ_INSERT_TAIL(&ct_state->ct_crypt_queue, trans,
@@ -528,7 +528,7 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 		ct_handle_xml_reply(trans, hdr, vbody);
 		break;
 	default:
-		CFATALX("unexpected message recieved 0x%x",
+		CFATALX("unexpected message received 0x%x",
 		    hdr->c_opcode);
 	}
 }
@@ -1245,7 +1245,7 @@ ct_handle_read_reply(struct ct_trans *trans, struct ct_header *hdr,
 
 	if (ct_debug) {
 		ct_sha1_encode(trans->tr_sha, shat);
-		CDBG("chunk recieved for %s len %u flags %u", shat,
+		CDBG("chunk received for %s len %u flags %u", shat,
 		    hdr->c_size, hdr->c_flags);
 	}
 	trans->tr_size[slot] = trans->hdr.c_size = hdr->c_size;
