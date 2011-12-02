@@ -665,3 +665,16 @@ void	ct_extract_open_next(struct ct_extract_head *, struct ct_xdr_state *);
 int ct_cull_add_shafile(const char *);
 void ct_cull_sha_insert(const uint8_t *);
 void ct_cull_kick(void);
+
+/*
+ * Extract an individual file from md_filename at md_offset, op_localname is
+ * the local filename to save it as
+ */
+struct ct_file_extract_priv {
+	struct ct_xdr_state	 xdr_ctx;
+	struct fnode		*fl_ex_node;
+	const char		*md_filename;
+	off_t			 md_offset;
+	int			 done;
+};
+ct_op_cb	ct_extract_file;

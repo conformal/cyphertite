@@ -500,6 +500,125 @@ skip:
 	}
 }
 
+/*
+ * Extract an individual file that has been passed into the op by op_priv.
+ */
+void
+ct_extract_file(struct ct_op *op)
+{
+	struct ct_file_extract_priv	*ex_priv = op->op_priv;
+	const char			*localfile = op->op_local_fname;
+	struct ct_trans			*trans;
+	int				 ret;
+	char				 shat[SHA_DIGEST_STRING_LENGTH];
+
+	CDBG("entry");
+	if (ct_state->ct_file_state == CT_S_STARTING) {
+		CDBG("starting");
+		/* open file and seek to beginning of file */
+		if (ct_xdr_parse_init_at(&ex_priv->xdr_ctx,
+		    ex_priv->md_filename, ex_priv->md_offset) != 0)
+			CFATALX("can't open metadata file %s",
+			    ex_priv->md_filename);
+		ct_encrypt_enabled =
+		    (ex_priv->xdr_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO);
+		ct_multilevel_allfiles = (ex_priv->xdr_ctx.xs_gh.cmg_flags &
+		    CT_MD_MLB_ALLFILES);
+	} else if (ct_state->ct_file_state == CT_S_FINISHED) {
+		return;
+	}
+
+	ct_set_file_state(CT_S_RUNNING);
+	while (1) {
+		if ((trans = ct_trans_alloc()) == NULL) {
+			CDBG("ran out of transactions, waiting");
+			ct_set_file_state(CT_S_WAITING_TRANS);
+			return;
+		}
+		/* unless start of file this is right */
+		trans->tr_fl_node = ex_priv->fl_ex_node;
+		trans->tr_trans_id = ct_trans_id++;
+
+		if (ex_priv->done) {
+			CDBG("Hit end of md");
+			ct_xdr_parse_close(&ex_priv->xdr_ctx);
+			trans->tr_state = TR_S_DONE;
+			ct_queue_transfer(trans);
+			CDBG("extract finished");
+			ct_set_file_state(CT_S_FINISHED);
+			return;
+		}
+
+		switch ((ret = ct_xdr_parse(&ex_priv->xdr_ctx))) {
+		case XS_RET_FILE:
+			CDBG("opening file");
+			if (ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas == -1) 
+				CFATALX("can't extract file with -1 shas");
+			trans->tr_fl_node = ex_priv->fl_ex_node =
+			    e_calloc(1, sizeof(*trans->tr_fl_node));
+
+			/* Make it local directory, it won't be set up right. */
+			ex_priv->xdr_ctx.xs_hdr.cmh_parent_dir = -1;
+			ct_populate_fnode(trans->tr_fl_node,
+			    &ex_priv->xdr_ctx.xs_hdr,
+			    &ex_priv->xdr_ctx.xs_lnkhdr,
+			    &trans->tr_state);
+
+			/* XXX Check filename matches what we expect */
+			e_free(&trans->tr_fl_node->fl_sname);
+			trans->tr_fl_node->fl_sname = e_strdup(localfile);
+			/* Set name pointer to something else passed in */
+
+			CDBG("file %s numshas %" PRId64,
+			    trans->tr_fl_node->fl_sname,
+			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas);
+			break;
+		case XS_RET_SHA:
+			CDBG("sha!");
+			if (ex_priv->xdr_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO) {
+				/*
+				 * yes csha and sha are reversed, we want
+				 * to download csha, but putting it in sha
+				 * simplifies the code
+				 */
+				bcopy(ex_priv->xdr_ctx.xs_sha, trans->tr_csha,
+				    sizeof(trans->tr_csha));
+				bcopy(ex_priv->xdr_ctx.xs_csha, trans->tr_sha,
+				    sizeof(trans->tr_sha));
+				bcopy(ex_priv->xdr_ctx.xs_iv, trans->tr_iv,
+				    sizeof(trans->tr_iv));
+			} else {
+				bcopy(ex_priv->xdr_ctx.xs_sha, trans->tr_sha,
+				    sizeof(trans->tr_sha));
+			}
+			if (ct_verbose) {
+				ct_sha1_encode(trans->tr_sha, shat);
+				CDBG("extracting sha %s", shat);
+			}
+			trans->tr_state = TR_S_EX_SHA;
+			trans->tr_dataslot = 0;
+			break;
+		case XS_RET_FILE_END:
+			CDBG("file end!");
+			bcopy(ex_priv->xdr_ctx.xs_trl.cmt_sha, trans->tr_sha,
+			    sizeof(trans->tr_sha));
+			trans->tr_state = TR_S_EX_FILE_END;
+			trans->tr_fl_node->fl_size =
+			    ex_priv->xdr_ctx.xs_trl.cmt_orig_size;
+			/* Done now, don't parse further. */
+			ex_priv->done = 1;
+			ct_queue_transfer(trans);
+			return;
+			break;
+		case XS_RET_FAIL:
+			CFATALX("failed to parse metadata file");
+			break;
+		default:
+			CFATALX("%s: invalid state %d", __func__, ret);
+		}
+		ct_queue_transfer(trans);
+	}
+}
 
 /*
  * Cull code.
