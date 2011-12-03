@@ -109,9 +109,11 @@ ct_build_and_install()
         # doesn't have it.
 	pkg="openssl-1.0.0e"
 	if ! openssl ciphers | grep ECDSA >/dev/null 2>&1; then
+		echo "Building ==> $pkg"
 		cd "$pkg"
 		./config || report_err "config script failed for '$pkg'."
 		make || report_err "Make failed for '$pkg'."
+		echo "Installing ==> $pkg"
 		make install || report_err "Install failed for '$pkg'."
 		cd ..
 	fi
@@ -119,10 +121,12 @@ ct_build_and_install()
 	# build and install packages in dependency order
 	CT_PKGS="clens clog assl xmlsd shrink exude cyphertite"
 	for pkg in $CT_PKGS; do
+		echo "Building ==> $pkg"
 		cd "$pkg"
 		make obj || report_err "Unable to make obj directory for '$pkg'."
 		make depend || report_err "Unable to make dependencies for '$pkg'."
 		make || report_err "Make failed for '$pkg'."
+		echo "Installing ==> $pkg"
 		make install || report_err "Install failed for '$pkg'."
 		cd ..
 	done
