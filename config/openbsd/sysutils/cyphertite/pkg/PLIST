@@ -12,7 +12,9 @@ include/cyphertite/ctutil.h
 lib/libctutil.a
 lib/libctutil_p.a
 @man man/man1/ct.1
+@man man/man1/ctfb.1
 @man man/man1/cyphertite.1
+@man man/man1/cyphertitefb.1
 @man man/man5/cyphertite.conf.5
 share/examples/cyphertite/
 @sample ${SYSCONFDIR}/cyphertite/
