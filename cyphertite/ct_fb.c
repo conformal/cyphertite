@@ -354,7 +354,11 @@ ctfb_follow_path(struct ct_fb_state *cfs, const char *path,
 			strlcpy(cwdbuf, newcwd, sizeof(cwdbuf));
 	}
 		
-	strlcpy(pbuf, path, sizeof(pbuf));
+	if (path != NULL) {
+		strlcpy(pbuf, path, sizeof(pbuf));
+	} else {
+		pbuf[0] = '\0';
+	}
 	next = (char *)pbuf;
 	/*
 	 * We walk the whole tree here, could probably be short circuited to
