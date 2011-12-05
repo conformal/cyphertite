@@ -39,6 +39,8 @@
 #include "ct.h"
 #include "ct_fb.h"
 
+int ctfb_quit = 0;
+
 #ifndef nitems
 #define nitems(_a)      (sizeof((_a)) / sizeof((_a)[0]))
 #endif /* !nitems */
@@ -56,6 +58,7 @@ ctfb_cmd	ctfb_lmkdir;
 ctfb_cmd	ctfb_lumask;
 ctfb_cmd	ctfb_lls;
 ctfb_cmd	ctfb_shell;
+ctfb_cmd	ctfb_exit;
 
 /* State function for current location in the version tree. */
 struct ct_fb_state {
@@ -866,6 +869,12 @@ ctfb_shell(int argc, const char **argv)
 
 }
 
+void
+ctfb_exit(int argc, const char **argv)
+{
+	ctfb_quit = 1;
+}
+
 /*
  * main() and assitance functions for the cyphertitefb filebrowser.
  */
@@ -882,6 +891,7 @@ struct ctfb_cmd {
 	char		*args;
 } cmds[] = {
 	{ "cd", ctfb_cd, "r" },
+	{ "exit", ctfb_exit, "" },
 	{ "get", ctfb_get, "vl" },
 	{ "ls", ctfb_ls, "R" },
 	{ "pwd", ctfb_pwd, "" },
@@ -890,6 +900,7 @@ struct ctfb_cmd {
 	{ "lmkdir", ctfb_lmkdir, "l" },
 	{ "lumask", ctfb_lumask, "" },
 	{ "lls", ctfb_lls, "L" },
+	{ "quit", ctfb_exit, "" },
 	{ "!", ctfb_shell, "" },
 };
 
@@ -1012,7 +1023,7 @@ ctfb_main(int argc, char *argv[])
 	el_set(el, EL_SIGNAL, 1);
 	tokenizer = tok_init(NULL);
 
-	for (;;) {
+	while (ctfb_quit == 0) {
 		if ((buf = el_gets(el, &cnt)) == NULL || cnt == 0)
 			break;
 		/* XXX deal with positive returns lines (continuations) */
