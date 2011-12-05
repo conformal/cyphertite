@@ -73,10 +73,10 @@ check_utils()
 
 check_external_libs()
 {
-	EXTERNAL_LIBS="ssl crypto expat z lzo2 lzma sqlite3 event edit ncurses"
+	EXTERNAL_LIBS="expat z lzo2 lzma sqlite3 event edit ncurses"
 
 	# standard lib dirs - override below if needed
-	LIB_DIRS="/usr/lib /usr/local/lib"
+	LIB_DIRS="/usr/lib /usr/lib64 /usr/local/lib /usr/local/lib64"
 
 	# linux flavor
 	if [ "$OS" = "Linux" ]; then
@@ -84,6 +84,7 @@ check_external_libs()
 		LIB_EXTS="a so"
 	# bsd flavor
 	elif echo "$OS" | grep "BSD" >/dev/null 2>&1; then
+		EXTRA_LIBS="ssl crypto"
 		LIB_EXTS="a so.*"
 	fi
 
