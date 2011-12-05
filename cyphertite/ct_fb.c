@@ -78,7 +78,7 @@ struct ct_fb_entry	*ct_add_tree(struct ct_fb_entry *,
 			     struct ct_xdr_state *, struct ct_fb_mdfile *,
 			     off_t);
 struct ct_fb_entry	*ctfb_follow_path(struct ct_fb_state *, const char *,
-			     char[PATH_MAX]);
+			     char *, size_t);
 int			 glob_mdfile(const char *, int,
 			     int (*)(const char *, int), glob_t *, int);
 /* completion code */
@@ -328,7 +328,7 @@ nextfile:
  */
 struct ct_fb_entry *
 ctfb_follow_path(struct ct_fb_state *cfs, const char *path,
-    char newcwd[PATH_MAX])
+    char *newcwd, size_t newcwdsz)
 {
 	struct ct_fb_entry	*cwd;
 	char			*next, *cur, cwdbuf[PATH_MAX], pbuf[PATH_MAX];
@@ -416,7 +416,7 @@ ctfb_follow_path(struct ct_fb_state *cfs, const char *path,
 	}
 
 	if (newcwd != NULL)
-		strlcpy(newcwd, cwdbuf, sizeof(newcwd));
+		strlcpy(newcwd, cwdbuf, newcwdsz);
 
 	return (cwd);
 }
@@ -453,7 +453,7 @@ ctfb_get_version(struct ct_fb_state *state, const char *path, int preferdir,
 	*postfix = '\0'; /* trim off version now we have it parsed out */
 
 search:
-	if ((entry = ctfb_follow_path(ctfb_cfs, path, NULL)) == NULL) {
+	if ((entry = ctfb_follow_path(ctfb_cfs, path, NULL, 0)) == NULL) {
 		if (noversion == 0)
 			*postfix = '.';
 		return (-1);
@@ -497,7 +497,7 @@ ctfb_chdir(struct ct_fb_state *state, const char *path)
 	struct ct_fb_entry *result;
 	
 	if ((result = ctfb_follow_path(state, path,
-	    state->cfs_curpath)) == NULL)
+	    state->cfs_curpath, sizeof(state->cfs_curpath))) == NULL)
 		return (-1);
 	state->cfs_cwd = result;
 
@@ -695,7 +695,7 @@ ctfb_ls(int argc, const char **argv)
 			for (j = 0; g.gl_pathv[j]; j++) {
 				prefix = NULL;
 				if ((entry = ctfb_follow_path(ctfb_cfs,
-				    g.gl_pathv[j], NULL)) == NULL) {
+				    g.gl_pathv[j], NULL, 0)) == NULL) {
 					CWARN("%s: %s", argv[0], argv[i]);
 					continue;
 				}
@@ -1419,7 +1419,7 @@ ctfb_opendir(const char *path)
 
 	CDBG("%s: %s", __func__, path);
 	
-	if ((entry = ctfb_follow_path(ctfb_cfs, path, NULL)) == NULL) {
+	if ((entry = ctfb_follow_path(ctfb_cfs, path, NULL, 0)) == NULL) {
 		CWARNX("%s: %s not found", __func__, path);
 		return (NULL);
 	}
