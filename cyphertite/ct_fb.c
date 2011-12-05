@@ -59,6 +59,7 @@ ctfb_cmd	ctfb_lumask;
 ctfb_cmd	ctfb_lls;
 ctfb_cmd	ctfb_shell;
 ctfb_cmd	ctfb_exit;
+ctfb_cmd	ctfb_help;
 
 /* State function for current location in the version tree. */
 struct ct_fb_state {
@@ -875,6 +876,27 @@ ctfb_exit(int argc, const char **argv)
 	ctfb_quit = 1;
 }
 
+void
+ctfb_help(int argc, const char **argv)
+{
+	printf("Available commands:\n"
+	    "cd path				Change working directory to 'path'\n"
+	    "exit				Quit the program\n"
+	    "get path [localname]		Download file\n"
+	    "help				Display this help text\n"
+	    "ls [path]			Display directory listing\n"
+	    "pwd				Display working directory\n"
+	    "lcd path			Change filesystem working directory\n"
+	    "lpwd				Display filesystem working directory\n"
+	    "lmkdir path			Create filesystem directory\n"
+	    "lumask umask			Set local umask to 'umask'\n"
+	    "lls				Display filesystem directory listing\n"
+	    "quit				Quit the program\n"
+	    "!command			Execute 'command' in local shell\n"
+	    "!				Escape to local shell\n"
+	    "?				Display this help text\n");
+}
+
 /*
  * main() and assitance functions for the cyphertitefb filebrowser.
  */
@@ -893,6 +915,7 @@ struct ctfb_cmd {
 	{ "cd", ctfb_cd, "r" },
 	{ "exit", ctfb_exit, "" },
 	{ "get", ctfb_get, "vl" },
+	{ "help", ctfb_help, "" },
 	{ "ls", ctfb_ls, "R" },
 	{ "pwd", ctfb_pwd, "" },
 	{ "lcd", ctfb_lcd, "l" },
@@ -902,6 +925,7 @@ struct ctfb_cmd {
 	{ "lls", ctfb_lls, "L" },
 	{ "quit", ctfb_exit, "" },
 	{ "!", ctfb_shell, "" },
+	{ "?", ctfb_help, "" },
 };
 
 struct ctfb_cmd *
