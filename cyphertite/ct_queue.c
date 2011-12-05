@@ -151,7 +151,7 @@ skip_sha:	/* metadata skips shas */
 		}
 		/* fallthru if compress not enabled */
 	case TR_S_COMPRESSED:
-		/* try to encrypt trans body, if compression enabled */
+		/* try to encrypt trans body, if encryption enabled */
 		if (ct_encrypt_enabled) {
 			/* XXX - locks */
 			ct_state->ct_crypt_qlen++;
