@@ -592,6 +592,8 @@ char			**ct_matchlist_fromfile(const char *);
 void			 ct_matchlist_free(char **);
 int			 ct_match(struct ct_match *, char *);
 void			 ct_match_unwind(struct ct_match *);
+void			 ct_match_insert_rb(struct ct_match *, char *);
+int			 ct_match_rb_is_empty(struct ct_match *);
 
 void			ct_ssl_init_bw_lim(struct ct_assl_io_ctx *);
 
@@ -669,6 +671,7 @@ void	ct_extract_setup(struct ct_extract_head *, struct ct_xdr_state *,
 void	ct_extract_setup_queue(struct ct_extract_head *, struct ct_xdr_state *,
 	    const char *);
 void	ct_extract_open_next(struct ct_extract_head *, struct ct_xdr_state *);
+void	ct_extract_cleanup_queue(struct ct_extract_head *);
 
 /* cull  */
 int ct_cull_add_shafile(const char *);

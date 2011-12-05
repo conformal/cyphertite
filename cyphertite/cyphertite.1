@@ -23,7 +23,7 @@
 .Nm cyphertite
 .Bk -words
 .Fl ctxV
-.Op Fl 0PRXpr
+.Op Fl 0APRXapr
 .Op Fl B Ar ctfile
 .Op Fl C Ar tmpdir
 .Op Fl D Ar debugstring
@@ -200,6 +200,12 @@ used:
 .It Fl 0
 Generate a level 0 (full) backup. Only applicable to remote metadata archive
 mode.
+.It Fl A
+override the config file directive
+.Em ctfile_differential_allfiles
+and turn that feature off.
+This option will cancel out
+.Fl a .
 .It Fl B Ar ctfile
 Specify the archive to be used as the basis of a differential backup.
 Files with a modification time (mtime) newer than the previous backup
@@ -270,6 +276,12 @@ The option prevents
 .Nm
 from descending into directories that have a different device number
 than the file from which the descent began.
+.It Fl a
+override the config file directive
+.Em ctfile_differential_allfiles
+and turn that feature on.
+This option will cancel out
+.Fl A .
 .It Fl e
 Delete remote metadata from the server.  This option is used in
 conjunction with -m.

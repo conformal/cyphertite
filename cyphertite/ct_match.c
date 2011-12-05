@@ -155,6 +155,30 @@ ct_glob_match(char **g, char *file)
 }
 
 void
+ct_match_insert_rb(struct ct_match *match, char *string)
+{
+	struct ct_match_node	*n;
+
+	if (match->cm_mode != CT_MATCH_RB)
+		CFATALX("match mode %d is not rb", match->cm_mode);
+	n = e_calloc(1, sizeof(struct ct_match_node));
+	n->cmn_string = e_strdup(string);
+	if (RB_INSERT(ct_match_tree, match->cm_rb_head, n)) {
+		/* pattern already exists free it */
+		e_free(&n->cmn_string);
+		e_free(&n);
+	}
+}
+int
+ct_match_rb_is_empty(struct ct_match *match)
+{
+	if (match->cm_mode != CT_MATCH_RB)
+		CFATALX("match mode %d is not rb", match->cm_mode);
+	return (RB_EMPTY(match->cm_rb_head));
+}
+
+
+void
 ct_rb_comp(struct ct_match_tree *head, char **flist)
 {
 	int			i;
@@ -180,12 +204,15 @@ ct_rb_match(struct ct_match_tree *head, char *file)
 	struct ct_match_node	*n, nfind;
 
 	if (RB_EMPTY(head))
-		return (0); /* no pattern means everything matches */
+		return (1); /* no pattern means nothing matches */
 
 	nfind.cmn_string = file;
 	n = RB_FIND(ct_match_tree, head, &nfind);
 	if (n == NULL)
 		return (1);
+	RB_REMOVE(ct_match_tree, head, n);
+	e_free(&n->cmn_string);
+	e_free(&n);
 
 	return (0);
 }
@@ -306,7 +333,7 @@ ct_matchlist_fromfile(const char *file)
 	 * Handle comments ?
 	 */
 	while ((line = fparseln(f, &len, NULL, NULL, 0)) != NULL) {
-		if (len != 0)	/* skip emptry lines */
+		if (len != 0)	/* skip empty lines */
 			n++;
 		free(line);
 	}

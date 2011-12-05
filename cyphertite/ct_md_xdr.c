@@ -350,13 +350,28 @@ ct_extract_open_next(struct ct_extract_head *extract_head,
 	}
 }
 
+void
+ct_extract_cleanup_queue(struct ct_extract_head *extract_head)
+{
+	struct ct_extract_stack *next;
+
+	while ((next = TAILQ_FIRST(extract_head)) != NULL) {
+		TAILQ_REMOVE(extract_head, next, next);
+		e_free(&next->filename);
+		e_free(&next);
+	}
+}
+
 struct ct_extract_priv {
 	struct ct_extract_head	 extract_head;
 	struct ct_xdr_state	 xdr_ctx;
 	struct ct_match		*inc_match;
 	struct ct_match		*ex_match;
+	struct ct_match		*rb_match;
 	struct fnode		*fl_ex_node;
 	int			 doextract;
+	int			 fillrb;
+	int			 haverb;
 };
 
 void
@@ -386,6 +401,13 @@ ct_extract(struct ct_op *op)
 		}
 		ct_extract_setup(&ex_priv->extract_head,
 		    &ex_priv->xdr_ctx, mfile);
+		/* create rb tree head, prepare to start inserting */
+		if (ct_multilevel_allfiles) {
+			char *nothing = NULL;
+			ex_priv->rb_match =
+			    ct_match_compile(CT_MATCH_RB, &nothing);
+			ex_priv->fillrb = 1;
+		}
 	} else if (ct_state->ct_file_state == CT_S_FINISHED) {
 		return;
 	}
@@ -404,11 +426,12 @@ ct_extract(struct ct_op *op)
 
 		switch ((ret = ct_xdr_parse(&ex_priv->xdr_ctx))) {
 		case XS_RET_FILE:
-			/* won't hit this until we start using allfiles */
-			if (ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas == -1) {
-				CINFO("mark file %s as restore from "
-				    "previous backup",
-				    ex_priv->xdr_ctx.xs_hdr.cmh_filename);
+			if (ex_priv->fillrb == 0 &&
+			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas == -1) {
+				if (ct_multilevel_allfiles == 0)
+					CINFO("file %s has negative shas "
+					    "and backup is not allfiles",
+					    ex_priv->xdr_ctx.xs_hdr.cmh_filename);
 				ex_priv->doextract = 0;
 				goto skip; /* skip ze file for now */
 			}
@@ -425,7 +448,20 @@ ct_extract(struct ct_op *op)
 			if (ex_priv->doextract && ex_priv->ex_match != NULL &&
 			    !ct_match(ex_priv->ex_match, fnode->fl_sname))
 				ex_priv->doextract = 0;
+			/*
+			 * If we're on the first md file in an allfiles backup
+			 * put the matches with -1 on the rb tree so we'll
+			 * remember to extract it from older files.
+			 */
+			if (ex_priv->doextract == 1 && ex_priv->fillrb &&
+			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas == -1) {
+				ct_match_insert_rb(ex_priv->rb_match,
+					    fnode->fl_sname);
+				ex_priv->doextract = 0;
+				goto skipfree;
+			}
 			if (ex_priv->doextract == 0) {
+skipfree:
 				ct_free_fnode(fnode);
 skip:
 				fnode = NULL;
@@ -504,7 +540,37 @@ skip:
 		case XS_RET_EOF:
 			CNDBG(CT_LOG_CTFILE, "Hit end of md");
 			ct_xdr_parse_close(&ex_priv->xdr_ctx);
+			/* if rb tree and rb is empty, goto end state */
+			if ((ex_priv->haverb &&
+			    ct_match_rb_is_empty(ex_priv->inc_match)) ||
+			    (ex_priv->fillrb &&
+			    ct_match_rb_is_empty(ex_priv->rb_match))) {
+				/*
+				 * Cleanup extract queue, in case we had files
+				 * left.
+				 */
+				ct_extract_cleanup_queue(
+				    &ex_priv->extract_head);
+				goto we_re_done_here;
+			}
+
 			if (!TAILQ_EMPTY(&ex_priv->extract_head)) {
+				/*
+				 * if allfiles and this was the first pass.
+				 * free the current match lists
+				 * switch to rb tree mode
+				 */
+				if (ex_priv->fillrb) {
+					ct_match_unwind(ex_priv->inc_match);
+					if (ex_priv->ex_match)
+						ct_match_unwind(
+						    ex_priv->ex_match);
+					ex_priv->ex_match = NULL;
+					ex_priv->inc_match = ex_priv->rb_match;
+					ex_priv->rb_match = NULL;
+					ex_priv->haverb = 1;
+					ex_priv->fillrb = 0;
+				}
 				ct_trans_free(trans);
 				/* reinits ex_priv->xdr_ctx */
 				ct_extract_open_next(&ex_priv->extract_head,
@@ -513,6 +579,17 @@ skip:
 				/* poke file into action */
 				ct_wakeup_file();
 			} else {
+				/*
+				 * If rb tree and it is still has entries,
+				 * bitch about it
+				 */
+				/* XXX print out missing files */
+				if ((ex_priv->haverb || ex_priv->fillrb) &&
+				    !ct_match_rb_is_empty(ex_priv->inc_match))
+					CWARNX("out of md files but some "
+					    "files are not found");
+
+we_re_done_here:
 				ct_match_unwind(ex_priv->inc_match);
 				if (ex_priv->ex_match)
 					ct_match_unwind(

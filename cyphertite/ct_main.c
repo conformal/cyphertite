@@ -80,7 +80,7 @@ void
 ct_usage(void)
 {
 	fprintf(stderr,
-	    "usage: %s {-ctxV} [-0PRXadprv] [-B basisctfile] [-C directory] [-D debugstring] [-E excludefile] [-F conffile] [-I includefile] -f <ctfile> [filelist]\n",
+	    "usage: %s {-ctxV} [-0APRXadprv] [-B basisctfile] [-C directory] [-D debugstring] [-E excludefile] [-F conffile] [-I includefile] -f <ctfile> [filelist]\n",
 	    __progname);
 	fprintf(stderr,
 	    "       %s -m {-cetx} [-r] [-C directory] [-D debugstring] [-F conffile] -f <metadata-tag> [pattern]\n",
@@ -272,13 +272,17 @@ ct_main(int argc, char **argv)
 	int		level0 = 0;
 	int		freeincludes = 0;
 	int		need_secrets;
+	int		force_allfiles = -1;
 	char		*configfile = NULL;
 	char		*basisfile = NULL;
 	char		*debugstring = NULL;
 
 	while ((c = getopt(argc, argv,
-	    "B:C:D:E:F:I:PRVXa:cdef:mprtvx0")) != -1) {
+	    "AB:C:D:E:F:I:PRVXacdef:mprtvx0")) != -1) {
 		switch (c) {
+		case 'A':
+			force_allfiles = 0;
+			break;
 		case 'B':
 			basisfile = optarg;
 			break;
@@ -314,7 +318,7 @@ ct_main(int argc, char **argv)
 			ct_no_cross_mounts = 1;
 			break;
 		case 'a':
-			ct_multilevel_allfiles = 1;
+			force_allfiles = 1;
 			break;
 		case 'c':
 			if (ct_action)
@@ -407,6 +411,10 @@ ct_main(int argc, char **argv)
 			    "specify its path or run %s with no parameters "
 			    "to generate one.", __progname);
 	}
+
+	/* ct -A or ct -a force allfiles on and off and cancel each other */
+	if (force_allfiles != -1)
+		ct_multilevel_allfiles = force_allfiles;
 
 	if (!(ct_metadata && ct_action == CT_A_LIST)) {
 		if (ct_mfile == NULL) {
