@@ -390,7 +390,7 @@ ctfb_follow_path(struct ct_fb_state *cfs, const char *path,
 
 			/* update our buffer */
 			if ((end = strrchr(cwdbuf, '/')) == NULL)
-				CFATALX("cfs_curpath is corrupted: %s", cwdbuf);
+				end = cwdbuf; /* first directory */
 			*(end) = '\0'; /* Amend curpath */
 		} else if (strcmp(cur, ".") == 0) {
 			CDBG(".: doing nothing");
