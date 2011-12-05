@@ -1351,6 +1351,10 @@ ct_md_verify_mfile(char *mfile)
 	if (mfile == NULL)
 		return 1;
 
+	/* No processing for local mode. */
+	if (ct_md_mode == CT_MDMODE_LOCAL)
+		return 0;
+
 	mfilelen = strlen(mfile);
 	if (ct_action != CT_A_ERASE && mfilelen >= CT_MD_TAG_MAXLEN)
 		return 1;
