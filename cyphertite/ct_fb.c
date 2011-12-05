@@ -955,7 +955,6 @@ ctfb_main(int argc, char *argv[])
 			ct_mfile = optarg;
 			break;
 		default:
-			CWARNX("must specify action");
 			ctfb_usage();
 			/* NOTREACHED */
 			break;
@@ -965,7 +964,7 @@ ctfb_main(int argc, char *argv[])
 	argv += optind;
 
 	if (ct_mfile == NULL)
-		CFATALX("no file specified");
+		ctfb_usage();
 
 	/* please don't delete this line AGAIN! --mp */
 	if (clog_set_flags(cflags))
