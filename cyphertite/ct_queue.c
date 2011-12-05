@@ -899,6 +899,7 @@ ct_complete_normal(struct ct_trans *trans)
 		if (trans->tr_eof == 1 || fnode->fl_skip_file) {
 			ct_write_md_eof(trans);
 			ct_stats->st_files_completed++;
+			release_fnode = 1;
 		}
 		break;
 	case TR_S_WMD_READY:
