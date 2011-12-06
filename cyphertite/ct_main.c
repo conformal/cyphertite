@@ -413,7 +413,7 @@ ct_main(int argc, char **argv)
 			ct_usage();
 		}
 
-		if (ct_md_verify_mfile(ct_mfile))
+		if (ct_md_verify_ctfile(ct_mfile))
 			CFATALX("invalid ctfile: %s", ct_mfile);
 	}
 

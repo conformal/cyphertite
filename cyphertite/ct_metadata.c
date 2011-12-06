@@ -25,7 +25,6 @@
 #include <fcntl.h>
 #include <fnmatch.h>
 #include <regex.h>
-#include <vis.h>
 #include <errno.h>
 
 #include <assl.h>
@@ -46,7 +45,7 @@ struct md_list_file {
 	}					mlf_entries;
 #define mlf_next	mlf_entries.nxt
 #define mlf_link	mlf_entries.lnk
-	char					mlf_name[CT_MAX_MD_FILENAME];
+	char					mlf_name[CT_CTFILE_MAXLEN];
 	off_t					mlf_size;
 	time_t					mlf_mtime;
 	int					mlf_keep;
@@ -96,22 +95,15 @@ struct xmlsd_v_elements ct_xml_cmds[] = {
 char *
 ct_md_cook_filename(const char *path)
 {
-	char	*bname, *fname, *pdup;
+	char	*bname;
 
-	fname = e_calloc(1, CT_MAX_MD_FILENAME);
-
-	pdup = e_strdup(path);
-	bname = basename(pdup);
+	bname = basename((char *)path);
 	if (bname == NULL)
 		CFATAL("can't basename metadata path");
 	if (bname[0] == '/')
 		CFATALX("invalid metadata filename");
 
-	if (strnvis(fname, bname, CT_MAX_MD_FILENAME, VIS_GLOB |
-	    VIS_WHITE | VIS_SAFE) >= CT_MAX_MD_FILENAME)
-		CFATALX("metadata filename too long");
-	e_free(&pdup);
-	return (fname);
+	return (e_strdup(bname));
 }
 
 struct fnode	md_node;
@@ -267,6 +259,7 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
 {
 	struct xmlsd_element_list	 xl;
 	struct xmlsd_element		*xe;
+	char				 b64[CT_MAX_MD_FILENAME];
 	size_t				 sz;
 
 	trans->tr_trans_id = ct_trans_id++;
@@ -274,28 +267,23 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
 
 	CNDBG(CT_LOG_XML, "setting up XML");
 
-	if (mode == MD_O_WRITE) {
-		xe = xmlsd_create(&xl, "ct_md_open_create");
-		xmlsd_set_attr(xe, "version", "V1");
-		xe = xmlsd_add_element(&xl, xe, "file");
-		xmlsd_set_attr(xe, "name", file);
-	} else if (mode == MD_O_APPEND) {
+	if (ct_base64_encode(CT_B64_M_ENCODE, (uint8_t *)file, strlen(file),
+	    (uint8_t *)b64, sizeof(b64)))
+		CFATALX("cant base64 encode %s", file);
+
+	if (mode == MD_O_WRITE || mode == MD_O_APPEND) {
 		xe = xmlsd_create(&xl, "ct_md_open_create");
 		xmlsd_set_attr(xe, "version", CT_MD_OPEN_CREATE_VERSION);
-		xe = xmlsd_add_element(&xl, xe, "file");
-		xmlsd_set_attr(xe, "name", file);
-		xmlsd_set_attr_uint32(xe, "chunkno", chunkno);
-	} else if (chunkno) {
+	} else {	/* mode == MD_O_READ */
 		xe = xmlsd_create(&xl, "ct_md_open_read");
 		xmlsd_set_attr(xe, "version", CT_MD_OPEN_READ_VERSION);
-		xe = xmlsd_add_element(&xl, xe, "file");
-		xmlsd_set_attr(xe, "name", file);
+	}
+
+	xe = xmlsd_add_element(&xl, xe, "file");
+	xmlsd_set_attr(xe, "name", b64);
+
+	if (mode == MD_O_APPEND || chunkno) {
 		xmlsd_set_attr_uint32(xe, "chunkno", chunkno);
-	} else {
-		xe = xmlsd_create(&xl, "ct_md_open_read");
-		xmlsd_set_attr(xe, "version", "V1");
-		xe = xmlsd_add_element(&xl, xe, "file");
-		xmlsd_set_attr(xe, "name", file);
 	}
 
 	if ((trans->tr_data[2] = (uint8_t *)xmlsd_generate(&xl,
@@ -321,33 +309,29 @@ ct_xml_file_open_polled(struct ct_assl_io_ctx *asslctx,
 	struct xmlsd_element_list xl;
 	struct xmlsd_element	*xe;
 	char			*body = NULL;
+	char			 b64[CT_MAX_MD_FILENAME];
 	size_t			 sz;
 	int			 rv = 1;
 
 	CNDBG(CT_LOG_XML, "setting up XML");
 
-	if (mode == MD_O_WRITE) {
-		xe = xmlsd_create(&xl, "ct_md_open_create");
-		xmlsd_set_attr(xe, "version", "V1");
-		xe = xmlsd_add_element(&xl, xe, "file");
-		xmlsd_set_attr(xe, "name", (char *)file);
-	} else if (mode == MD_O_APPEND) {
+	if (ct_base64_encode(CT_B64_M_ENCODE, (uint8_t *)file, strlen(file),
+	    (uint8_t *)b64, sizeof(b64)))
+		CFATALX("cant base64 encode %s", file);
+
+	if (mode == MD_O_WRITE || mode == MD_O_APPEND) {
 		xe = xmlsd_create(&xl, "ct_md_open_create");
 		xmlsd_set_attr(xe, "version", CT_MD_OPEN_CREATE_VERSION);
-		xe = xmlsd_add_element(&xl, xe, "file");
-		xmlsd_set_attr(xe, "name", (char *)file);
-		xmlsd_set_attr_uint32(xe, "chunkno", chunkno);
-	} else if (chunkno) {
+	} else {	/* mode == MD_O_READ */
 		xe = xmlsd_create(&xl, "ct_md_open_read");
 		xmlsd_set_attr(xe, "version", CT_MD_OPEN_READ_VERSION);
-		xe = xmlsd_add_element(&xl, xe, "file");
-		xmlsd_set_attr(xe, "name", (char *)file);
+	}
+
+	xe = xmlsd_add_element(&xl, xe, "file");
+	xmlsd_set_attr(xe, "name", b64);
+
+	if (mode == MD_O_APPEND || chunkno) {
 		xmlsd_set_attr_uint32(xe, "chunkno", chunkno);
-	} else {
-		xe = xmlsd_create(&xl, "ct_md_open_read");
-		xmlsd_set_attr(xe, "version", "V1");
-		xe = xmlsd_add_element(&xl, xe, "file");
-		xmlsd_set_attr(xe, "name", (char *)file);
 	}
 
 	body = xmlsd_generate(&xl, malloc, &sz, 1);
@@ -642,15 +626,21 @@ ct_md_delete(struct ct_op *op)
 	struct xmlsd_element		*xe;
 	const char			*md = op->op_remote_fname;
 	struct ct_trans			*trans;
+	char				 b64[CT_MAX_MD_FILENAME * 2];
 	size_t				 sz;
 
 	md = ct_md_cook_filename(md);
 
+	if (ct_base64_encode(CT_B64_M_ENCODE, (uint8_t *)md, strlen(md),
+	    (uint8_t *)b64, sizeof(b64)))
+		CFATALX("cant base64 encode %s", md);
+
 	xe = xmlsd_create(&xl, "ct_md_delete");
 	xmlsd_set_attr(xe, "version", CT_MD_DELETE_VERSION);
 	xe = xmlsd_add_element(&xl, xe, "file");
-	xmlsd_set_attr(xe, "name", (char *)md);
-CINFO("deleting file [%s]", md);
+	xmlsd_set_attr(xe, "name", b64);
+
+	CINFO("deleting file [%s]", md);
 
 	e_free(&md);
 
@@ -677,6 +667,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 	struct xmlsd_element *xe;
 	char *body = vbody;
 	char *filename;
+	char b64[CT_MAX_MD_FILENAME * 2];
 	int r;
 
 	CNDBG(CT_LOG_XML, "xml [%s]", (char *)vbody);
@@ -739,8 +730,15 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 					e_free(&file);
 					continue;
 				}
-				strlcpy(file->mlf_name, tmp,
-				    sizeof(file->mlf_name));
+
+				if (ct_base64_encode(CT_B64_M_DECODE,
+				    (uint8_t *)tmp, strlen(tmp),
+				    (uint8_t *)file->mlf_name,
+				    sizeof(file->mlf_name))) {
+					    e_free(&file);
+					    continue;
+				}
+
 				tmp = xmlsd_get_attr(xe, "size");
 				file->mlf_size = strtonum(tmp, 0, LLONG_MAX,
 				    &errstr);
@@ -765,8 +763,15 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 				if (filename == NULL || filename[0] == '\0')
 					printf("specified archive does not "
 					    "exist [%s]\n", filename);
-				else
-					printf("%s deleted\n", filename);
+				else {
+					if (ct_base64_encode(CT_B64_M_DECODE,
+					    (uint8_t *)filename, strlen(filename),
+					    (uint8_t *)b64, sizeof(b64))) {
+						CFATALX("cant base64 encode %s",
+						    filename);
+					}
+					printf("%s deleted\n", b64);
+				}
 			}
 		}
 		trans->tr_state = TR_S_DONE;
@@ -1357,41 +1362,39 @@ ct_md_trigger_delete(struct ct_op *op)
 }
 
 /*
- * Verify that the mfile name is kosher.
- *
- * Size considerations:
- * The maximum md file length is CT_MAX_MD_FILENAME (256 bytes) before
- * encoding (modified base64). We however clamp that to an effective
- * tag length CT_MD_TAG_MAXLEN for both remote and local modes.
- *
- * To help with interoperability, a few special characters are banned,
- * see CT_MD_TAG_REJECTCHRS.
- *
- * Remote metadata remove (CT_A_ERASE) requires that the user specify
- * the full name of the metadata file which means we must accept an mfile
- * longer then CT_MD_TAG_MAXLEN in that case.
+ * Verify that the ctfile name is kosher.
+ * - Encode the name (with a fake prefix) to make sure it fits.
+ * - To help with interoperability, scan for a few special characters
+ *   and punt if we find those.
  */
 int
-ct_md_verify_mfile(char *mfile)
+ct_md_verify_ctfile(char *ctfile)
 {
-	const char	*set = CT_MD_TAG_REJECTCHRS;
-	size_t		 span, mfilelen;
+	const char	*set = CT_CTFILE_REJECTCHRS;
+	char		 b[CT_CTFILE_MAXLEN], b64[CT_CTFILE_MAXLEN];
+	size_t		 span, ctfilelen;
+	int		 sz;
 
-	if (mfile == NULL)
+	if (ctfile == NULL)
 		return 1;
 
 	/* No processing for local mode. */
 	if (ct_md_mode == CT_MDMODE_LOCAL)
 		return 0;
 
-	mfilelen = strlen(mfile);
-	if (ct_action != CT_A_ERASE && mfilelen >= CT_MD_TAG_MAXLEN)
-		return 1;
-	else if (mfilelen >= CT_MAX_MD_FILENAME)
+	sz = snprintf(b, sizeof(b), "YYYYMMDD-HHMMSS-%s", ctfile);
+	if (sz == -1 || sz >= sizeof(b))
 		return 1;
 
-	span = strcspn(mfile, set);
-	return !(span == mfilelen);
+	/* Make sure it fits. */
+	sz = ct_base64_encode(CT_B64_M_ENCODE, (uint8_t *)b, strlen(b),
+	    (uint8_t *)b64, sizeof(b64));
+	if (sz != 0)
+		return 1;
+
+	ctfilelen = strlen(ctfile);
+	span = strcspn(ctfile, set);
+	return !(span == ctfilelen);
 }
 
 /*
