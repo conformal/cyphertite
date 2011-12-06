@@ -1270,13 +1270,7 @@ ct_compute_compress(void *vctx)
 	int			len;
 	int			ncompmode;
 
-	/* #define LOW_PRI_COMPUTE */
-	#ifdef LOW_PRI_COMPUTE
-	if  (!TAILQ_EMPTY(&ct_state->ct_comp_queue))
-	#else
-	while (!TAILQ_EMPTY(&ct_state->ct_comp_queue))
-	#endif
-	{
+	while (!TAILQ_EMPTY(&ct_state->ct_comp_queue)) {
 		trans = TAILQ_FIRST(&ct_state->ct_comp_queue);
 		TAILQ_REMOVE(&ct_state->ct_comp_queue, trans, tr_next);
 		ct_state->ct_comp_qlen--;
@@ -1360,15 +1354,6 @@ ct_compute_compress(void *vctx)
 			trans->tr_state = TR_S_EX_UNCOMPRESSED;
 		ct_queue_transfer(trans);
 	}
-	#ifdef LOW_PRI_COMPUTE
-	if  (!TAILQ_EMPTY(&ct_state->ct_comp_queue)) {
-		/*
-		 * we are leaving something in the queue make certain
-		 * it doesnt get lost by sending another wakeup
-		 */
-		ct_wakeup_compress();
-	}
-	#endif
 }
 
 void
@@ -1385,12 +1370,7 @@ ct_compute_encrypt(void *vctx)
 	int			encr;
 	int			len;
 
-	#ifdef LOW_PRI_COMPUTE
-	if (!TAILQ_EMPTY(&ct_state->ct_crypt_queue))
-	#else
-	while (!TAILQ_EMPTY(&ct_state->ct_crypt_queue))
-	#endif
-	{
+	while (!TAILQ_EMPTY(&ct_state->ct_crypt_queue)) {
 		trans = TAILQ_FIRST(&ct_state->ct_crypt_queue);
 		TAILQ_REMOVE(&ct_state->ct_crypt_queue, trans, tr_next);
 		ct_state->ct_crypt_qlen--;
@@ -1461,15 +1441,6 @@ ct_compute_encrypt(void *vctx)
 			trans->tr_state = TR_S_EX_DECRYPTED;
 		ct_queue_transfer(trans);
 	}
-	#ifdef LOW_PRI_COMPUTE
-	if (!TAILQ_EMPTY(&ct_state->ct_crypt_queue)) {
-		/*
-		 * we are leaving something in the queue make certain
-		 * it doesnt get lost by sending another wakeup
-		 */
-		ct_wakeup_encrypt();
-	}
-	#endif
 }
 
 void
