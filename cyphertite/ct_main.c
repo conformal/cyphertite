@@ -509,8 +509,8 @@ main(int argc, char *argv[])
 	if (!strcmp(executablestem, "ctctl") ||
 	    !strcmp(executablestem, "cyphertitectl"))
 		return (ctctl_main(argc, argv));
-	if (!strcmp(executablename, "ctfb") ||
-	    !strcmp(executablename, "cyphertitefb"))
+	if (!strcmp(executablestem, "ctfb") ||
+	    !strcmp(executablestem, "cyphertitefb"))
 		return (ctfb_main(argc, argv));
 	else
 		CFATALX("invalid executable name");
