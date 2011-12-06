@@ -491,15 +491,12 @@ ct_validate_xml_negotiate_xml(struct ct_header *hdr, char *xml_body)
 done:
 	return rv; /* success */
 }
-<<<<<<< HEAD
 
 void
 ct_shutdown_op(struct ct_op *unused)
 {
 	ct_shutdown();
 }
-=======
->>>>>>> a354a39... negotiate with server version of localdb, if found out of date, remove
 
 void
 ct_shutdown()

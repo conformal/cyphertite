@@ -1631,10 +1631,8 @@ ct_fetch_all_md_parse(struct ct_op *op)
 			ct_add_operation_after(op, ct_md_extract,
 			    ct_free_mdname_and_remote, cachename,
 			    e_strdup(file->mlf_name), NULL, NULL, NULL, 0, 0);
-	CINFO("downloading %s", file->mlf_name);
 			SLIST_INSERT_HEAD(&ct_cull_all_mds, file, mlf_link);
 		} else {
-	CINFO("already got %s", file->mlf_name);
 			CDBG("already got %s", file->mlf_name);
 			SLIST_INSERT_HEAD(&ct_cull_all_mds, file, mlf_link);
 		}
@@ -1645,9 +1643,24 @@ void
 ct_cull_collect_md_files(struct ct_op *op)
 {
 	struct md_list_file *file;
+	int timelen;
+	char	 buf[TIMEDATA_LEN];
+	time_t	 now;
+
 	CINFO("collect_md_files\n");
 
+	now = time(NULL);
+	now -= (24 * 60 * 2); /* hack hack, 2 days */
+	if (strftime(buf, TIMEDATA_LEN, "%Y%m%d-%H%M%S",
+	    localtime(&now)) == 0)
+		CFATALX("can't format time");
+
+	timelen = strlen(buf);
+
 	while ((file = SLIST_FIRST(&ct_cull_all_mds)) != NULL) {
+		if (strncmp (file->mlf_name, buf, timelen) < 0) {
+			CINFO("file is old %s\n", file->mlf_name);
+		}
 		ct_cull_add_shafile(file->mlf_name);
 		SLIST_REMOVE_HEAD(&ct_cull_all_mds, mlf_link);
 		e_free(&file);
