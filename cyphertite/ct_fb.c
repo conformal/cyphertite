@@ -882,7 +882,7 @@ ctfb_readdir_versions(void *arg)
 
 		if (strftime(buf + sz , sizeof(buf) - sz, ".%Y%m%d%H%M%S",
 		    localtime(&mtime)) == 0) {
-			CWARNX("can't format time %lld", (long long)mtime);
+			CWARNX("can't format time %" PRId64, (long long)mtime);
 			return (NULL);
 		}
 		CDBG("%s: %s", __func__, buf);
