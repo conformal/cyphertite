@@ -721,15 +721,20 @@ ctfb_lpwd(int argc, const char **argv)
 void
 ctfb_lmkdir(int argc, const char **argv)
 {
+	char *path;
 	if (argc != 2) {
 		CWARNX("%s: path", argv[0]);
 		return;
 	}
 
-	if (mkdir(argv[1], 0777) != 0) {
+	e_asprintf(&path, "%s/", argv[1]);
+
+	if (ct_make_full_path(path, 0777) != 0) {
 		CWARN("%s: couldn't make local directory \"%s\"",
 		    argv[0], argv[1]);
 	}
+
+	e_free(&path);
 }
 
 void
