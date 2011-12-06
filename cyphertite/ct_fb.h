@@ -1,3 +1,5 @@
+#include <glob.h>
+
 /*
  * XXX ownership, times and mode can change in each differential,
  * perhaps needa a split
@@ -56,5 +58,23 @@ struct ct_fb_link {
 	int			 cfb_hardlink;	/* boolean */
 };
 
+/* State function for current location in the version tree. */
+struct ct_fb_state {
+	struct ct_fb_entry	 cfs_tree;
+	struct ct_fb_entry	*cfs_cwd;
+	char			 cfs_curpath[PATH_MAX];
+};
+
 int		ctfb_main(int, char *[]);
 void		ct_fb_print_entry(char *, struct ct_fb_key *, int);
+int		ctfb_lstat(const char *path, struct stat *sb);
+
+typedef void    (ctfb_cmd)(int, const char **);
+__dead void	ctfb_usage(void);
+void		ct_build_tree(const char *, struct ct_fb_entry *);
+int		glob_mdfile(const char *, int, int (*)(const char *, int),
+		    glob_t *, int);
+void		 complete_display(char **, u_int);
+char		*complete_ambiguous(const char *, char **, size_t);
+int		 ctfb_get_version(struct ct_fb_state *, const char *,
+		     int, struct ct_fb_entry **, struct ct_fb_key **);
