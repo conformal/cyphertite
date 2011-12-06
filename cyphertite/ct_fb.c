@@ -38,10 +38,6 @@
 
 int ctfb_quit = 0;
 
-#ifndef nitems
-#define nitems(_a)      (sizeof((_a)) / sizeof((_a)[0]))
-#endif /* !nitems */
-
 /* Subclass of dnode for faster lookup. */
 struct ct_fb_dnode {
 	struct dnode		 dnode;

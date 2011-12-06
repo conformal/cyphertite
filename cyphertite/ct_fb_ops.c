@@ -39,6 +39,10 @@
 #include "ct.h"
 #include "ct_fb.h"
 
+#ifndef nitems
+#define nitems(_a)      (sizeof((_a)) / sizeof((_a)[0]))
+#endif /* !nitems */
+
 /* completion code */
 unsigned char		 complete(EditLine *el, int cb);
 unsigned char		 complete_file(EditLine *, const char *, int,
