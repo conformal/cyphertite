@@ -187,14 +187,12 @@ ctctl_main(int argc, char *argv[])
 {
 	int			c;
 	struct ct_cli_cmd	*cc = NULL;
+	uint64_t		debug_mask = 0;
 
 	while ((c = getopt(argc, argv, "dF:")) != -1) {
 		switch (c) {
 		case 'd':
-			ct_debug = 1;
-			cflags |= CLOG_F_DBGENABLE | CLOG_F_FILE | CLOG_F_FUNC |
-			    CLOG_F_LINE | CLOG_F_DTIME;
-			exude_enable();
+			ct_debug++;
 			break;
 		case 'F':
 			ct_configfile = optarg;
@@ -209,9 +207,18 @@ ctctl_main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	if (ct_debug) {
+		cflags |= CLOG_F_DBGENABLE | CLOG_F_FILE | CLOG_F_FUNC |
+		    CLOG_F_LINE | CLOG_F_DTIME;
+		exude_enable(CT_LOG_EXUDE);
+		if (ct_debug > 1)
+			debug_mask |= CT_LOG_EXUDE;
+	}
+
 	/* please don't delete this line AGAIN! --mp */
 	if (clog_set_flags(cflags))
 		errx(1, "illegal clog flags");
+	clog_set_mask(debug_mask);
 
 	/* load config */
 	if (ct_load_config(settings))
@@ -235,8 +242,6 @@ cull(struct ct_cli_cmd *c, int argc, char **argv)
 	char			pwd[PASS_MAX];
 	int			need_secrets;
 	int			i, ret;
-
-	exude_enable();
 
 	/* XXX */
 

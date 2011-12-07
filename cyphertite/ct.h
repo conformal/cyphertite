@@ -679,3 +679,6 @@ struct ct_file_extract_priv {
 	int			 done;
 };
 ct_op_cb	ct_extract_file;
+
+/* log levels */
+#define	CT_LOG_EXUDE	(0x1)

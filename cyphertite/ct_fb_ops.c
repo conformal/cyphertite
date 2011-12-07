@@ -263,16 +263,14 @@ ctfb_main(int argc, char *argv[])
 	History			*hist;
 	HistEvent		 hev;
 	Tokenizer		*tokenizer;
+	uint64_t		 debug_mask = 0;
 	int		 	 c, cnt, l_argc, ret;
 
 	bzero(&cfs, sizeof(cfs));
 	while ((c = getopt(argc, argv, "dF:f:")) != -1) {
 		switch (c) {
 		case 'd':
-			ct_debug = 1;
-			cflags |= CLOG_F_DBGENABLE | CLOG_F_FILE | CLOG_F_FUNC |
-			    CLOG_F_LINE | CLOG_F_DTIME;
-			exude_enable();
+			ct_debug++;
 			break;
 		case 'F':
 			ct_configfile = e_strdup(optarg);
@@ -292,9 +290,18 @@ ctfb_main(int argc, char *argv[])
 	if (ct_mfile == NULL)
 		ctfb_usage();
 
+	if (ct_debug) {
+		cflags |= CLOG_F_DBGENABLE | CLOG_F_FILE | CLOG_F_FUNC |
+		    CLOG_F_LINE | CLOG_F_DTIME;
+		exude_enable(CT_LOG_EXUDE);
+		if (ct_debug > 1)
+			debug_mask |= CT_LOG_EXUDE;
+	}
+
 	/* please don't delete this line AGAIN! --mp */
 	if (clog_set_flags(cflags))
 		errx(1, "illegal clog flags");
+	clog_set_mask(debug_mask);
 
 	/* load config */
 	if (ct_load_config(settings))
