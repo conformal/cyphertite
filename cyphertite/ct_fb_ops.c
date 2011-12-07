@@ -163,7 +163,7 @@ ctfb_lstat(const char *path, struct stat *sb)
 	struct ct_fb_spec		*spec;
 	int				 ret = -1;
 
-	CDBG("%s %s", __func__, path);
+	CNDBG(CT_LOG_VERTREE, "%s %s", __func__, path);
 
 	/* ctfb_get_version sets errno */
 	if (ctfb_get_version(ctfb_cfs, path, 1, &entry, &key) != 0)
@@ -260,6 +260,7 @@ ctfb_main(int argc, char *argv[])
 	const char		*buf;
 	char			*configfile = NULL;
 	char			*ct_mfile = NULL;
+	char			*debugstring = NULL;
 	EditLine		*el = NULL;
 	History			*hist;
 	HistEvent		 hev;
@@ -268,10 +269,13 @@ ctfb_main(int argc, char *argv[])
 	int		 	 c, cnt, l_argc, ret;
 
 	bzero(&cfs, sizeof(cfs));
-	while ((c = getopt(argc, argv, "dF:f:")) != -1) {
+	while ((c = getopt(argc, argv, "D:F:f:")) != -1) {
 		switch (c) {
-		case 'd':
+		case 'D':
+			if (debugstring != NULL)
+				CFATALX("only one -D argument is valid");
 			ct_debug++;
+			debugstring = optarg;
 			break;
 		case 'F':
 			configfile = optarg;
@@ -295,8 +299,7 @@ ctfb_main(int argc, char *argv[])
 		cflags |= CLOG_F_DBGENABLE | CLOG_F_FILE | CLOG_F_FUNC |
 		    CLOG_F_LINE | CLOG_F_DTIME;
 		exude_enable(CT_LOG_EXUDE);
-		if (ct_debug > 1)
-			debug_mask |= CT_LOG_EXUDE;
+		debug_mask |= ct_get_debugmask(debugstring);
 	}
 
 	/* please don't delete this line AGAIN! --mp */

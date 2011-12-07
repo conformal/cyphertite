@@ -197,7 +197,7 @@ ct_mdcache_trim(const char *cachedir, long long max_size)
 
 	if (dirsize <= max_size)
 		return;
-	CDBG("cleaning up md cachedir, %llu > %llu",
+	CNDBG(CT_LOG_CTFILE, "cleaning up md cachedir, %llu > %llu",
 	    (long long)dirsize, (long long)max_size);
 
 	if ((ftsp = fts_open(paths, FTS_XDEV | FTS_PHYSICAL | FTS_NOCHDIR,
@@ -207,7 +207,7 @@ ct_mdcache_trim(const char *cachedir, long long max_size)
 	while ((fe = fts_read(ftsp)) != NULL) {
 		switch(fe->fts_info) {
 		case FTS_F:
-			CDBG("%s %llu", fe->fts_path,
+			CNDBG(CT_LOG_CTFILE, "%s %llu", fe->fts_path,
 			    (long long)fe->fts_statp->st_size);
 			if (unlink(fe->fts_path) != 0) {
 				CWARN("couldn't delete md file %s",
@@ -228,7 +228,7 @@ ct_mdcache_trim(const char *cachedir, long long max_size)
 			/* valid but we don't care */
 			continue;
 		}
-		CDBG("size now %llu", (long long)dirsize);
+		CNDBG(CT_LOG_CTFILE, "size now %llu", (long long)dirsize);
 
 		if (dirsize < max_size)
 			break;

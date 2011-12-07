@@ -122,26 +122,26 @@ ct_md_archive(struct ct_op *op)
 	struct ct_trans		*ct_trans;
 	int			error;
 
-	CDBG("md_fileio entered for block %d", md_block_no);
+	CNDBG(CT_LOG_FILE, "md_fileio entered for block %d", md_block_no);
 	ct_set_file_state(CT_S_RUNNING);
 loop:
 	ct_trans = ct_trans_alloc();
 	if (ct_trans == NULL) {
 		/* system busy, return */
-		CDBG("ran out of transactions, waiting");
+		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
 		ct_set_file_state(CT_S_WAITING_TRANS);
 		return;
 	}
 
 	if (md_is_open == 0) {
 		if (md_open_inflight) {
-			CDBG("waiting on md open");
+			CNDBG(CT_LOG_FILE, "waiting on md open");
 			ct_trans_free(ct_trans);
 			ct_set_file_state(CT_S_WAITING_TRANS);
 			return;
 		}
 
-		CDBG("opening md file for archive %s", mfile);
+		CNDBG(CT_LOG_FILE, "opening md file for archive %s", mfile);
 		md_backup_file = fopen(mfile, "rb");
 		if (md_backup_file == NULL)
 			CFATAL("can't open %s for reading", mfile);
@@ -173,7 +173,8 @@ loop:
 		ct_trans->tr_state = TR_S_XML_CLOSE;
 		ct_trans->tr_eof = 1;
 		ct_trans->tr_trans_id = ct_trans_id++;
-		CDBG("setting eof on trans %" PRIu64, ct_trans->tr_trans_id);
+		CNDBG(CT_LOG_FILE, "setting eof on trans %" PRIu64,
+		    ct_trans->tr_trans_id);
 		ct_trans->hdr.c_flags = C_HDR_F_METADATA;
 		ct_trans->tr_md_name = mdname;
 		ct_stats->st_bytes_tot += md_size;
@@ -183,7 +184,7 @@ loop:
 	/* perform read */
 	rsz = md_size - md_offset;
 
-	CDBG("rsz %ld max %d", (long) rsz, ct_max_block_size);
+	CNDBG(CT_LOG_FILE, "rsz %ld max %d", (long) rsz, ct_max_block_size);
 	if (rsz > ct_max_block_size) {
 		rsz = ct_max_block_size;
 	}
@@ -191,7 +192,7 @@ loop:
 	ct_trans->tr_dataslot = 0;
 	rlen = fread(ct_trans->tr_data[0], sizeof(char), rsz, md_backup_file);
 
-	CDBG("read %ld", (long) rlen);
+	CNDBG(CT_LOG_FILE, "read %ld", (long) rlen);
 
 	ct_stats->st_bytes_read += rlen;
 
@@ -206,7 +207,7 @@ loop:
 	ct_trans->tr_md_chunkno = md_block_no;
 	ct_trans->tr_md_name = mdname;
 
-	CDBG(" trans %"PRId64", read size %ld, into %p rlen %ld",
+	CNDBG(CT_LOG_FILE, " trans %"PRId64", read size %ld, into %p rlen %ld",
 	    ct_trans->tr_trans_id, (long) rsz, ct_trans->tr_data[0],
 	    (long) rlen);
 
@@ -227,12 +228,12 @@ loop:
 
 	md_block_no++;
 
-	CDBG("sizes rlen %ld offset %ld size %ld", (long) rlen,
+	CNDBG(CT_LOG_FILE, "sizes rlen %ld offset %ld size %ld", (long) rlen,
 	    (long) md_offset, (long) md_size);
 
 	if (rsz != rlen || (rlen + md_offset) == md_size) {
 		/* short read, file truncated or EOF */
-		CDBG("DONE");
+		CNDBG(CT_LOG_FILE, "DONE");
 		error = fstat(fileno(md_backup_file), &sb);
 		if (error) {
 			CWARNX("file stat error %s %d %s",
@@ -268,7 +269,7 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_state = TR_S_XML_OPEN;
 
-	CDBG("setting up XML");
+	CNDBG(CT_LOG_XML, "setting up XML");
 
 	if (mode == MD_O_WRITE) {
 		xe = xmlsd_create(&xl, "ct_md_open_create");
@@ -301,7 +302,7 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = sz;
 
-	CDBG("open trans %"PRIu64, trans->tr_trans_id);
+	CNDBG(CT_LOG_XML, "open trans %"PRIu64, trans->tr_trans_id);
 	ct_queue_transfer(trans);
 
 }
@@ -320,7 +321,7 @@ ct_xml_file_open_polled(struct ct_assl_io_ctx *asslctx,
 	size_t			 sz;
 	int			 rv = 1;
 
-	CDBG("setting up XML");
+	CNDBG(CT_LOG_XML, "setting up XML");
 
 	if (mode == MD_O_WRITE) {
 		xe = xmlsd_create(&xl, "ct_md_open_create");
@@ -405,7 +406,7 @@ ct_xml_file_close(void)
 	trans = ct_trans_alloc();
 	if (trans == NULL) {
 		/* system busy, return */
-		CDBG("ran out of transactions, waiting");
+		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
 		ct_set_file_state(CT_S_WAITING_TRANS);
 		return;
 	}
@@ -413,7 +414,7 @@ ct_xml_file_close(void)
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_state = TR_S_XML_CLOSING;
 
-	CDBG("setting up XML");
+	CNDBG(CT_LOG_XML, "setting up XML");
 
 	xe = xmlsd_create(&xl, "ct_md_close");
 	xmlsd_set_attr(xe, "version", CT_MD_CLOSE_VERSION);
@@ -441,13 +442,13 @@ ct_md_extract(struct ct_op *op)
 	trans = ct_trans_alloc();
 	if (trans == NULL) {
 		/* system busy, return */
-		CDBG("ran out of transactions, waiting");
+		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
 		ct_set_file_state(CT_S_WAITING_TRANS);
 		return;
 	}
 	if (md_is_open == 0) {
 		if (md_open_inflight) {
-			CDBG("waiting on md open");
+			CNDBG(CT_LOG_FILE, "waiting on md open");
 			ct_trans_free(trans);
 			ct_set_file_state(CT_S_WAITING_TRANS);
 			return;
@@ -513,7 +514,7 @@ ct_complete_metadata(struct ct_trans *trans)
 	case TR_S_EX_UNCOMPRESSED:
 		if (trans->hdr.c_status == C_HDR_S_OK) {
 			slot = trans->tr_dataslot;
-			CDBG("writing packet sz %d",
+			CNDBG(CT_LOG_FILE, "writing packet sz %d",
 			    trans->tr_size[slot]);
 			wlen = fwrite(trans->tr_data[slot], sizeof(char),
 			    trans->tr_size[slot], md_backup_file);
@@ -549,7 +550,7 @@ ct_complete_metadata(struct ct_trans *trans)
 	case TR_S_READ:
 		break;
 	case TR_S_XML_CLOSE:
-		CDBG("eof reached, closing file");
+		CNDBG(CT_LOG_FILE, "eof reached, closing file");
 		if (md_backup_file != NULL) {
 			fclose(md_backup_file);
 			md_backup_file = NULL;
@@ -581,7 +582,7 @@ ct_md_list_start(struct ct_op *op)
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_state = TR_S_XML_LIST;
 
-	CDBG("setting up XML");
+	CNDBG(CT_LOG_XML, "setting up XML");
 
 	xe = xmlsd_create(&xl, "ct_md_list");
 	xmlsd_set_attr(xe, "version", CT_MD_LIST_VERSION);
@@ -674,7 +675,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 	char *filename;
 	int r;
 
-	CDBG("xml [%s]", (char *)vbody);
+	CNDBG(CT_LOG_XML, "xml [%s]", (char *)vbody);
 
 	/* Dispose of last parsed command. */
 	TAILQ_INIT(&xl);
@@ -684,11 +685,11 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 		CFATALX("XML parse failed! (%d)", r);
 
 	TAILQ_FOREACH(xe, &xl, entry) {
-		CDBG("%d %s = %s (parent = %s)",
+		CNDBG(CT_LOG_XML, "%d %s = %s (parent = %s)",
 		    xe->depth, xe->name, xe->value ? xe->value : "NOVAL",
 		    xe->parent ? xe->parent->name : "NOPARENT");
 		TAILQ_FOREACH(xa, &xe->attr_list, entry)
-			CDBG("\t%s = %s", xa->name, xa->value);
+			CNDBG(CT_LOG_XML, "\t%s = %s", xa->name, xa->value);
 	}
 
 	r = xmlsd_validate(&xl, ct_xml_cmds);
@@ -706,7 +707,8 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 			if (strcmp(xe->name, "file") == 0) {
 				filename = xmlsd_get_attr(xe, "name");
 				if (filename && filename[0] != '\0') {
-					CDBG("%s opened\n", filename);
+					CNDBG(CT_LOG_FILE, "%s opened\n",
+					    filename);
 					die = 0;
 					md_open_inflight = 0;
 					md_is_open = 1;
@@ -765,16 +767,16 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 		}
 		trans->tr_state = TR_S_DONE;
 	} else  if (strcmp(xe->name, "ct_cull_setup_reply") == 0) {
-		CDBG("cull_setup_reply");
+		CNDBG(CT_LOG_XML, "cull_setup_reply");
 		trans->tr_state = TR_S_DONE;
 	} else  if (strcmp(xe->name, "ct_cull_shas_reply") == 0) {
-		CDBG("cull_shas_reply");
+		CNDBG(CT_LOG_XML, "cull_shas_reply");
 		if (trans->tr_eof == 1)
 			trans->tr_state = TR_S_DONE;
 		else
 			trans->tr_state = TR_S_XML_CULL_REPLIED;
 	} else  if (strcmp(xe->name, "ct_cull_complete_reply") == 0) {
-		CDBG("cull_complete_reply");
+		CNDBG(CT_LOG_XML, "cull_complete_reply");
 		trans->tr_state = TR_S_DONE;
 	} else {
 		CABORTX("unexpected XML returned [%s]", (char *)vbody);
@@ -789,7 +791,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 void
 ct_mdmode_setup(const char *mdmode)
 {
-	CDBG("mdmode setup %s", mdmode ? mdmode : "");
+	CNDBG(CT_LOG_CTFILE, "mdmode setup %s", mdmode ? mdmode : "");
 	if (mdmode == NULL)
 		return;
 
@@ -812,7 +814,7 @@ md_is_in_cache(const char *mdfile)
 		CFATALX("can't open metadata cache dir");
 	while ((dp = readdir(dirp)) != NULL) {
 		if (strcmp(dp->d_name, mdfile) == 0) {
-			CDBG("found in cachedir");
+			CNDBG(CT_LOG_CTFILE, "found in cachedir");
 			found = 1;
 			break;
 		}
@@ -901,7 +903,7 @@ ct_find_md_for_extract(struct ct_op *op)
 	}
 	e_free(&mdname);
 
-	CDBG("looking for %s", bufp[0]);
+	CNDBG(CT_LOG_CTFILE, "looking for %s", bufp[0]);
 
 	list_fakeop->op_filelist = bufp;
 	list_fakeop->op_matchmode = matchmode;
@@ -914,7 +916,6 @@ void
 ct_free_mdname(struct ct_op *op)
 {
 
-	CDBG("%s: %s", __func__, op->op_local_fname);
 	if (op->op_local_fname != NULL)
 		e_free(&op->op_local_fname);
 }
@@ -922,7 +923,6 @@ ct_free_mdname(struct ct_op *op)
 void
 ct_free_remotename(struct ct_op *op)
 {
-	CDBG("%s: %s", __func__, op->op_local_fname);
 	if (op->op_remote_fname != NULL)
 		e_free(&op->op_remote_fname);
 }
@@ -945,7 +945,7 @@ ct_md_download_next(struct ct_op *op)
 
 	md_is_open = 0;	/* prevent trying to close upon next download */
 again:
-	CDBG("mfile %s", mfile);
+	CNDBG(CT_LOG_CTFILE, "mfile %s", mfile);
 
 	md_prev = ct_metadata_check_prev(mfile);
 	if (md_prev == NULL)
@@ -953,7 +953,8 @@ again:
 
 	if (md_prev[0] != '\0') {
 		cachename = ct_md_get_cachename(md_prev);
-		CDBG("prev file %s cachename %s", md_prev, cachename);
+		CNDBG(CT_LOG_CTFILE, "prev file %s cachename %s", md_prev,
+		    cachename);
 		if (!md_is_in_cache(cachename)) {
 			e_free(&cachename);
 			ct_add_operation_after(op, ct_md_extract,
@@ -1018,7 +1019,8 @@ ct_md_extract_nextop(struct ct_op *op)
 		 * is stored in basis. Swap them.
 		 */
 		mfile = ct_find_md_for_archive(op->op_basis);
-		CDBG("setting basisname %s", op->op_local_fname);
+		CNDBG(CT_LOG_CTFILE, "setting basisname %s",
+		    op->op_local_fname);
 		/* XXX does this leak cachename? */
 		ct_add_operation(ct_archive, NULL, mfile, NULL,
 		    op->op_filelist, op->op_excludelist, op->op_local_fname,
@@ -1066,7 +1068,7 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 
 	/* pick the newest one */
 	best = e_strdup(tmp->mlf_name);
-	CDBG("backup file is %s", best);
+	CNDBG(CT_LOG_CTFILE, "backup file is %s", best);
 
 	while((tmp = RB_ROOT(&result)) != NULL) {
 		RB_REMOVE(md_list_tree, &result, tmp);
@@ -1123,7 +1125,7 @@ ct_find_md_for_archive(const char *mdname)
 	    localtime(&now)) == 0)
 		CFATALX("can't format time");
 	e_asprintf(&fullname, "%s-%s", buf, mdname);
-	CDBG("backup file is %s", fullname);
+	CNDBG(CT_LOG_CTFILE, "backup file is %s", fullname);
 
 	/* check it isn't already in the cache */
 	cachename = ct_md_get_cachename(fullname);
@@ -1167,7 +1169,8 @@ ct_check_crypto_secrets_nextop(struct ct_op *op)
 	if ((file = RB_MAX(md_list_tree, &results)) == NULL)
 		goto check_local;
 
-	CDBG("latest secrets file on server: %s", file->mlf_name);
+	CNDBG(CT_LOG_CRYPTO, "latest secrets file on server: %s",
+	    file->mlf_name);
 	/* parse out mtime */
 	if ((t = strchr(file->mlf_name, '-')) == NULL)
 		CFATALX("invalid answer from server");
@@ -1190,7 +1193,7 @@ check_local:
 
 	/* This includes the case where both are missing */
 	if (mtime == local_mtime) {
-		CDBG("dates match, nothing to do");
+		CNDBG(CT_LOG_CRYPTO, "dates match, nothing to do");
 		if (remote_name)
 			e_free(&remote_name);
 		if (ct_create_or_unlock_secrets(current_secrets,
@@ -1198,7 +1201,7 @@ check_local:
 			CFATALX("can't unlock secrets file");
 	} else if (mtime < local_mtime) {
 		/* XXX verify local file before upload? */
-		CDBG("uploading local file");
+		CNDBG(CT_LOG_CRYPTO, "uploading local file");
 		if (remote_name)
 			e_free(&remote_name);
 		e_asprintf(&remote_name, "%020" PRId64 "-crypto.secrets",
@@ -1206,7 +1209,7 @@ check_local:
 		ct_add_operation_after(op, ct_md_archive, ct_secrets_unlock,
 		    current_secrets, remote_name, NULL, NULL, NULL, 0, 0);
 	} else { /* mtime > local_mtime */
-		CDBG("downloading remote file");
+		CNDBG(CT_LOG_CRYPTO, "downloading remote file");
 		strlcpy(dir, current_secrets, sizeof(dir));
 		if ((dirp = dirname(dir)) == NULL)
 			CFATALX("can't get dirname of secrets file");
@@ -1216,7 +1219,7 @@ check_local:
 			CFATAL("can't make temporary file");
 		if ((md_backup_file = fdopen(crypto_fd, "w+")) == NULL)
 			CFATAL("can't associate stream with temporary file");
-		CDBG("temp file: %s", tmp);
+		CNDBG(CT_LOG_CRYPTO, "temp file: %s", tmp);
 		/* stash current name in basis in case we need to fallback */
 		ct_add_operation_after(op, ct_md_extract, ct_secrets_unlock,
 		    e_strdup(tmp), remote_name, NULL, NULL,  current_secrets,
@@ -1235,7 +1238,7 @@ ct_secrets_unlock(struct ct_op *op)
 	struct timeval		 times[2] = { };
 	struct stat	 	 sb;
 
-	CDBG("operation complete, unlocking secrets file");
+	CNDBG(CT_LOG_CRYPTO, "operation complete, unlocking secrets file");
 again:
 	if (stat(crypto_secrets, &sb) == -1) {
 		if (old_secrets != NULL) {
@@ -1319,7 +1322,8 @@ ct_md_trigger_delete(struct ct_op *op)
 	ct_md_list_complete(op->op_matchmode, op->op_filelist,
 	    op->op_excludelist, &results);
 	while((file = RB_ROOT(&results)) != NULL) {
-		CDBG("deleting remote crypto secrets file %s", file->mlf_name);
+		CNDBG(CT_LOG_CRYPTO, "deleting remote crypto secrets file %s",
+		    file->mlf_name);
 		ct_add_operation_after(op, ct_md_delete, NULL, NULL,
 		    e_strdup(file->mlf_name), NULL, NULL, NULL, 0, 0);
 		RB_REMOVE(md_list_tree, &results, file);
@@ -1418,8 +1422,8 @@ void
 ct_cull_kick(void)
 {
 
-	CDBG("add_op cull_setup");
-	CDBG("shacnt %" PRIu64 , shacnt);
+	CNDBG(CT_LOG_TRANS, "add_op cull_setup");
+	CNDBG(CT_LOG_SHA, "shacnt %" PRIu64 , shacnt);
 	ct_add_operation(ct_cull_setup, NULL,
 	    NULL, NULL, NULL, NULL, NULL, 0, 0);
 	ct_add_operation(ct_cull_send_shas, NULL,
@@ -1431,7 +1435,8 @@ ct_cull_kick(void)
 void
 ct_cull_complete(struct ct_op *op)
 {
-	CDBG("shacnt %" PRIu64 " shapayload %" PRIu64, shacnt, sha_payload_sz);
+	CNDBG(CT_LOG_SHA, "shacnt %" PRIu64 " shapayload %" PRIu64, shacnt,
+	    sha_payload_sz);
 }
 
 uint64_t cull_uuid; /* set up with random number in ct_cull_setup() */
@@ -1448,7 +1453,7 @@ ct_cull_setup(struct ct_op *op)
 
 	arc4random_buf(&cull_uuid, sizeof(cull_uuid));
 
-	CDBG("cull_setup");
+	CNDBG(CT_LOG_TRANS, "cull_setup");
 	ct_set_file_state(CT_S_RUNNING);
 
 	trans = ct_trans_alloc();
@@ -1491,7 +1496,7 @@ ct_cull_send_complete(struct ct_op *op)
 	}
 	sent_complete = 1;
 
-	CDBG("send cull_complete");
+	CNDBG(CT_LOG_TRANS, "send cull_complete");
 	trans = ct_trans_alloc();
 
 	if (trans == NULL) {
@@ -1523,7 +1528,6 @@ ct_cull_send_complete(struct ct_op *op)
 void
 ct_cull_send_shas(struct ct_op *op)
 {
-	CDBG("cull_send_shas");
 	struct xmlsd_element_list	xl;
 	struct xmlsd_element		*xe, *xp;
 	struct ct_trans			*trans;
@@ -1532,6 +1536,7 @@ ct_cull_send_shas(struct ct_op *op)
 	int				sha_add;
 	char				shat[SHA_DIGEST_STRING_LENGTH];
 
+	CNDBG(CT_LOG_TRANS, "cull_send_shas");
 	node = RB_ROOT(&ct_sha_rb_head);
 	if (shacnt == 0 || node == NULL) {
 		ct_set_file_state(CT_S_FINISHED);
@@ -1561,7 +1566,7 @@ ct_cull_send_shas(struct ct_op *op)
 	while (node != NULL && sha_add < sha_per_packet) {
 		xe = xmlsd_add_element(&xl, xp, "sha");
 		ct_sha1_encode(node->sha, shat);
-		//CDBG("adding sha %s\n", shat);
+		//CNDBG(CT_LOG_SHA, "adding sha %s\n", shat);
 		xmlsd_set_attr(xe, "sha", shat);
 		shacnt--;
 		sha_add++;
@@ -1578,14 +1583,14 @@ ct_cull_send_shas(struct ct_op *op)
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = sz;
 
-	CDBG("sending shas [%s]", (char *)trans->tr_data[2]);
-	CDBG("sending shas len %lu", (unsigned long) sz);
+	CNDBG(CT_LOG_SHA, "sending shas [%s]", (char *)trans->tr_data[2]);
+	CNDBG(CT_LOG_SHA, "sending shas len %lu", (unsigned long) sz);
 	sha_payload_sz += sz;
 	ct_queue_transfer(trans);
 
 	if (shacnt == 0 || node == NULL) {
 		ct_set_file_state(CT_S_FINISHED);
 		trans->tr_eof = 1;
-		CDBG("shacnt %" PRIu64, shacnt);
+		CNDBG(CT_LOG_SHA, "shacnt %" PRIu64, shacnt);
 	}
 }

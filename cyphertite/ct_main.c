@@ -42,6 +42,10 @@
 #include "ct_ctl.h"
 #include "ct_fb.h"
 
+#ifndef nitems
+#define nitems(_a)      (sizeof((_a)) / sizeof((_a)[0]))
+#endif /* !nitems */
+
 #ifdef BUILDSTR
 __attribute__((__unused__)) static const char *vertag = "version: " CT_VERSION\
     " " BUILDSTR;
@@ -156,8 +160,8 @@ ct_init_eventloop(void)
 	if (ct_assl_negotiate_poll(ct_assl_ctx))
 		CFATALX("negotiate failed");
 
-	CDBG("assl data: as bits %d, protocol [%s]", ct_assl_ctx->c->as_bits,
-	    ct_assl_ctx->c->as_protocol);
+	CNDBG(CT_LOG_NET, "assl data: as bits %d, protocol [%s]",
+	    ct_assl_ctx->c->as_bits, ct_assl_ctx->c->as_protocol);
 
 	ct_setup_wakeup_file(ct_state, ct_nextop);
 	ct_setup_wakeup_sha(ct_state, ct_compute_sha);
@@ -171,7 +175,7 @@ void
 ct_update_secrets(void)
 {
 	if (ct_secrets_upload > 0) {
-		CDBG("doing list for crypto secrets");
+		CNDBG(CT_LOG_CRYPTO, "doing list for crypto secrets");
 		ct_add_operation(ct_md_list_start,
 		    ct_check_crypto_secrets_nextop, ct_crypto_secrets,
 		    NULL, secrets_file_pattern, NULL, NULL,
@@ -200,6 +204,52 @@ ct_cleanup(void)
 	ct_cleanup_eventloop();
 }
 
+uint64_t
+ct_get_debugmask(char *debugstring)
+{
+	char		*cur, *next;
+	uint64_t	 debug_mask = 0;
+	int		 i;
+	struct debuglvl {
+		const char	*name;
+		uint64_t	 mask;
+	} debuglevels[] = {
+		{ "exude", CT_LOG_EXUDE },
+		{ "net", CT_LOG_NET },
+		{ "trans", CT_LOG_TRANS },
+		{ "sha", CT_LOG_SHA },
+		{ "ctfile", CT_LOG_CTFILE },
+		{ "db", CT_LOG_DB },
+		{ "crypto", CT_LOG_CRYPTO },
+		{ "file", CT_LOG_FILE },
+		{ "xml", CT_LOG_XML },
+		{ "vertree", CT_LOG_VERTREE },
+		{ "all", ~(0ULL) },
+	};
+
+	CWARNX("%s", __func__);
+	next = debugstring;
+	while ((cur = next) != NULL) {
+		if ((next = strchr(next + 1, ',')) != NULL) {
+			*(next++) = '\0';
+		}
+		for (i = 0; i < nitems(debuglevels); i++) {
+			if (strcasecmp(debuglevels[i].name,
+			    cur) == 0)
+				break;
+		}
+		if (i == nitems(debuglevels)) {
+			CWARNX("unrecognized debug option:"
+			    "\"%s\"", cur);
+			 continue;
+		}
+
+		debug_mask |= debuglevels[i].mask;
+	}
+
+	return (debug_mask);
+}
+
 int
 ct_main(int argc, char **argv)
 {
@@ -220,9 +270,10 @@ ct_main(int argc, char **argv)
 	int		need_secrets;
 	char		*configfile = NULL;
 	char		*basisfile = NULL;
+	char		*debugstring = NULL;
 
 	while ((c = getopt(argc, argv,
-	    "B:C:DE:F:I:PRVXa:cdef:mprtvx0")) != -1) {
+	    "B:C:D:E:F:I:PRVXa:cdef:mprtvx0")) != -1) {
 		switch (c) {
 		case 'B':
 			basisfile = optarg;
@@ -231,7 +282,10 @@ ct_main(int argc, char **argv)
 			ct_tdir = optarg;
 			break;
 		case 'D':
-			foreground = 0;
+			if (debugstring != NULL)
+				CFATALX("only one -D argument is valid");
+			ct_debug++;
+			debugstring = optarg;
 			break;
 		case 'E':
 			ct_excludefile = optarg;
@@ -262,9 +316,6 @@ ct_main(int argc, char **argv)
 			if (ct_action)
 				CFATALX("cannot mix operations, -c -e -t -x");
 			ct_action = CT_A_ARCHIVE;
-			break;
-		case 'd':
-			ct_debug++;
 			break;
 		case 'e':
 			if (ct_action)
@@ -313,8 +364,7 @@ ct_main(int argc, char **argv)
 		cflags |= CLOG_F_DBGENABLE | CLOG_F_FILE | CLOG_F_FUNC |
 		    CLOG_F_LINE | CLOG_F_DTIME;
 		exude_enable(CT_LOG_EXUDE);
-		if (ct_debug > 1)
-			debug_mask |= CT_LOG_EXUDE;
+		debug_mask |= ct_get_debugmask(debugstring);
 	}
 
 	/* please don't delete this line AGAIN! --mp */

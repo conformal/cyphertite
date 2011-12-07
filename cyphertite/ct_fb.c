@@ -100,7 +100,7 @@ ct_add_tree(struct ct_fb_entry *head, struct ct_xdr_state *xdr_ctx,
 	 * Have parent node, search children to see if we already exist.
 	 * Else make a new one and insert.
 	 */
-	CDBG("filename = %s", hdr->cmh_filename);
+	CNDBG(CT_LOG_VERTREE, "filename = %s", hdr->cmh_filename);
 	sentry.cfb_name = e_strdup(hdr->cmh_filename);
 	if ((entry = RB_FIND(ct_fb_entries, &parent->cfb_children,
 	    &sentry)) == NULL) {
@@ -134,9 +134,9 @@ ct_add_tree(struct ct_fb_entry *head, struct ct_xdr_state *xdr_ctx,
 	    lastkey->cfb_gid == hdr->cmh_gid &&
 	    lastkey->cfb_mode == hdr->cmh_mode) {
 		key = lastkey;
-		CDBG("found existing key");
+		CNDBG(CT_LOG_VERTREE, "found existing key");
 	} else { /* something changed. make a new one */
-		CDBG("making new key");
+		CNDBG(CT_LOG_VERTREE, "making new key");
 		if (C_ISDIR(hdr->cmh_type)) {
 			sz = sizeof(struct ct_fb_dir);
 		} else if (C_ISBLK(hdr->cmh_type) ||
@@ -187,8 +187,8 @@ ct_add_tree(struct ct_fb_entry *head, struct ct_xdr_state *xdr_ctx,
 		fb_dnode->dnode.d_name = e_strdup(entry->cfb_name);
 		fb_dnode->dnode.d_num = ct_ex_dirnum++;
 		fb_dnode->dir = entry;
-		CDBG("inserting %s as %" PRId64, fb_dnode->dnode.d_name,
-		    fb_dnode->dnode.d_num );
+		CNDBG(CT_LOG_VERTREE, "inserting %s as %" PRId64,
+		    fb_dnode->dnode.d_name, fb_dnode->dnode.d_num );
 		dnode = RB_INSERT(d_num_tree, &ct_dnum_head, &fb_dnode->dnode);
 		if (dnode != NULL)
 			CFATALX("duplicate dentry");
@@ -234,7 +234,7 @@ ct_build_tree(const char *mfile, struct ct_fb_entry *head)
 	off_t			 offset;
 	int			 ret;
 
-	CDBG("entry");
+	CNDBG(CT_LOG_FILE, "entry");
 
 	TAILQ_INIT(&extract_head);
 	ct_extract_setup(&extract_head, &xdr_ctx, mfile);
@@ -265,10 +265,10 @@ nextfile:
 		offset = ct_xdr_parse_tell(&xdr_ctx);
 	}
 	if (ret == XS_RET_EOF) {
-		CDBG("done, closing file");
+		CNDBG(CT_LOG_FILE, "done, closing file");
 		ct_xdr_parse_close(&xdr_ctx);
 		if (!TAILQ_EMPTY(&extract_head)) {
-			CDBG("opening next one");
+			CNDBG(CT_LOG_FILE, "opening next one");
 			ct_extract_open_next(&extract_head, &xdr_ctx);
 			goto nextfile;
 		}
@@ -300,10 +300,10 @@ ctfb_follow_path(struct ct_fb_state *cfs, const char *path,
 	int			 absolute = 0, home = 0;
 
 	if (path == NULL || path[0] == '\0') {
-		CDBG("should go back to /");
+		CNDBG(CT_LOG_VERTREE, "should go back to /");
 		home = 1;
 	} else if (path[0] == '/') {
-		CDBG("absolute path %s", path); 
+		CNDBG(CT_LOG_VERTREE, "absolute path %s", path); 
 		absolute = 1;
 	}
 
@@ -335,17 +335,17 @@ ctfb_follow_path(struct ct_fb_state *cfs, const char *path,
 		/* XXX directory separator */
 		if ((next = strchr(cur, '/')) != NULL)
 			*(next++) = '\0';
-		CDBG("next segment = %s", cur);
+		CNDBG(CT_LOG_VERTREE, "next segment = %s", cur);
 
 		if (*cur == '\0')
 			continue;
 		else if (strcmp(cur, "..") == 0) {
 			char		*end;
 
-			CDBG("goback");
+			CNDBG(CT_LOG_VERTREE, "goback");
 			/* ignore .. from root */
 			if (cwd->cfb_parent == NULL) {
-				CDBG("at root");
+				CNDBG(CT_LOG_VERTREE, "at root");
 				continue;
 			}
 			cwd = cwd->cfb_parent;
@@ -358,15 +358,16 @@ ctfb_follow_path(struct ct_fb_state *cfs, const char *path,
 				end = cwdbuf; /* first directory */
 			*(end) = '\0'; /* Amend curpath */
 		} else if (strcmp(cur, ".") == 0) {
-			CDBG(".: doing nothing");
+			CNDBG(CT_LOG_VERTREE, ".: doing nothing");
 		} else {
 			struct ct_fb_entry	sentry;
-			CDBG("next dir = %s", cur);
+			CNDBG(CT_LOG_VERTREE, "next dir = %s", cur);
 
 			sentry.cfb_name = cur;
 			if ((cwd = RB_FIND(ct_fb_entries, &cwd->cfb_children,
 			    &sentry)) == NULL) {
-				CDBG("can't find directory %s", cur);
+				CNDBG(CT_LOG_VERTREE,
+				    "can't find directory %s", cur);
 				errno = ENOENT;
 				return (NULL);
 			}
@@ -399,20 +400,21 @@ ctfb_get_version(struct ct_fb_state *state, const char *path, int preferdir,
 
 	/* Get version out of the filename. */
 	if ((postfix = strrchr(path, '.')) == NULL) {
-		CDBG("can't find version postfix");
+		CNDBG(CT_LOG_VERTREE, "can't find version postfix");
 		noversion = 1;
 		goto search;
 	}
 
 	/* parse file name. path/name.date */
 	if (strptime(postfix, ".%Y%m%d%H%M%S", &tm) == NULL) {
-		CDBG("can't parse version from filename %s", path);
+		CNDBG(CT_LOG_VERTREE, "can't parse version from filename %s",
+		    path);
 		noversion = 1;
 		goto search;
 	}
 	tm.tm_isdst = -1;
 	mtime = mktime(&tm);
-	CDBG("mtime = %" PRIi64, (int64_t)mtime);
+	CNDBG(CT_LOG_VERTREE, "mtime = %" PRIi64, (int64_t)mtime);
 
 
 	*postfix = '\0'; /* trim off version now we have it parsed out */
@@ -542,7 +544,7 @@ ctfb_cd(int argc, const char **argv)
 	if (argc > 2)
 		CWARNX("%s: /path/to/directory", argv[0]);
 
-	CDBG("%s: %s", __func__, argv[1]);
+	CNDBG(CT_LOG_VERTREE, "%s: %s", __func__, argv[1]);
 	if (ctfb_chdir(ctfb_cfs, argv[1]) != 0)
 		CWARN("%s: %s", argv[0], argv[1]);
 }
@@ -643,7 +645,7 @@ ctfb_ls(int argc, const char **argv)
 	glob_t			 g;
 	int			 i, j;
 
-	CDBG("%s", __func__);
+	CNDBG(CT_LOG_VERTREE, "%s", __func__);
 
 
 	if (argc > 1) {
@@ -681,7 +683,7 @@ ctfb_ls(int argc, const char **argv)
 void
 ctfb_pwd(int argc, const char **argv)
 {
-	CDBG("%s", __func__);
+	CNDBG(CT_LOG_VERTREE, "%s", __func__);
 	if (ctfb_cfs->cfs_curpath[0] == '\0')
 		printf("/\n");	/* XXX directory separator */
 	else
@@ -809,7 +811,7 @@ ctfb_opendir(const char *path)
 	struct ctfb_opendir		*dir;
 	struct ct_fb_entry		*entry;
 
-	CDBG("%s: %s", __func__, path);
+	CNDBG(CT_LOG_VERTREE, "%s: %s", __func__, path);
 	
 	if ((entry = ctfb_follow_path(ctfb_cfs, path, NULL, 0)) == NULL) {
 		CWARNX("%s: %s not found", __func__, path);
@@ -834,13 +836,13 @@ ctfb_readdir(void *arg)
 	static struct dirent	ret;
 
 	if (ctx->nextkey == NULL && ctx->nextentry == NULL) {
-		CDBG("%s: no more entries", __func__);
+		CNDBG(CT_LOG_VERTREE, "%s: no more entries", __func__);
 		return (NULL);
 	}
 
 	entry = ctx->nextentry;
 	
-	CDBG("%s: %s", __func__, entry->cfb_name);
+	CNDBG(CT_LOG_VERTREE, "%s: %s", __func__, entry->cfb_name);
 	/*
 	 * OpenBSD doesn't have d_ino, but does have d_type. posix only
 	 * promises dirent has d_name and d_ino so just fill in d_name.
@@ -865,7 +867,7 @@ ctfb_readdir_versions(void *arg)
 	char			 buf[PATH_MAX];
 
 	if (ctx->nextkey == NULL && ctx->nextentry == NULL) {
-		CDBG("%s: no more entries", __func__);
+		CNDBG(CT_LOG_VERTREE, "%s: no more entries", __func__);
 		return (NULL);
 	}
 
@@ -886,13 +888,13 @@ ctfb_readdir_versions(void *arg)
 			CWARNX("can't format time %" PRId64, (int64_t)mtime);
 			return (NULL);
 		}
-		CDBG("%s: %s", __func__, buf);
+		CNDBG(CT_LOG_VERTREE, "%s: %s", __func__, buf);
 		strlcpy(ret.d_name, buf, sizeof(ret.d_name));
 		return (&ret);
 	}
 	entry = ctx->nextentry;
 
-	CDBG("%s: %s", __func__, entry->cfb_name);
+	CNDBG(CT_LOG_VERTREE, "%s: %s", __func__, entry->cfb_name);
 
 	/* set up for next version to be read */
 	ctx->nextkey = TAILQ_FIRST(&entry->cfb_versions);

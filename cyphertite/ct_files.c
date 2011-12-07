@@ -342,7 +342,7 @@ ct_sched_backup_file(struct stat *sb, char *filename, int forcedir)
 			e_free(&dnode);
 			return 0;
 		} else
-			CDBG("inserted %s", filename);
+			CNDBG(CT_LOG_CTFILE, "inserted %s", filename);
 	}
 
 	//ct_numalloc++;
@@ -361,14 +361,16 @@ ct_sched_backup_file(struct stat *sb, char *filename, int forcedir)
 	dfound = RB_FIND(d_name_tree, &ct_dname_head, &dsearch);
 	if (dfound != NULL) {
 		flnode->fl_parent_dir = dfound;
-		CDBG("parent of %s is %s", filename, dfound->d_name);
+		CNDBG(CT_LOG_CTFILE, "parent of %s is %s", filename,
+		    dfound->d_name);
 		strlcpy(fname_buf, filename, sizeof(fname_buf));
 		flnode->fl_fname = e_strdup(basename(fname_buf));
-		CDBG("setting name of %s as %s", filename, flnode->fl_fname);
+		CNDBG(CT_LOG_CTFILE, "setting name of %s as %s", filename,
+		    flnode->fl_fname);
 	} else {
 		flnode->fl_fname = e_strdup(filename);
-		CDBG("parent of %s is not found [%s]", flnode->fl_fname,
-		    dsearch.d_name);
+		CNDBG(CT_LOG_CTFILE, "parent of %s is not found [%s]",
+		    flnode->fl_fname, dsearch.d_name);
 	}
 
 	flnode->fl_hlnode = NULL;
@@ -378,7 +380,7 @@ ct_sched_backup_file(struct stat *sb, char *filename, int forcedir)
 	flnode_exists = RB_INSERT(fl_tree, &fl_rb_head, flnode);
 	if (flnode_exists != NULL) {
 		flnode->fl_hlnode = flnode_exists;
-		CDBG("found %s as hardlink of %s", safe,
+		CNDBG(CT_LOG_CTFILE, "found %s as hardlink of %s", safe,
 		    ct_name_to_safename(flnode->fl_hlnode->fl_fname));
 	} else {
 		if (S_ISREG(sb->st_mode))
@@ -406,7 +408,7 @@ ct_archive(struct ct_op *op)
 	int			skip_file;
 	int			nextlvl = 0;
 
-	CDBG("processing");
+	CNDBG(CT_LOG_TRANS, "processing");
 	/* XXX if state finished jump to done */
 	if (ct_state->ct_file_state == CT_S_STARTING) {
 		if (*filelist == NULL) {
@@ -458,14 +460,15 @@ ct_archive(struct ct_op *op)
 	if (fl_curnode == NULL)
 		goto done;
 loop:
-	CDBG("file %s state %d", fl_curnode->fl_sname, fl_curnode->fl_state);
+	CNDBG(CT_LOG_CTFILE, "file %s state %d", fl_curnode->fl_sname,
+	    fl_curnode->fl_state);
 	new_file = (fl_curnode->fl_state == CT_FILE_START);
 
 	/* allocate transaction */
 	ct_trans = ct_trans_alloc();
 	if (ct_trans == NULL) {
 		/* system busy, return */
-		CDBG("ran out of transactions, waiting");
+		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
 		ct_set_file_state(CT_S_WAITING_TRANS);
 		return;
 	}
@@ -483,10 +486,9 @@ loop:
 				    fl_curnode->fl_sname);
 			} else {
 				if (sb.st_mtime < ct_prev_backup_time) {
-					if (ct_verbose > 1)
-						CDBG("skipping dir"
-						    " based on mtime %s",
-						    fl_curnode->fl_sname);
+					CNDBG(CT_LOG_FILE, "skipping dir"
+					    " based on mtime %s",
+					    fl_curnode->fl_sname);
 					fl_curnode->fl_skip_file = 1;
 				}
 			}
@@ -563,7 +565,8 @@ loop:
 
 	/* perform read */
 	rsz = fl_curnode->fl_size - fl_curnode->fl_offset;
-	CDBG("rsz %lu max %d", (unsigned long) rsz, ct_max_block_size);
+	CNDBG(CT_LOG_FILE, "rsz %lu max %d", (unsigned long) rsz,
+	    ct_max_block_size);
 	if (rsz > ct_max_block_size) {
 		rsz = ct_max_block_size;
 	}
@@ -580,7 +583,8 @@ loop:
 	ct_trans->tr_trans_id = ct_trans_id++;
 	ct_trans->tr_eof = 0;
 	ct_trans->hdr.c_flags = 0;
-	CDBG("read %ld for block %" PRIu64, (long) rlen, ct_trans->tr_trans_id);
+	CNDBG(CT_LOG_FILE, "read %ld for block %" PRIu64, (long) rlen,
+	    ct_trans->tr_trans_id);
 
 	/* update offset */
 	if (rsz != rlen || rlen == 0 ||
@@ -598,8 +602,9 @@ loop:
 			 * to pad archive file to right number of chunks
 			 */
 		}
-		CDBG("going to next file %s", fl_curnode->fl_sname);
-		CDBG("setting eof on trans %" PRIu64 " %s",
+		CNDBG(CT_LOG_FILE, "going to next file %s",
+		    fl_curnode->fl_sname);
+		CNDBG(CT_LOG_TRANS, "setting eof on trans %" PRIu64 " %s",
 		    ct_trans->tr_trans_id, fl_curnode->fl_sname);
 		close(current_fd);
 		current_fd = -1;
@@ -624,7 +629,7 @@ next_file:
 		do {
 			fl_lcurnode = TAILQ_NEXT(fl_lcurnode, fl_list);
 			if (fl_lcurnode == NULL) {
-				CDBG("no more files");
+				CNDBG(CT_LOG_FILE, "no more files");
 				fl_curnode = NULL;
 			} else {
 				fl_curnode =
@@ -632,21 +637,22 @@ next_file:
 			}
 		} while (fl_lcurnode != NULL && fl_curnode == NULL);
 		if (fl_curnode != NULL)
-			CDBG("going to next file %s", fl_curnode->fl_sname);
+			CNDBG(CT_LOG_FILE, "going to next file %s",
+			    fl_curnode->fl_sname);
 	}
 
 	if (fl_curnode != NULL)
 		goto loop;
 
 done:
-	CDBG("last file read");
+	CNDBG(CT_LOG_FILE, "last file read");
 	/* done with backup */
 	ct_set_file_state(CT_S_FINISHED);
 
 	ct_trans = ct_trans_alloc();
 	if (ct_trans == NULL) {
 		/* system busy, return */
-		CDBG("ran out of transactions, waiting");
+		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
 		ct_set_file_state(CT_S_WAITING_TRANS);
 		return;
 	}
@@ -719,7 +725,8 @@ ct_traverse(char **paths, char **exclude, int match_mode)
 		 * anyway.
 		 */
 		if (include_match && ct_match(include_match, clean)) {
-			CDBG("failing %s: not in include list", clean);
+			CNDBG(CT_LOG_FILE, "failing %s: not in include list",
+			    clean);
 			continue;
 		}
 		if (exclude_match && !ct_match(exclude_match, clean)) {
@@ -728,7 +735,7 @@ ct_traverse(char **paths, char **exclude, int match_mode)
 			continue;
 		}
 
-		CDBG("scheduling backup of %s", clean);
+		CNDBG(CT_LOG_FILE, "scheduling backup of %s", clean);
 		/* backup all other files */
 		if (ct_sched_backup_file(fe->fts_statp, clean, 0))
 			CFATAL("backup_file failed: %s", clean);
@@ -909,7 +916,7 @@ ct_file_extract_open(struct fnode *fnode)
 	 * XXX - this should open a temporary file and rename
 	 * XXX - on EX_FILE_END
 	 */
-	CDBG("opening %s for writing", fnode->fl_sname);
+	CNDBG(CT_LOG_FILE, "opening %s for writing", fnode->fl_sname);
 	if (ct_extract_fd != -1) {
 		CFATALX("file open on extract_open");
 	}
@@ -1006,7 +1013,7 @@ ct_file_extract_special(struct fnode *fnode)
 
 	snprintf(ltpath, sizeof ltpath, "%s%s%s",
 	    ct_tdir ? ct_tdir : "", ct_tdir ? "/" : "", fnode->fl_sname);
-	CDBG("special %s mode %d", ltpath, fnode->fl_mode);
+	CNDBG(CT_LOG_FILE, "special %s mode %d", ltpath, fnode->fl_mode);
 
 	if(C_ISDIR(fnode->fl_type)) {
 mkdir_again:

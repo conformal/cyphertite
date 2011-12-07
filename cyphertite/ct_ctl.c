@@ -188,12 +188,16 @@ ctctl_main(int argc, char *argv[])
 	int			c;
 	struct ct_cli_cmd	*cc = NULL;
 	char			*configfile = NULL;
+	char			*debugstring = NULL;
 	uint64_t		debug_mask = 0;
 
-	while ((c = getopt(argc, argv, "dF:")) != -1) {
+	while ((c = getopt(argc, argv, "D:F:")) != -1) {
 		switch (c) {
-		case 'd':
+		case 'D':
+			if (debugstring != NULL)
+				CFATALX("only one -D argument is valid");
 			ct_debug++;
+			debugstring = optarg;
 			break;
 		case 'F':
 			configfile = optarg;
@@ -212,8 +216,7 @@ ctctl_main(int argc, char *argv[])
 		cflags |= CLOG_F_DBGENABLE | CLOG_F_FILE | CLOG_F_FUNC |
 		    CLOG_F_LINE | CLOG_F_DTIME;
 		exude_enable(CT_LOG_EXUDE);
-		if (ct_debug > 1)
-			debug_mask |= CT_LOG_EXUDE;
+		debug_mask |= ct_get_debugmask(debugstring);
 	}
 
 	/* please don't delete this line AGAIN! --mp */
@@ -232,8 +235,6 @@ ctctl_main(int argc, char *argv[])
 
 	if ((cc = ct_cli_validate(cmd_list, &argc, &argv)) == NULL)
 		ct_cli_usage(cmd_list, NULL);
-
-	CDBG("calling %s", cc->cc_cmd);
 
 	ct_cli_execute(cc, &argc, &argv);
 

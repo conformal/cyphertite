@@ -91,31 +91,31 @@ ct_crypto_init(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type, uint8_t *key,
 	/* setup crypto engine */
 	EVP_CIPHER_CTX_init(ctx);
 	if (!EVP_CipherInit_ex(ctx, type, NULL, NULL, NULL, enc)) {
-		CDBG("can't init crypto");
+		CNDBG(CT_LOG_CRYPTO, "can't init crypto");
 		goto bad;
 	}
 
 	/* set key length */
 	if (!EVP_CIPHER_CTX_set_key_length(ctx, keylen)) {
-		CDBG("can't set key length");
+		CNDBG(CT_LOG_CRYPTO, "can't set key length");
 		goto bad;
 	}
 
 	/* set key */
 	if (!EVP_CipherInit_ex(ctx, NULL, NULL, key, iv, enc)) {
-		CDBG("can't init crypto");
+		CNDBG(CT_LOG_CRYPTO, "can't init crypto");
 		goto bad;
 	}
 
 	/* sanity */
 	if (EVP_CIPHER_CTX_key_length(ctx) != keylen) {
-		CDBG("invalid key length");
+		CNDBG(CT_LOG_CRYPTO, "invalid key length");
 		goto bad;
 	}
 	if (EVP_CIPHER_CTX_iv_length(ctx) != 0 &&
 	    ivlen != 0 &&
 	    EVP_CIPHER_CTX_iv_length(ctx) != ivlen) {
-		CDBG("invalid iv length");
+		CNDBG(CT_LOG_CRYPTO, "invalid iv length");
 		goto bad;
 	}
 
@@ -131,7 +131,7 @@ ct_crypto_update(EVP_CIPHER_CTX *ctx, uint8_t *src, size_t srclen,
 	int			len = dstlen;
 
 	if (!EVP_CipherUpdate(ctx, dst, &len, src, srclen)) {
-		CDBG("couldn't encrypt");
+		CNDBG(CT_LOG_CRYPTO, "couldn't encrypt");
 		return (-1);
 	}
 
@@ -144,7 +144,7 @@ ct_crypto_final(EVP_CIPHER_CTX *ctx, uint8_t *dst)
 	int			len = -1;
 
 	if (!EVP_CipherFinal_ex(ctx, dst, &len)) {
-		CDBG("can't finalize encryption");
+		CNDBG(CT_LOG_CRYPTO, "can't finalize encryption");
 		return (-1);
 	}
 
@@ -161,37 +161,37 @@ ct_crypto_crypt(const EVP_CIPHER *type, uint8_t *key, size_t keylen,
 
 	/* sanity */
 	if (key == NULL || src == NULL || dst == NULL) {
-		CDBG("invalid pointers");
+		CNDBG(CT_LOG_CRYPTO, "invalid pointers");
 		goto done;
 	}
 	if (srclen <= 0) {
-		CDBG("invalid srclen");
+		CNDBG(CT_LOG_CRYPTO, "invalid srclen");
 		goto done;
 	}
 
 	/* encryption requires bigger block */
 	if (enc && dstlen < srclen + EVP_CIPHER_block_size(type)) {
-		CDBG("invalid dstlen while encrypting");
+		CNDBG(CT_LOG_CRYPTO, "invalid dstlen while encrypting");
 		goto done;
 	}
 
 	if (enc == 0 && dstlen < srclen - EVP_CIPHER_block_size(type)) {
-		CDBG("invalid dstlen while decrypting");
+		CNDBG(CT_LOG_CRYPTO, "invalid dstlen while decrypting");
 		goto done;
 	}
 
 	if (ct_crypto_init(&ctx, type, key, keylen, iv, ivlen, enc)) {
-		CDBG("can't init crypto engine");
+		CNDBG(CT_LOG_CRYPTO, "can't init crypto engine");
 		goto unwind;
 	}
 
 	if ((len = ct_crypto_update(&ctx, src, srclen, dst, dstlen)) == -1) {
-		CDBG("can't encrypt");
+		CNDBG(CT_LOG_CRYPTO, "can't encrypt");
 		goto unwind;
 	}
 
 	if ((final = ct_crypto_final(&ctx, dst + len)) == -1) {
-		CDBG("can't finalize encryption");
+		CNDBG(CT_LOG_CRYPTO, "can't finalize encryption");
 		goto unwind;
 	}
 
@@ -209,7 +209,7 @@ ct_create_iv(uint8_t *key, size_t keylen, uint8_t *src, size_t srclen,
 	HMAC_CTX		hctx;
 
 	if (ivlen != SHA256_DIGEST_LENGTH) {
-		CDBG("invalid iv length");
+		CNDBG(CT_LOG_CRYPTO, "invalid iv length");
 		return (1);
 	}
 
@@ -324,7 +324,7 @@ ct_create_secrets(const char *passphrase, const char *filename,
 	int			fd;
 
 	if (filename == NULL) {
-		CDBG("no filename");
+		CNDBG(CT_LOG_CRYPTO, "no filename");
 		return (-1);
 	}
 
@@ -372,7 +372,7 @@ ct_create_secrets(const char *passphrase, const char *filename,
 
 	if (!PKCS5_PBKDF2_HMAC_SHA1(p, strlen(p), salt,
 	    sizeof(salt), rounds, sizeof key, key)) {
-		CDBG("can't create key");
+		CNDBG(CT_LOG_CRYPTO, "can't create key");
 		goto done;
 	}
 
@@ -391,14 +391,14 @@ ct_create_secrets(const char *passphrase, const char *filename,
 
 	if ((tot = ct_passphrase_encrypt(maskkey, sizeof maskkey, aeskey,
 	    sizeof aeskey, e_aeskey, sizeof e_aeskey)) <= 0) {
-		CDBG("ct_passphrase_encrypt aeskey");
+		CNDBG(CT_LOG_CRYPTO, "ct_passphrase_encrypt aeskey");
 		goto done;
 	}
 	ct_fprintfhex(f, C_F_AESKEY, e_aeskey, tot);
 
 	if ((tot = ct_passphrase_encrypt(maskkey, sizeof maskkey, ivkey,
 	    sizeof ivkey, e_ivkey, sizeof e_ivkey)) <= 0) {
-		CDBG("passphrase_encrypt ivkey");
+		CNDBG(CT_LOG_CRYPTO, "passphrase_encrypt ivkey");
 		goto done;
 	}
 	ct_fprintfhex(f, C_F_IVKEY, e_ivkey, tot);
@@ -406,7 +406,7 @@ ct_create_secrets(const char *passphrase, const char *filename,
 	/* step 4 */
 	if ((tot = ct_passphrase_encrypt(key, sizeof key, maskkey,
 	    sizeof maskkey, e_maskkey, sizeof e_maskkey)) <= 0) {
-		CDBG("passphrase_encrypt maskkey");
+		CNDBG(CT_LOG_CRYPTO, "passphrase_encrypt maskkey");
 		goto done;
 	}
 	ct_fprintfhex(f, C_F_MASKKEY, e_maskkey, tot);
@@ -489,7 +489,7 @@ ct_unlock_secrets(const char *passphrase, const char *filename,
 	struct stat		sb;
 
 	if (filename == NULL) {
-		CDBG("no filename");
+		CNDBG(CT_LOG_CRYPTO, "no filename");
 		return (-1);
 	}
 
@@ -518,45 +518,45 @@ ct_unlock_secrets(const char *passphrase, const char *filename,
 			s = line + C_F_ROUNDS_LEN;
 			if (ct_fscanfhex(s, (uint8_t *)&rounds_load,
 			    sizeof rounds_load)) {
-				CDBG("invalid rounds");
+				CNDBG(CT_LOG_CRYPTO, "invalid rounds");
 				goto done;
 			}
 		} else if (!strncmp(line, C_F_SALT, C_F_SALT_LEN)) {
 			s = line + C_F_SALT_LEN;
 			if (ct_fscanfhex(s, salt, sizeof salt)) {
-				CDBG("invalid salt");
+				CNDBG(CT_LOG_CRYPTO, "invalid salt");
 				goto done;
 			}
 		} else if (!strncmp(line, C_F_AESKEY, C_F_AESKEY_LEN)) {
 			s = line + C_F_AESKEY_LEN;
 			if (ct_fscanfhex(s, e_aeskey, sizeof e_aeskey)) {
-				CDBG("invalid e_aeskey");
+				CNDBG(CT_LOG_CRYPTO, "invalid e_aeskey");
 				goto done;
 			}
 		} else if (!strncmp(line, C_F_IVKEY, C_F_IVKEY_LEN)) {
 			s = line + C_F_IVKEY_LEN;
 			if (ct_fscanfhex(s, e_ivkey, sizeof e_ivkey)) {
-				CDBG("invalid e_ivkey");
+				CNDBG(CT_LOG_CRYPTO, "invalid e_ivkey");
 				goto done;
 			}
 		} else if (!strncmp(line, C_F_MASKKEY, C_F_MASKKEY_LEN)) {
 			s = line + C_F_MASKKEY_LEN;
 			if (ct_fscanfhex(s, e_maskkey, sizeof e_maskkey)) {
-				CDBG("invalid e_maskkey");
+				CNDBG(CT_LOG_CRYPTO, "invalid e_maskkey");
 				goto done;
 			}
 		} else if (!strncmp(line, C_F_HMACMASKKEY,
 		    C_F_HMACMASKKEY_LEN)) {
 			s = line + C_F_HMACMASKKEY_LEN;
 			if (ct_fscanfhex(s, hmac_maskkey, sizeof hmac_maskkey)) {
-				CDBG("invalid hmac_maskkey");
+				CNDBG(CT_LOG_CRYPTO, "invalid hmac_maskkey");
 				goto done;
 			}
 		} else if (!strncmp(line, C_F_DIGEST,
 		    C_F_DIGEST_LEN)) {
 			s = line + C_F_DIGEST_LEN;
 			if (ct_fscanfhex(s, digest, sizeof digest)) {
-				CDBG("invalid digest");
+				CNDBG(CT_LOG_CRYPTO, "invalid digest");
 				goto done;
 			}
 			got_digest = 1;
@@ -565,7 +565,7 @@ ct_unlock_secrets(const char *passphrase, const char *filename,
 			s = line + C_F_VERSION_LEN;
 			if (ct_fscanfhex(s, (uint8_t *)&f_version_load,
 			    sizeof f_version_load)) {
-				CDBG("invalid version");
+				CNDBG(CT_LOG_CRYPTO, "invalid version");
 				goto done;
 			}
 		} else {
@@ -577,7 +577,7 @@ ct_unlock_secrets(const char *passphrase, const char *filename,
 	/* step 0 */
 	rounds = ntohl(rounds_load);
 	if (rounds == 0) {
-		CDBG("invalid rounds");
+		CNDBG(CT_LOG_CRYPTO, "invalid rounds");
 		goto done;
 	}
 	f_version = ntohl(f_version_load);
@@ -607,7 +607,7 @@ ct_unlock_secrets(const char *passphrase, const char *filename,
 		 */
 		if (got_digest == 0) {
 			bcopy(digest_v, digest, sizeof digest);
-			CDBG("adding digest to secrets file");
+			CNDBG(CT_LOG_CRYPTO, "adding digest to secrets file");
 			if (fstat(fileno(f), &sb) == -1)
 				CFATAL("stat");
 			if (fchmod(fileno(f), S_IRWXU) == -1)
@@ -647,13 +647,13 @@ ct_unlock_secrets(const char *passphrase, const char *filename,
 	/* step 1 */
 	if (!PKCS5_PBKDF2_HMAC_SHA1(p, strlen(p), salt,
 	    sizeof(salt), rounds, sizeof key, key)) {
-		CDBG("can't create key");
+		CNDBG(CT_LOG_CRYPTO, "can't create key");
 		goto done;
 	}
 
 	if ((tot = ct_passphrase_decrypt(key, sizeof key, e_maskkey,
 	    sizeof e_maskkey, maskkey, sizeof maskkey)) <= 0) {
-		CDBG("ct_passphrase_decrypt maskkey");
+		CNDBG(CT_LOG_CRYPTO, "ct_passphrase_decrypt maskkey");
 		goto done;
 	}
 
@@ -672,24 +672,24 @@ ct_unlock_secrets(const char *passphrase, const char *filename,
 	/* step 4 */
 	if ((tot_iv = ct_passphrase_decrypt(maskkey, sizeof maskkey, e_ivkey,
 	    sizeof e_ivkey, ivkey, CT_IV_LEN)) <= 0) {
-		CDBG("ct_passphrase_decrypt ivkey");
+		CNDBG(CT_LOG_CRYPTO, "ct_passphrase_decrypt ivkey");
 		goto done;
 	}
 
 	/* step 5 */
 	if ((tot_aes = ct_passphrase_decrypt(maskkey, sizeof maskkey, e_aeskey,
 	    sizeof e_aeskey, aeskey, sizeof aeskey)) <= 0) {
-		CDBG("ct_passphrase_decrypt aeskey");
+		CNDBG(CT_LOG_CRYPTO, "ct_passphrase_decrypt aeskey");
 		goto done;
 	}
 
 	/* validate output */
 	if (tot_aes != outaeskeylen) {
-		CDBG("invalid aes key length");
+		CNDBG(CT_LOG_CRYPTO, "invalid aes key length");
 		goto done;
 	}
 	if (tot_iv != outivkeylen) {
-		CDBG("invalid iv key length");
+		CNDBG(CT_LOG_CRYPTO, "invalid iv key length");
 		goto done;
 	}
 

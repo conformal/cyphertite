@@ -680,5 +680,16 @@ struct ct_file_extract_priv {
 };
 ct_op_cb	ct_extract_file;
 
-/* log levels */
-#define	CT_LOG_EXUDE	(0x1)
+/* debug log levels */
+#define	CT_LOG_EXUDE	(0x001)
+#define	CT_LOG_NET	(0x002)
+#define	CT_LOG_TRANS	(0x004)
+#define	CT_LOG_SHA	(0x008)
+#define	CT_LOG_CTFILE	(0x010)
+#define	CT_LOG_DB	(0x020)
+#define	CT_LOG_CRYPTO	(0x040)
+#define	CT_LOG_FILE	(0x080)
+#define	CT_LOG_XML	(0x100)
+#define	CT_LOG_VERTREE	(0x200)
+
+uint64_t ct_get_debugmask(char *);

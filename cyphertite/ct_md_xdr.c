@@ -68,13 +68,15 @@ ct_populate_fnode(struct fnode *fnode, struct ct_md_header *hdr,
 		flistnode.fl_fname = hdr->cmh_filename;
 
 		flistnode.fl_parent_dir = gen_finddir(hdr->cmh_parent_dir);
-		CDBG("parent_dir %p %" PRId64, flistnode.fl_parent_dir,
+		CNDBG(CT_LOG_CTFILE,
+		    "parent_dir %p %" PRId64, flistnode.fl_parent_dir,
 		    hdr->cmh_parent_dir);
 
 		fnode->fl_sname = gen_fname(&flistnode);
 	} else
 		fnode->fl_sname = e_strdup(hdr->cmh_filename);
-	CDBG("name %s from %s %" PRId64, fnode->fl_sname, hdr->cmh_filename,
+	CNDBG(CT_LOG_CTFILE,
+	    "name %s from %s %" PRId64, fnode->fl_sname, hdr->cmh_filename,
 	    hdr->cmh_parent_dir);
 
 	if (C_ISDIR(hdr->cmh_type)) {
@@ -82,7 +84,8 @@ ct_populate_fnode(struct fnode *fnode, struct ct_md_header *hdr,
 		dnode->d_name = e_strdup(fnode->fl_sname);
 		dnode->d_num = ct_ex_dirnum++;
 		RB_INSERT(d_num_tree, &ct_dnum_head, dnode);
-		CDBG("inserting %s as %" PRId64, dnode->d_name, dnode->d_num );
+		CNDBG(CT_LOG_CTFILE, "inserting %s as %" PRId64,
+		    dnode->d_name, dnode->d_num );
 	}
 
 
@@ -102,7 +105,7 @@ ct_list_op(struct ct_op *op)
 	trans = ct_trans_alloc();
 	if (trans == NULL) {
 		/* system busy, return (should never happen) */
-		CDBG("ran out of transactions, waiting");
+		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
 		ct_set_file_state(CT_S_WAITING_TRANS);
 		return;
 	}
@@ -146,7 +149,7 @@ next_file:
 	}
 
 	if (xs_ctx.xs_gh.cmg_prevlvl_filename) {
-		CDBG("previous backup file %s\n",
+		CNDBG(CT_LOG_CTFILE, "previous backup file %s\n",
 		    xs_ctx.xs_gh.cmg_prevlvl_filename);
 		ct_next_filename = xs_ctx.xs_gh.cmg_prevlvl_filename;
 		ct_filename_free = ct_next_filename;
@@ -321,7 +324,8 @@ ct_extract_open_next(struct ct_extract_head *extract_head,
 
 	if (!TAILQ_EMPTY(extract_head)) {
 		next = TAILQ_FIRST(extract_head);
-		CDBG("should start restoring [%s]", next->filename);
+		CNDBG(CT_LOG_CTFILE,
+		    "should start restoring [%s]", next->filename);
 		TAILQ_REMOVE(extract_head, next, next);
 
 		if (ct_xdr_parse_init(ctx, next->filename))
@@ -358,7 +362,7 @@ ct_extract(struct ct_op *op)
 	struct ct_trans		*trans;
 	char			shat[SHA_DIGEST_STRING_LENGTH];
 
-	CDBG("entry");
+	CNDBG(CT_LOG_TRANS, "entry");
 	if (ct_state->ct_file_state == CT_S_STARTING) {
 		if (ex_priv == NULL) {
 			ex_priv = e_calloc(1, sizeof(*ex_priv));
@@ -382,7 +386,7 @@ ct_extract(struct ct_op *op)
 		trans = ct_trans_alloc();
 		if (trans == NULL) {
 			/* system busy, return */
-			CDBG("ran out of transactions, waiting");
+			CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
 			ct_set_file_state(CT_S_WAITING_TRANS);
 			return;
 		}
@@ -418,7 +422,8 @@ skip:
 				continue;
 			}
 
-			CDBG("file %s numshas %" PRId64, fnode->fl_sname,
+			CNDBG(CT_LOG_CTFILE,
+			    "file %s numshas %" PRId64, fnode->fl_sname,
 			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas);
 
 			trans->tr_trans_id = ct_trans_id++;
@@ -450,7 +455,7 @@ skip:
 			}
 			if (ct_verbose) {
 				ct_sha1_encode(trans->tr_sha, shat);
-				CDBG("extracting sha %s", shat);
+				CNDBG(CT_LOG_SHA, "extracting sha %s", shat);
 			}
 			trans->tr_state = TR_S_EX_SHA;
 			trans->tr_dataslot = 0;
@@ -472,7 +477,7 @@ skip:
 			ct_queue_transfer(trans);
 			break;
 		case XS_RET_EOF:
-			CDBG("Hit end of md");
+			CNDBG(CT_LOG_CTFILE, "Hit end of md");
 			ct_xdr_parse_close(&ex_priv->xdr_ctx);
 			if (!TAILQ_EMPTY(&ex_priv->extract_head)) {
 				ct_trans_free(trans);
@@ -492,7 +497,7 @@ skip:
 				trans->tr_state = TR_S_DONE;
 				trans->tr_trans_id = ct_trans_id++;
 				ct_queue_transfer(trans);
-				CDBG("extract finished");
+				CNDBG(CT_LOG_TRANS, "extract finished");
 				ct_set_file_state(CT_S_FINISHED);
 			}
 			return;
@@ -516,9 +521,9 @@ ct_extract_file(struct ct_op *op)
 	int				 ret;
 	char				 shat[SHA_DIGEST_STRING_LENGTH];
 
-	CDBG("entry");
+	CNDBG(CT_LOG_TRANS, "entry");
 	if (ct_state->ct_file_state == CT_S_STARTING) {
-		CDBG("starting");
+		CNDBG(CT_LOG_TRANS, "starting");
 		/* open file and seek to beginning of file */
 		if (ct_xdr_parse_init_at(&ex_priv->xdr_ctx,
 		    ex_priv->md_filename, ex_priv->md_offset) != 0)
@@ -535,7 +540,7 @@ ct_extract_file(struct ct_op *op)
 	ct_set_file_state(CT_S_RUNNING);
 	while (1) {
 		if ((trans = ct_trans_alloc()) == NULL) {
-			CDBG("ran out of transactions, waiting");
+			CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
 			ct_set_file_state(CT_S_WAITING_TRANS);
 			return;
 		}
@@ -544,18 +549,18 @@ ct_extract_file(struct ct_op *op)
 		trans->tr_trans_id = ct_trans_id++;
 
 		if (ex_priv->done) {
-			CDBG("Hit end of md");
+			CNDBG(CT_LOG_CTFILE, "Hit end of md");
 			ct_xdr_parse_close(&ex_priv->xdr_ctx);
 			trans->tr_state = TR_S_DONE;
 			ct_queue_transfer(trans);
-			CDBG("extract finished");
+			CNDBG(CT_LOG_TRANS, "extract finished");
 			ct_set_file_state(CT_S_FINISHED);
 			return;
 		}
 
 		switch ((ret = ct_xdr_parse(&ex_priv->xdr_ctx))) {
 		case XS_RET_FILE:
-			CDBG("opening file");
+			CNDBG(CT_LOG_CTFILE, "opening file");
 			if (ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas == -1) 
 				CFATALX("can't extract file with -1 shas");
 			trans->tr_fl_node = ex_priv->fl_ex_node =
@@ -573,12 +578,12 @@ ct_extract_file(struct ct_op *op)
 			trans->tr_fl_node->fl_sname = e_strdup(localfile);
 			/* Set name pointer to something else passed in */
 
-			CDBG("file %s numshas %" PRId64,
+			CNDBG(CT_LOG_CTFILE, "file %s numshas %" PRId64,
 			    trans->tr_fl_node->fl_sname,
 			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas);
 			break;
 		case XS_RET_SHA:
-			CDBG("sha!");
+			CNDBG(CT_LOG_SHA, "sha!");
 			if (ex_priv->xdr_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO) {
 				/*
 				 * yes csha and sha are reversed, we want
@@ -597,13 +602,13 @@ ct_extract_file(struct ct_op *op)
 			}
 			if (ct_verbose) {
 				ct_sha1_encode(trans->tr_sha, shat);
-				CDBG("extracting sha %s", shat);
+				CNDBG(CT_LOG_SHA, "extracting sha %s", shat);
 			}
 			trans->tr_state = TR_S_EX_SHA;
 			trans->tr_dataslot = 0;
 			break;
 		case XS_RET_FILE_END:
-			CDBG("file end!");
+			CNDBG(CT_LOG_CTFILE, "file end!");
 			bcopy(ex_priv->xdr_ctx.xs_trl.cmt_sha, trans->tr_sha,
 			    sizeof(trans->tr_sha));
 			trans->tr_state = TR_S_EX_FILE_END;
@@ -634,7 +639,7 @@ ct_cull_add_shafile(const char *file)
 	char			*ct_next_filename, *ct_filename_free = NULL;
 	int			ret;
 
-	CDBG("processing [%s]", file);
+	CNDBG(CT_LOG_TRANS, "processing [%s]", file);
 
 	/*
 	 * XXX - should we keep a list of added files,
@@ -648,7 +653,7 @@ next_file:
 	ct_next_filename = NULL;
 
 	ret = ct_xdr_parse_init(&xs_ctx, file);
-	CDBG("opening [%s]", file);
+	CNDBG(CT_LOG_CTFILE, "opening [%s]", file);
 	if (ret)
 		CFATALX("failed to open %s", file);
 
@@ -658,7 +663,7 @@ next_file:
 	}
 
 	if (xs_ctx.xs_gh.cmg_prevlvl_filename) {
-		CDBG("previous backup file %s\n",
+		CNDBG(CT_LOG_CTFILE, "previous backup file %s\n",
 		    xs_ctx.xs_gh.cmg_prevlvl_filename);
 		ct_next_filename = xs_ctx.xs_gh.cmg_prevlvl_filename;
 		ct_filename_free = ct_next_filename;

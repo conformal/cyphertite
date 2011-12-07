@@ -122,7 +122,7 @@ ct_set_file_state(int newstate)
 void
 ct_queue_transfer(struct ct_trans *trans)
 {
-	CDBG("queuing transaction %" PRIu64 " %d",
+	CNDBG(CT_LOG_TRANS, "queuing transaction %" PRIu64 " %d",
 	    trans->tr_trans_id, trans->tr_state);
 	switch (trans->tr_state) {
 	case TR_S_READ:
@@ -307,7 +307,7 @@ ct_trans_free(struct ct_trans *trans)
 
 	/* XXX - should this wait for a low threshold? */
 	if (ct_state->ct_file_state == CT_S_WAITING_TRANS) {
-		CDBG("send wakeup");
+		CNDBG(CT_LOG_TRANS, "send wakeup");
 		ct_wakeup_file();
 	}
 }
@@ -318,7 +318,7 @@ ct_trans_cleanup(void)
 	struct ct_trans *trans;
 	int count = 0;
 
-	CDBG("trans num free  %d", c_trans_free);
+	CNDBG(CT_LOG_TRANS, "trans num free  %d", c_trans_free);
 	/* free the transaction data block/or each element */
 	while (!TAILQ_EMPTY(&ct_trans_free_head)) {
 		trans = TAILQ_FIRST(&ct_trans_free_head);
@@ -327,7 +327,7 @@ ct_trans_cleanup(void)
 		count++;
 	}
 	c_trans_free = ct_numalloc = 0;
-	CDBG("freed %d transactions", count);
+	CNDBG(CT_LOG_TRANS, "freed %d transactions", count);
 }
 
 #define CT_RECONNECT_DEFAULT_TIMEOUT	30
@@ -359,7 +359,8 @@ ct_reconnect_internal(void)
 				 * don't worry.
 				 */
 				if (trans->tr_state == TR_S_XML_OPEN) {
-					CDBG("found open in queue, ignoring");
+					CNDBG(CT_LOG_NET,
+					    "found open in queue, ignoring");
 					break;
 				}
 				/*
@@ -368,7 +369,8 @@ ct_reconnect_internal(void)
 				 * just complete it and stop worrying
 				 */
 				if (trans->tr_state == TR_S_XML_CLOSING) {
-					CDBG("found close in queue, completing");
+					CNDBG(CT_LOG_NET,
+					    "found close in queue, completing");
 					/*
 					 * Don't try and close again,
 					 * complete it and stop worrying.
@@ -390,7 +392,7 @@ ct_reconnect_internal(void)
 			    trans->tr_state == TR_S_COMPRESSED ||
 			    trans->tr_state == TR_S_ENCRYPTED ||
 			    trans->tr_state == TR_S_READ) {
-				CDBG("write in queue chunkno %d",
+				CNDBG(CT_LOG_NET, "write in queue chunkno %d",
 				    trans->tr_md_chunkno);
 				/*
 				 * Reopen the file at the point we are.
@@ -408,7 +410,7 @@ ct_reconnect_internal(void)
 					CFATALX("can't reopen metadata file");
 				break;
 			} else if (trans->tr_state == TR_S_EX_SHA) {
-				CDBG("read in queue chunkno %d",
+				CNDBG(CT_LOG_NET, "read in queue chunkno %d",
 				    trans->tr_md_chunkno);
 				/*
 				 * We had a read in progress. reinject
@@ -470,8 +472,9 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 		while(!RB_EMPTY(&ct_state->ct_inflight)) {
 			trans = RB_MAX(ct_iotrans_lookup,
 			    &ct_state->ct_inflight);
-			CDBG("moving trans %" PRIu64 " back to queued",
-				trans->tr_trans_id);
+			CNDBG(CT_LOG_NET,
+			    "moving trans %" PRIu64 " back to queued",
+			    trans->tr_trans_id);
 			RB_REMOVE(ct_iotrans_lookup, &ct_state->ct_inflight,
 			    trans);
 			/* put on the head so write queue is still ordered. */
@@ -501,7 +504,8 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 	if (hdr->c_opcode & 1)
 		lookup_body = 1;
 	if (lookup_body) {
-		CDBG("handle message iotrans %u opcode %u status %u",
+		CNDBG(CT_LOG_NET,
+		    "handle message iotrans %u opcode %u status %u",
 		    hdr->c_tag, hdr->c_opcode, hdr->c_status);
 		trans = RB_FIND(ct_iotrans_lookup, &ct_state->ct_inflight,
 		    &ltrans);
@@ -514,7 +518,8 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 	}
 
 	if (trans)
-		CDBG("trans %" PRIu64 " found", trans->tr_trans_id);
+		CNDBG(CT_LOG_NET,
+		    "trans %" PRIu64 " found", trans->tr_trans_id);
 	switch(hdr->c_opcode) {
 	case C_HDR_O_EXISTS_REPLY:
 		ct_handle_exists_reply(trans, hdr, vbody);
@@ -544,7 +549,7 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 	    (hdr->c_flags & C_HDR_F_METADATA) == 0))
 		CFATALX("not expecting vbody");
 
-	CDBG("write done, trans %" PRIu64 " op %u",
+	CNDBG(CT_LOG_NET, "write done, trans %" PRIu64 " op %u",
 	    trans->tr_trans_id, hdr->c_opcode);
 
 	if (ct_disconnected) {
@@ -553,7 +558,7 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 		 * move back to to write_queue
 		 */
 		trans = (struct ct_trans *)hdr; /* cast to parent struct */
-		CDBG("moving trans %" PRIu64" back to write queue",
+		CNDBG(CT_LOG_NET, "moving trans %" PRIu64" back to write queue",
 		    trans->tr_trans_id);
 		TAILQ_REMOVE(&ct_state->ct_queued, trans, tr_next);
 		ct_state->ct_queued_qlen--;
@@ -603,7 +608,7 @@ ct_body_alloc(void *vctx, struct ct_header *hdr)
 	   /* lookup transaction and return alternate data payload */
 	/* else */
 	   /* allocate buffer of hdr->c_size */
-	CDBG("body alloc on iotrans %u", hdr->c_tag);
+	CNDBG(CT_LOG_TRANS, "body alloc on iotrans %u", hdr->c_tag);
 
 	if (hdr->c_opcode & 1) {
 		/* not all replies have bodies preallocated */
@@ -626,7 +631,7 @@ ct_body_alloc(void *vctx, struct ct_header *hdr)
 		body = trans->tr_data[slot];
 	} else {
 		body = e_calloc(1, hdr->c_size);
-		CDBG("body allocated %p", body);
+		CNDBG(CT_LOG_TRANS, "body allocated %p", body);
 	}
 
 	return body;
@@ -687,7 +692,8 @@ ct_compute_sha(void *vctx)
 		case TR_S_EXISTS:
 			if (ct_debug) {
 				ct_sha1_encode(trans->tr_sha, shat);
-				CDBG("entering sha into db %" PRIu64 " %s",
+				CNDBG(CT_LOG_SHA,
+				    "entering sha into db %" PRIu64 " %s",
 				    trans->tr_trans_id, shat);
 			}
 			ctdb_insert(trans);
@@ -700,8 +706,9 @@ ct_compute_sha(void *vctx)
 		}
 		ct_stats->st_chunks_tot++;
 		slot = trans->tr_dataslot;
-		CDBG("computing sha for trans %" PRIu64 " slot %d, size %d",
-			trans->tr_trans_id, slot, trans->tr_size[slot]);
+		CNDBG(CT_LOG_SHA,
+		    "computing sha for trans %" PRIu64 " slot %d, size %d",
+		    trans->tr_trans_id, slot, trans->tr_size[slot]);
 		ct_sha1(trans->tr_data[slot], trans->tr_sha,
 		    trans->tr_size[slot]);
 		ct_sha1_add(trans->tr_data[slot], &fnode->fl_shactx,
@@ -711,7 +718,8 @@ ct_compute_sha(void *vctx)
 
 		if (ct_debug) {
 			ct_sha1_encode(trans->tr_sha, shat);
-			CDBG("block tr_id %" PRIu64 " sha %s sz %d",
+			CNDBG(CT_LOG_SHA,
+			    "block tr_id %" PRIu64 " sha %s sz %d",
 			    trans->tr_trans_id, shat, trans->tr_size[slot]);
 		}
 		if (ctdb_exists(trans)) {
@@ -744,7 +752,7 @@ ct_compute_csha(void *vctx)
 
 		if (ct_debug) {
 			ct_sha1_encode(trans->tr_sha, shat);
-			CDBG("block tr_id %" PRIu64 " sha %s",
+			CNDBG(CT_LOG_SHA, "block tr_id %" PRIu64 " sha %s",
 			    trans->tr_trans_id, shat);
 		}
 		trans->tr_state = TR_S_COMPSHA_ED;
@@ -764,7 +772,7 @@ ct_write_md_special(struct ct_trans *trans)
 	if (C_ISDIR(type)) {
 		if (ct_write_header(fnode, fnode->fl_sname, 1))
 			CWARNX("header write failed");
-		CDBG("record dir %s", fnode->fl_sname);
+		CNDBG(CT_LOG_CTFILE, "record dir %s", fnode->fl_sname);
 	} else if (C_ISCHR(type) || C_ISBLK(type)) {
 		if (ct_write_header(fnode, fnode->fl_sname, 1))
 			CWARNX("header write failed");
@@ -798,7 +806,7 @@ ct_write_md_special(struct ct_trans *trans)
 			    fnode->fl_hardlink ? "hard" : "sym");
 			return;
 		}
-		CDBG("mylink %s %s", fnode->fl_sname, plink);
+		CNDBG(CT_LOG_CTFILE, "mylink %s %s", fnode->fl_sname, plink);
 		if (ct_write_header(fnode, fnode->fl_sname, 1))
 			CWARNX("header write failed");
 
@@ -832,8 +840,8 @@ ct_write_md_eof(struct ct_trans *trans)
 	    fnode->fl_skip_file)
 		return;
 
-	CDBG("trailer on trans %" PRIu64, trans->tr_trans_id);
-	CDBG("should write trans for %s",
+	CNDBG(CT_LOG_CTFILE, "trailer on trans %" PRIu64, trans->tr_trans_id);
+	CNDBG(CT_LOG_CTFILE, "should write trans for %s",
 	    fnode->fl_sname);
 	ct_write_trailer(trans);
 	if (ct_verbose > 1) {
@@ -980,14 +988,15 @@ ct_process_completions(void *vctx)
 
 	trans = RB_MIN(ct_trans_lookup, &ct_state->ct_complete);
 	if (trans)
-		CDBG("completing trans %" PRIu64 " pkt id: %" PRIu64"",
+		CNDBG(CT_LOG_TRANS,
+		    "completing trans %" PRIu64 " pkt id: %" PRIu64"",
 		    trans->tr_trans_id, ct_packet_id);
 
 	while (trans != NULL && trans->tr_trans_id == ct_packet_id) {
 		RB_REMOVE(ct_trans_lookup, &ct_state->ct_complete, trans);
 		ct_state->ct_complete_rblen--;
 
-		CDBG("writing file trans %" PRIu64 " eof %d",
+		CNDBG(CT_LOG_TRANS, "writing file trans %" PRIu64 " eof %d",
 		    trans->tr_trans_id, trans->tr_eof);
 
 		ct_packet_id++;
@@ -1028,14 +1037,14 @@ ct_wakeup_write(void)
 		ct_reconnect_pending = 0;
 	}
 
-	CDBG("wakup write");
+	CNDBG(CT_LOG_NET, "wakup write");
 	while (ct_disconnected == 0 &&
 	    !TAILQ_EMPTY(&ct_state->ct_write_queue)) {
 		trans = TAILQ_FIRST(&ct_state->ct_write_queue);
 		TAILQ_REMOVE(&ct_state->ct_write_queue, trans, tr_next);
 		ct_state->ct_write_qlen--;
 
-		CDBG("wakup write going");
+		CNDBG(CT_LOG_NET, "wakup write going");
 		hdr = &trans->hdr;
 
 		hdr->c_version = C_HDR_VERSION;
@@ -1092,7 +1101,7 @@ ct_wakeup_write(void)
 		/* hdr->c_tag - set once when trans was originally created */
 		hdr->c_version = C_HDR_VERSION;
 
-		CDBG("queuing write of op %u trans %" PRIu64
+		CNDBG(CT_LOG_NET, "queuing write of op %u trans %" PRIu64
 		    " iotrans %u tstate %d flags 0x%x",
 		    hdr->c_opcode, trans->tr_trans_id, hdr->c_tag,
 		    trans->tr_state, hdr->c_flags);
@@ -1133,7 +1142,7 @@ ct_handle_exists_reply(struct ct_trans *trans, struct ct_header *hdr,
 {
 	int slot;
 
-	CDBG("exists_reply %" PRIu64 " status %u",
+	CNDBG(CT_LOG_NET, "exists_reply %" PRIu64 " status %u",
 	    trans->tr_trans_id, hdr->c_status);
 
 	switch(hdr->c_status) {
@@ -1168,8 +1177,8 @@ void
 ct_handle_write_reply(struct ct_trans *trans, struct ct_header *hdr,
     void *vbody)
 {
-	CDBG("handle_write_reply");
-	CDBG("hdr op %u status %u size %u",
+	CNDBG(CT_LOG_NET, "handle_write_reply");
+	CNDBG(CT_LOG_NET, "hdr op %u status %u size %u",
 	    hdr->c_opcode, hdr->c_status, hdr->c_size);
 
 	if (hdr->c_status == C_HDR_S_OK) {
@@ -1210,7 +1219,6 @@ ct_handle_read_reply(struct ct_trans *trans, struct ct_header *hdr,
 
 		if (hdr->c_flags & C_HDR_F_METADATA &&
 		    hdr->c_ex_status == 2) {
-			CDBG("checking footer");
 			cmf = (struct ct_metadata_footer *)
 			    (trans->tr_data[slot] + hdr->c_size - sizeof(*cmf));
 			cmf->cmf_size = ntohl(cmf->cmf_size);
@@ -1221,11 +1229,10 @@ ct_handle_read_reply(struct ct_trans *trans, struct ct_header *hdr,
 			if (cmf->cmf_chunkno != trans->tr_md_chunkno)
 				CFATALX("invalid chunkno %u %u",
 				    cmf->cmf_chunkno, trans->tr_md_chunkno);
-			CDBG("footer ok");
 			hdr->c_size -= sizeof(*cmf);
 		}
 	} else {
-		CDBG("c_flags on reply %x", hdr->c_flags);
+		CNDBG(CT_LOG_NET, "c_flags on reply %x", hdr->c_flags);
 		if (hdr->c_flags & C_HDR_F_METADATA) {
 			/* FAIL on metadata read is 'eof' */
 			if (ct_state->ct_file_state != CT_S_FINISHED) {
@@ -1247,7 +1254,7 @@ ct_handle_read_reply(struct ct_trans *trans, struct ct_header *hdr,
 
 	if (ct_debug) {
 		ct_sha1_encode(trans->tr_sha, shat);
-		CDBG("chunk received for %s len %u flags %u", shat,
+		CNDBG(CT_LOG_NET, "chunk received for %s len %u flags %u", shat,
 		    hdr->c_size, hdr->c_flags);
 	}
 	trans->tr_size[slot] = trans->hdr.c_size = hdr->c_size;
@@ -1321,7 +1328,8 @@ ct_compute_compress(void *vctx)
 			newlen = len;
 			rv = ct_compress(src, dst, len, &newlen);
 			if (newlen >= len) {
-				CDBG("use uncompressed buffer %d %lu", len,
+				CNDBG(CT_LOG_TRANS,
+				    "use uncompressed buffer %d %lu", len,
 				    (unsigned long) newlen);
 				rv = 1; /* act like compression failed */
 				newlen = len;
@@ -1339,7 +1347,7 @@ ct_compute_compress(void *vctx)
 				    len);
 		}
 
-		CDBG("compress block of %d to %lu, rv %d", len,
+		CNDBG(CT_LOG_TRANS, "compress block of %d to %lu, rv %d", len,
 		    (unsigned long) newlen, rv);
 
 		/* if compression failed for whatever reason use input data */
@@ -1427,7 +1435,8 @@ ct_compute_encrypt(void *vctx)
 			CFATALX("failed to %scrypt files",
 			    encr ? "en" : "de");
 
-		CDBG("%scrypt block of %d to %lu", encr ? "en" : "de",
+		CNDBG(CT_LOG_TRANS,
+		    "%scrypt block of %d to %lu", encr ? "en" : "de",
 		    len, (unsigned long) newlen);
 
 		ct_stats->st_bytes_crypted += newlen;

@@ -93,8 +93,6 @@ ct_regex_comp(regex_t *re, char **flist)
 	if (q == NULL)
 		return;
 
-	CDBG("%s", q);
-
 	if ((rv = regcomp(re, q, REG_EXTENDED | REG_NOSUB)) != 0) {
 		regerror(rv, re, error, sizeof(error) - 1);
 		CFATALX("extract_archive: regcomp failed: %s", error);

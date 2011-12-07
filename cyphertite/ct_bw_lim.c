@@ -59,7 +59,7 @@ ct_ssl_init_bw_lim(struct ct_assl_io_ctx *ctx)
 
 	/* 1/4 of the number of bytes to send per timeslot */
 	packet_len = ((ct_io_bw_limit * 1024) / (US_PER_SEC/BW_TIMESLOT))/4;
-	CDBG("packet_len %d",  packet_len);
+	CNDBG(CT_LOG_NET, "packet_len %d",  packet_len);
 	ct_assl_io_ctx_set_maxtrans(ctx, packet_len);
 	ct_assl_io_ctx_set_over_bw_func(ctx, ct_ssl_over_bw_func);
 	evtimer_set(&wakeuptimer_ev, ct_ssl_over_bw_wakeup, ctx);
@@ -68,7 +68,7 @@ ct_ssl_init_bw_lim(struct ct_assl_io_ctx *ctx)
 	single_slot_time.tv_usec = BW_TIMESLOT;
 
 	slot_max =  ((ct_io_bw_limit * 1024) / (US_PER_SEC/BW_TIMESLOT));
-	CDBG("slottime %d max_bw_total %d",
+	CNDBG(CT_LOG_NET, "slottime %d max_bw_total %d",
 	    BW_TIMESLOT, slot_max);
 }
 
@@ -182,7 +182,7 @@ ct_ssl_over_bw_func(void *cbarg, struct ct_assl_io_ctx *ioctx)
 		}
 	}
 
-	CDBG("cbarg bytes %" PRIu64, ioctx->io_write_bytes);
+	CNDBG(CT_LOG_NET, "cbarg bytes %" PRIu64, ioctx->io_write_bytes);
 	if (traceslot == 0 || traceslot == 0) {
 		dump_bw_stats();
 	}

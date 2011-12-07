@@ -275,7 +275,7 @@ ct_alloc_dirnum(struct dnode *dnode, struct dnode *parentdir)
 	 * lazy directory header writing
 	 */
 	fnode_dir = ct_populate_fnode_from_flist(dnode->d_flnode);
-	CDBG("alloc_dirnum dir %"PRId64" %s", dnode->d_num,
+	CNDBG(CT_LOG_CTFILE, "alloc_dirnum dir %"PRId64" %s", dnode->d_num,
 	    fnode_dir->fl_sname);
 	ct_write_header(fnode_dir, fnode_dir->fl_sname, 1);
 	ct_free_fnode(fnode_dir);
@@ -287,7 +287,7 @@ ct_write_header(struct fnode *fnode, char *filename, int base)
 	struct ct_md_header	hdr;
 
 
-	CDBG("writing file header %s %s", fnode->fl_sname,
+	CNDBG(CT_LOG_CTFILE, "writing file header %s %s", fnode->fl_sname,
 	    filename);
 
 	bzero(&hdr, sizeof hdr);
@@ -298,7 +298,7 @@ ct_write_header(struct fnode *fnode, char *filename, int base)
 
 		if (fnode->fl_curdir_dir->d_num == -2) {
 			fnode->fl_curdir_dir->d_num = ++ct_dirnum;
-			CDBG("tagging dir %s as %" PRId64,
+			CNDBG(CT_LOG_CTFILE, "tagging dir %s as %" PRId64,
 			    fnode->fl_curdir_dir->d_name,
 			    fnode->fl_curdir_dir->d_num);
 
@@ -310,12 +310,13 @@ ct_write_header(struct fnode *fnode, char *filename, int base)
 				ct_alloc_dirnum(fnode->fl_curdir_dir,
 				    fnode->fl_parent_dir);
 			} else {
-				CDBG("skipping dir %s", filename);
+				CNDBG(CT_LOG_CTFILE,
+				     "skipping dir %s", filename);
 				/* do not write 'unused' dirs */
 			}
 			return 0;
 		}
-		CDBG("WRITING %s tag %" PRId64,
+		CNDBG(CT_LOG_CTFILE, "WRITING %s tag %" PRId64,
 		    fnode->fl_curdir_dir->d_name,
 		    fnode->fl_curdir_dir->d_num);
 	} else if (fnode->fl_skip_file)
@@ -368,9 +369,9 @@ ct_write_trailer(struct ct_trans *trans)
 
 	fnode = trans->tr_fl_node;
 
-	CDBG("multi %d", ct_multilevel_allfiles);
+	CNDBG(CT_LOG_CTFILE, "multi %d", ct_multilevel_allfiles);
 
-	CDBG("writing file trailer %s", fnode->fl_sname);
+	CNDBG(CT_LOG_CTFILE, "writing file trailer %s", fnode->fl_sname);
 	bzero (&trl, sizeof trl);
 	ct_sha1_final(trl.cmt_sha, &fnode->fl_shactx);
 	trl.cmt_orig_size = fnode->fl_size;
@@ -389,7 +390,8 @@ ct_write_sha(struct ct_trans *trans)
 {
 	bool_t ret;
 
-	CDBG("XoX sha sz %d eof %d", trans->tr_size[(int)trans->tr_dataslot],
+	CNDBG(CT_LOG_CTFILE,
+	    "XoX sha sz %d eof %d", trans->tr_size[(int)trans->tr_dataslot],
 	    trans->tr_eof);
 	ret = ct_xdr_dedup_sha(&xdr, trans->tr_sha);
 
@@ -404,7 +406,7 @@ ct_write_sha_crypto(struct ct_trans *trans)
 {
 	bool_t ret;
 
-	CDBG("XoX sha crypt");
+	CNDBG(CT_LOG_CTFILE, "XoX sha crypt");
 	ret = ct_xdr_dedup_sha_crypto(&xdr, trans->tr_sha, trans->tr_csha,
 	   trans->tr_iv);
 
@@ -462,7 +464,8 @@ ct_read_header(struct ct_md_header *hdr)
 	if (ct_xdr_header(&xdr, hdr) == FALSE)
 		return 1;
 
-	CDBG("header beacon 0x%08x 0x%08x shas %" PRIu64 " name %s",
+	CNDBG(CT_LOG_CTFILE,
+	    "header beacon 0x%08x 0x%08x shas %" PRIu64 " name %s",
 	    hdr->cmh_beacon, CT_HDR_BEACON, hdr->cmh_nr_shas,
 	    hdr->cmh_filename);
 

@@ -309,8 +309,8 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *asslctx)
 		goto done;
 	}
 
-	CDBG("negotiated queue depth: %u max chunk size: %u", ct_max_trans,
-	    ct_max_block_size);
+	CNDBG(CT_LOG_NET, "negotiated queue depth: %u max chunk size: %u",
+	    ct_max_trans, ct_max_block_size);
 
 	ct_sha512((uint8_t *)ct_password, pwd_digest, strlen(ct_password));
 	if (ct_base64_encode(CT_B64_ENCODE, pwd_digest, sizeof pwd_digest,
@@ -367,7 +367,7 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *asslctx)
 		goto done;
 	}
 
-	CDBG("login successful");
+	CNDBG(CT_LOG_NET, "login successful");
 	rv = 0;
 done:
 	return (rv);

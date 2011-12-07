@@ -194,6 +194,35 @@ file and the backup window.
 Set the current working directory.  When extracting, files will be
 extracted into the specified directory; when creating, the specified
 files will be matched from the directory.
+.It Fl D Ar modestring
+Run in debug mode.
+.Ar modestring
+is a comma delimited list of the following types:
+.Pp
+.Bl -tag -width "vertreeXX" -compact
+.It Ar exude
+memory debugging.
+.It Ar net
+network.
+.It Ar trans
+transactions.
+.It Ar sha
+deduplication has calculations.
+.It Ar ctfile
+generation and reading of ctfiles.
+.It Ar db
+Local database.
+.It Ar crypto
+Cryptographical transforms and key calculations.
+.It Ar file
+Filesystem access.
+.It Ar xml
+xml messages to the server.
+.It Ar vertree
+version tree calculations.
+.It Ar all
+All of the above.
+.El
 .It Fl E Ar pattern_file
 Specify the location of a file containing a list of patterns to be ignored
 in list, archive and extract modes.
@@ -221,8 +250,6 @@ The option prevents
 .Nm
 from descending into directories that have a different device number
 than the file from which the descent began.
-.It Fl d
-Run in debug mode.
 .It Fl e
 Deletes a remotely stored archive metadata file.  The option is used in
 conjunction with -m.
