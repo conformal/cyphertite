@@ -23,9 +23,10 @@
 .Nm cyphertite
 .Bk -words
 .Fl ctxV
-.Op Fl 0PRXdpr
+.Op Fl 0PRXpr
 .Op Fl B Ar ctfile
 .Op Fl C Ar tmpdir
+.Op Fl D Ar debugstring
 .Op Fl E Ar excludefile
 .Op Fl F Ar conffile
 .Op Fl I Ar includefile
@@ -37,8 +38,9 @@
 .Bk -words
 .Fl m
 .Fl cetx
-.Op Fl dr
+.Op Fl r
 .Op Fl C Ar tmpdir
+.Op Fl D Ar debugstring
 .Op Fl F Ar conffile
 .Op Fl f Ar metadata-tag
 .Op Ar pattern
@@ -194,9 +196,9 @@ file and the backup window.
 Set the current working directory.  When extracting, files will be
 extracted into the specified directory; when creating, the specified
 files will be matched from the directory.
-.It Fl D Ar modestring
+.It Fl D Ar debugstring
 Run in debug mode.
-.Ar modestring
+.Ar debugstring
 is a comma delimited list of the following types:
 .Pp
 .Bl -tag -width "vertreeXX" -compact

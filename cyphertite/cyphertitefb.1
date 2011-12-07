@@ -22,8 +22,7 @@
 .Sh SYNOPSIS
 .Nm cyphertitefb
 .Bk -words
-.Fl ctxV
-.Op Fl d
+.Op Fl D Ar debugstring
 .Op Fl F Ar conffile
 .Op Fl f Ar ctfile
 .Op Ar file ...
@@ -50,11 +49,14 @@ in the configuration is set to remote then only the metadata tag is required.
 In addition to the aforementioned flag, the following flags may be
 used:
 .Bl -tag -width Ds
+.It Fl D Ar debugstring
+Run in debug mode.
+.Ar debugstring
+is a comma delimited list of the types described in
+.Xr cyphertite 1
 .It Fl F Ar config
 Specify the location of the configuration file to use, overriding
 the default values.
-.It Fl d
-Run in debug mode.
 .El
 .Sh COMMANDS
 After
