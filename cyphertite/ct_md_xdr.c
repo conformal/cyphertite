@@ -12,7 +12,8 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- */ #include <stdlib.h>
+ */
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
@@ -26,6 +27,8 @@ int	ct_populate_fnode(struct fnode *, struct ct_md_header *,
 	    struct ct_md_header *, int *);
 
 int64_t		ct_ex_dirnum = 0;
+uint8_t		zerosha[SHA_DIGEST_LENGTH];
+
 /*
  * Helper functions
  */
@@ -437,6 +440,17 @@ skip:
 				ct_trans_free(trans);
 				continue;
 			}
+
+			if (memcmp(zerosha, ex_priv->xdr_ctx.xs_sha,
+				SHA_DIGEST_LENGTH) == 0) {
+				CWARNX("\"%s\" truncated during backup",
+				    trans->tr_fl_node->fl_sname);
+				if (ct_xdr_parse_seek(&ex_priv->xdr_ctx))
+					CFATALX("can't seek past shas");
+				ct_trans_free(trans);
+				continue;
+			}
+
 			if (ex_priv->xdr_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO) {
 				/*
 				 * yes csha and sha are reversed, we want

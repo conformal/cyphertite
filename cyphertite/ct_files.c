@@ -592,26 +592,25 @@ loop:
 		/* short read, file truncated, or end of file */
 		/* restat file for modifications */
 		error = fstat(current_fd, &sb);
+
+		close(current_fd);
+		current_fd = -1;
+		ct_trans->tr_eof = 1;
+		fl_curnode->fl_state = CT_FILE_FINISHED;
+
 		if (error) {
 			CWARN("archive: file %s stat error",
 			    fl_curnode->fl_sname);
 		} else if (sb.st_size != fl_curnode->fl_size) {
-			CWARNX("file truncated during backup");
-			/*
-			 * may need to perform special nop processing
-			 * to pad archive file to right number of chunks
-			 */
+			CWARNX("\"%s\" truncated during backup",
+			    fl_curnode->fl_sname);
+			ct_trans->tr_state = TR_S_WMD_READY;
+			ct_trans->tr_eof = 2;
 		}
 		CNDBG(CT_LOG_FILE, "going to next file %s",
 		    fl_curnode->fl_sname);
 		CNDBG(CT_LOG_TRANS, "setting eof on trans %" PRIu64 " %s",
 		    ct_trans->tr_trans_id, fl_curnode->fl_sname);
-		close(current_fd);
-		current_fd = -1;
-		ct_trans->tr_eof = 1;
-
-		fl_curnode->fl_offset = fl_curnode->fl_size;
-		fl_curnode->fl_state = CT_FILE_FINISHED;
 	} else {
 		fl_curnode->fl_offset += rlen;
 	}

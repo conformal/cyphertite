@@ -912,12 +912,33 @@ ct_complete_normal(struct ct_trans *trans)
 		break;
 	case TR_S_WMD_READY:
 		ct_stats->st_chunks_completed++;
-		if (ct_encrypt_enabled) {
-			ct_write_sha_crypto(trans);
-		} else {
-			ct_write_sha(trans);
+		if (trans->tr_eof < 2) {
+			if (ct_encrypt_enabled) {
+				ct_write_sha_crypto(trans);
+			} else {
+				ct_write_sha(trans);
+			}
 		}
-		if (trans->tr_eof == 1) {
+
+		if (trans->tr_eof) {
+			if (trans->tr_eof == 2) {
+				struct fnode *fn = trans->tr_fl_node;
+				size_t padlen = fn->fl_size - fn->fl_offset;
+
+				bzero(trans->tr_sha, sizeof(trans->tr_sha));
+				/*
+				 * File got truncated during backup, pad up
+				 * zero shas to the original size of the file.
+				 */
+				while (padlen > 0) {
+					padlen -= ct_max_block_size;
+					if (ct_encrypt_enabled) {
+						ct_write_sha_crypto(trans);
+					} else {
+						ct_write_sha(trans);
+					}
+				}
+			}
 			ct_write_md_eof(trans);
 			release_fnode = 1;
 		}
