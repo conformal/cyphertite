@@ -218,12 +218,14 @@ ct_main(int argc, char **argv)
 	int		level0 = 0;
 	int		freeincludes = 0;
 	int		need_secrets;
+	char		*configfile = NULL;
+	char		*basisfile = NULL;
 
 	while ((c = getopt(argc, argv,
 	    "B:C:DE:F:I:PRVXa:cdef:mprtvx0")) != -1) {
 		switch (c) {
 		case 'B':
-			ct_basisbackup = e_strdup(optarg);
+			basisfile = optarg;
 			break;
 		case 'C':
 			ct_tdir = optarg;
@@ -232,13 +234,13 @@ ct_main(int argc, char **argv)
 			foreground = 0;
 			break;
 		case 'E':
-			ct_excludefile = e_strdup(optarg);
+			ct_excludefile = optarg;
 			break;
 		case 'F':
-			ct_configfile = e_strdup(optarg);
+			configfile = optarg;
 			break;
 		case 'I':
-			ct_includefile = e_strdup(optarg);
+			ct_includefile = optarg;
 			break;
 		case 'P':
 			ct_strip_slash = 0;
@@ -319,6 +321,12 @@ ct_main(int argc, char **argv)
 	if (clog_set_flags(cflags))
 		errx(1, "illegal clog flags");
 	clog_set_mask(debug_mask);
+
+	/* We can allocate these now that we've decided if we need exude */
+	if (configfile)
+		ct_configfile = e_strdup(configfile);
+	if (basisfile)
+		ct_basisbackup = e_strdup(basisfile);
 
 	if ((ct_action == CT_A_LIST || ct_action == CT_A_EXTRACT)) {
 		if (ct_includefile != NULL) {

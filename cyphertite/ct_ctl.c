@@ -187,6 +187,7 @@ ctctl_main(int argc, char *argv[])
 {
 	int			c;
 	struct ct_cli_cmd	*cc = NULL;
+	char			*configfile = NULL;
 	uint64_t		debug_mask = 0;
 
 	while ((c = getopt(argc, argv, "dF:")) != -1) {
@@ -195,7 +196,7 @@ ctctl_main(int argc, char *argv[])
 			ct_debug++;
 			break;
 		case 'F':
-			ct_configfile = optarg;
+			configfile = optarg;
 			break;
 		default:
 			CWARNX("must specify action");
@@ -219,6 +220,10 @@ ctctl_main(int argc, char *argv[])
 	if (clog_set_flags(cflags))
 		errx(1, "illegal clog flags");
 	clog_set_mask(debug_mask);
+
+	/* We can allocate these now that we've decided if we need exude */
+	if (configfile)
+		ct_configfile = e_strdup(configfile);
 
 	/* load config */
 	if (ct_load_config(settings))

@@ -258,6 +258,7 @@ ctfb_main(int argc, char *argv[])
 	struct ctfb_cmd		*cmd;
 	const char		**l_argv;
 	const char		*buf;
+	char			*configfile = NULL;
 	char			*ct_mfile = NULL;
 	EditLine		*el = NULL;
 	History			*hist;
@@ -273,7 +274,7 @@ ctfb_main(int argc, char *argv[])
 			ct_debug++;
 			break;
 		case 'F':
-			ct_configfile = e_strdup(optarg);
+			configfile = optarg;
 			break;
 		case 'f': /* metadata file */
 			ct_mfile = optarg;
@@ -302,6 +303,10 @@ ctfb_main(int argc, char *argv[])
 	if (clog_set_flags(cflags))
 		errx(1, "illegal clog flags");
 	clog_set_mask(debug_mask);
+
+	/* We can allocate these now that we've decided if we need exude */
+	if (configfile)
+		ct_configfile = e_strdup(configfile);
 
 	/* load config */
 	if (ct_load_config(settings))
