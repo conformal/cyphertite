@@ -38,8 +38,6 @@ ct_sha1(uint8_t *src, uint8_t *dst, size_t len)
 {
 	SHA_CTX		ctx;
 
-	CDBG("src %p len %lu", src, (unsigned long) len);
-
 	SHA1_Init(&ctx);
 	SHA1_Update(&ctx, src, len);
 	SHA1_Final(dst, &ctx);
@@ -54,8 +52,6 @@ ct_sha1_setup(SHA_CTX *ctx)
 void
 ct_sha1_add(uint8_t *src, SHA_CTX *ctx, size_t len)
 {
-	CDBG("src %p len %lu", src, (unsigned long) len);
-
 	SHA1_Update(ctx, src, len);
 }
 
@@ -82,8 +78,6 @@ void
 ct_sha512(uint8_t *src, uint8_t *dst, size_t len)
 {
 	SHA512_CTX		ctx;
-
-	CDBG("src %p len %lu", src, (unsigned long) len);
 
 	SHA512_Init(&ctx);
 	SHA512_Update(&ctx, src, len);
