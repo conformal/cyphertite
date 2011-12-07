@@ -254,7 +254,7 @@ ct_config_parse(struct ct_settings *settings, const char *filename)
 	int			i;
 	size_t			len, lineno = 0;
 
-	CDBG("filename %s\n", filename);
+	CNDBG(CTUTIL_LOG_CONFIG, "filename %s\n", filename);
 
 	if (filename == NULL)
 		CFATALX("invalid config file name");
@@ -289,13 +289,13 @@ ct_config_parse(struct ct_settings *settings, const char *filename)
 			i--;
 		val[++i] = '\0';
 
-		CDBG("config_parse: %s=%s\n",var ,val);
+		CNDBG(CTUTIL_LOG_CONFIG, "config_parse: %s=%s\n",var ,val);
 		if (ct_settings_add(settings, var, val))
 			CFATALX("invalid conf file entry: %s=%s", var, val);
 
 		free(line);
 	}
-	CDBG("loaded config from %s", filename);
+	CNDBG(CTUTIL_LOG_CONFIG, "loaded config from %s", filename);
 
 	fclose(config);
 
@@ -355,7 +355,7 @@ ct_polltype_setup(const char *type)
 	else
 		CFATALX("unknown poll type %s", type);
 
-	CDBG("polltype: %s\n", type);
+	CNDBG(CTUTIL_LOG_CONFIG, "polltype: %s\n", type);
 }
 
 /* opcode to error string tables; see ctutil.h/ct_header_strerror(); */
@@ -375,8 +375,10 @@ ct_cli_cmd_find(struct ct_cli_cmd *cl, char *cmd)
 		return (NULL);
 
 	for (c = cl; c->cc_cmd != NULL; c++) {
-		CDBG("searching for [%p] in [%p]", c->cc_cmd, cmd);
-		CDBG("searching for [%s] in [%s]", c->cc_cmd, cmd);
+		CNDBG(CTUTIL_LOG_CONFIG, "searching for [%p] in [%p]",
+		    c->cc_cmd, cmd);
+		CNDBG(CTUTIL_LOG_CONFIG, "searching for [%s] in [%s]",
+		    c->cc_cmd, cmd);
 		if (!strncmp(c->cc_cmd, cmd, strlen(cmd))) {
 			if (found)
 				return (NULL); /* ambiguous */

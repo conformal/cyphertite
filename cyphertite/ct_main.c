@@ -214,6 +214,8 @@ ct_get_debugmask(char *debugstring)
 		const char	*name;
 		uint64_t	 mask;
 	} debuglevels[] = {
+		{ "socket", CT_LOG_SOCKET },
+		{ "config", CT_LOG_CONFIG },
 		{ "exude", CT_LOG_EXUDE },
 		{ "net", CT_LOG_NET },
 		{ "trans", CT_LOG_TRANS },

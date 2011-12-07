@@ -29,13 +29,6 @@
 
 #include "ct_socket.h"
 
-#if 1
-/* force off event debugging */
-#undef CDBG
-#define CDBG(a...) do { } while(0)
-#endif
-
-
 /* XXX */
 void ct_wire_header(struct ct_header *h);
 void ct_unwire_header(struct ct_header *h);
@@ -61,9 +54,8 @@ ct_event_assl_write(int fd_notused, short events, void *arg)
 	hdr = iob->io_hdr;
 	body = NULL;
 
-	CDBG("pid %d hdr op %d state %d, off %d sz %d",
-	    c_pid, hdr->c_opcode,
-	    ioctx->io_o_state, ioctx->io_o_off,
+	CNDBG(CTUTIL_LOG_SOCKET, "pid %d hdr op %d state %d, off %d sz %d",
+	    c_pid, hdr->c_opcode, ioctx->io_o_state, ioctx->io_o_off,
 	    hdr != NULL ? hdr->c_size : -1);
 
 	switch (ioctx->io_o_state) {
@@ -77,7 +69,8 @@ ct_event_assl_write(int fd_notused, short events, void *arg)
 	case 1: /* writing header */
 		wlen = sizeof(*hdr) - ioctx->io_o_off;
 		len = assl_write(c, (uint8_t *)hdr + ioctx->io_o_off, wlen);
-		CDBG("pid %d wlen %d len %ld", c_pid, wlen, (long) len);
+		CNDBG(CTUTIL_LOG_SOCKET, "pid %d wlen %d len %ld", c_pid, wlen,
+		    (long) len);
 		if (len == 0) {
 			/* lost socket */
 			ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
@@ -122,7 +115,8 @@ ct_event_assl_write(int fd_notused, short events, void *arg)
 
 		len = assl_write(c, body + ioctx->io_o_off, wlen);
 		s_errno = errno;
-		CDBG("pid %d wlen1 %d len %ld", c_pid, wlen, (long) len);
+		CNDBG(CTUTIL_LOG_SOCKET, "pid %d wlen1 %d len %ld", c_pid, wlen,
+		    (long) len);
 
 		if (len == 0 && wlen != 0) {
 			/* lost socket */
@@ -152,7 +146,8 @@ ct_event_assl_write(int fd_notused, short events, void *arg)
 
 			if ((iob->iovcnt == 0) ||
 			    (iob->iovcnt == ioctx->io_o_state - 1)) {
-				CDBG("pid %d xmit completed %d",
+				CNDBG(CTUTIL_LOG_SOCKET,
+				    "pid %d xmit completed %d",
 				    c_pid, hdr->c_opcode);
 
 				/* ready for next output packet */
@@ -203,7 +198,7 @@ ct_event_assl_read(int fd, short events, void *arg)
 	hdr = ioctx->io_i_hdr;
 	body = ioctx->io_i_data;
 
-	CDBG("pid %d hdr state %d, off %d sz %d",
+	CNDBG(CTUTIL_LOG_SOCKET, "pid %d hdr state %d, off %d sz %d",
 	    c_pid, ioctx->io_i_state, ioctx->io_i_off,
 	    hdr != NULL ? hdr->c_size : -1);
 
@@ -254,9 +249,9 @@ ct_event_assl_read(int fd, short events, void *arg)
 	case 2: /* reading body */
 		rlen = hdr->c_size - ioctx->io_i_off;
 		len = assl_read(c,  body + ioctx->io_i_off, rlen);
-		CDBG("pid %d op %d, body sz %d read %ld, rlen %d off %d",
-		    c_pid, hdr->c_opcode, hdr->c_size, (long) len, rlen,
-		    ioctx->io_i_off);
+		CNDBG(CTUTIL_LOG_SOCKET, "pid %d op %d, body sz %d read %ld, "
+		    "rlen %d off %d", c_pid, hdr->c_opcode, hdr->c_size,
+		    (long) len, rlen, ioctx->io_i_off);
 
 		if (len == 0 && rlen != 0) {
 			ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
@@ -313,7 +308,7 @@ ct_event_io_write(int fd, short events, void *arg)
 	hdr = iob->io_hdr;
 	body = NULL;
 
-	CDBG("pid %d hdr op %d state %d, off %d sz %d",
+	CNDBG(CTUTIL_LOG_SOCKET, "pid %d hdr op %d state %d, off %d sz %d",
 	    c_pid, hdr->c_opcode,
 	    ioctx->io_o_state, ioctx->io_o_off,
 	    hdr != NULL ? hdr->c_size : -1);
@@ -328,7 +323,8 @@ ct_event_io_write(int fd, short events, void *arg)
 	case 1: /* writing header */
 		wlen = sizeof(*hdr) - ioctx->io_o_off;
 		len = write(fd, (uint8_t *)hdr + ioctx->io_o_off, wlen);
-		CDBG("pid %d wlen %d len %ld", c_pid, wlen, (long) len);
+		CNDBG(CTUTIL_LOG_SOCKET, "pid %d wlen %d len %ld", c_pid, wlen,
+		    (long) len);
 
 		if (len == 0) {
 			/* lost socket */
@@ -365,12 +361,13 @@ write_next_iov:
 			body = iov[idx].iov_base;
 			body_len = iov[idx].iov_len;
 		}
-	CDBG("writing body state %d sz %d count %d",
-	ioctx->io_o_state, body_len, iob->iovcnt);
+		CNDBG(CTUTIL_LOG_SOCKET, "writing body state %d sz %d count %d",
+		    ioctx->io_o_state, body_len, iob->iovcnt);
 		wlen = body_len - ioctx->io_o_off;
 		len = write(fd, body + ioctx->io_o_off, wlen);
 		s_errno = errno;
-		CDBG("pid %d wlen1 %d len %ld", c_pid, wlen, (long) len);
+		CNDBG(CTUTIL_LOG_SOCKET, "pid %d wlen1 %d len %ld", c_pid, wlen,
+		    (long) len);
 
 		if (len == 0 && wlen != 0) {
 			/* lost socket */
@@ -401,7 +398,8 @@ write_next_iov:
 
 			if ((iob->iovcnt == 0) ||
 			    (iob->iovcnt == ioctx->io_o_state - 1)) {
-				CDBG("pid %d xmit completed %d",
+				CNDBG(CTUTIL_LOG_SOCKET,
+				    "pid %d xmit completed %d",
 				    c_pid, hdr->c_opcode);
 
 				/* ready for next output packet */
@@ -448,7 +446,7 @@ ct_event_io_read(int fd, short events, void *arg)
 	hdr = ioctx->io_i_hdr;
 	body = ioctx->io_i_data;
 
-	CDBG("pid %d hdr state %d, off %d sz %d",
+	CNDBG(CTUTIL_LOG_SOCKET, "pid %d hdr state %d, off %d sz %d",
 	    c_pid, ioctx->io_i_state, ioctx->io_i_off,
 	    hdr != NULL ? hdr->c_size : -1);
 
@@ -497,9 +495,9 @@ ct_event_io_read(int fd, short events, void *arg)
 	case 2: /* reading body */
 		rlen = hdr->c_size - ioctx->io_i_off;
 		len = read(fd, body + ioctx->io_i_off, rlen);
-		CDBG("pid %d op %d, body sz %d read %ld, rlen %d off %d", c_pid,
-		    hdr->c_opcode, hdr->c_size, (long) len, rlen,
-		    ioctx->io_i_off);
+		CNDBG(CTUTIL_LOG_SOCKET, "pid %d op %d, body sz %d read %ld, "
+		    "rlen %d off %d", c_pid, hdr->c_opcode, hdr->c_size,
+		    (long) len, rlen, ioctx->io_i_off);
 
 		if (len == 0 && rlen != 0) {
 			ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
@@ -627,7 +625,8 @@ ct_io_writev_op(struct ct_io_ctx *ioctx, struct ct_header *hdr,
 	if (TAILQ_EMPTY(&ioctx->io_o_q) && ioctx->io_write_io_enabled)
 		start_write = 1;
 
-	CDBG("scheduling iov cnt %d sz %d", iovcnt, hdr->c_size);
+	CNDBG(CTUTIL_LOG_SOCKET, "scheduling iov cnt %d sz %d", iovcnt,
+	    hdr->c_size);
 	iob = ioctx->io_ioctx_alloc();
 	iob->io_hdr = hdr;
 	iob->io_data = iov;
@@ -680,7 +679,7 @@ ct_io_disconnect(struct ct_io_ctx *ioctx)
 	/* XXX -check state? */
 	struct ct_io_queue	*ioq;
 
-	CDBG("disconnecting");
+	CNDBG(CTUTIL_LOG_SOCKET, "disconnecting");
 	event_del(&ioctx->io_ev_rd);
 	event_del(&ioctx->io_ev_wr);
 	close(ioctx->io_i_fd);
@@ -749,7 +748,7 @@ ct_assl_disconnect(struct ct_assl_io_ctx *ioctx)
 void
 ct_assl_io_ctx_set_maxtrans(struct ct_assl_io_ctx *ctx, size_t newmax)
 {
-	CDBG("setting max to %lu", (unsigned long) newmax);
+	CNDBG(CTUTIL_LOG_SOCKET, "setting max to %lu", (unsigned long) newmax);
 	ctx->io_max_transfer = newmax;
 }
 
