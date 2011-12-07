@@ -938,6 +938,7 @@ ct_complete_normal(struct ct_trans *trans)
 						ct_write_sha(trans);
 					}
 				}
+				fn->fl_size = fn->fl_offset;
 			}
 			ct_write_md_eof(trans);
 			release_fnode = 1;

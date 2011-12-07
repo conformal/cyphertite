@@ -27,7 +27,7 @@ int	ct_populate_fnode(struct fnode *, struct ct_md_header *,
 	    struct ct_md_header *, int *);
 
 int64_t		ct_ex_dirnum = 0;
-uint8_t		zerosha[SHA_DIGEST_LENGTH];
+const uint8_t	zerosha[SHA_DIGEST_LENGTH];
 
 /*
  * Helper functions
