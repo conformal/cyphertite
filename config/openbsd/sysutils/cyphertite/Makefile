@@ -28,9 +28,4 @@ LIB_DEPENDS =		archivers/libshrink>=0.3.0	\
 
 NO_REGRESS =		Yes
 
-post-install:
-	${INSTALL_DATA_DIR} ${PREFIX}/share/examples/cyphertite
-	${INSTALL_DATA} ${WRKSRC}/cyphertite/cyphertite.conf \
-		${PREFIX}/share/examples/cyphertite/cyphertite.conf.sample
-
 .include <bsd.port.mk>

@@ -16,7 +16,3 @@ lib/libctutil_p.a
 @man man/man1/cyphertite.1
 @man man/man1/cyphertitefb.1
 @man man/man5/cyphertite.conf.5
-share/examples/cyphertite/
-@sample ${SYSCONFDIR}/cyphertite/
-share/examples/cyphertite/cyphertite.conf.sample
-@sample ${SYSCONFDIR}/cyphertite/cyphertite.conf
