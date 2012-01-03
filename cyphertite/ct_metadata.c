@@ -49,6 +49,7 @@ struct md_list_file {
 	char					mlf_name[CT_MAX_MD_FILENAME];
 	off_t					mlf_size;
 	time_t					mlf_mtime;
+	int					mlf_keep;
 };
 
 SLIST_HEAD(md_list, md_list_file);
@@ -1606,7 +1607,7 @@ ct_cull_send_shas(struct ct_op *op)
  * Code to get all metadata files on the server.
  * to be used for cull.
  */
-struct md_list	 ct_cull_all_mds = SLIST_HEAD_INITIALIZER(&ct_cull_all_mds);
+struct md_list_tree ct_cull_all_mds = RB_INITIALIZER(&ct_cull_all_mds);
 char		*all_mds_pattern[] = {
 			"^[[:digit:]]{8}-[[:digit:]]{6}-.*",
 			NULL,
@@ -1631,18 +1632,18 @@ ct_fetch_all_md_parse(struct ct_op *op)
 			ct_add_operation_after(op, ct_md_extract,
 			    ct_free_mdname_and_remote, cachename,
 			    e_strdup(file->mlf_name), NULL, NULL, NULL, 0, 0);
-			SLIST_INSERT_HEAD(&ct_cull_all_mds, file, mlf_link);
 		} else {
 			CNDBG(CT_LOG_CTFILE, "already got %s", file->mlf_name);
-			SLIST_INSERT_HEAD(&ct_cull_all_mds, file, mlf_link);
 		}
+		RB_INSERT(md_list_tree, &ct_cull_all_mds, file);
 	}
 }
 
 void
 ct_cull_collect_md_files(struct ct_op *op)
 {
-	struct md_list_file *file;
+	struct md_list_file *file, *prevfile, filesearch;
+	char *prev_filename;
 	int timelen;
 	char	 buf[TIMEDATA_LEN];
 	time_t	 now;
@@ -1657,13 +1658,54 @@ ct_cull_collect_md_files(struct ct_op *op)
 
 	timelen = strlen(buf);
 
-	while ((file = SLIST_FIRST(&ct_cull_all_mds)) != NULL) {
+	RB_FOREACH(file, md_list_tree, &ct_cull_all_mds) {
 		if (strncmp (file->mlf_name, buf, timelen) < 0) {
-			CINFO("file is old %s\n", file->mlf_name);
+			file->mlf_keep = 0;
+		} else {
+			file->mlf_keep = 1;
 		}
+	}
+
+	RB_FOREACH(file, md_list_tree, &ct_cull_all_mds) {
+		if (file->mlf_keep == 0)
+			continue;
+
+		prev_filename = ct_metadata_check_prev(file->mlf_name);
+prev_ct_file:
+		if (prev_filename != NULL) {
+			strncpy(filesearch.mlf_name, prev_filename,
+			    sizeof(filesearch.mlf_name));
+			prevfile = RB_FIND(md_list_tree, &ct_cull_all_mds,
+			    &filesearch);
+			if (prevfile == NULL) {
+				CWARNX("file not found in ctfilelist %s",
+				    prev_filename);
+			} else {
+				if (prevfile->mlf_keep == 0)
+					CINFO("Warning, old ctfile %s still "
+					    "referenced by newer backups, "
+					    "keeping", prev_filename);
+				prevfile->mlf_keep++;
+				e_free(&prev_filename);
+
+				prev_filename = ct_metadata_check_prev(
+				    prevfile->mlf_name);
+				goto prev_ct_file;
+			}
+			e_free(&prev_filename);
+		}
+	}
+	RB_FOREACH(file, md_list_tree, &ct_cull_all_mds) {
+		if (file->mlf_keep == 0)
+			continue;
 		ct_cull_add_shafile(file->mlf_name);
-		SLIST_REMOVE_HEAD(&ct_cull_all_mds, mlf_link);
+	}
+
+	/* cleanup */
+	while((file = RB_ROOT(&ct_cull_all_mds)) != NULL) {
+		RB_REMOVE(md_list_tree, &ct_cull_all_mds, file);
 		e_free(&file);
+		/* XXX - name  */
 	}
 	ct_op_complete();
 }
