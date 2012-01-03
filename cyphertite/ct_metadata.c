@@ -1623,17 +1623,17 @@ ct_fetch_all_md_parse(struct ct_op *op)
 	ct_md_list_complete(CT_MATCH_REGEX, all_mds_pattern, NULL, &results);
 	while ((file = RB_ROOT(&results)) != NULL) {
 		RB_REMOVE(md_list_tree, &results, file);
-		CDBG("looking for file %s ", file->mlf_name);
+		CNDBG(CT_LOG_CTFILE, "looking for file %s ", file->mlf_name);
 		if (!md_is_in_cache(file->mlf_name)) {
 			cachename = ct_md_get_cachename(file->mlf_name);
-			CDBG("getting %s to %s", file->mlf_name,
+			CNDBG(CT_LOG_CTFILE, "getting %s to %s", file->mlf_name,
 			    cachename);
 			ct_add_operation_after(op, ct_md_extract,
 			    ct_free_mdname_and_remote, cachename,
 			    e_strdup(file->mlf_name), NULL, NULL, NULL, 0, 0);
 			SLIST_INSERT_HEAD(&ct_cull_all_mds, file, mlf_link);
 		} else {
-			CDBG("already got %s", file->mlf_name);
+			CNDBG(CT_LOG_CTFILE, "already got %s", file->mlf_name);
 			SLIST_INSERT_HEAD(&ct_cull_all_mds, file, mlf_link);
 		}
 	}
