@@ -176,13 +176,13 @@ ct_name_to_safename(char *filename)
 
 	/* compute 'safe' name */
 	safe = filename;
-	if (ct_strip_slash && safe[0] == '/') {
+	if (ct_strip_slash && safe[0] == CT_PATHSEP) {
 		safe++;
 		if (safe[0] == '\0') {
 			return NULL;
 		}
 	}
-	while (!(strncmp(safe, "../", 3)))
+	while (!(strncmp(safe, ".." CT_PATHSEP_STR, 3)))
 		safe += 3;
 	if (!strcmp(safe, ".."))
 		return NULL;
@@ -199,8 +199,8 @@ gen_fname(struct flist *flnode)
 	char *name;
 
 	if (flnode->fl_parent_dir && flnode->fl_parent_dir->d_num != -3) {
-		e_asprintf(&name, "%s/%s", flnode->fl_parent_dir->d_name,
-		    flnode->fl_fname);
+		e_asprintf(&name, "%s%c%s", flnode->fl_parent_dir->d_name,
+		    CT_PATHSEP, flnode->fl_fname);
 	} else {
 		name = e_strdup(flnode->fl_fname);
 	}
@@ -1013,7 +1013,7 @@ eat_double_dots(char *path, char *resolved)
 		tab = ntab;
 		tab[sz++] = e_strdup(cp);
 
-		if (!strcmp(buf, ".") || !strcmp(buf, "/"))
+		if (!strcmp(buf, ".") || !strcmp(buf, CT_PATHSEP_STR))
 			break; /* reached the top */
 	}
 
@@ -1033,7 +1033,7 @@ eat_double_dots(char *path, char *resolved)
 
 		/* '..' component is special */
 		if (!strcmp(cp, "..")) {
-			if (!strcmp(resolved, "/"))
+			if (!strcmp(resolved, CT_PATHSEP_STR))
 				continue; /* cannot go beyond fs root */
 
 			/* remove last component if other than '..' */
@@ -1041,17 +1041,18 @@ eat_double_dots(char *path, char *resolved)
 			    strcmp(basename(resolved), "..") != 0)
 				strlcpy(resolved, dirname(resolved), PATH_MAX);
 			else
-				strlcat(resolved, "/..", PATH_MAX);
+				strlcat(resolved, CT_PATHSEP_STR "..",
+				    PATH_MAX);
 			continue;
 		}
 
 		/* append regular component */
-		if (strcmp(resolved, "/") != 0)
-			strlcat(resolved, "/", PATH_MAX);
+		if (strcmp(resolved, CT_PATHSEP_STR) != 0)
+			strlcat(resolved, CT_PATHSEP_STR, PATH_MAX);
 		strlcat(resolved, cp, PATH_MAX);
 	}
 
-	if (!strncmp(resolved, "./", 2))
+	if (!strncmp(resolved, "." CT_PATHSEP_STR, 2))
 		memmove(resolved, resolved + 2, PATH_MAX - 2);
 
 	rv = resolved;
@@ -1078,8 +1079,8 @@ backup_prefix(char *root, struct flist_head *flist, struct fl_tree *ino_tree)
 	/* archive each leading dir */
 	p = pfx;
 	bzero(&dir, sizeof dir);
-	for (;; strlcat(dir, "/", sizeof dir)) {
-		cp = strsep(&p, "/");
+	for (;; strlcat(dir, CT_PATHSEP_STR, sizeof dir)) {
+		cp = strsep(&p, CT_PATHSEP_STR);
 		if (cp == NULL)
 			break; /* parsed it all */
 		if (*cp == '\0')
@@ -1218,14 +1219,15 @@ ct_file_extract_open(struct fnode *fnode)
 	if (fnode->fl_sname[0] == '/') {
 		strlcpy(tpath, fnode->fl_sname, sizeof(tpath));
 	} else {
-		snprintf(tpath, sizeof(tpath), "%s/%s", ct_rootdir.d_name,
-		    fnode->fl_sname);
+		snprintf(tpath, sizeof(tpath), "%s%c%s", ct_rootdir.d_name,
+		    CT_PATHSEP, fnode->fl_sname);
 	}
 	strlcpy(dirpath, tpath, sizeof(dirpath));
 	if ((dirp = dirname(dirpath)) == NULL)
 		CFATALX("can't get dirname of %s", tpath);
 
-	e_asprintf(&fnode->fl_fname, "%s/%s", dirp, "cyphertite.XXXXXXXXXX");
+	e_asprintf(&fnode->fl_fname, "%s%c%s", dirp, CT_PATHSEP,
+	    "cyphertite.XXXXXXXXXX");
 	ct_extract_fd = mkstemp(fnode->fl_fname);
 #else
 	fnode->fl_fname = e_strdup("cyphertite.XXXXXXXXXX");
@@ -1320,8 +1322,8 @@ ct_file_extract_special(struct fnode *fnode)
 		}
 	} else if (C_ISLINK(fnode->fl_type)){
 		if (fnode->fl_hardlink && fnode->fl_hlname[0] != '/') {
-			snprintf(apath, sizeof(apath), "%s/%s",
-			    ct_rootdir.d_name, fnode->fl_hlname);
+			snprintf(apath, sizeof(apath), "%s%c%s",
+			    ct_rootdir.d_name, CT_PATHSEP, fnode->fl_hlname);
 			appath = apath;
 		} else {
 			appath = fnode->fl_hlname;

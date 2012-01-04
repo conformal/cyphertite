@@ -25,6 +25,7 @@
 #include <fcntl.h>
 
 #include <clog.h>
+#include <ctutil.h>
 
 void
 ct_expand_tilde(char **dst, char *key, char *val)
@@ -49,10 +50,11 @@ ct_expand_tilde(char **dst, char *key, char *val)
 			CFATALX("invalid user %d", uid);
 
 		i = 1;
-		while (val[i] == '/' && val[i] != '\0')
+		while (val[i] == CT_PATHSEP && val[i] != '\0')
 			i++;
 
-		if (asprintf(dst, "%s/%s", pwd->pw_dir, &val[i]) == -1)
+		if (asprintf(dst, "%s%c%s", pwd->pw_dir, CT_PATHSEP,
+		    &val[i]) == -1)
 			CFATALX("no memory for %s", key);
 	} else
 		*dst = strdup(val);
@@ -70,21 +72,21 @@ ct_make_full_path(char *path, mode_t mode)
 	struct stat	 st;
 
 	/* deal with full paths */
-	if (*nxt == '/')
+	if (*nxt == CT_PATHSEP)
 		nxt++;
 	for (;;) {
-		if ((nxt = strchr(nxt, '/')) == NULL)
+		if ((nxt = strchr(nxt, CT_PATHSEP)) == NULL)
 			break;
 		*nxt = '\0';
 
 		if (lstat(path, &st) == 0) {
-			*(nxt++) = '/';
+			*(nxt++) = CT_PATHSEP;
 			continue;
 		}
 
 		if (mkdir(path, mode) == -1)
 			return (1);
-		*(nxt++) = '/';
+		*(nxt++) = CT_PATHSEP;
 		/* XXX stupid umask? */
 	}
 
@@ -103,7 +105,7 @@ ct_remove_ext(char *path)
 		CFATALX("strdup path in ct_remove_ext");
 
 	dot = strrchr(ret, '.');
-	sep = strrchr(ret, '/');
+	sep = strrchr(ret, CT_PATHSEP);
 
 	/* no extension */
 	if (dot == NULL)

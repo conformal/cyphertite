@@ -632,7 +632,7 @@ crypto_passphrase:
 	else
 		fprintf(f, "#crypto_passphrase\t\t\t=\n");
 
-	fprintf(f, "cache_db\t\t\t\t= %s/ct_db\n", dir);
+	fprintf(f, "cache_db\t\t\t\t= %s%cct_db\n", dir, CT_PATHSEP);
 	fprintf(f, "session_compression\t\t\t= lzo\n");
 	fprintf(f, "crypto_secrets\t\t\t\t= %s\n", ct_crypto_secrets);
 	fprintf(f, "ca_cert\t\t\t\t\t= %s\n", ct_ca_cert);
@@ -736,11 +736,12 @@ ct_load_config(struct ct_settings *mysettings)
 	ctfile_mode_setup(ctfile_mode_str);
 	/* Fix up cachedir: code requires it to end with a slash. */
 	if (ctfile_cachedir != NULL &&
-	    ctfile_cachedir[strlen(ctfile_cachedir) - 1] != '/') {
+	    ctfile_cachedir[strlen(ctfile_cachedir) - 1] != CT_PATHSEP) {
 		int rv;
 
 		if ((rv = snprintf(ct_fullcachedir, sizeof(ct_fullcachedir),
-		    "%s/", ctfile_cachedir)) == -1 || rv > PATH_MAX)
+		    "%s%c", ctfile_cachedir, CT_PATHSEP)) == -1 ||
+		    rv > PATH_MAX)
 			CFATALX("invalid metadata pathname");
 		ctfile_cachedir = ct_fullcachedir;
 

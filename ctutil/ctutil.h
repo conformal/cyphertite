@@ -248,6 +248,9 @@ int     ct_make_full_path(char *, mode_t);
 /* pipe handling */
 int	 ct_set_pipe_nonblock(int);
 
+#define CT_PATHSEP	'/'
+#define CT_PATHSEP_STR	"/"
+
 /* cli parsing */
 struct ct_cli_cmd {
 	char			*cc_cmd;	/* command name */
