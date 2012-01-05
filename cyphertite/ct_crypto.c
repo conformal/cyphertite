@@ -40,7 +40,7 @@
 
 #ifdef __linux__
 #ifndef PASS_MAX
-#define PASS_MAX 1024
+#define PASS_MAX		(1024)
 #endif
 #endif
 
