@@ -1696,9 +1696,12 @@ prev_ct_file:
 		}
 	}
 	RB_FOREACH(file, md_list_tree, &ct_cull_all_mds) {
-		if (file->mlf_keep == 0)
-			continue;
-		ct_cull_add_shafile(file->mlf_name);
+		if (file->mlf_keep == 0) {
+			ct_add_operation(ct_md_delete, NULL, NULL,
+			    file->mlf_name, NULL, NULL, NULL, 0, 0);
+		} else {
+			ct_cull_add_shafile(file->mlf_name);
+		}
 	}
 
 	/* cleanup */
