@@ -58,6 +58,7 @@ extern char		*__progname;
 extern char		*ct_includefile;
 extern char		*ct_crypto_password;
 extern char		*ct_configfile;
+extern int		ct_ctfile_expire_day;
 
 /* crypto */
 extern unsigned char		ct_iv[CT_IV_LEN];

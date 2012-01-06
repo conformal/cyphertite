@@ -650,6 +650,7 @@ ct_md_delete(struct ct_op *op)
 	xmlsd_set_attr(xe, "version", CT_MD_DELETE_VERSION);
 	xe = xmlsd_add_element(&xl, xe, "file");
 	xmlsd_set_attr(xe, "name", (char *)md);
+CINFO("deleting file [%s]", md);
 
 	e_free(&md);
 
@@ -763,7 +764,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 				filename = xmlsd_get_attr(xe, "name");
 				if (filename == NULL || filename[0] == '\0')
 					printf("specified archive does not "
-					    "exist\n");
+					    "exist [%s]\n", filename);
 				else
 					printf("%s deleted\n", filename);
 			}
@@ -1547,6 +1548,7 @@ ct_cull_send_shas(struct ct_op *op)
 	CNDBG(CT_LOG_TRANS, "cull_send_shas");
 	node = RB_ROOT(&ct_sha_rb_head);
 	if (shacnt == 0 || node == NULL) {
+CINFO("finished");
 		ct_set_file_state(CT_S_FINISHED);
 		return;
 	}
@@ -1642,16 +1644,18 @@ ct_fetch_all_md_parse(struct ct_op *op)
 void
 ct_cull_collect_md_files(struct ct_op *op)
 {
-	struct md_list_file *file, *prevfile, filesearch;
-	char *prev_filename;
-	int timelen;
-	char	 buf[TIMEDATA_LEN];
-	time_t	 now;
+	struct md_list_file	*file, *prevfile, filesearch;
+	char			*prev_filename;
+	int			timelen;
+	char			buf[TIMEDATA_LEN];
+	time_t			now;
+	int			keep_files = 0;
 
-	CINFO("collect_md_files\n");
+	if (ct_ctfile_expire_day == 0)
+		CFATALX("cull: ctfile_expire_day must be specified in config");
 
 	now = time(NULL);
-	now -= (24 * 60 * 2); /* hack hack, 2 days */
+	now -= (24 * 60 * 60 * ct_ctfile_expire_day);
 	if (strftime(buf, TIMEDATA_LEN, "%Y%m%d-%H%M%S",
 	    localtime(&now)) == 0)
 		CFATALX("can't format time");
@@ -1663,8 +1667,12 @@ ct_cull_collect_md_files(struct ct_op *op)
 			file->mlf_keep = 0;
 		} else {
 			file->mlf_keep = 1;
+			keep_files++;
 		}
 	}
+
+	if (keep_files == 0)
+		CFATALX("All ctfiles are old and would be deleted, aborting.");
 
 	RB_FOREACH(file, md_list_tree, &ct_cull_all_mds) {
 		if (file->mlf_keep == 0)
@@ -1673,12 +1681,13 @@ ct_cull_collect_md_files(struct ct_op *op)
 		prev_filename = ct_metadata_check_prev(file->mlf_name);
 prev_ct_file:
 		if (prev_filename != NULL) {
+			CINFO("prev filename %s", prev_filename);
 			strncpy(filesearch.mlf_name, prev_filename,
 			    sizeof(filesearch.mlf_name));
 			prevfile = RB_FIND(md_list_tree, &ct_cull_all_mds,
 			    &filesearch);
 			if (prevfile == NULL) {
-				CWARNX("file not found in ctfilelist %s",
+				CWARNX("file not found in ctfilelist [%s]",
 				    prev_filename);
 			} else {
 				if (prevfile->mlf_keep == 0)
@@ -1697,9 +1706,13 @@ prev_ct_file:
 	}
 	RB_FOREACH(file, md_list_tree, &ct_cull_all_mds) {
 		if (file->mlf_keep == 0) {
+			CNDBG(CT_LOG_CTFILE, "adding %s to delete list",
+			    file->mlf_name);
 			ct_add_operation(ct_md_delete, NULL, NULL,
-			    file->mlf_name, NULL, NULL, NULL, 0, 0);
+			    e_strdup(file->mlf_name), NULL, NULL, NULL, 0, 0);
 		} else {
+			CNDBG(CT_LOG_CTFILE, "adding %s to keep list",
+			    file->mlf_name);
 			ct_cull_add_shafile(file->mlf_name);
 		}
 	}
