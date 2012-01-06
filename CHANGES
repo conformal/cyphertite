@@ -3,6 +3,13 @@ User visible changes for cyphertite
   A high-security scalable solution for online backups
 ============================================================================
 
+Changes in 0.6.1 (Fri Jan 06 2012)
+  - Improve file browser utility (cyphertitefb)
+  - Recommend .ct as the extension for metadata archive files
+  - Implement debug trace filtering with '-D flagname'
+  - Negotiate local database revision and sync with server
+  - Other misc code cleanup and improvements
+
 Changes in 0.6.0 (Fri Dec 02 2011)
   - Enable UTF-8 support for file names
   - Add a new file browser utility (cyphertitefb)

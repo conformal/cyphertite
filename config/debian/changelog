@@ -1,3 +1,13 @@
+cyphertite (0.6.1-1) unstable; urgency=low
+
+  * Improve file browser utility (cyphertitefb)
+  * Recommend .ct as the extension for metadata archive files
+  * Implement debug trace filtering with '-D flagname'
+  * Negotiate local database revision and sync with server
+  * Other misc code cleanup and improvements
+
+ -- Conformal Systems <package-discuss@conformal.com>  Fri, 06 Jan 2012 14:53:16 -0600
+
 cyphertite (0.6.0-1) unstable; urgency=low
 
   * Enable UTF-8 support for file names

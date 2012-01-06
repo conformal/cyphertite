@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		0.6.0
+%define version		0.6.1
 %define release		1
 
 Name: 		%{name}
@@ -51,6 +51,12 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Fri Jan 06 2012 - davec 0.6.1-1
+- Improve file browser utility (cyphertitefb)
+- Recommend .ct as the extension for metadata archive files
+- Implement debug trace filtering with '-D flagname'
+- Negotiate local database revision and sync with server
+- Other misc code cleanup and improvements
 * Fri Dec 02 2011 - davec 0.6.0-1
 - Enable UTF-8 support for file names
 - Add a new file browser utility (cyphertitefb)
