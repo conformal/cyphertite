@@ -330,14 +330,14 @@ ctdb_lookup_sha(sqlite3 *db, uint8_t *sha_k, uint8_t *sha_v, uint8_t *iv)
 		p = (uint8_t *)sqlite3_column_blob(stmt, 1);
 		if (p) {
 			if (sqlite3_column_bytes(stmt, 1) !=
-			    E_IV_LEN)
+			    CT_IV_LEN)
 				CFATALX("invalid blob size");
 			if (ctdb_verbose) {
 				ct_sha1_encode(p, shat);
 				CNDBG(CT_LOG_DB, "found iv (prefix) %s", shat);
 			}
 
-			bcopy (p, iv, E_IV_LEN);
+			bcopy (p, iv, CT_IV_LEN);
 		} else if (ctdb_verbose) {
 			CNDBG(CT_LOG_DB, "no iv found");
 			rv = 0;
@@ -415,7 +415,7 @@ ctdb_insert_sha(sqlite3 *db, uint8_t *sha_k, uint8_t *sha_v, uint8_t *iv)
 		    SHA_DIGEST_LENGTH, SQLITE_STATIC))
 			CFATALX("could not bind sha_v");
 		if (sqlite3_bind_blob(stmt, 3, iv,
-		    E_IV_LEN, SQLITE_STATIC))
+		    CT_IV_LEN, SQLITE_STATIC))
 			CFATALX("could not bind iv ");
 	}
 

@@ -59,7 +59,7 @@ ct_xdr_dedup_sha_crypto(XDR *xdrs, uint8_t *sha, uint8_t *csha, uint8_t *iv)
 		return (FALSE);
 	if (!xdr_opaque(xdrs, (caddr_t)csha, SHA_DIGEST_LENGTH))
 		return (FALSE);
-	if (!xdr_opaque(xdrs, (caddr_t)iv, E_IV_LEN))
+	if (!xdr_opaque(xdrs, (caddr_t)iv, CT_IV_LEN))
 		return (FALSE);
 	return (TRUE);
 }

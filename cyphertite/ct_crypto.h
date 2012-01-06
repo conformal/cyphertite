@@ -16,6 +16,9 @@
 
 #include <openssl/evp.h>
 
+#define CT_KEY_LEN	(256>>3)
+#define CT_IV_LEN	(256>>3)
+
 int			ct_crypto_crypt(const EVP_CIPHER *, uint8_t *, size_t,
 			    uint8_t *, size_t, uint8_t *, size_t, uint8_t *,
 			    size_t, int);

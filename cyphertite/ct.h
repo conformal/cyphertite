@@ -24,6 +24,8 @@
 #include <ctutil.h>
 #include <ct_socket.h>
 
+#include "ct_crypto.h"
+
 /* versioning */
 #define CT_STRINGIFY(x)		#x
 #define CT_STR(x)		CT_STRINGIFY(x)
@@ -58,9 +60,6 @@ extern char		*ct_crypto_password;
 extern char		*ct_configfile;
 
 /* crypto */
-#define CT_KEY_LEN		(256>>3)
-#define CT_IV_LEN		(256>>3)
-
 extern unsigned char		ct_iv[CT_IV_LEN];
 extern unsigned char		ct_crypto_key[CT_KEY_LEN];
 
@@ -161,10 +160,6 @@ extern struct flist_head	fl_list_head;
 
 void				ct_set_file_state(int);
 
-/* crypt - XXX in ct_crypto.h */
-#define E_KEY_LEN		(256>>3)
-#define E_IV_LEN		(256>>3)
-
 /* Transaction  */
 
 struct ct_trans;
@@ -223,7 +218,7 @@ struct ct_trans {
 
 	uint8_t			tr_sha[SHA_DIGEST_LENGTH];
 	uint8_t			tr_csha[SHA_DIGEST_LENGTH];
-	uint8_t			tr_iv[E_IV_LEN];
+	uint8_t			tr_iv[CT_IV_LEN];
 
 
 	int			tr_chsize;
@@ -434,7 +429,7 @@ char				*ct_metadata_check_prev(const char *);
 struct dedup_digest {
 	char		dd_digest[SHA_DIGEST_LENGTH];
 	char		dd_digest_crypto[SHA_DIGEST_LENGTH];
-	char		dd_iv[E_IV_LEN];
+	char		dd_iv[CT_IV_LEN];
 };
 typedef struct dedup_digest dedup_digest;	/* ugh typedef, blame XDR */
 
@@ -628,7 +623,7 @@ struct ct_xdr_state {
 
 	uint8_t			 xs_sha[SHA_DIGEST_LENGTH];
 	uint8_t			 xs_csha[SHA_DIGEST_LENGTH];
-	uint8_t			 xs_iv[E_IV_LEN];
+	uint8_t			 xs_iv[CT_IV_LEN];
 #define	XS_STATE_FILE		0
 #define	XS_STATE_SHA		1
 #define	XS_STATE_EOF		2
