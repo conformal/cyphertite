@@ -251,7 +251,7 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *asslctx)
 	struct xmlsd_element_list	 xl;
 	char				 b64_digest[128];
 	uint8_t				 pwd_digest[SHA512_DIGEST_LENGTH];
-	uint8_t				 *body;
+	char				 *body;
 	struct ct_header		 hdr;
 	size_t				 orig_size;
 	ssize_t				 sz;
@@ -330,8 +330,8 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *asslctx)
 
 	body = e_calloc(1, payload_sz);
 
-	strlcpy((char *)body, ct_username, payload_sz);
-	strlcpy((char *)body + user_len + 1, b64_digest,
+	strlcpy(body, ct_username, payload_sz);
+	strlcpy(body + user_len + 1, b64_digest,
 	    payload_sz - user_len - 1);
 
 	/* login in polled mode */
