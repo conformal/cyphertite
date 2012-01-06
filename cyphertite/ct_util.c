@@ -401,7 +401,7 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *asslctx)
 	/* get server reply */
 	sz = ct_assl_io_read_poll(ct_assl_ctx, &hdr, sizeof hdr, ASSL_TIMEOUT);
 	if (sz != sizeof hdr) {
-		CWARNX("invalid header size %zd", sz);
+		CWARNX("invalid header size %" PRId64, (long long)sz);
 		goto done;
 	}
 	ct_unwire_header(&hdr);
@@ -413,7 +413,8 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *asslctx)
 	body = e_calloc(1, hdr.c_size);
 	sz = ct_assl_io_read_poll(ct_assl_ctx, body, hdr.c_size, ASSL_TIMEOUT);
 	if (sz != hdr.c_size) {
-		CWARNX("invalid xml body size %zd %d", sz, hdr.c_size);
+		CWARNX("invalid xml body size %"PRId64" %d", (long long)sz,
+		    hdr.c_size);
 		goto done;
 	}
 	/* XXX check xml data */
