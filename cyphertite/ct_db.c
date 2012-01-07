@@ -276,6 +276,7 @@ do_retry:
 			retry = 0;
 			/* db is in incorrect mode, delete it and try again */
 			CWARNX("db file wrong mode, removing it");
+			sqlite3_close(db);
 			unlink(dbfile);
 			goto do_retry;
 		} else {
