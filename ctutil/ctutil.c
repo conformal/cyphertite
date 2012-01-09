@@ -110,6 +110,19 @@ ct_text2sha(char *shat, uint8_t *sha)
 	return (0);
 }
 
+
+/* opcode to error string tables; see ctutil.h/ct_header_strerror(); */
+char *c_hdr_login_reply_ex_errstrs[] = {
+	"Invalid login credentials. Please check your username,"
+	    "password and certificates.",
+	"Account has been disabled."
+};
+
+char *c_hdr_write_reply_ex_errstrs[] = {
+	"Your account has run out of space. Please visit your account "
+	    "information page at http://www.cyphertite.com",
+};
+
 char *
 ct_header_strerror(struct ct_header *h)
 {
@@ -129,6 +142,11 @@ ct_header_strerror(struct ct_header *h)
 		if (h->c_ex_status > nitems(*c_hdr_login_reply_ex_errstrs))
 			break;
 		errstr = c_hdr_login_reply_ex_errstrs[h->c_ex_status];
+		break;
+	case C_HDR_O_WRITE_REPLY:
+		if (h->c_ex_status > nitems(*c_hdr_write_reply_ex_errstrs))
+			break;
+		errstr = c_hdr_write_reply_ex_errstrs[h->c_ex_status];
 		break;
 	default:
 		break;
@@ -357,13 +375,6 @@ ct_polltype_setup(const char *type)
 
 	CNDBG(CTUTIL_LOG_CONFIG, "polltype: %s\n", type);
 }
-
-/* opcode to error string tables; see ctutil.h/ct_header_strerror(); */
-char *c_hdr_login_reply_ex_errstrs[] = {
-	"Invalid login credentials. Please check your username,"
-	    "password and certificates.",
-	"Account has been disabled."
-};
 
 /* cli parsing */
 struct ct_cli_cmd *

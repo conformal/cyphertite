@@ -165,6 +165,8 @@ struct ct_read {
  */
 #define C_HDR_O_WRITE		(16)
 #define C_HDR_O_WRITE_REPLY	(17)
+#define C_HDR_O_WRITE_EXS_ENOSPACE	(0)
+extern char	*c_hdr_write_reply_ex_errstr[];
 struct ct_write_reply {
 	u_char			cwr_digest[SHA_DIGEST_LENGTH];
 } __packed;

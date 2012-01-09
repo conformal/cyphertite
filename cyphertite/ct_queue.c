@@ -1211,7 +1211,7 @@ ct_handle_write_reply(struct ct_trans *trans, struct ct_header *hdr,
 		ct_queue_transfer(trans);
 		ct_header_free(NULL, hdr);
 	} else {
-		CFATALX("chunk write failed");
+		CFATALX("chunk write failed: %s", ct_header_strerror(hdr));
 	}
 }
 
