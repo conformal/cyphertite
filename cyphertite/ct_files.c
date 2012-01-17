@@ -474,6 +474,13 @@ loop:
 		return;
 	}
 
+	/*
+	 * Only regular files that haven't just been opened need to talk
+	 * to the server. don't waste slots.
+	 */
+	if (!C_ISREG(fl_curnode->fl_type) || new_file)
+		ct_trans = ct_trans_realloc_local(ct_trans);
+
 	/* handle special files */
 	if (!C_ISREG(fl_curnode->fl_type)) {
 		if (C_ISDIR(fl_curnode->fl_type)) {

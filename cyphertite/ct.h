@@ -172,6 +172,9 @@ struct ct_trans {
 	TAILQ_ENTRY(ct_trans)	tr_next;
 	RB_ENTRY(ct_trans)	tr_trans_rbnode;
 
+	/* is this a local or data transaction */
+	int			tr_local;
+
 	struct fnode		*tr_fl_node;
 	uint64_t tr_trans_id;
 	int tr_type;
@@ -231,6 +234,7 @@ struct ct_trans {
 };
 
 struct ct_trans		*ct_trans_alloc(void);
+struct ct_trans		*ct_trans_realloc_local(struct ct_trans *);
 void			ct_trans_free(struct ct_trans *trans);
 void			ct_trans_cleanup(void);
 void			ct_flnode_cleanup(void);

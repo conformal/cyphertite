@@ -247,6 +247,80 @@ skip_csha:
 	}
 }
 
+/*
+ * Local transaction allocator.
+ *
+ * When we wish to start a new transaction we must always use ct_trans_alloc()
+ * in case the operation in question needs to talk to the server. When we
+ * determine that no server communication is needed (a local file open for
+ * example) then we can free that transaction and use a local one which are not
+ * limited by the negotiated size of the server queue.
+ *
+ * Otherwise we can get in the situation where we have a lot of small files
+ * (1 chunk each) so we use one transaction for open, one for close and one for
+ * the sha, meaning that one file took 3 transactions of which only one went to
+ * the server. theoretically dividing our throughput by 3.
+ */
+/*
+ * we have a cap on the maximum number of transactions to prevent things
+ * getting silly. For example if you had an archive of 100000 directories you
+ * would try and allocate 100000  local transactions and probably start hitting
+ * memory limits.
+ *
+ * this number probably wants some careful tuning.
+ */
+#define CT_MAX_LOCAL_TRANSACTIONS	(100)
+static int ct_num_local_transactions;
+static struct ct_trans *
+ct_trans_alloc_local(void)
+{
+	
+	struct ct_trans *trans;
+
+	if (ct_num_local_transactions >= CT_MAX_LOCAL_TRANSACTIONS)
+		return (NULL);
+	ct_num_local_transactions++;
+
+	/*
+	 * This should come from preallocated shared memory
+	 * however for now since this is unneeded just allocate on demand.
+	 */
+	trans = e_calloc(1, sizeof(*trans));
+
+	/*
+	 * No tag, body or compressed body. If they are needed then trans
+	 * is not local.
+	 */
+	trans->tr_data[0] = NULL;
+	trans->tr_data[1] = NULL;
+
+	trans->tr_local = 1;
+
+	return trans;
+}
+
+/*
+ * Replace an allocated transaction with a local one.
+ * No fields saved, just the right to do some work.
+ */
+struct ct_trans *
+ct_trans_realloc_local(struct ct_trans *trans)
+{
+	struct ct_trans		*tmp;
+
+	/*
+	 * If we have too many local transactions on the go then just return
+	 * the non local trans, we'll eventually starve those too and
+	 * wait for some to finish.
+	 */
+	if ((tmp = ct_trans_alloc_local()) == NULL)
+		return (trans);
+
+	ct_trans_free(trans);
+
+	return (tmp);
+}
+
 struct ct_trans *
 ct_trans_alloc(void)
 {
@@ -298,7 +372,15 @@ void
 ct_trans_free(struct ct_trans *trans)
 {
 	/* This should come from preallocated shared memory freelist */
-	TAILQ_INSERT_HEAD(&ct_trans_free_head, trans, tr_next);
+	if (trans->tr_local) {
+		/* just chuck local trans for now. */
+		ct_num_local_transactions--;
+		e_free(&trans);
+
+		return;
+	} else {
+		TAILQ_INSERT_HEAD(&ct_trans_free_head, trans, tr_next);
+	}
 	c_trans_free++;
 	if (trans->tr_dataslot == 2) {
 		ct_body_free(NULL, trans->tr_data[2], &trans->hdr);

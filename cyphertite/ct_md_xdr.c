@@ -105,6 +105,12 @@ ct_list_op(struct ct_op *op)
 
 	ct_list(op->op_local_fname, op->op_filelist, op->op_excludelist,
 	    op->op_matchmode);
+	/*
+	 * Technicaly should be a local transaction.
+	 * However, since this is just so that list can fit into the normal
+	 * state machine for async operations and there should be none
+	 * others allocated it doesn't really matter.
+	 */
 	trans = ct_trans_alloc();
 	if (trans == NULL) {
 		/* system busy, return (should never happen) */
@@ -406,6 +412,8 @@ ct_extract(struct ct_op *op)
 				ex_priv->doextract = 0;
 				goto skip; /* skip ze file for now */
 			}
+
+			trans = ct_trans_realloc_local(trans);
 			trans->tr_fl_node = ex_priv->fl_ex_node = fnode =
 			    e_calloc(1, sizeof(*fnode));
 
@@ -477,6 +485,9 @@ skip:
 			ct_queue_transfer(trans);
 			break;
 		case XS_RET_FILE_END:
+			trans = ct_trans_realloc_local(trans);
+			trans->tr_fl_node = ex_priv->fl_ex_node; /* reload */
+
 			if (ex_priv->doextract == 0 ||
 			    trans->tr_fl_node->fl_skip_file != 0) {
 				ct_trans_free(trans);
@@ -510,6 +521,11 @@ skip:
 				op->op_priv = NULL;
 				trans->tr_state = TR_S_DONE;
 				trans->tr_trans_id = ct_trans_id++;
+				/*
+				 * Technically this should be a local
+				 * transaction. However, since we are done
+				 * it doesn't really matter either way.
+				 */
 				ct_queue_transfer(trans);
 				CNDBG(CT_LOG_TRANS, "extract finished");
 				ct_set_file_state(CT_S_FINISHED);
@@ -532,6 +548,7 @@ ct_extract_file(struct ct_op *op)
 	struct ct_file_extract_priv	*ex_priv = op->op_priv;
 	const char			*localfile = op->op_local_fname;
 	struct ct_trans			*trans;
+	uint64_t			 ltrans_id;
 	int				 ret;
 	char				 shat[SHA_DIGEST_STRING_LENGTH];
 
@@ -560,7 +577,7 @@ ct_extract_file(struct ct_op *op)
 		}
 		/* unless start of file this is right */
 		trans->tr_fl_node = ex_priv->fl_ex_node;
-		trans->tr_trans_id = ct_trans_id++;
+		trans->tr_trans_id = ltrans_id = ct_trans_id++;
 
 		if (ex_priv->done) {
 			CNDBG(CT_LOG_CTFILE, "Hit end of md");
@@ -577,6 +594,9 @@ ct_extract_file(struct ct_op *op)
 			CNDBG(CT_LOG_CTFILE, "opening file");
 			if (ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas == -1) 
 				CFATALX("can't extract file with -1 shas");
+
+			trans = ct_trans_realloc_local(trans);
+			trans->tr_trans_id = ltrans_id;
 			trans->tr_fl_node = ex_priv->fl_ex_node =
 			    e_calloc(1, sizeof(*trans->tr_fl_node));
 
@@ -622,6 +642,10 @@ ct_extract_file(struct ct_op *op)
 			trans->tr_dataslot = 0;
 			break;
 		case XS_RET_FILE_END:
+			trans = ct_trans_realloc_local(trans);
+			trans->tr_fl_node = ex_priv->fl_ex_node; /* reload */
+			trans->tr_trans_id = ltrans_id;
+
 			CNDBG(CT_LOG_CTFILE, "file end!");
 			bcopy(ex_priv->xdr_ctx.xs_trl.cmt_sha, trans->tr_sha,
 			    sizeof(trans->tr_sha));
