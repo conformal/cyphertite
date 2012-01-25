@@ -946,38 +946,45 @@ ct_md_download_next(struct ct_op *op)
 	const char		*mfilename = op->op_remote_fname;
 	char			*md_prev;
 	char			*cachename;
+	char			*cookedname;
 
 	md_is_open = 0;	/* prevent trying to close upon next download */
 again:
 	CNDBG(CT_LOG_CTFILE, "mfile %s", mfile);
 
+	/* this will provide us the path that we need to use */
 	md_prev = ct_metadata_check_prev(mfile);
 	if (md_prev == NULL)
 		goto out;
 
 	if (md_prev[0] != '\0') {
-		cachename = ct_md_get_cachename(md_prev);
+		cookedname = ct_md_cook_filename(md_prev);
+		cachename = ct_md_get_cachename(cookedname);
 		CNDBG(CT_LOG_CTFILE, "prev file %s cachename %s", md_prev,
 		    cachename);
 		if (!md_is_in_cache(cachename)) {
 			e_free(&cachename);
 			ct_add_operation_after(op, ct_md_extract,
-			    ct_md_download_next, (char *)md_prev, md_prev,
+			    ct_md_download_next, (char *)md_prev, cookedname,
 				NULL, NULL, NULL, 0, 0);
 		} else {
-			if (mfile == mfilename)
+			if (mfile)
 				e_free(&mfile);
+			if (mfilename)
+				e_free(&mfilename);
+			e_free(&cookedname);
 			e_free(&cachename);
-			mfile = mfilename = md_prev;
+			mfile = md_prev;
 			goto again;
 		}
 	} else
 		e_free(&md_prev);
 
 out:
-	if (mfile == mfilename) {
+	if (mfile)
 		e_free(&mfile);
-	}
+	if (mfilename)
+		e_free(&mfilename);
 
 }
 
@@ -989,6 +996,7 @@ void
 ct_md_extract_nextop(struct ct_op *op)
 {
 	char	*mfile;
+	char	*tmfile, *trfile;
 
 	md_is_open = 0;
 	/*
@@ -996,8 +1004,21 @@ ct_md_extract_nextop(struct ct_op *op)
 	 * queue download of that file
 	 */
 	if (op->op_action == CT_A_EXTRACT || op->op_action == CT_A_LIST ||
-	    op->op_action == CT_A_JUSTDL)
+	    op->op_action == CT_A_JUSTDL) {
+		/*
+		 * we need to keep these files, but download_next normally
+		 * needs to free them, make a temporary copy.
+		 */
+		tmfile = op->op_local_fname;
+		trfile = op->op_remote_fname;
+		if (tmfile)
+			op->op_local_fname = e_strdup(tmfile);
+		if (trfile)
+			op->op_remote_fname = e_strdup(trfile);
 		ct_md_download_next(op);
+		op->op_local_fname = tmfile;
+		op->op_remote_fname = trfile;
+	}
 
 	/*
 	 * Any recursive download after here will be placed after the
