@@ -573,6 +573,9 @@ ct_metadata_check_prev(const char *mdname)
 	if ((md_file = ct_metadata_open(mdname, &gh)) != NULL) {
 		if (gh.cmg_prevlvl_filename)
 			ret = e_strdup(gh.cmg_prevlvl_filename);
+		/* cleanup */
+		if (gh.cmg_cwd != NULL)
+			free(gh.cmg_cwd);
 		if (gh.cmg_paths != NULL) {
 			for (i = 0; i < gh.cmg_num_paths; i++)
 				free(gh.cmg_paths[i]);
@@ -758,6 +761,8 @@ ct_xdr_parse_close(struct ct_xdr_state *ctx)
 
 	if (ctx->xs_gh.cmg_prevlvl_filename)
 		free(ctx->xs_gh.cmg_prevlvl_filename);
+	if (ctx->xs_gh.cmg_cwd != NULL)
+		free(ctx->xs_gh.cmg_cwd);
 	if (ctx->xs_gh.cmg_paths != NULL) {
 		for (i = 0; i < ctx->xs_gh.cmg_num_paths; i++)
 			free(ctx->xs_gh.cmg_paths[i]);
