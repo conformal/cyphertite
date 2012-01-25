@@ -41,6 +41,7 @@ int				ct_xdr_version;
 int64_t				ct_dirnum = -1;
 
 void ct_alloc_dirnum(struct dnode *, struct dnode *);
+void ct_metadata_cleanup_gheader(struct ct_md_gheader *);
 
 
 /* metadata */
@@ -464,6 +465,26 @@ ct_metadata_open(const char *filename, struct ct_md_gheader *gh)
 	return (f);
 }
 
+/*
+ * Cleanup a global header that has been read from a file.
+ * xdr strings are malloced and thus need cleaning up.
+ */
+void
+ct_metadata_cleanup_gheader(struct ct_md_gheader *gh)
+{
+	int	 i;
+	if (gh->cmg_prevlvl_filename)
+		free(gh->cmg_prevlvl_filename);
+	if (gh->cmg_cwd != NULL)
+		free(gh->cmg_cwd);
+	if (gh->cmg_paths != NULL) {
+		for (i = 0; i < gh->cmg_num_paths; i++)
+			free(gh->cmg_paths[i]);
+
+		e_free(&gh->cmg_paths);
+	}
+}
+
 int
 ct_read_header(struct ct_md_header *hdr)
 {
@@ -576,24 +597,12 @@ ct_metadata_check_prev(const char *mdname)
 	FILE			*md_file;
 	char			*ret = NULL;
 	struct ct_md_gheader	 gh;
-	int			 i;
 
 	if ((md_file = ct_metadata_open(mdname, &gh)) != NULL) {
-		if (gh.cmg_prevlvl_filename) {
+		if (gh.cmg_prevlvl_filename)
 			ret = e_strdup(gh.cmg_prevlvl_filename);
-			free(gh.cmg_prevlvl_filename);
-		}
 
-		/* cleanup */
-		if (gh.cmg_cwd != NULL)
-			free(gh.cmg_cwd);
-		if (gh.cmg_paths != NULL) {
-			for (i = 0; i < gh.cmg_num_paths; i++)
-				free(gh.cmg_paths[i]);
-
-			e_free(&gh.cmg_paths);
-		}
-
+		ct_metadata_cleanup_gheader(&gh);
 		ct_metadata_close(md_file);
 	}
 
@@ -762,18 +771,8 @@ ct_xdr_parse_tell(struct ct_xdr_state *ctx)
 void
 ct_xdr_parse_close(struct ct_xdr_state *ctx)
 {
-	int	i;
 
-	if (ctx->xs_gh.cmg_prevlvl_filename)
-		free(ctx->xs_gh.cmg_prevlvl_filename);
-	if (ctx->xs_gh.cmg_cwd != NULL)
-		free(ctx->xs_gh.cmg_cwd);
-	if (ctx->xs_gh.cmg_paths != NULL) {
-		for (i = 0; i < ctx->xs_gh.cmg_num_paths; i++)
-			free(ctx->xs_gh.cmg_paths[i]);
-
-		e_free(&ctx->xs_gh.cmg_paths);
-	}
+	ct_metadata_cleanup_gheader(&ctx->xs_gh);
 	if (ctx->xs_filename != NULL)
 		e_free(&ctx->xs_filename);
 
