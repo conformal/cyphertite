@@ -435,6 +435,14 @@ ct_metadata_open(const char *filename, struct ct_md_gheader *gh)
 	if (ct_xdr_gheader(&xdr, gh, 0) == FALSE)
 		CFATALX("e_xdr_gheader failed");
 
+	/* don't bother with empty strings for prevlevel */
+	if (gh->cmg_prevlvl_filename &&
+	    gh->cmg_prevlvl_filename[0] == '\0') {
+		free(gh->cmg_prevlvl_filename);
+		gh->cmg_prevlvl_filename = NULL;
+	}
+
+
 	ltime = gh->cmg_created;
 	if (ct_verbose > 1)
 		printf("version: %d level: %d block size: %d created: %s",
@@ -571,11 +579,6 @@ ct_metadata_check_prev(const char *mdname)
 	int			 i;
 
 	if ((md_file = ct_metadata_open(mdname, &gh)) != NULL) {
-		if (gh.cmg_prevlvl_filename &&
-		    gh.cmg_prevlvl_filename[0] == '\0') {
-			free(gh.cmg_prevlvl_filename);
-			gh.cmg_prevlvl_filename = NULL;
-		}
 		if (gh.cmg_prevlvl_filename) {
 			ret = e_strdup(gh.cmg_prevlvl_filename);
 			free(gh.cmg_prevlvl_filename);
@@ -605,12 +608,6 @@ ct_xdr_parse_init_at(struct ct_xdr_state *ctx, const char *file, off_t offset)
 		return 2;
 
 	ctx->xs_filename  = e_strdup(file);
-
-	if (ctx->xs_gh.cmg_prevlvl_filename &&
-	    ctx->xs_gh.cmg_prevlvl_filename[0] == '\0') {
-		free(ctx->xs_gh.cmg_prevlvl_filename);
-		ctx->xs_gh.cmg_prevlvl_filename = NULL;
-	}
 
 	if (offset != 0 && fseek(ctx->xs_f, offset, SEEK_SET) == -1) {
 		CWARN("failed to seek in file %s", file);
