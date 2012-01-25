@@ -32,7 +32,26 @@
 #include <exude.h>
 
 #include "ct.h"
-#include "ct_xdr.h"
+
+#ifdef __linux__
+#define xdr_u_int32_t	xdr_uint32_t
+#define xdr_u_int64_t	xdr_uint64_t
+#endif
+
+bool_t          ct_xdr_dedup_sha(XDR *, uint8_t *);
+bool_t		ct_xdr_dedup_sha_crypto(XDR *, uint8_t *, uint8_t *,
+			uint8_t *);
+bool_t          ct_xdr_header(XDR *, struct ct_md_header *);
+bool_t          ct_xdr_trailer(XDR *, struct ct_md_trailer *);
+bool_t          ct_xdr_stdin(XDR *, struct ct_md_stdin *);
+bool_t          ct_xdr_gheader(XDR *, struct ct_md_gheader *, int);
+
+FILE           *ct_metadata_open(const char *,
+			struct ct_md_gheader *);
+int             ct_read_trailer(struct ct_md_trailer *);
+
+void		ct_alloc_dirnum(struct dnode *, struct dnode *);
+void		ct_metadata_cleanup_gheader(struct ct_md_gheader *);
 
 XDR				xdr;
 time_t				ct_prev_backup_time;
@@ -40,8 +59,6 @@ int				md_dir = -1;
 int				ct_xdr_version;
 int64_t				ct_dirnum = -1;
 
-void ct_alloc_dirnum(struct dnode *, struct dnode *);
-void ct_metadata_cleanup_gheader(struct ct_md_gheader *);
 
 
 /* metadata */
