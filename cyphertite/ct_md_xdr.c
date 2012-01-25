@@ -127,17 +127,17 @@ ct_list_op(struct ct_op *op)
 int
 ct_list(const char *file, char **flist, char **excludelist, int match_mode)
 {
-	struct ct_xdr_state	xs_ctx;
-	struct fnode		fnodestore;
-	uint64_t		reduction;
-	struct fnode		*fnode = &fnodestore;
-	struct ct_match		*match, *ex_match = NULL;
-	char			*ct_next_filename;
-	char			*sign;
-	int			state;
-	int			doprint = 0;
-	int			ret;
-	char			shat[SHA_DIGEST_STRING_LENGTH];
+	struct ctfile_parse_state	 xs_ctx;
+	struct fnode			 fnodestore;
+	uint64_t			 reduction;
+	struct fnode			*fnode = &fnodestore;
+	struct ct_match			*match, *ex_match = NULL;
+	char				*ct_next_filename;
+	char				*sign;
+	int				 state;
+	int				 doprint = 0;
+	int				 ret;
+	char				 shat[SHA_DIGEST_STRING_LENGTH];
 
 	match = ct_match_compile(match_mode, flist);
 	if (excludelist != NULL)
@@ -147,7 +147,7 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode)
 
 	ct_next_filename = NULL;
 next_file:
-	ret = ct_xdr_parse_init(&xs_ctx, file);
+	ret = ctfile_parse_init(&xs_ctx, file);
 	if (ret)
 		CFATALX("failed to open %s", file);
 
@@ -162,7 +162,7 @@ next_file:
 	bzero(&fnodestore, sizeof(fnodestore));
 
 	do {
-		ret = ct_xdr_parse(&xs_ctx);
+		ret = ctfile_parse(&xs_ctx);
 		switch (ret) {
 		case XS_RET_FILE:
 			ct_populate_fnode(fnode, &xs_ctx.xs_hdr,
@@ -210,7 +210,7 @@ next_file:
 			break;
 		case XS_RET_SHA:
 			if (!(doprint && ct_verbose > 2)) {
-				if (ct_xdr_parse_seek(&xs_ctx)) {
+				if (ctfile_parse_seek(&xs_ctx)) {
 					CFATALX("seek failed");
 				}
 			} else {
@@ -226,7 +226,7 @@ next_file:
 
 	} while (ret != XS_RET_EOF && ret != XS_RET_FAIL);
 
-	ct_xdr_parse_close(&xs_ctx);
+	ctfile_parse_close(&xs_ctx);
 
 	if (ret != XS_RET_EOF) {
 		CWARNX("end of archive not hit");
@@ -246,12 +246,12 @@ next_file:
  */
 void
 ct_extract_setup(struct ct_extract_head *extract_head,
-    struct ct_xdr_state *ctx, const char *file)
+    struct ctfile_parse_state *ctx, const char *file)
 {
 	struct ct_extract_stack	*nfile;
 	char			*prevlvl;
 
-	if (ct_xdr_parse_init(ctx, file))
+	if (ctfile_parse_init(ctx, file))
 		CFATALX("extract failure: unable to open metadata file '%s'\n",
 		    file);
 
@@ -266,13 +266,13 @@ ct_extract_setup(struct ct_extract_head *extract_head,
 
 		prevlvl = e_strdup(ctx->xs_gh.cmg_prevlvl_filename);
 
-		ct_xdr_parse_close(ctx);
+		ctfile_parse_close(ctx);
 		ct_extract_setup_queue(extract_head, ctx, prevlvl);
 
 		e_free(&prevlvl);
 
 		if (ct_multilevel_allfiles) {
-			ct_xdr_parse_close(ctx);
+			ctfile_parse_close(ctx);
 			/* reopen first file */
 			ct_extract_open_next(extract_head, ctx);
 		} 
@@ -283,12 +283,12 @@ ct_extract_setup(struct ct_extract_head *extract_head,
 
 void
 ct_extract_setup_queue(struct ct_extract_head *extract_head,
-    struct ct_xdr_state *ctx, const char *file)
+    struct ctfile_parse_state *ctx, const char *file)
 {
 	char			*prevlvl;
 	struct ct_extract_stack	*nfile;
 
-	if (ct_xdr_parse_init(ctx, file))
+	if (ctfile_parse_init(ctx, file))
 		CFATALX("extract failure: unable to open differential archive"
 		    "'%s'\n", file);
 
@@ -306,7 +306,7 @@ ct_extract_setup_queue(struct ct_extract_head *extract_head,
 			TAILQ_INSERT_HEAD(extract_head, nfile, next);
 
 		prevlvl = e_strdup(ctx->xs_gh.cmg_prevlvl_filename);
-		ct_xdr_parse_close(ctx);
+		ctfile_parse_close(ctx);
 
 		ct_extract_setup_queue(extract_head, ctx, prevlvl);
 		e_free(&prevlvl);
@@ -322,7 +322,7 @@ ct_extract_setup_queue(struct ct_extract_head *extract_head,
 
 void
 ct_extract_open_next(struct ct_extract_head *extract_head,
-    struct ct_xdr_state *ctx)
+    struct ctfile_parse_state *ctx)
 {
 	struct ct_extract_stack *next;
 
@@ -332,7 +332,7 @@ ct_extract_open_next(struct ct_extract_head *extract_head,
 		    "should start restoring [%s]", next->filename);
 		TAILQ_REMOVE(extract_head, next, next);
 
-		if (ct_xdr_parse_init(ctx, next->filename))
+		if (ctfile_parse_init(ctx, next->filename))
 			CFATALX("failed to open %s", next->filename);
 		ct_encrypt_enabled = (ctx->xs_gh.cmg_flags & CT_MD_CRYPTO);
 
@@ -358,15 +358,15 @@ ct_extract_cleanup_queue(struct ct_extract_head *extract_head)
 }
 
 struct ct_extract_priv {
-	struct ct_extract_head	 extract_head;
-	struct ct_xdr_state	 xdr_ctx;
-	struct ct_match		*inc_match;
-	struct ct_match		*ex_match;
-	struct ct_match		*rb_match;
-	struct fnode		*fl_ex_node;
-	int			 doextract;
-	int			 fillrb;
-	int			 haverb;
+	struct ct_extract_head		 extract_head;
+	struct ctfile_parse_state	 xdr_ctx;
+	struct ct_match			*inc_match;
+	struct ct_match			*ex_match;
+	struct ct_match			*rb_match;
+	struct fnode			*fl_ex_node;
+	int				 doextract;
+	int				 fillrb;
+	int				 haverb;
 };
 
 void
@@ -419,7 +419,7 @@ ct_extract(struct ct_op *op)
 		/* Correct unless new file or EOF. Will fix in those cases  */
 		trans->tr_fl_node = ex_priv->fl_ex_node;
 
-		switch ((ret = ct_xdr_parse(&ex_priv->xdr_ctx))) {
+		switch ((ret = ctfile_parse(&ex_priv->xdr_ctx))) {
 		case XS_RET_FILE:
 			if (ex_priv->fillrb == 0 &&
 			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas == -1) {
@@ -474,7 +474,7 @@ skip:
 		case XS_RET_SHA:
 			if (ex_priv->doextract == 0 ||
 			    trans->tr_fl_node->fl_skip_file != 0) {
-				if (ct_xdr_parse_seek(&ex_priv->xdr_ctx))
+				if (ctfile_parse_seek(&ex_priv->xdr_ctx))
 					CFATALX("can't seek past shas");
 				ct_trans_free(trans);
 				continue;
@@ -484,7 +484,7 @@ skip:
 				SHA_DIGEST_LENGTH) == 0) {
 				CWARNX("\"%s\" truncated during backup",
 				    trans->tr_fl_node->fl_sname);
-				if (ct_xdr_parse_seek(&ex_priv->xdr_ctx))
+				if (ctfile_parse_seek(&ex_priv->xdr_ctx))
 					CFATALX("can't seek past shas");
 				ct_trans_free(trans);
 				continue;
@@ -534,7 +534,7 @@ skip:
 			break;
 		case XS_RET_EOF:
 			CNDBG(CT_LOG_CTFILE, "Hit end of md");
-			ct_xdr_parse_close(&ex_priv->xdr_ctx);
+			ctfile_parse_close(&ex_priv->xdr_ctx);
 			/* if rb tree and rb is empty, goto end state */
 			if ((ex_priv->haverb &&
 			    ct_match_rb_is_empty(ex_priv->inc_match)) ||
@@ -628,7 +628,7 @@ ct_extract_file(struct ct_op *op)
 	if (ct_state->ct_file_state == CT_S_STARTING) {
 		CNDBG(CT_LOG_TRANS, "starting");
 		/* open file and seek to beginning of file */
-		if (ct_xdr_parse_init_at(&ex_priv->xdr_ctx,
+		if (ctfile_parse_init_at(&ex_priv->xdr_ctx,
 		    ex_priv->md_filename, ex_priv->md_offset) != 0)
 			CFATALX("can't open metadata file %s",
 			    ex_priv->md_filename);
@@ -653,7 +653,7 @@ ct_extract_file(struct ct_op *op)
 
 		if (ex_priv->done) {
 			CNDBG(CT_LOG_CTFILE, "Hit end of md");
-			ct_xdr_parse_close(&ex_priv->xdr_ctx);
+			ctfile_parse_close(&ex_priv->xdr_ctx);
 			trans->tr_state = TR_S_DONE;
 			ct_queue_transfer(trans);
 			CNDBG(CT_LOG_TRANS, "extract finished");
@@ -661,7 +661,7 @@ ct_extract_file(struct ct_op *op)
 			return;
 		}
 
-		switch ((ret = ct_xdr_parse(&ex_priv->xdr_ctx))) {
+		switch ((ret = ctfile_parse(&ex_priv->xdr_ctx))) {
 		case XS_RET_FILE:
 			CNDBG(CT_LOG_CTFILE, "opening file");
 			if (ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas == -1) 
@@ -745,10 +745,11 @@ ct_extract_file(struct ct_op *op)
 int
 ct_cull_add_shafile(const char *file)
 {
-	struct ct_xdr_state	xs_ctx;
-	char			*ct_next_filename, *ct_filename_free = NULL;
-	char			*cachename;
-	int			ret;
+	struct ctfile_parse_state	xs_ctx;
+	char				*ct_next_filename;
+	char				*ct_filename_free = NULL;
+	char				*cachename;
+	int				ret;
 
 	CNDBG(CT_LOG_TRANS, "processing [%s]", file);
 
@@ -770,7 +771,7 @@ next_file:
 		e_asprintf(&cachename, "%s%s", ct_md_cachedir, file);
 	}
 
-	ret = ct_xdr_parse_init(&xs_ctx, cachename);
+	ret = ctfile_parse_init(&xs_ctx, cachename);
 	e_free(&cachename);
 	CNDBG(CT_LOG_CTFILE, "opening [%s]", file);
 
@@ -789,7 +790,7 @@ next_file:
 	}
 
 	do {
-		ret = ct_xdr_parse(&xs_ctx);
+		ret = ctfile_parse(&xs_ctx);
 		switch (ret) {
 		case XS_RET_FILE:
 			/* nothing to do, ct_populate_fnode2 is optional now */
@@ -808,7 +809,7 @@ next_file:
 
 	} while (ret != XS_RET_EOF && ret != XS_RET_FAIL);
 
-	ct_xdr_parse_close(&xs_ctx);
+	ctfile_parse_close(&xs_ctx);
 
 	if (ret != XS_RET_EOF) {
 		CWARNX("end of archive not hit");

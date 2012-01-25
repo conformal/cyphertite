@@ -48,7 +48,7 @@ struct ct_fb_state	*ctfb_cfs;
 
 __dead void		 ctfb_usage(void);
 struct ct_fb_entry	*ct_add_tree(struct ct_fb_entry *,
-			     struct ct_xdr_state *, struct ct_fb_mdfile *,
+			     struct ctfile_parse_state *, struct ct_fb_mdfile *,
 			     off_t);
 struct ct_fb_entry	*ctfb_follow_path(struct ct_fb_state *, const char *,
 			     char *, size_t);
@@ -70,7 +70,7 @@ RB_GENERATE_STATIC(ct_fb_entries, ct_fb_entry, cfb_entry, ct_cmp_entry);
  * the md file.
  */
 struct ct_fb_entry *
-ct_add_tree(struct ct_fb_entry *head, struct ct_xdr_state *xdr_ctx,
+ct_add_tree(struct ct_fb_entry *head, struct ctfile_parse_state *xdr_ctx,
     struct ct_fb_mdfile *mdfile, off_t fileoffset)
 {
 	extern int64_t			 ct_ex_dirnum;
@@ -210,11 +210,11 @@ ct_add_tree(struct ct_fb_entry *head, struct ct_xdr_state *xdr_ctx,
 			file->cfb_nr_shas = hdr->cmh_nr_shas;
 			file->cfb_sha_offs = fileoffset;
 			file->cfb_file = mdfile;
-			if (ct_xdr_parse_seek(xdr_ctx))
+			if (ctfile_parse_seek(xdr_ctx))
 				CFATALX("failed to skip shas in %s",
 				    mdfile->cff_path);
 		}
-		if (ct_xdr_parse(xdr_ctx) != XS_RET_FILE_END)
+		if (ctfile_parse(xdr_ctx) != XS_RET_FILE_END)
 			CFATALX("no file trailer found");
 		file->cfb_file_size = xdr_ctx->xs_trl.cmt_orig_size;
 	}
@@ -228,13 +228,13 @@ ct_add_tree(struct ct_fb_entry *head, struct ct_xdr_state *xdr_ctx,
 void
 ct_build_tree(const char *mfile, struct ct_fb_entry *head)
 {
-	struct ct_extract_head	 extract_head;
-	struct ct_xdr_state	 xdr_ctx;
-	struct ct_fb_mdfile	*mdfile = NULL;
-	struct ct_fb_dir	*root_dir;
-	struct ct_fb_key	*root_version;
-	off_t			 offset;
-	int			 ret;
+	struct ct_extract_head		 extract_head;
+	struct ctfile_parse_state	 xdr_ctx;
+	struct ct_fb_mdfile		*mdfile = NULL;
+	struct ct_fb_dir		*root_dir;
+	struct ct_fb_key		*root_version;
+	off_t				 offset;
+	int				 ret;
 
 	CNDBG(CT_LOG_FILE, "entry");
 
@@ -260,9 +260,9 @@ nextfile:
 	mdfile = calloc(1, sizeof(*mdfile));
 	strlcpy(mdfile->cff_path, xdr_ctx.xs_filename,
 	    sizeof(mdfile->cff_path));
-	offset = ct_xdr_parse_tell(&xdr_ctx);
+	offset = ctfile_parse_tell(&xdr_ctx);
 
-	while ((ret = ct_xdr_parse(&xdr_ctx)) != XS_RET_EOF &&
+	while ((ret = ctfile_parse(&xdr_ctx)) != XS_RET_EOF &&
 	    ret != XS_RET_FAIL) {
 		switch(ret) {
 		case XS_RET_FILE:
@@ -274,11 +274,11 @@ nextfile:
 		default:
 			CFATALX("invalid state in %s: %d", __func__, ret);
 		}
-		offset = ct_xdr_parse_tell(&xdr_ctx);
+		offset = ctfile_parse_tell(&xdr_ctx);
 	}
 	if (ret == XS_RET_EOF) {
 		CNDBG(CT_LOG_FILE, "done, closing file");
-		ct_xdr_parse_close(&xdr_ctx);
+		ctfile_parse_close(&xdr_ctx);
 		if (!TAILQ_EMPTY(&extract_head)) {
 			CNDBG(CT_LOG_FILE, "opening next one");
 			ct_extract_open_next(&extract_head, &xdr_ctx);

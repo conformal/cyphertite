@@ -537,11 +537,11 @@ ct_read_trailer(struct ct_md_trailer *trl)
 int
 ct_basis_setup(const char *basisbackup, char **filelist)
 {
-	struct ct_xdr_state	 xs_ctx;
-	char			 cwd[PATH_MAX], **fptr;
-	int			 nextlvl, i, rooted = 1, ret;
+	struct ctfile_parse_state	 xs_ctx;
+	char				 cwd[PATH_MAX], **fptr;
+	int			 	 nextlvl, i, rooted = 1, ret;
 
-	if (ct_xdr_parse_init(&xs_ctx, basisbackup))
+	if (ctfile_parse_init(&xs_ctx, basisbackup))
 		CFATALX("unable to open/parse previous backup %s",
 		    basisbackup);
 
@@ -590,16 +590,16 @@ ct_basis_setup(const char *basisbackup, char **filelist)
 			    " basis %s", cwd, xs_ctx.xs_gh.cmg_cwd);
 	}
 
-	while ((ret = ct_xdr_parse(&xs_ctx)) != XS_RET_EOF) {
+	while ((ret = ctfile_parse(&xs_ctx)) != XS_RET_EOF) {
 		if (ret == XS_RET_SHA)  {
-			if (ct_xdr_parse_seek(&xs_ctx))
+			if (ctfile_parse_seek(&xs_ctx))
 				CFATALX("seek failed");
 		} else if (ret == XS_RET_FAIL) {
 			CFATALX("basis corrupt: EOF not found");
 		}
 
 	}
-	ct_xdr_parse_close(&xs_ctx);
+	ctfile_parse_close(&xs_ctx);
 
 	return (nextlvl);
 }
@@ -623,7 +623,8 @@ ct_metadata_check_prev(const char *mdname)
 }
 
 int
-ct_xdr_parse_init_at(struct ct_xdr_state *ctx, const char *file, off_t offset)
+ctfile_parse_init_at(struct ctfile_parse_state *ctx, const char *file,
+    off_t offset)
 {
 	ctx->xs_f = ct_metadata_open(file,  &ctx->xs_gh);
 	if (ctx->xs_f == NULL)
@@ -633,7 +634,7 @@ ct_xdr_parse_init_at(struct ct_xdr_state *ctx, const char *file, off_t offset)
 
 	if (offset != 0 && fseek(ctx->xs_f, offset, SEEK_SET) == -1) {
 		CWARN("failed to seek in file %s", file);
-		ct_xdr_parse_close(ctx);
+		ctfile_parse_close(ctx);
 		return (3);
 	}
 
@@ -643,7 +644,7 @@ ct_xdr_parse_init_at(struct ct_xdr_state *ctx, const char *file, off_t offset)
 }
 
 int
-ct_xdr_parse(struct ct_xdr_state *ctx)
+ctfile_parse(struct ctfile_parse_state *ctx)
 {
 	off_t			pos0, pos1;
 	int			ret;
@@ -739,7 +740,7 @@ fail:
  * of the shas and read the file trailer
  */
 int
-ct_xdr_parse_seek(struct ct_xdr_state *ctx)
+ctfile_parse_seek(struct ctfile_parse_state *ctx)
 {
 	off_t	pos0, pos1;
 
@@ -776,13 +777,13 @@ ct_xdr_parse_seek(struct ct_xdr_state *ctx)
 }
 
 off_t
-ct_xdr_parse_tell(struct ct_xdr_state *ctx)
+ctfile_parse_tell(struct ctfile_parse_state *ctx)
 {
 	return (ftello(ctx->xs_f));
 }
 
 void
-ct_xdr_parse_close(struct ct_xdr_state *ctx)
+ctfile_parse_close(struct ctfile_parse_state *ctx)
 {
 
 	ct_metadata_cleanup_gheader(&ctx->xs_gh);

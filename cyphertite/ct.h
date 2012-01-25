@@ -627,8 +627,8 @@ void			ct_cleanup(void);
 void			ct_cleanup_eventloop(void);
 void			ct_cleanup_login_cache(void);
 
-/* XDR parser for cyphertite MD archives */
-struct ct_xdr_state {
+/* parser for cyphertite ctfile archives */
+struct ctfile_parse_state {
 	FILE			*xs_f;
 	const char		*xs_filename;
 	struct ct_md_gheader	 xs_gh;
@@ -654,12 +654,12 @@ struct ct_xdr_state {
 #define	XS_RET_FAIL		4
 };
 
-int ct_xdr_parse_init_at(struct ct_xdr_state *, const char *, off_t);
-#define ct_xdr_parse_init(ctx, file) ct_xdr_parse_init_at(ctx, file, 0)
-int ct_xdr_parse(struct ct_xdr_state *);
-int ct_xdr_parse_seek(struct ct_xdr_state *);
-void ct_xdr_parse_close(struct ct_xdr_state *);
-off_t ct_xdr_parse_tell(struct ct_xdr_state *);
+int ctfile_parse_init_at(struct ctfile_parse_state *, const char *, off_t);
+#define ctfile_parse_init(ctx, file) ctfile_parse_init_at(ctx, file, 0)
+int ctfile_parse(struct ctfile_parse_state *);
+int ctfile_parse_seek(struct ctfile_parse_state *);
+void ctfile_parse_close(struct ctfile_parse_state *);
+off_t ctfile_parse_tell(struct ctfile_parse_state *);
 
 /*
  * Functions for queueing differentials for extract or similar.
@@ -669,11 +669,12 @@ struct ct_extract_stack   {
 	TAILQ_ENTRY(ct_extract_stack)	next;
 	char		*filename;
 };
-void	ct_extract_setup(struct ct_extract_head *, struct ct_xdr_state *,
+void	ct_extract_setup(struct ct_extract_head *, struct ctfile_parse_state *,
 	    const char *);
-void	ct_extract_setup_queue(struct ct_extract_head *, struct ct_xdr_state *,
-	    const char *);
-void	ct_extract_open_next(struct ct_extract_head *, struct ct_xdr_state *);
+void	ct_extract_setup_queue(struct ct_extract_head *,
+	    struct ctfile_parse_state *, const char *);
+void	ct_extract_open_next(struct ct_extract_head *,
+	    struct ctfile_parse_state *);
 void	ct_extract_cleanup_queue(struct ct_extract_head *);
 
 /* cull  */
@@ -686,11 +687,11 @@ void ct_cull_kick(void);
  * the local filename to save it as
  */
 struct ct_file_extract_priv {
-	struct ct_xdr_state	 xdr_ctx;
-	struct fnode		*fl_ex_node;
-	const char		*md_filename;
-	off_t			 md_offset;
-	int			 done;
+	struct ctfile_parse_state	 xdr_ctx;
+	struct fnode			*fl_ex_node;
+	const char			*md_filename;
+	off_t				 md_offset;
+	int				 done;
 };
 ct_op_cb	ct_extract_file;
 
