@@ -34,7 +34,6 @@ void ct_handle_write_reply(struct ct_trans *, struct ct_header *, void *);
 void ct_handle_read_reply(struct ct_trans *, struct ct_header *, void *);
 
 void ct_write_md_special(struct ct_trans *);
-void ct_write_md_eof(struct ct_trans *);
 void ct_complete_normal(struct ct_trans *);
 
 /* ct flags - these are named wrongly, should come from config */
@@ -846,104 +845,22 @@ void
 ct_write_md_special(struct ct_trans *trans)
 {
 	struct fnode		*fnode = trans->tr_fl_node;
-	char			mylink[PATH_MAX];
-	char			*plink;
-	int			type = fnode->fl_type;
-	int			ret;
+	char			 mylink[PATH_MAX];
+	int			 ret;
 
-	if (C_ISDIR(type)) {
-		if (ct_write_header(fnode, fnode->fl_sname, 1))
-			CWARNX("header write failed");
-		CNDBG(CT_LOG_CTFILE, "record dir %s", fnode->fl_sname);
-	} else if (C_ISCHR(type) || C_ISBLK(type)) {
-		if (ct_write_header(fnode, fnode->fl_sname, 1))
-			CWARNX("header write failed");
-	} else if (C_ISFIFO(type)) {
-		CWARNX("fifo not supported");
-	} else if (C_ISLINK(type)) {
-		if (fnode->fl_hardlink) {
-			plink = fnode->fl_hlname;
-		} else {
-			ret = readlink(fnode->fl_fname, mylink, sizeof(mylink));
-			if (ret == -1 || ret == sizeof(mylink)) {
-				/* readlink failed, do not record */
-				CWARNX("unable to read mylink for %s",
-				    fnode->fl_sname);
-				return;
-			}
-			mylink[ret] = '\0';
-			plink = mylink;
-		}
-		if (fnode->fl_sname == NULL &&
-		    plink == NULL) {
-			CWARNX("%slink with no name or dest",
-			    fnode->fl_hardlink ? "hard" : "sym");
-			return;
-		} else if (fnode->fl_sname == NULL) {
-			CWARNX("%slink with no name",
-			    fnode->fl_hardlink ? "hard" : "sym");
-			return;
-		} else if (plink == NULL) {
-			CWARNX("%slink with no dest",
-			    fnode->fl_hardlink ? "hard" : "sym");
+	if (C_ISLINK(fnode->fl_type) && fnode->fl_hardlink == 0) {
+		ret = readlink(fnode->fl_fname, mylink, sizeof(mylink));
+		if (ret == -1 || ret == sizeof(mylink)) {
+			/* readlink failed, do not record */
+			CWARNX("unable to read mylink for %s",
+			    fnode->fl_sname);
 			return;
 		}
-		CNDBG(CT_LOG_CTFILE, "mylink %s %s", fnode->fl_sname, plink);
-		if (ct_write_header(fnode, fnode->fl_sname, 1))
-			CWARNX("header write failed");
-
-		if (fnode->fl_hardlink) {
-			fnode->fl_type = C_TY_REG; /* cheat */
-		}
-
-		if (ct_write_header(fnode, plink, 0))
-			CWARNX("header write failed");
-
-		fnode->fl_type = type; /* restore */
-
-	} else if (C_ISSOCK(type)) {
-		CWARNX("cannot archive a socket %s", fnode->fl_sname);
-	} else {
-		CWARNX("invalid type on %s %d", fnode->fl_sname,
-		    type);
+		mylink[ret] = '\0';
+		fnode->fl_hlname = e_strdup(mylink);
 	}
-}
 
-void
-ct_write_md_eof(struct ct_trans *trans)
-{
-	int			compression;
-	struct fnode		*fnode;
-	int			nrshas;
-
-	fnode = trans->tr_fl_node;
-
-	if ((ct_multilevel_allfiles == 0) &&
-	    fnode->fl_skip_file)
-		return;
-
-	CNDBG(CT_LOG_CTFILE, "trailer on trans %" PRIu64, trans->tr_trans_id);
-	CNDBG(CT_LOG_CTFILE, "should write trans for %s",
-	    fnode->fl_sname);
-	ct_write_trailer(trans);
-	if (ct_verbose > 1) {
-
-		if (fnode->fl_size == 0)
-			compression = 0;
-		else
-			compression = 100 * (fnode->fl_size -
-			    fnode->fl_comp_size) / fnode->fl_size;
-		if (ct_verbose > 2) {
-			nrshas = fnode->fl_size /
-			    ct_max_block_size;
-			if (fnode->fl_size % ct_max_block_size)
-				nrshas++;
-
-			printf(" shas %d", nrshas);
-		}
-		printf(" (%d%%)\n", compression);
-	} else if (ct_verbose)
-		printf("\n");
+	ctfile_write_special(trans->tr_ctfile, fnode);
 }
 
 /* completion handler for states for non-metadata actions. */
@@ -956,7 +873,9 @@ ct_complete_normal(struct ct_trans *trans)
 
 	switch (trans->tr_state) {
 	case TR_S_DONE:
-		ct_cleanup_md(); /* XXX */
+		if (trans->tr_ctfile) {
+			ctfile_write_close(trans->tr_ctfile);
+		}
 		/* do we have more operations queued up? */
 		if (ct_op_complete() == 0)
 			return;
@@ -978,7 +897,7 @@ ct_complete_normal(struct ct_trans *trans)
 			break;
 		}
 
-		if (ct_write_header(fnode, fnode->fl_sname, 1))
+		if (ctfile_write_file_start(trans->tr_ctfile, fnode))
 			CWARNX("header write failed");
 
 		if (ct_verbose) {
@@ -987,7 +906,8 @@ ct_complete_normal(struct ct_trans *trans)
 		}
 
 		if (trans->tr_eof == 1 || fnode->fl_skip_file) {
-			ct_write_md_eof(trans);
+			ctfile_write_file_end(trans->tr_ctfile,
+			    trans->tr_fl_node);
 			ct_stats->st_files_completed++;
 			release_fnode = 1;
 		}
@@ -995,34 +915,20 @@ ct_complete_normal(struct ct_trans *trans)
 	case TR_S_WMD_READY:
 		ct_stats->st_chunks_completed++;
 		if (trans->tr_eof < 2) {
-			if (ct_encrypt_enabled) {
-				ct_write_sha_crypto(trans);
-			} else {
-				ct_write_sha(trans);
-			}
+			CNDBG(CT_LOG_CTFILE, "XoX sha sz %d eof %d",
+			    trans->tr_size[(int)trans->tr_dataslot],
+			    trans->tr_eof);
+
+			ctfile_write_file_sha(trans->tr_ctfile, trans->tr_sha,
+			    trans->tr_csha, trans->tr_iv);
 		}
 
 		if (trans->tr_eof) {
-			if (trans->tr_eof == 2) {
-				struct fnode *fn = trans->tr_fl_node;
-				off_t padlen = fn->fl_size - fn->fl_offset;
-
-				bzero(trans->tr_sha, sizeof(trans->tr_sha));
-				/*
-				 * File got truncated during backup, pad up
-				 * zero shas to the original size of the file.
-				 */
-				while (padlen > 0) {
-					padlen -= ct_max_block_size;
-					if (ct_encrypt_enabled) {
-						ct_write_sha_crypto(trans);
-					} else {
-						ct_write_sha(trans);
-					}
-				}
-				fn->fl_size = fn->fl_offset;
-			}
-			ct_write_md_eof(trans);
+			if (trans->tr_eof == 2)
+				ctfile_write_file_pad(trans->tr_ctfile,
+				    trans->tr_fl_node);
+			ctfile_write_file_end(trans->tr_ctfile,
+			    trans->tr_fl_node);
 			release_fnode = 1;
 		}
 		break;

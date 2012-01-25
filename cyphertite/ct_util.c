@@ -205,25 +205,6 @@ ct_ssl_cleanup(void)
 	e_free(&ct_ssl_ctx);
 }
 
-void
-ct_setup_write_md(const char *mfile, int infile, const char *basis, int lvl,
-    char *cwd, char **filelist)
-{
-	ct_mdf = ct_metadata_create(mfile, infile, basis, lvl, cwd, filelist);
-	if (ct_mdf == NULL)
-		CFATAL("can't create %s", mfile);
-}
-
-void
-ct_cleanup_md(void)
-{
-	if (ct_mdf != NULL) {
-		ct_metadata_close(ct_mdf);
-		ct_mdf = NULL;
-	}
-}
-
-
 struct ct_io_queue *
 ct_ioctx_alloc(void)
 {

@@ -182,6 +182,7 @@ struct ct_trans {
 	int			tr_local;
 
 	struct fnode		*tr_fl_node;
+	struct ctfile_write_state *tr_ctfile;
 	uint64_t tr_trans_id;
 	int tr_type;
 /* DIR is another special */
@@ -436,9 +437,6 @@ int				ctdb_insert(struct ct_trans *trans);
 
 /* metadata */
 int				ct_s_to_e_type(int);
-FILE				*ct_metadata_create(const char *, int,
-				    const char *, int, char *, char **);
-void				ct_metadata_close(FILE *);
 char				*ct_metadata_check_prev(const char *);
 
 struct dedup_digest {
@@ -520,11 +518,6 @@ struct ct_md_trailer {
 	uint8_t			cmt_sha[SHA_DIGEST_LENGTH];
 };
 
-int			ct_write_header(struct fnode *, char *, int);
-int			ct_write_sha(struct ct_trans *);
-int			ct_write_sha_crypto(struct ct_trans *);
-int			ct_write_trailer(struct ct_trans *);
-void			ct_cleanup_md(void);
 int			ct_read_header(struct ct_md_header *hdr);
 struct ct_assl_io_ctx	*ct_assl_ctx;
 int			ct_basis_setup(const char *, char **);
@@ -578,9 +571,6 @@ void			ct_reconnect(evutil_socket_t, short, void *);
 int			ct_reconnect_internal(void);
 void			ct_load_certs(struct assl_context *);
 int			ct_assl_negotiate_poll(struct ct_assl_io_ctx *);
-void			ct_setup_write_md(const char *, int, const char *, int,
-			    char *, char **);
-void			ct_cleanup_md(void);
 
 /* match functionality */
 #define CT_MATCH_INVALID	(0)
@@ -627,10 +617,14 @@ void			ct_cleanup(void);
 void			ct_cleanup_eventloop(void);
 void			ct_cleanup_login_cache(void);
 
+/* XXX this should be hidden */
+#include <rpc/types.h>
+#include <rpc/xdr.h>
 /* parser for cyphertite ctfile archives */
 struct ctfile_parse_state {
 	FILE			*xs_f;
 	const char		*xs_filename;
+	XDR			 xs_xdr;
 	struct ct_md_gheader	 xs_gh;
 	struct ct_md_header	 xs_hdr;
 	struct ct_md_header	 xs_lnkhdr;
@@ -660,6 +654,19 @@ int ctfile_parse(struct ctfile_parse_state *);
 int ctfile_parse_seek(struct ctfile_parse_state *);
 void ctfile_parse_close(struct ctfile_parse_state *);
 off_t ctfile_parse_tell(struct ctfile_parse_state *);
+
+struct ctfile_write_state;
+struct ctfile_write_state	
+	*ctfile_write_init(const char *, int, const char *, int, char *,
+	    char **);
+void	 ctfile_write_special(struct ctfile_write_state *, struct fnode *);
+int	 ctfile_write_file_start(struct ctfile_write_state *, struct fnode *);
+int	 ctfile_write_file_sha(struct ctfile_write_state *, uint8_t *,
+	     uint8_t *, uint8_t *);
+int	 ctfile_write_file_pad(struct ctfile_write_state *, struct fnode *);
+int	 ctfile_write_file_end(struct ctfile_write_state *, struct fnode *);
+void	 ctfile_write_close(struct ctfile_write_state *);
+
 
 /*
  * Functions for queueing differentials for extract or similar.

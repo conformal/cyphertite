@@ -403,6 +403,7 @@ ct_archive(struct ct_op *op)
 	off_t			rsz;
 	struct stat		sb;
 	struct ct_trans		*ct_trans;
+	struct ctfile_write_state	*cws = op->op_priv;
 	char			cwd[PATH_MAX];
 	int			new_file = 0;
 	int			error;
@@ -432,8 +433,10 @@ ct_archive(struct ct_op *op)
 
 		/* XXX - deal with stdin */
 		/* XXX - if basisbackup should the type change ? */
-		ct_setup_write_md(mfile, CT_MD_REGULAR, basisbackup, nextlvl,
-		    cwd, filelist);
+		if ((cws = ctfile_write_init(mfile, CT_MD_REGULAR, basisbackup,
+		    nextlvl, cwd, filelist)) == NULL)
+			CFATAL("can't create %s", mfile);
+		op->op_priv = cws;
 
 		if (basisbackup != NULL)
 			e_free(&basisbackup);
@@ -501,6 +504,7 @@ loop:
 				}
 			}
 		}
+		ct_trans->tr_ctfile = cws;
 		ct_trans->tr_fl_node = fl_curnode;
 		fl_curnode->fl_state = CT_FILE_FINISHED;
 		fl_curnode->fl_size = 0;
@@ -545,6 +549,7 @@ loop:
 				fl_curnode->fl_skip_file = skip_file;
 			}
 		}
+		ct_trans->tr_ctfile = cws;
 		ct_trans->tr_fl_node = fl_curnode;
 		ct_trans->tr_state = TR_S_FILE_START;
 		ct_trans->tr_type = TR_T_WRITE_HEADER;
@@ -586,6 +591,7 @@ loop:
 	if (rlen > 0)
 		ct_stats->st_bytes_read += rlen;
 
+	ct_trans->tr_ctfile = cws;
 	ct_trans->tr_fl_node = fl_curnode;
 	ct_trans->tr_size[0] = rlen;
 	ct_trans->tr_chsize = rlen;
@@ -668,6 +674,7 @@ done:
 		ct_set_file_state(CT_S_WAITING_TRANS);
 		return;
 	}
+	ct_trans->tr_ctfile = cws;
 	ct_trans->tr_fl_node = NULL;
 	ct_trans->tr_state = TR_S_DONE;
 	ct_trans->tr_eof = 0;

@@ -41,23 +41,18 @@
 bool_t          ct_xdr_dedup_sha(XDR *, uint8_t *);
 bool_t		ct_xdr_dedup_sha_crypto(XDR *, uint8_t *, uint8_t *,
 			uint8_t *);
-bool_t          ct_xdr_header(XDR *, struct ct_md_header *);
+bool_t          ct_xdr_header(XDR *, struct ct_md_header *, int);
 bool_t          ct_xdr_trailer(XDR *, struct ct_md_trailer *);
 bool_t          ct_xdr_stdin(XDR *, struct ct_md_stdin *);
 bool_t          ct_xdr_gheader(XDR *, struct ct_md_gheader *, int);
 
 FILE           *ct_metadata_open(const char *,
-			struct ct_md_gheader *);
-int             ct_read_trailer(struct ct_md_trailer *);
+			struct ct_md_gheader *, XDR *);
+void		ct_metadata_close(FILE *, XDR *);
 
-void		ct_alloc_dirnum(struct dnode *, struct dnode *);
 void		ct_metadata_cleanup_gheader(struct ct_md_gheader *);
 
-XDR				xdr;
 time_t				ct_prev_backup_time;
-int				md_dir = -1;
-int				ct_xdr_version;
-int64_t				ct_dirnum = -1;
 
 
 
@@ -83,13 +78,13 @@ ct_xdr_dedup_sha_crypto(XDR *xdrs, uint8_t *sha, uint8_t *csha, uint8_t *iv)
 }
 
 bool_t
-ct_xdr_header(XDR *xdrs, struct ct_md_header *objp)
+ct_xdr_header(XDR *xdrs, struct ct_md_header *objp, int version)
 {
 	if (!xdr_int(xdrs, &objp->cmh_beacon))
 		return (FALSE);
 	if (!xdr_u_int64_t(xdrs, &objp->cmh_nr_shas))
 		return (FALSE);
-	if (ct_xdr_version >= CT_MD_V3) {
+	if (version >= CT_MD_V3) {
 		if (!xdr_int64_t(xdrs, &objp->cmh_parent_dir))
 			return (FALSE);
 	} else {
@@ -139,7 +134,8 @@ ct_xdr_stdin(XDR *xdrs, struct ct_md_stdin *objp)
 }
 
 bool_t
-ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp, int dowrite)
+ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp,
+    int direction)
 {
 	char	 *basep, base[PATH_MAX], *prevlvl;
 	int	 i;
@@ -156,7 +152,7 @@ ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp, int dowrite)
 		return (FALSE);
 	if (!xdr_int(xdrs, &objp->cmg_flags))
 		return (FALSE);
-	if (md_dir  == XDR_ENCODE && ct_md_mode == CT_MDMODE_REMOTE &&
+	if (direction  == XDR_ENCODE && ct_md_mode == CT_MDMODE_REMOTE &&
 	    objp->cmg_prevlvl_filename != NULL &&
 	    objp->cmg_prevlvl_filename[0] != '\0') {
 		strlcpy(base, objp->cmg_prevlvl_filename, sizeof(base));
@@ -169,7 +165,7 @@ ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp, int dowrite)
 	}
 	if (!xdr_string(xdrs, &prevlvl, PATH_MAX))
 		return (FALSE);
-	if (md_dir == XDR_DECODE && ct_md_mode == CT_MDMODE_REMOTE &&
+	if (direction == XDR_DECODE && ct_md_mode == CT_MDMODE_REMOTE &&
 	    prevlvl != NULL && prevlvl[0] != '\0') {
 		strlcpy(base, prevlvl, sizeof(base));
 		if ((basep = basename(base)) == NULL)
@@ -187,7 +183,7 @@ ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp, int dowrite)
 			return (FALSE);
 		if (!xdr_int(xdrs, &objp->cmg_num_paths))
 			return (FALSE);
-		if (dowrite == 0) {
+		if (direction == XDR_DECODE) {
 			objp->cmg_paths = e_calloc(objp->cmg_num_paths,
 			    sizeof(*objp->cmg_paths));
 		}
@@ -199,243 +195,21 @@ ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp, int dowrite)
 	return (TRUE);
 }
 
-FILE *
-ct_metadata_create(const char *filename, int intype, const char *basis, int lvl,
-    char *cwd, char **filelist)
-{
-	char			**fptr;
-	FILE			*f;
-	struct ct_md_gheader	gh;
-
-	/* always save to the current version */
-	ct_xdr_version = CT_MD_VERSION;
-
-	if (lvl != 0 && basis == NULL)
-		CFATALX("multilevel archive with no basis");
-
-	/* open metadata file */
-	f = fopen(filename, "wb");
-	if (f == NULL)
-		return (NULL);
-
-	/* prepare header */
-	bzero(&gh, sizeof gh);
-	gh.cmg_beacon = CT_MD_BEACON;
-	gh.cmg_version = CT_MD_VERSION;
-	gh.cmg_chunk_size = ct_max_block_size;
-	gh.cmg_created = time(NULL);
-	gh.cmg_type = intype;
-	gh.cmg_flags = 0;
-	if (ct_encrypt_enabled)
-		gh.cmg_flags |= CT_MD_CRYPTO;
-	if (ct_multilevel_allfiles)
-		gh.cmg_flags |= CT_MD_MLB_ALLFILES;
-	gh.cmg_prevlvl_filename = basis ? (char *)basis : "";
-	gh.cmg_cur_lvl = lvl;
-	gh.cmg_cwd = cwd;
-
-	fptr = filelist;
-	while((*fptr++) != NULL)
-		gh.cmg_num_paths++;
-	gh.cmg_paths = filelist;
-
-	md_dir = XDR_ENCODE;
-	/* write global header */
-	xdrstdio_create(&xdr, f, XDR_ENCODE);
-	if (ct_xdr_gheader(&xdr, &gh, 1) == FALSE)
-		CFATALX("e_xdr_gheader failed");
-
-	return (f);
-}
-
 void
-ct_metadata_close(FILE *file)
+ct_metadata_close(FILE *file, XDR *xdr)
 {
 	extern int64_t		ct_ex_dirnum;
-	struct ct_md_header	hdr;
-	char			fake[1];
-
-	/* write EOF header on close */
-	if (md_dir == XDR_ENCODE) {
-		bzero(&hdr, sizeof hdr);
-		fake[0] = '\0';
-		hdr.cmh_filename = fake;
-		hdr.cmh_beacon = CT_HDR_EOF;
-		if (ct_xdr_header(&xdr, &hdr) == FALSE)
-			CWARNX("Failed to write archive footer");
-	}
 
 	 /* These counters only apply for the file in question. reset. */
 	ct_dnode_cleanup();
-	ct_dirnum = -1;
 	ct_ex_dirnum = 0;
 
-	xdr_destroy(&xdr);
+	xdr_destroy(xdr);
 	fclose(file);
 }
 
-void
-ct_alloc_dirnum(struct dnode *dnode, struct dnode *parentdir)
-{
-	struct fnode	*fnode_dir;
-
-	if (dnode->d_num != -1)
-		return;
-
-	/* flag as allocate dirnum */
-	dnode->d_num = -2;
-
-	if (parentdir && parentdir->d_num == -1) {
-		ct_alloc_dirnum(parentdir, parentdir->d_parent);
-	}
-
-	/*
-	 * lazy directory header writing
-	 */
-	fnode_dir = ct_populate_fnode_from_flist(dnode->d_flnode);
-	CNDBG(CT_LOG_CTFILE, "alloc_dirnum dir %"PRId64" %s", dnode->d_num,
-	    fnode_dir->fl_sname);
-	ct_write_header(fnode_dir, fnode_dir->fl_sname, 1);
-	ct_free_fnode(fnode_dir);
-}
-
-int
-ct_write_header(struct fnode *fnode, char *filename, int base)
-{
-	struct ct_md_header	hdr;
-
-
-	CNDBG(CT_LOG_CTFILE, "writing file header %s %s", fnode->fl_sname,
-	    filename);
-
-	bzero(&hdr, sizeof hdr);
-
-	if (C_ISDIR(fnode->fl_type)) {
-		if (fnode->fl_curdir_dir->d_parent == NULL)
-			fnode->fl_curdir_dir->d_parent = fnode->fl_parent_dir;
-
-		if (fnode->fl_curdir_dir->d_num == -2) {
-			fnode->fl_curdir_dir->d_num = ++ct_dirnum;
-			CNDBG(CT_LOG_CTFILE, "tagging dir %s as %" PRId64,
-			    fnode->fl_curdir_dir->d_name,
-			    fnode->fl_curdir_dir->d_num);
-
-		} else if (fnode->fl_curdir_dir->d_num == -1) {
-			if (fnode->fl_skip_file == 0) {
-				/* timestamp newer, back up this node */
-
-				/* alloc_dirnum will write the node */
-				ct_alloc_dirnum(fnode->fl_curdir_dir,
-				    fnode->fl_parent_dir);
-			} else {
-				CNDBG(CT_LOG_CTFILE,
-				     "skipping dir %s", filename);
-				/* do not write 'unused' dirs */
-			}
-			return 0;
-		}
-		CNDBG(CT_LOG_CTFILE, "WRITING %s tag %" PRId64,
-		    fnode->fl_curdir_dir->d_name,
-		    fnode->fl_curdir_dir->d_num);
-	} else if (fnode->fl_skip_file)
-		hdr.cmh_nr_shas = -1LL;
-	else if (C_ISREG(fnode->fl_type)) {
-		hdr.cmh_nr_shas = fnode->fl_size / ct_max_block_size;
-		if (fnode->fl_size % ct_max_block_size)
-			hdr.cmh_nr_shas++;
-	}
-
-	if (fnode->fl_parent_dir) {
-		if (fnode->fl_parent_dir->d_num == -1) {
-			ct_alloc_dirnum(fnode->fl_parent_dir,
-			    fnode->fl_parent_dir->d_parent);
-		}
-		hdr.cmh_parent_dir = fnode->fl_parent_dir->d_num;
-	} else {
-		if (base && filename[0] == '/') {
-			/* this is a rooted directory element */
-			hdr.cmh_parent_dir = -2;
-		} else {
-			hdr.cmh_parent_dir = -1;
-		}
-	}
-	hdr.cmh_beacon = CT_HDR_BEACON;
-	hdr.cmh_uid = fnode->fl_uid;
-	hdr.cmh_gid = fnode->fl_gid;
-	hdr.cmh_mode = fnode->fl_mode;
-	hdr.cmh_rdev = fnode->fl_rdev;
-	hdr.cmh_atime = fnode->fl_atime;
-	hdr.cmh_mtime = fnode->fl_mtime;
-	if (base)
-		hdr.cmh_filename = basename(filename);
-	else
-		hdr.cmh_filename = filename;
-	hdr.cmh_type = fnode->fl_type;
-
-	if (ct_xdr_header(&xdr, &hdr) == FALSE)
-		return 1;
-
-	return 0;
-}
-
-int
-ct_write_trailer(struct ct_trans *trans)
-{
-	struct ct_md_trailer trl;
-	struct fnode *fnode;
-	bool_t ret;
-
-	fnode = trans->tr_fl_node;
-
-	CNDBG(CT_LOG_CTFILE, "multi %d", ct_multilevel_allfiles);
-
-	CNDBG(CT_LOG_CTFILE, "writing file trailer %s", fnode->fl_sname);
-	bzero (&trl, sizeof trl);
-	ct_sha1_final(trl.cmt_sha, &fnode->fl_shactx);
-	trl.cmt_orig_size = fnode->fl_size;
-	trl.cmt_comp_size = fnode->fl_comp_size;
-
-	ret = ct_xdr_trailer(&xdr, &trl);
-
-	if (ret == FALSE)
-		CWARNX("failed to write trailer sha");
-
-	return (ret == FALSE);
-}
-
-int
-ct_write_sha(struct ct_trans *trans)
-{
-	bool_t ret;
-
-	CNDBG(CT_LOG_CTFILE,
-	    "XoX sha sz %d eof %d", trans->tr_size[(int)trans->tr_dataslot],
-	    trans->tr_eof);
-	ret = ct_xdr_dedup_sha(&xdr, trans->tr_sha);
-
-	if (ret == FALSE)
-		CWARNX("failed to write sha");
-
-	return (ret == FALSE);
-}
-
-int
-ct_write_sha_crypto(struct ct_trans *trans)
-{
-	bool_t ret;
-
-	CNDBG(CT_LOG_CTFILE, "XoX sha crypt");
-	ret = ct_xdr_dedup_sha_crypto(&xdr, trans->tr_sha, trans->tr_csha,
-	   trans->tr_iv);
-
-	if (ret == FALSE)
-		CWARNX("failed to write sha");
-
-	return (ret == FALSE);
-}
-
 FILE *
-ct_metadata_open(const char *filename, struct ct_md_gheader *gh)
+ct_metadata_open(const char *filename, struct ct_md_gheader *gh, XDR *xdr)
 {
 	FILE			*f;
 	time_t			ltime;
@@ -445,12 +219,11 @@ ct_metadata_open(const char *filename, struct ct_md_gheader *gh)
 	if (f == NULL)
 		return (NULL);
 
-	md_dir = XDR_DECODE;
-	xdrstdio_create(&xdr, f, XDR_DECODE);
+	xdrstdio_create(xdr, f, XDR_DECODE);
 
 	bzero(gh, sizeof *gh);
 
-	if (ct_xdr_gheader(&xdr, gh, 0) == FALSE)
+	if (ct_xdr_gheader(xdr, gh, XDR_DECODE) == FALSE)
 		CFATALX("e_xdr_gheader failed");
 
 	/* don't bother with empty strings for prevlevel */
@@ -475,7 +248,6 @@ ct_metadata_open(const char *filename, struct ct_md_gheader *gh)
 	}
 
 	ct_max_block_size = gh->cmg_chunk_size;
-	ct_xdr_version = gh->cmg_version;
 
 	return (f);
 }
@@ -500,39 +272,6 @@ ct_metadata_cleanup_gheader(struct ct_md_gheader *gh)
 	}
 }
 
-int
-ct_read_header(struct ct_md_header *hdr)
-{
-	bzero(hdr, sizeof *hdr);
-
-	if (ct_xdr_header(&xdr, hdr) == FALSE)
-		return 1;
-
-	CNDBG(CT_LOG_CTFILE,
-	    "header beacon 0x%08x 0x%08x shas %" PRIu64 " name %s",
-	    hdr->cmh_beacon, CT_HDR_BEACON, hdr->cmh_nr_shas,
-	    hdr->cmh_filename);
-
-	if (hdr->cmh_beacon != CT_HDR_BEACON && hdr->cmh_beacon != CT_HDR_EOF)
-		return 1;
-
-	return 0;
-}
-
-int
-ct_read_trailer(struct ct_md_trailer *trl)
-{
-	bool_t ret;
-
-	bzero (trl, sizeof *trl);
-
-	ret = ct_xdr_trailer(&xdr, trl);
-
-	if (ret == FALSE)
-		CWARNX("failed to read trailer sha");
-
-	return (ret == FALSE);
-}
 
 int
 ct_basis_setup(const char *basisbackup, char **filelist)
@@ -609,14 +348,15 @@ ct_metadata_check_prev(const char *mdname)
 {
 	FILE			*md_file;
 	char			*ret = NULL;
+	XDR			 xdr;
 	struct ct_md_gheader	 gh;
 
-	if ((md_file = ct_metadata_open(mdname, &gh)) != NULL) {
+	if ((md_file = ct_metadata_open(mdname, &gh, &xdr)) != NULL) {
 		if (gh.cmg_prevlvl_filename)
 			ret = e_strdup(gh.cmg_prevlvl_filename);
 
 		ct_metadata_cleanup_gheader(&gh);
-		ct_metadata_close(md_file);
+		ct_metadata_close(md_file, &xdr);
 	}
 
 	return ret;
@@ -626,7 +366,7 @@ int
 ctfile_parse_init_at(struct ctfile_parse_state *ctx, const char *file,
     off_t offset)
 {
-	ctx->xs_f = ct_metadata_open(file,  &ctx->xs_gh);
+	ctx->xs_f = ct_metadata_open(file,  &ctx->xs_gh, &ctx->xs_xdr);
 	if (ctx->xs_f == NULL)
 		return 2;
 
@@ -643,6 +383,42 @@ ctfile_parse_init_at(struct ctfile_parse_state *ctx, const char *file,
 	return 0;
 }
 
+static int
+ctfile_parse_read_header(struct ctfile_parse_state *ctx,
+    struct ct_md_header *hdr)
+{
+	bzero(hdr, sizeof *hdr);
+
+	if (ct_xdr_header(&ctx->xs_xdr, hdr, ctx->xs_gh.cmg_version) == FALSE)
+		return 1;
+
+	CNDBG(CT_LOG_CTFILE,
+	    "header beacon 0x%08x 0x%08x shas %" PRIu64 " name %s",
+	    hdr->cmh_beacon, CT_HDR_BEACON, hdr->cmh_nr_shas,
+	    hdr->cmh_filename);
+
+	if (hdr->cmh_beacon != CT_HDR_BEACON && hdr->cmh_beacon != CT_HDR_EOF)
+		return 1;
+
+	return 0;
+}
+
+static int
+ctfile_parse_read_trailer(struct ctfile_parse_state *ctx,
+    struct ct_md_trailer *trl)
+{
+	bool_t ret;
+
+	bzero (trl, sizeof *trl);
+
+	ret = ct_xdr_trailer(&ctx->xs_xdr, trl);
+
+	if (ret == FALSE)
+		CWARNX("failed to read trailer sha");
+
+	return (ret == FALSE);
+}
+
 int
 ctfile_parse(struct ctfile_parse_state *ctx)
 {
@@ -655,7 +431,7 @@ ctfile_parse(struct ctfile_parse_state *ctx)
 	switch (ctx->xs_state) {
 	case XS_STATE_FILE:
 		/* actually between files, next expected object is hdr */
-		ret = ct_read_header(&ctx->xs_hdr);
+		ret = ctfile_parse_read_header(ctx, &ctx->xs_hdr);
 		if (ret)
 			goto fail;
 
@@ -666,7 +442,7 @@ ctfile_parse(struct ctfile_parse_state *ctx)
 		}
 
 		if (C_ISLINK(ctx->xs_hdr.cmh_type)) {
-			ret = ct_read_header(&ctx->xs_lnkhdr);
+			ret = ctfile_parse_read_header(ctx, &ctx->xs_lnkhdr);
 			if (ret)
 				goto fail;
 		}
@@ -690,10 +466,10 @@ ctfile_parse(struct ctfile_parse_state *ctx)
 
 			if (ctx->xs_gh.cmg_flags & CT_MD_CRYPTO) {
 				ret = ct_xdr_dedup_sha_crypto(
-				    &xdr, ctx->xs_sha, ctx->xs_csha,
+				    &ctx->xs_xdr, ctx->xs_sha, ctx->xs_csha,
 				    ctx->xs_iv);
 			} else {
-				ret = ct_xdr_dedup_sha(&xdr,
+				ret = ct_xdr_dedup_sha(&ctx->xs_xdr,
 				    ctx->xs_sha);
 			}
 			if (ret == FALSE)
@@ -710,9 +486,11 @@ ctfile_parse(struct ctfile_parse_state *ctx)
 			 */
 			rv = XS_RET_SHA;
 		 } else {
-			ret = ct_read_trailer(&ctx->xs_trl);
-			if (ret)
+			ret = ctfile_parse_read_trailer(ctx, &ctx->xs_trl);
+			if (ret) {
+				CWARNX("trailer read failed");
 				goto fail;
+			}
 
 			ctx->xs_state = XS_STATE_FILE;
 			rv = XS_RET_FILE_END;
@@ -752,13 +530,14 @@ ctfile_parse_seek(struct ctfile_parse_state *ctx)
 	if (ctx->xs_sha_sz == 0) {
 		pos0 = ftello(ctx->xs_f);
 		if (ctx->xs_gh.cmg_flags & CT_MD_CRYPTO) {
-			if (ct_xdr_dedup_sha_crypto(&xdr, ctx->xs_sha,
+			if (ct_xdr_dedup_sha_crypto(&ctx->xs_xdr, ctx->xs_sha,
 			    ctx->xs_csha, ctx->xs_iv) == FALSE) {
 				CFATALX("file corrupt: can't get sha");
 				ctx->xs_state = XS_STATE_FAIL;
 				return 1;
 			}
-		} else if (ct_xdr_dedup_sha(&xdr, ctx->xs_sha) == FALSE) {
+		} else if (ct_xdr_dedup_sha(&ctx->xs_xdr,
+		    ctx->xs_sha) == FALSE) {
 			ctx->xs_state = XS_STATE_FAIL;
 			return 1;
 		}
@@ -790,5 +569,355 @@ ctfile_parse_close(struct ctfile_parse_state *ctx)
 	if (ctx->xs_filename != NULL)
 		e_free(&ctx->xs_filename);
 
-	ct_metadata_close(ctx->xs_f);
+	ct_metadata_close(ctx->xs_f, &ctx->xs_xdr);
 }
+
+struct ctfile_write_state {
+	FILE		*cws_f;
+	XDR		 cws_xdr;
+	int		 cws_version;
+	int		 cws_flags;
+	int64_t		 cws_dirnum;
+};
+void		ctfile_alloc_dirnum(struct ctfile_write_state *,
+		    struct dnode *, struct dnode *);
+int		ctfile_write_header(struct ctfile_write_state *,
+		    struct fnode *, char *, int);
+/*
+ * API for creating ctfiles.
+ */
+struct ctfile_write_state *
+ctfile_write_init(const char *ctfile, int type, const char *basis, int lvl,
+    char *cwd, char **filelist)
+{
+	struct ctfile_write_state	*ctx;
+	char				**fptr;
+	struct ct_md_gheader		 gh;
+
+	ctx = e_calloc(1, sizeof(*ctx));
+
+	/* always save to the current version */
+	ctx->cws_version = CT_MD_VERSION;
+	ctx->cws_dirnum = -1;
+
+	if (lvl != 0 && basis == NULL)
+		CFATALX("multilevel archive with no basis");
+
+	/* open metadata file */
+	if ((ctx->cws_f = fopen(ctfile, "wb")) == NULL)
+		goto fail;
+
+	/* prepare header */
+	bzero(&gh, sizeof gh);
+	gh.cmg_beacon = CT_MD_BEACON;
+	gh.cmg_version = CT_MD_VERSION;
+	gh.cmg_chunk_size = ct_max_block_size;
+	gh.cmg_created = time(NULL);
+	gh.cmg_type = type;
+	gh.cmg_flags = 0;
+	if (ct_encrypt_enabled)
+		gh.cmg_flags |= CT_MD_CRYPTO;
+	if (ct_multilevel_allfiles)
+		gh.cmg_flags |= CT_MD_MLB_ALLFILES;
+	gh.cmg_prevlvl_filename = basis ? (char *)basis : "";
+	gh.cmg_cur_lvl = lvl;
+	gh.cmg_cwd = cwd;
+
+	ctx->cws_flags = gh.cmg_flags;
+
+	fptr = filelist;
+	while((*fptr++) != NULL)
+		gh.cmg_num_paths++;
+	gh.cmg_paths = filelist;
+
+	/* write global header */
+	xdrstdio_create(&ctx->cws_xdr, ctx->cws_f, XDR_ENCODE);
+	if (ct_xdr_gheader(&ctx->cws_xdr, &gh, XDR_ENCODE) == FALSE)
+		CFATALX("e_xdr_gheader failed");
+
+	return (ctx);
+fail:
+	if (ctx) {
+		if (ctx->cws_f)
+			fclose(ctx->cws_f);
+		e_free(&ctx);
+	}
+	return (NULL);
+}
+
+void
+ctfile_alloc_dirnum(struct ctfile_write_state *ctx, struct dnode *dnode,
+    struct dnode *parentdir)
+{
+	struct fnode	*fnode_dir;
+
+	if (dnode->d_num != -1)
+		return;
+
+	/* flag as allocate dirnum */
+	dnode->d_num = -2;
+
+	if (parentdir && parentdir->d_num == -1) {
+		ctfile_alloc_dirnum(ctx, parentdir, parentdir->d_parent);
+	}
+
+	/*
+	 * lazy directory header writing
+	 */
+	fnode_dir = ct_populate_fnode_from_flist(dnode->d_flnode);
+	CNDBG(CT_LOG_CTFILE, "alloc_dirnum dir %"PRId64" %s", dnode->d_num,
+	    fnode_dir->fl_sname);
+	ctfile_write_header(ctx, fnode_dir, fnode_dir->fl_sname, 1);
+	ct_free_fnode(fnode_dir);
+}
+
+
+int
+ctfile_write_header(struct ctfile_write_state *ctx, struct fnode *fnode,
+    char *filename, int base)
+{
+	struct ct_md_header	hdr;
+
+	CNDBG(CT_LOG_CTFILE, "writing file header %s %s", fnode->fl_sname,
+	    filename);
+	bzero(&hdr, sizeof hdr);
+
+	if (C_ISDIR(fnode->fl_type)) {
+		if (fnode->fl_curdir_dir->d_parent == NULL)
+			fnode->fl_curdir_dir->d_parent = fnode->fl_parent_dir;
+
+		if (fnode->fl_curdir_dir->d_num == -2) {
+			fnode->fl_curdir_dir->d_num = ++ctx->cws_dirnum;
+			CNDBG(CT_LOG_CTFILE, "tagging dir %s as %" PRId64,
+			    fnode->fl_curdir_dir->d_name,
+			    fnode->fl_curdir_dir->d_num);
+
+		} else if (fnode->fl_curdir_dir->d_num == -1) {
+			if (fnode->fl_skip_file == 0) {
+				/* timestamp newer, back up this node */
+
+				/* alloc_dirnum will write the node */
+				ctfile_alloc_dirnum(ctx, fnode->fl_curdir_dir,
+				    fnode->fl_parent_dir);
+			} else {
+				CNDBG(CT_LOG_CTFILE,
+				     "skipping dir %s", filename);
+				/* do not write 'unused' dirs */
+			}
+			return 0;
+		}
+		CNDBG(CT_LOG_CTFILE, "WRITING %s tag %" PRId64,
+		    fnode->fl_curdir_dir->d_name,
+		    fnode->fl_curdir_dir->d_num);
+	} else if (fnode->fl_skip_file)
+		hdr.cmh_nr_shas = -1LL;
+	else if (C_ISREG(fnode->fl_type)) {
+		hdr.cmh_nr_shas = fnode->fl_size / ct_max_block_size;
+		if (fnode->fl_size % ct_max_block_size)
+			hdr.cmh_nr_shas++;
+	}
+
+	if (fnode->fl_parent_dir) {
+		if (fnode->fl_parent_dir->d_num == -1) {
+			ctfile_alloc_dirnum(ctx, fnode->fl_parent_dir,
+			    fnode->fl_parent_dir->d_parent);
+		}
+		hdr.cmh_parent_dir = fnode->fl_parent_dir->d_num;
+	} else {
+		if (base && filename[0] == '/') {
+			/* this is a rooted directory element */
+			hdr.cmh_parent_dir = -2;
+		} else {
+			hdr.cmh_parent_dir = -1;
+		}
+	}
+	hdr.cmh_beacon = CT_HDR_BEACON;
+	hdr.cmh_uid = fnode->fl_uid;
+	hdr.cmh_gid = fnode->fl_gid;
+	hdr.cmh_mode = fnode->fl_mode;
+	hdr.cmh_rdev = fnode->fl_rdev;
+	hdr.cmh_atime = fnode->fl_atime;
+	hdr.cmh_mtime = fnode->fl_mtime;
+	if (base)
+		hdr.cmh_filename = basename(filename);
+	else
+		hdr.cmh_filename = filename;
+	hdr.cmh_type = fnode->fl_type;
+
+	if (ct_xdr_header(&ctx->cws_xdr, &hdr, ctx->cws_version) == FALSE)
+		return 1;
+
+	return 0;
+}
+
+void
+ctfile_write_special(struct ctfile_write_state *ctx, struct fnode *fnode)
+{
+	int type = fnode->fl_type;
+	
+	if (C_ISDIR(type)) {
+		if (ctfile_write_header(ctx, fnode, fnode->fl_sname, 1))
+			CWARNX("header write failed");
+		CNDBG(CT_LOG_CTFILE, "record dir %s", fnode->fl_sname);
+	} else if (C_ISCHR(type) || C_ISBLK(type)) {
+		if (ctfile_write_header(ctx, fnode, fnode->fl_sname, 1))
+			CWARNX("header write failed");
+	} else if (C_ISFIFO(type)) {
+		CWARNX("fifo not supported");
+	} else if (C_ISLINK(type)) {
+		if (fnode->fl_sname == NULL &&
+		    fnode->fl_hlname == NULL) {
+			CWARNX("%slink with no name or dest",
+			    fnode->fl_hardlink ? "hard" : "sym");
+			return;
+		} else if (fnode->fl_sname == NULL) {
+			CWARNX("%slink with no name",
+			    fnode->fl_hardlink ? "hard" : "sym");
+			return;
+		} else if (fnode->fl_hlname == NULL) {
+			CWARNX("%slink with no dest",
+			    fnode->fl_hardlink ? "hard" : "sym");
+			return;
+		}
+		CNDBG(CT_LOG_CTFILE, "mylink %s %s", fnode->fl_sname,
+		    fnode->fl_hlname);
+		if (ctfile_write_header(ctx, fnode, fnode->fl_sname, 1))
+			CWARNX("header write failed");
+
+		if (fnode->fl_hardlink) {
+			fnode->fl_type = C_TY_REG; /* cheat */
+		}
+
+		if (ctfile_write_header(ctx, fnode, fnode->fl_hlname, 0))
+			CWARNX("header write failed");
+
+		fnode->fl_type = type; /* restore */
+
+	} else if (C_ISSOCK(type)) {
+		CWARNX("cannot archive a socket %s", fnode->fl_sname);
+	} else {
+		CWARNX("invalid type on %s %d", fnode->fl_sname,
+		    type);
+	}
+}
+
+int
+ctfile_write_file_start(struct ctfile_write_state *ctx, struct fnode *fnode)
+{
+	return (ctfile_write_header(ctx, fnode, fnode->fl_sname, 1));
+}
+
+
+int
+ctfile_write_file_sha(struct ctfile_write_state *ctx, uint8_t *sha,
+    uint8_t *csha, uint8_t *iv)
+{
+	bool_t	ret;
+
+	CNDBG(CT_LOG_CTFILE, "writing sha %s", ctx->cws_flags & CT_MD_CRYPTO ?
+	    "crypto" : "no crypto");
+	if (ctx->cws_flags & CT_MD_CRYPTO) {
+		ret = ct_xdr_dedup_sha_crypto(&ctx->cws_xdr, sha, csha, iv);
+	} else {
+		ret = ct_xdr_dedup_sha(&ctx->cws_xdr, sha);
+	}
+
+	if (ret == FALSE)
+		CWARNX("failed to write sha");
+
+	return (ret == FALSE);
+}
+
+int
+ctfile_write_file_pad(struct ctfile_write_state *ctx, struct fnode *fn)
+{
+	off_t		padlen = fn->fl_size - fn->fl_offset;
+	uint8_t		sha[SHA_DIGEST_LENGTH];
+	uint8_t		iv[CT_IV_LEN];
+	int		ret = 0;
+
+	bzero(sha, sizeof(sha));
+	/*
+	 * File got truncated during backup, pad up
+	 * zero shas to the original size of the file.
+	 */
+	while (padlen > 0) {
+		padlen -= ct_max_block_size;
+		if ((ret = ctfile_write_file_sha(ctx, sha, sha, iv)) != 0)
+			goto out;
+	}
+	fn->fl_size = fn->fl_offset;
+
+out:
+	return (ret);
+}
+
+int
+ctfile_write_file_end(struct ctfile_write_state *ctx, struct fnode *fnode)
+{
+	struct ct_md_trailer	trl;
+	int			compression;
+	int			nrshas;
+	bool_t			ret;
+
+	if ((ctx->cws_flags & CT_MD_MLB_ALLFILES) == 0 && fnode->fl_skip_file)
+		return (0);
+
+	bzero (&trl, sizeof trl);
+
+	CNDBG(CT_LOG_CTFILE, "multi %d",
+	    !!(ctx->cws_flags & CT_MD_MLB_ALLFILES));
+	CNDBG(CT_LOG_CTFILE, "writing file trailer %s", fnode->fl_sname);
+
+	ct_sha1_final(trl.cmt_sha, &fnode->fl_shactx);
+	trl.cmt_orig_size = fnode->fl_size;
+	trl.cmt_comp_size = fnode->fl_comp_size;
+
+	ret = ct_xdr_trailer(&ctx->cws_xdr, &trl);
+
+	if (ret == FALSE)
+		CWARNX("failed to write trailer sha");
+
+
+	if (ct_verbose > 1) {
+		if (fnode->fl_size == 0)
+			compression = 0;
+		else
+			compression = 100 * (fnode->fl_size -
+			    fnode->fl_comp_size) / fnode->fl_size;
+		if (ct_verbose > 2) {
+			nrshas = fnode->fl_size /
+			    ct_max_block_size;
+			if (fnode->fl_size % ct_max_block_size)
+				nrshas++;
+
+			printf(" shas %d", nrshas);
+		}
+		printf(" (%d%%)\n", compression);
+	} else if (ct_verbose)
+		printf("\n");
+
+	return (ret == FALSE);
+}
+
+void
+ctfile_write_close(struct ctfile_write_state *ctx)
+{
+	struct ct_md_header	hdr;
+	char			fake[1];
+
+	/* Write EOF header on close */
+	bzero(&hdr, sizeof hdr);
+	fake[0] = '\0';
+	hdr.cmh_filename = fake;
+	hdr.cmh_beacon = CT_HDR_EOF;
+	if (ct_xdr_header(&ctx->cws_xdr, &hdr, ctx->cws_version) == FALSE)
+		CWARNX("Failed to write archive footer");
+	
+	ct_metadata_close(ctx->cws_f, &ctx->cws_xdr);
+
+	CWARNX("close called");
+	e_free(&ctx);
+}
+
+
