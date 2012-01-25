@@ -571,8 +571,11 @@ ct_metadata_check_prev(const char *mdname)
 	int			 i;
 
 	if ((md_file = ct_metadata_open(mdname, &gh)) != NULL) {
-		if (gh.cmg_prevlvl_filename)
+		if (gh.cmg_prevlvl_filename) {
 			ret = e_strdup(gh.cmg_prevlvl_filename);
+			free(gh.cmg_prevlvl_filename);
+		}
+
 		/* cleanup */
 		if (gh.cmg_cwd != NULL)
 			free(gh.cmg_cwd);
