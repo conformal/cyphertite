@@ -115,12 +115,13 @@ ct_text2sha(char *shat, uint8_t *sha)
 char *c_hdr_login_reply_ex_errstrs[] = {
 	"Invalid login credentials. Please check your username,"
 	    "password and certificates.",
-	"Account has been disabled."
+	"Account Disabled - Please log in to your cyphertite.com account or "
+	    "contact support@cyphertite.com",
 };
 
 char *c_hdr_write_reply_ex_errstrs[] = {
-	"Your account has run out of space. Please visit your account "
-	    "information page at http://www.cyphertite.com",
+	"Account has run out of space - Please log in to your cyphertite.com "
+	    "account or contact support@cyphertite.com",
 };
 
 char *
