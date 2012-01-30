@@ -305,7 +305,7 @@ mode,
 .Nm
 operates similarly to
 .Xr tar 1
-with the archive metadata files operating analgously to the tar archive
+with the archive metadata files operating analogously to the tar archive
 files.
 .Pp
 In
@@ -324,6 +324,29 @@ The cache directory defined in the
 .Xr cyphertite.conf 5
 configuration file will be used to store
 local copies of the archive metadata files.
+.Sh BACKUP vs ARCHIVE
+By default
+.Nm
+will operate in archive mode.
+All data backed up will be archived forever.
+If a user chooses to delete old backups, this can be achieved by running
+the ctctl(1) command:
+.Pp
+.Dl $ ctctl cull
+.Pp
+This will use the configuration setting ctfile_expire_day and automatically
+delete any ctfile archives that are older than the specified age which are
+not referenced by more recent incremental backups.
+.Pp
+For routine backup type operations, cull may be configured to be run once
+or twice per week, for instance using something like
+.Xr cron 8 .
+.Pp
+Due to how the deduplication process works, it is not recommended that
+cull operations be issued while backups are running.
+If a long running backup (eg multiple days) is running, it is highly
+recommended that cull operations be suspended for the duration of the 
+long running backup.
 .Sh FILES
 .Bl -tag -width "cyphertite" -compact
 .It Pa /etc/cyphertite/cyphertite.conf
