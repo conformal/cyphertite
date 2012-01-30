@@ -27,6 +27,10 @@
 #include <regex.h>
 #include <errno.h>
 
+#ifdef NEED_LIBCLENS
+#include <clens.h>
+#endif
+
 #include <assl.h>
 #include <clog.h>
 #include <exude.h>

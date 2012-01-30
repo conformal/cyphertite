@@ -2,6 +2,13 @@
 ARFLAGS = crs
 
 LIB.STATIC = lib$(LIB.NAME).a
+LDADD += -lbsd
+LIB.LINKSTATIC = -Wl,-Bstatic
+LIB.LINKDYNAMIC = -Wl,-Bdynamic
+
+INCFLAGS+= -I$(LOCALBASE)/ssl/include
+LDADD += -L$(LOCALBASE)/lib
+LDADD += -L$(LOCALBASE)/ssl/lib
 
 CPPFLAGS += -D_GNU_SOURCE
 

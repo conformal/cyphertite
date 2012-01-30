@@ -42,14 +42,14 @@ endif
 
 # Compiler and linker flags.
 CPPFLAGS += -DNEED_LIBCLENS
-INCFLAGS += -I../ctutil -I$(INCDIR)/clens -I$(LOCALBASE)/ssl/include
+INCFLAGS += -I../ctutil -I$(INCDIR)/clens
 CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(DEBUG)
 CFLAGS += $(CTHREAD)
 LDFLAGS+= $(LDTHREAD)
-LDFLAGS += -L$(LOCALBASE)/ssl/lib
-LDFLAGS += -L../ctutil/obj -L../ctutil -lctutil -lassl -lclog -levent -lexude
-LDFLAGS += -lshrink -lxmlsd -lexpat -lsqlite3 -llzma -llzo2 -lclens -lbsd
-LDFLAGS += -Wl,-Bstatic -lssl -lcrypto -Wl,-Bdynamic -ldl -ledit -lncurses -lz
+LDLIBS += -L../ctutil/obj -L../ctutil -lctutil -lassl -lclog -levent -lexude
+LDLIBS += -lshrink -lxmlsd -lexpat -lsqlite3 -llzma -llzo2 -lclens
+LDLIBS += ${LIB.LINKSTATIC} -lssl -lcrypto ${LIB.LINKDYNAMIC} -ldl
+LDLIBS += -ledit -lncurses -lz 
 
 BIN.NAME = cyphertite
 BIN.LINKS = ct cyphertitectl ctctl cyphertitefb ctfb
@@ -64,7 +64,8 @@ BIN.MLINKS += cyphertitefb.1 ctfb.1
 BIN.MLINKS += cyphertitectl.1 ctctl.1
 BIN.OBJS = $(addprefix $(OBJPREFIX), $(BIN.SRCS:.c=.o))
 BIN.DEPS = $(addsuffix .depend, $(BIN.OBJS))
-BIN.LDFLAGS = $(LDFLAGS.EXTRA) $(LDFLAGS) $(LDADD)
+BIN.LDFLAGS = $(LDFLAGS.EXTRA) $(LDFLAGS)
+BIN.LDLIBS = $(LDLIBS) $(LDADD)
 BIN.MDIRS = $(foreach page, $(BIN.MANPAGES), $(subst ., man, $(suffix $(page))))
 BIN.MLINKS := $(foreach page, $(BIN.MLINKS), $(subst ., man, $(suffix $(page)))/$(page))
 
@@ -74,7 +75,7 @@ obj:
 	-$(MKDIR) obj
 
 $(OBJPREFIX)$(BIN.NAME): $(BIN.OBJS)
-	$(CC) $^ $(BIN.LDFLAGS) -o $@
+	$(CC) $(BIN.LDFLAGS) -o $@ $^ ${BIN.LDLIBS}
 
 
 $(OBJPREFIX)%.o: %.c
