@@ -94,9 +94,9 @@ struct fnode {
 	int64_t			fl_atime;
 	int64_t			fl_mtime;
 	int			fl_type;
-	size_t			fl_size;
-	size_t			fl_offset;
-	size_t			fl_comp_size;
+	off_t			fl_size;
+	off_t			fl_offset;
+	off_t			fl_comp_size;
 	char			*fl_fname;
 	char			*fl_sname;
 	int			fl_state;
