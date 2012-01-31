@@ -579,9 +579,12 @@ loop:
 		rsz = ct_max_block_size;
 	}
 	ct_trans->tr_dataslot = 0;
-	rlen = read(current_fd, ct_trans->tr_data[0], rsz);
+	rlen = 0;
+	if (rsz > 0)
+		rlen = read(current_fd, ct_trans->tr_data[0], rsz);
 
-	ct_stats->st_bytes_read += rlen;
+	if (rlen > 0)
+		ct_stats->st_bytes_read += rlen;
 
 	ct_trans->tr_fl_node = fl_curnode;
 	ct_trans->tr_size[0] = rlen;
@@ -596,7 +599,7 @@ loop:
 
 	/* update offset */
 	if (rsz != rlen || rlen == 0 ||
-	    ((rlen + fl_curnode->fl_offset) == fl_curnode->fl_size)) {
+	    ((fl_curnode->fl_offset + rlen) == fl_curnode->fl_size)) {
 		/* short read, file truncated, or end of file */
 		/* restat file for modifications */
 		error = fstat(current_fd, &sb);
