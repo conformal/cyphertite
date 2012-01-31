@@ -923,7 +923,7 @@ ct_complete_normal(struct ct_trans *trans)
 		if (trans->tr_eof) {
 			if (trans->tr_eof == 2) {
 				struct fnode *fn = trans->tr_fl_node;
-				size_t padlen = fn->fl_size - fn->fl_offset;
+				off_t padlen = fn->fl_size - fn->fl_offset;
 
 				bzero(trans->tr_sha, sizeof(trans->tr_sha));
 				/*

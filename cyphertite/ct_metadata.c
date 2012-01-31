@@ -62,7 +62,7 @@ FILE				*md_backup_file = NULL;
 int				md_block_no = 0;
 int				md_is_open = 0;
 int				md_open_inflight = 0;
-size_t				md_size, md_offset;
+off_t				md_size, md_offset;
 time_t				md_mtime;
 
 int			strcompare(const void *, const void *);
