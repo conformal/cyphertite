@@ -613,8 +613,10 @@ loop:
 			CWARN("archive: file %s stat error",
 			    fl_curnode->fl_sname);
 		} else if (sb.st_size != fl_curnode->fl_size) {
-			CWARNX("\"%s\" truncated during backup",
-			    fl_curnode->fl_sname);
+			CWARNX("\"%s\" %s during backup",
+			    fl_curnode->fl_sname,
+			    (sb.st_size > fl_curnode->fl_size) ? "grew" :
+				"truncated");
 			ct_trans->tr_state = TR_S_WMD_READY;
 			ct_trans->tr_eof = 2;
 		}
