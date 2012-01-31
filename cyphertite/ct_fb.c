@@ -231,6 +231,8 @@ ct_build_tree(const char *mfile, struct ct_fb_entry *head)
 	struct ct_extract_head	 extract_head;
 	struct ct_xdr_state	 xdr_ctx;
 	struct ct_fb_mdfile	*mdfile = NULL;
+	struct ct_fb_dir	*root_dir;
+	struct ct_fb_key	*root_version;
 	off_t			 offset;
 	int			 ret;
 
@@ -239,11 +241,21 @@ ct_build_tree(const char *mfile, struct ct_fb_entry *head)
 	TAILQ_INIT(&extract_head);
 	ct_extract_setup(&extract_head, &xdr_ctx, mfile);
 
-	/* head has no name or parent */
 	TAILQ_INIT(&head->cfb_versions);
 	RB_INIT(&head->cfb_children);
+	head->cfb_name = "/";
 
 nextfile:
+	root_dir = e_calloc(1, sizeof(*root_dir));
+	root_version = &root_dir->cfb_base;
+	root_version->cfb_type = C_TY_DIR;
+	root_version->cfb_uid = 0;
+	root_version->cfb_gid = 0;
+	root_version->cfb_mode = 0777;
+	root_version->cfb_atime = xdr_ctx.xs_gh.cmg_created;
+	root_version->cfb_mtime = xdr_ctx.xs_gh.cmg_created;
+	TAILQ_INSERT_HEAD(&head->cfb_versions, root_version, cfb_link);
+
 	/* XXX keep these in a list? Right now they leak */
 	mdfile = calloc(1, sizeof(*mdfile));
 	strlcpy(mdfile->cff_path, xdr_ctx.xs_filename,
