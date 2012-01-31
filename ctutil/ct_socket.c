@@ -22,6 +22,7 @@
 #include <event.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <inttypes.h>
 
 #include <assl.h>
 #include <clog.h>
@@ -54,9 +55,9 @@ ct_event_assl_write(int fd_notused, short events, void *arg)
 	hdr = iob->io_hdr;
 	body = NULL;
 
-	CNDBG(CTUTIL_LOG_SOCKET, "pid %d hdr op %d state %d, off %d sz %d",
-	    c_pid, hdr->c_opcode, ioctx->io_o_state, ioctx->io_o_off,
-	    hdr != NULL ? hdr->c_size : -1);
+	CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" hdr op %d state %d, off %d "
+	    "sz %d", (int64_t)c_pid, hdr->c_opcode, ioctx->io_o_state,
+	    ioctx->io_o_off, hdr != NULL ? hdr->c_size : -1);
 
 	switch (ioctx->io_o_state) {
 	case 0: /* idle */
@@ -69,8 +70,8 @@ ct_event_assl_write(int fd_notused, short events, void *arg)
 	case 1: /* writing header */
 		wlen = sizeof(*hdr) - ioctx->io_o_off;
 		len = assl_write(c, (uint8_t *)hdr + ioctx->io_o_off, wlen);
-		CNDBG(CTUTIL_LOG_SOCKET, "pid %d wlen %d len %ld", c_pid, wlen,
-		    (long) len);
+		CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" wlen %d len %ld",
+		    (int64_t)c_pid, wlen, (long) len);
 		if (len == 0) {
 			/* lost socket */
 			ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
@@ -115,8 +116,8 @@ ct_event_assl_write(int fd_notused, short events, void *arg)
 
 		len = assl_write(c, body + ioctx->io_o_off, wlen);
 		s_errno = errno;
-		CNDBG(CTUTIL_LOG_SOCKET, "pid %d wlen1 %d len %ld", c_pid, wlen,
-		    (long) len);
+		CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" wlen1 %d len %ld",
+		    (int64_t)c_pid, wlen, (long) len);
 
 		if (len == 0 && wlen != 0) {
 			/* lost socket */
@@ -147,8 +148,8 @@ ct_event_assl_write(int fd_notused, short events, void *arg)
 			if ((iob->iovcnt == 0) ||
 			    (iob->iovcnt == ioctx->io_o_state - 1)) {
 				CNDBG(CTUTIL_LOG_SOCKET,
-				    "pid %d xmit completed %d",
-				    c_pid, hdr->c_opcode);
+				    "pid %"PRId64" xmit completed %d",
+				    (int64_t)c_pid, hdr->c_opcode);
 
 				/* ready for next output packet */
 				ioctx->io_o_state = 0;
@@ -198,8 +199,8 @@ ct_event_assl_read(int fd, short events, void *arg)
 	hdr = ioctx->io_i_hdr;
 	body = ioctx->io_i_data;
 
-	CNDBG(CTUTIL_LOG_SOCKET, "pid %d hdr state %d, off %d sz %d",
-	    c_pid, ioctx->io_i_state, ioctx->io_i_off,
+	CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" hdr state %d, off %d sz %d",
+	    (int64_t)c_pid, ioctx->io_i_state, ioctx->io_i_off,
 	    hdr != NULL ? hdr->c_size : -1);
 
 	switch (ioctx->io_i_state) {
@@ -249,9 +250,9 @@ ct_event_assl_read(int fd, short events, void *arg)
 	case 2: /* reading body */
 		rlen = hdr->c_size - ioctx->io_i_off;
 		len = assl_read(c,  body + ioctx->io_i_off, rlen);
-		CNDBG(CTUTIL_LOG_SOCKET, "pid %d op %d, body sz %d read %ld, "
-		    "rlen %d off %d", c_pid, hdr->c_opcode, hdr->c_size,
-		    (long) len, rlen, ioctx->io_i_off);
+		CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" op %d, body sz %d "
+		    "read %ld, rlen %d off %d", (int64_t)c_pid, hdr->c_opcode,
+		    hdr->c_size, (long) len, rlen, ioctx->io_i_off);
 
 		if (len == 0 && rlen != 0) {
 			ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
@@ -308,8 +309,8 @@ ct_event_io_write(int fd, short events, void *arg)
 	hdr = iob->io_hdr;
 	body = NULL;
 
-	CNDBG(CTUTIL_LOG_SOCKET, "pid %d hdr op %d state %d, off %d sz %d",
-	    c_pid, hdr->c_opcode,
+	CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" hdr op %d state %d, off %d "
+	    "sz %d", (int64_t)c_pid, hdr->c_opcode,
 	    ioctx->io_o_state, ioctx->io_o_off,
 	    hdr != NULL ? hdr->c_size : -1);
 
@@ -323,8 +324,8 @@ ct_event_io_write(int fd, short events, void *arg)
 	case 1: /* writing header */
 		wlen = sizeof(*hdr) - ioctx->io_o_off;
 		len = write(fd, (uint8_t *)hdr + ioctx->io_o_off, wlen);
-		CNDBG(CTUTIL_LOG_SOCKET, "pid %d wlen %d len %ld", c_pid, wlen,
-		    (long) len);
+		CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" wlen %d len %ld",
+		    (int64_t)c_pid, wlen, (long) len);
 
 		if (len == 0) {
 			/* lost socket */
@@ -366,8 +367,8 @@ write_next_iov:
 		wlen = body_len - ioctx->io_o_off;
 		len = write(fd, body + ioctx->io_o_off, wlen);
 		s_errno = errno;
-		CNDBG(CTUTIL_LOG_SOCKET, "pid %d wlen1 %d len %ld", c_pid, wlen,
-		    (long) len);
+		CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" wlen1 %d len %ld",
+		    (int64_t)c_pid, wlen, (long) len);
 
 		if (len == 0 && wlen != 0) {
 			/* lost socket */
@@ -399,8 +400,8 @@ write_next_iov:
 			if ((iob->iovcnt == 0) ||
 			    (iob->iovcnt == ioctx->io_o_state - 1)) {
 				CNDBG(CTUTIL_LOG_SOCKET,
-				    "pid %d xmit completed %d",
-				    c_pid, hdr->c_opcode);
+				    "pid %"PRId64" xmit completed %d",
+				    (int64_t)c_pid, hdr->c_opcode);
 
 				/* ready for next output packet */
 				ioctx->io_o_state = 0;
@@ -446,8 +447,8 @@ ct_event_io_read(int fd, short events, void *arg)
 	hdr = ioctx->io_i_hdr;
 	body = ioctx->io_i_data;
 
-	CNDBG(CTUTIL_LOG_SOCKET, "pid %d hdr state %d, off %d sz %d",
-	    c_pid, ioctx->io_i_state, ioctx->io_i_off,
+	CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" hdr state %d, off %d sz %d",
+	    (int64_t)c_pid, ioctx->io_i_state, ioctx->io_i_off,
 	    hdr != NULL ? hdr->c_size : -1);
 
 	switch (ioctx->io_i_state) {
@@ -495,9 +496,9 @@ ct_event_io_read(int fd, short events, void *arg)
 	case 2: /* reading body */
 		rlen = hdr->c_size - ioctx->io_i_off;
 		len = read(fd, body + ioctx->io_i_off, rlen);
-		CNDBG(CTUTIL_LOG_SOCKET, "pid %d op %d, body sz %d read %ld, "
-		    "rlen %d off %d", c_pid, hdr->c_opcode, hdr->c_size,
-		    (long) len, rlen, ioctx->io_i_off);
+		CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" op %d, body sz %d "
+		    "read %ld, rlen %d off %d", (int64_t)c_pid, hdr->c_opcode,
+		    hdr->c_size, (long) len, rlen, ioctx->io_i_off);
 
 		if (len == 0 && rlen != 0) {
 			ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
