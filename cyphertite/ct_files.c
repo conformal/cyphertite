@@ -399,7 +399,8 @@ ct_archive(struct ct_op *op)
 	const char		*mfile = op->op_local_fname;
 	char			**filelist = op->op_filelist;
 	const char		*basisbackup = op->op_basis;
-	size_t			rsz, rlen;
+	ssize_t			rlen;
+	off_t			rsz;
 	struct stat		sb;
 	struct ct_trans		*ct_trans;
 	char			cwd[PATH_MAX];
@@ -509,9 +510,9 @@ loop:
 		fl_curnode->fl_state = CT_FILE_PROCESSING;
 		if (current_fd != -1) {
 			CFATALX("state error, new file open,"
-			    " sz %lu offset %lu",
-			    (unsigned long) fl_curnode->fl_size,
-			    (unsigned long) fl_curnode->fl_offset);
+			    " sz %" PRId64 " offset %" PRId64,
+			    (int64_t) fl_curnode->fl_size,
+			    (int64_t) fl_curnode->fl_offset);
 		}
 		current_fd = open(fl_curnode->fl_fname, O_RDONLY);
 
@@ -557,9 +558,9 @@ loop:
 	} else {
 		if (current_fd == -1) {
 			CFATALX("state error, old file not open,"
-			    " sz %lu offset %lu",
-			    (unsigned long) fl_curnode->fl_size,
-			    (unsigned long) fl_curnode->fl_offset);
+			    " sz %" PRId64 " offset %" PRId64,
+			    (int64_t) fl_curnode->fl_size,
+			    (int64_t) fl_curnode->fl_offset);
 		}
 	}
 
