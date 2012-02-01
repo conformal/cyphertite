@@ -51,10 +51,10 @@ LDFLAGS += -Wl,-Bstatic -lssl -lcrypto -Wl,-Bdynamic -ldl -ledit -lncurses
 
 BIN.NAME = cyphertite
 BIN.LINKS = ct cyphertitectl ctctl cyphertitefb ctfb
-BIN.SRCS = ct_main.c ct_metadata.c ct_files.c ct_util.c ct_queue.c ct_event.c
-BIN.SRCS += ct_aes_xts.c ct_crypto.c ct_match.c
-BIN.SRCS += ct_db.c ct_xdr.c ct_bw_lim.c ct_ctl.c ct_md_xdr.c
-BIN.SRCS += ct_config.c ct_md_traverse.c ct_fb.c ct_fb_ops.c
+BIN.SRCS = ct_main.c ct_ctfile_mode.c ct_files.c ct_util.c ct_queue.c
+BIN.SRCS +=  ct_event.c ct_aes_xts.c ct_crypto.c ct_match.c
+BIN.SRCS += ct_db.c ct_xdr.c ct_bw_lim.c ct_ctl.c ct_ops.c
+BIN.SRCS += ct_config.c ct_ctfile_traverse.c ct_fb.c ct_fb_ops.c
 BIN.MANPAGES = cyphertite.1 cyphertite.conf.5 cyphertitefb.1 cyphertitectl.1
 BIN.MLINKS  = cyphertite.1 ct.1
 BIN.MLINKS += cyphertitefb.1 ctfb.1

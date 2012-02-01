@@ -1358,7 +1358,6 @@ ctfile_trigger_delete(struct ct_op *op)
 
 /*
  * Verify that the ctfile name is kosher.
-<<<<<<< HEAD
  * - Encode the name (with a fake prefix) to make sure it fits.
  * - To help with interoperability, scan for a few special characters
  *   and punt if we find those.
