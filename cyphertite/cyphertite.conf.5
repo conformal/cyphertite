@@ -77,11 +77,11 @@ Specify the port to connect to.
 .It Ic key = Ar file
 Specify the path to the client certificate key file.
 .Pp
-.It Ic md_cachedir =  Ar string
+.It Ic ctfile_cachdir =  Ar string
 Specify the path to the directory to be used to cache metadata files in
 remote mode.
 .Pp
-.It Ic md_cachedir_max_size =  Ar size
+.It Ic ctfile_cachedir_max_size =  Ar size
 Specify the maximum size of the metadata cache directory.
 If this is set then when the size of the directory is larger than this
 directive the oldest files will be deleted from the cache to make the
@@ -93,7 +93,7 @@ may end with a letter to signify units, for example a value of 128M would
 equal 128 megabytes.
 .Pp
 .It Xo
-.Ic md_mode =
+.Ic ctfile_mode =
 .Pq Ic local Ns \&| Ns Ic remote
 .Xc
 Specify whether to operate in local or remote metadata mode.
@@ -101,21 +101,21 @@ The default is local.
 If
 .Em remote
 mode is set then the
-.Op md_cachedir
+.Op ctfile_cachedir
 option is required.
 See
 .Xr cyphertite 1
 for a description of the different metadata modes.
 .Pp
 .It Xo
-.Ic md_remote_auto_differential =
+.Ic ctfile_remote_auto_differential =
 .Pq Ic 0 Ns \&| Ns Ic 1
 .Xc
 Specify if differentials should be generated for remote mode.
 This only applies for remote metadata mode.
 .Pp
 .It Xo
-.Ic md_max_differentials = Ar number
+.Ic ctfile_max_differentials = Ar number
 .Xc
 Specify the number of differential backups to perform between full
 (level 0) backups.

@@ -80,19 +80,28 @@ struct ct_settings	settings[] = {
 	{ "session_compression", CT_S_STR, NULL, &ct_compression_type, NULL,
 	    NULL },
 	{ "polltype", CT_S_STR, NULL, &ct_polltype, NULL, NULL },
-	{ "md_mode", CT_S_STR, NULL, &ct_mdmode_str, NULL, NULL },
-	{ "md_cachedir", CT_S_DIR, NULL, &ct_md_cachedir, NULL, NULL },
+	{ "upload_crypto_secrets" , CT_S_INT, &ct_secrets_upload,
+	    NULL, NULL, NULL },
+	{ "ctfile_expire_day" , CT_S_INT, &ct_ctfile_expire_day,
+	    NULL, NULL, NULL },
+	{ "ctfile_mode", CT_S_STR, NULL, &ctfile_mode_str, NULL, NULL },
+	{ "ctfile_cachedir", CT_S_DIR, NULL, &ctfile_cachedir, NULL, NULL },
+	{ "ctfile_cachedir_max_size", CT_S_SIZE, NULL, NULL, NULL,
+	    &ctfile_max_cachesize, NULL },
+	{ "ctfile_remote_auto_differential" , CT_S_INT, &ct_auto_differential,
+	    NULL, NULL, NULL },
+	{ "ctfile_max_differentials" , CT_S_INT, &ct_max_differentials,
+	    NULL, NULL, NULL },
 	{ "ctfile_differential_allfiles", CT_S_INT, &ct_multilevel_allfiles,
 	    NULL, NULL, NULL },
+	/* backwards compat, old names */
+	{ "md_mode", CT_S_STR, NULL, &ctfile_mode_str, NULL, NULL },
+	{ "md_cachedir", CT_S_DIR, NULL, &ctfile_cachedir, NULL, NULL },
 	{ "md_cachedir_max_size", CT_S_SIZE, NULL, NULL, NULL,
 	    &ctfile_max_cachesize, NULL },
 	{ "md_remote_auto_differential" , CT_S_INT, &ct_auto_differential,
 	    NULL, NULL, NULL },
 	{ "md_max_differentials" , CT_S_INT, &ct_max_differentials,
-	    NULL, NULL, NULL },
-	{ "upload_crypto_secrets" , CT_S_INT, &ct_secrets_upload,
-	    NULL, NULL, NULL },
-	{ "ctfile_expire_day" , CT_S_INT, &ct_ctfile_expire_day,
 	    NULL, NULL, NULL },
 	{ NULL, 0, NULL, NULL, NULL,  NULL }
 };
@@ -392,16 +401,16 @@ ct_create_config(void)
 	fprintf(f, "cert\t\t\t\t= %s/ct_certs/ct_%s.crt\n", dir, user);
 	fprintf(f, "key\t\t\t\t= %s/ct_certs/private/ct_%s.key\n", dir, user);
 
-	fprintf(f, "md_mode\t\t\t\t= %s\n", mode);
+	fprintf(f, "ctfile_mode\t\t\t\t= %s\n", mode);
 	if (strcmp(mode, "remote") == 0) {
-		fprintf(f, "md_cachedir\t\t\t= %s\n", ctfile_cachedir);
-		fprintf(f, "md_remote_auto_differential\t= %d\n",
+		fprintf(f, "ctfile_cachedir\t\t\t= %s\n", ctfile_cachedir);
+		fprintf(f, "ctfile_remote_auto_differential\t= %d\n",
 		    ctfile_remote_diff);
 	}
 	else
 	{
-		fprintf(f, "#md_cachedir\t\t\t= %s\n", cachedir);
-		fprintf(f, "#md_remote_auto_differential\t= %d\n",
+		fprintf(f, "#ctfile_cachedir\t\t\t= %s\n", cachedir);
+		fprintf(f, "#ctfile_remote_auto_differential\t= %d\n",
 		    ctfile_remote_diff);
 	}
 
