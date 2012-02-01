@@ -148,9 +148,9 @@ ct_init(int foreground, int need_secrets, int only_metadata)
 	/* set polltype used by libevent */
 	ct_polltype_setup(ct_polltype);
 
-	if (ct_md_mode == CT_MDMODE_REMOTE && only_metadata == 0) {
-		if (ct_md_cachedir == NULL)
-			CFATALX("remote mode needs a md_cachedir set");
+	if (ctfile_mode == CT_MDMODE_REMOTE && only_metadata == 0) {
+		if (ctfile_cachedir == NULL)
+			CFATALX("remote mode needs a cache directory set");
 	}
 
 	if (need_secrets != 0) {
@@ -195,13 +195,13 @@ ct_update_secrets(void)
 {
 	if (ct_secrets_upload > 0) {
 		CNDBG(CT_LOG_CRYPTO, "doing list for crypto secrets");
-		ct_add_operation(ct_md_list_start,
+		ct_add_operation(ctfile_list_start,
 		    ct_check_crypto_secrets_nextop, ct_crypto_secrets,
 		    NULL, secrets_file_pattern, NULL, NULL,
 		    CT_MATCH_REGEX, 0);
 	} else {
-		ct_add_operation(ct_md_list_start,
-		    ct_md_trigger_delete, NULL, NULL,
+		ct_add_operation(ctfile_list_start,
+		    ctfile_trigger_delete, NULL, NULL,
 		    secrets_file_pattern, NULL, NULL,
 		    CT_MATCH_REGEX, 0);
 	}
@@ -278,7 +278,7 @@ ct_main(int argc, char **argv)
 {
 	char		tpath[PATH_MAX];
 	char		*ct_basisbackup = NULL;
-	char		*ct_mfile = NULL;
+	char		*ctfile = NULL;
 	char		*ct_excludefile = NULL;
 	char		**excludelist = NULL;
 	char		**includelist = NULL;
@@ -350,7 +350,7 @@ ct_main(int argc, char **argv)
 			ct_action = CT_A_ERASE;
 			break;
 		case 'f': /* metadata file */
-			ct_mfile = optarg;
+			ctfile = optarg;
 			break;
 		case 'm': /* metadata processing - XXX temporary? */
 			ct_metadata = 1;
@@ -436,26 +436,26 @@ ct_main(int argc, char **argv)
 		ct_multilevel_allfiles = force_allfiles;
 
 	if (!(ct_metadata && ct_action == CT_A_LIST)) {
-		if (ct_mfile == NULL) {
+		if (ctfile == NULL) {
 			CWARNX("ctfile is required");
 			ct_usage();
 		}
 
-		if (ct_md_verify_ctfile(ct_mfile))
-			CFATALX("invalid ctfile: %s", ct_mfile);
+		if (ctfile_verify_name(ctfile))
+			CFATALX("invalid ctfile: %s", ctfile);
 	}
 
 	if (level0)
 		ct_auto_differential = 0; /* force differential off */
 
-	if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0 &&
+	if (ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0 &&
 	    ct_basisbackup != NULL)
 		CFATALX("differential basis in remote mode");
 
 	/* Don't bother starting a connection if just listing local files. */
-	if (ct_action == CT_A_LIST && ct_md_mode == CT_MDMODE_LOCAL &&
+	if (ct_action == CT_A_LIST && ctfile_mode == CT_MDMODE_LOCAL &&
 	    ct_metadata == 0 ) {
-		ret = ct_list(ct_mfile, includelist, excludelist,
+		ret = ct_list(ctfile, includelist, excludelist,
 		    ct_match_mode);
 		goto out;
 	}
@@ -464,33 +464,33 @@ ct_main(int argc, char **argv)
 
 	need_secrets = (ct_action == CT_A_EXTRACT ||
 	    ct_action == CT_A_ARCHIVE || (ct_action == CT_A_LIST &&
-	    ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0));
+	    ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0));
 
 	ct_init(foreground, need_secrets, ct_metadata);
 	if (need_secrets != 0)
 		ct_update_secrets();
 
-	if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
+	if (ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
 		switch (ct_action) {
 		case CT_A_EXTRACT:
 		case CT_A_LIST:
-			ct_add_operation(ct_find_md_for_extract,
-			    ct_find_md_for_extract_complete, ct_mfile, NULL,
+			ct_add_operation(ctfile_find_for_extract,
+			    ctfile_find_for_extract_complete, ctfile, NULL,
 			    includelist, excludelist, NULL, ct_match_mode,
 			    ct_action);
 			break;
 		case CT_A_ARCHIVE:
 			if (ct_auto_differential)
-				ct_add_operation(ct_find_md_for_extract,
-				    ct_find_md_for_extract_complete, ct_mfile,
+				ct_add_operation(ctfile_find_for_extract,
+				    ctfile_find_for_extract_complete, ctfile,
 				    NULL, argv, excludelist, NULL,
 				    ct_match_mode, ct_action);
 			else   {
-				ct_mfile = ct_find_md_for_archive(ct_mfile);
-				ct_add_operation(ct_archive, NULL, ct_mfile,
+				ctfile = ctfile_find_for_archive(ctfile);
+				ct_add_operation(ct_archive, NULL, ctfile,
 				    NULL, argv, excludelist, NULL,
 				    ct_match_mode, 0);
-				ct_add_operation(ct_md_archive, NULL, ct_mfile,
+				ct_add_operation(ctfile_archive, NULL, ctfile,
 				    NULL, NULL, NULL, NULL, ct_match_mode, 0);
 			}
 			break;
@@ -504,28 +504,28 @@ ct_main(int argc, char **argv)
 		if (ct_action == CT_A_ARCHIVE || ct_action == CT_A_EXTRACT) {
 			if (ct_tdir) {
 				snprintf(tpath, sizeof tpath, "%s/%s",
-				    ct_tdir, ct_mfile);
+				    ct_tdir, ctfile);
 			} else {
-				strlcpy(tpath, ct_mfile, sizeof(tpath));
+				strlcpy(tpath, ctfile, sizeof(tpath));
 			}
 		}
 		switch (ct_action) {
 		case CT_A_ARCHIVE:
-			ct_add_operation(ct_md_archive, ct_free_remotename,
+			ct_add_operation(ctfile_archive, ct_free_remotename,
 			    tpath, NULL, NULL, NULL, NULL, 0, 0);
 			break;
 		case CT_A_EXTRACT:
-			ct_add_operation(ct_md_extract, ct_free_remotename,
+			ct_add_operation(ctfile_extract, ct_free_remotename,
 			    tpath, NULL, NULL, NULL, NULL, 0, 0);
 			break;
 		case CT_A_LIST:
-			ct_add_operation(ct_md_list_start, ct_md_list_print,
+			ct_add_operation(ctfile_list_start, ctfile_list_print,
 			    NULL, NULL, includelist, excludelist, NULL,
 			    ct_match_mode, 0);
 			break;
 		case CT_A_ERASE:
-			ct_add_operation(ct_md_delete, NULL, NULL,
-			    ct_mfile, NULL, NULL, NULL, 0, 0);
+			ct_add_operation(ctfile_delete, NULL, NULL,
+			    ctfile, NULL, NULL, NULL, 0, 0);
 			break;
 		default:
 			CWARNX("must specify action");
@@ -537,11 +537,11 @@ ct_main(int argc, char **argv)
 		/* list handled above. */
 		switch (ct_action) {
 		case CT_A_ARCHIVE:
-			ct_add_operation(ct_archive, NULL, ct_mfile, NULL, argv,
+			ct_add_operation(ct_archive, NULL, ctfile, NULL, argv,
 			    excludelist, ct_basisbackup, ct_match_mode, 0);
 			break;
 		case CT_A_EXTRACT:
-			ct_add_operation(ct_extract, NULL, ct_mfile, NULL,
+			ct_add_operation(ct_extract, NULL, ctfile, NULL,
 			    includelist, excludelist, NULL, ct_match_mode, 0);
 			break;
 		case CT_A_ERASE:
@@ -565,8 +565,8 @@ out:
 		ct_matchlist_free(includelist);
 	if (excludelist)
 		ct_matchlist_free(excludelist);
-	if (ct_md_mode == CT_MDMODE_REMOTE && ct_metadata == 0)
-		ct_mdcache_trim(ct_md_cachedir, ct_max_mdcache_size);
+	if (ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0)
+		ctfile_trim_cache(ctfile_cachedir, ctfile_max_cachesize);
 
 #ifdef notyet
 	e_check_memory();

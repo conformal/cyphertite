@@ -51,15 +51,15 @@ char			*ct_crypto_secrets;
 char			*ct_crypto_password;
 char			*ct_compression_type;
 char			*ct_polltype;
-char			*ct_mdmode_str;
-char			*ct_md_cachedir;
+char			*ctfile_mode_str;
+char			*ctfile_cachedir;
 char			*ct_includefile;
-int			ct_md_mode = CT_MDMODE_LOCAL;
+int			ctfile_mode = CT_MDMODE_LOCAL;
 int			ct_compress_enabled;
 int			ct_encrypt_enabled;
 int			ct_multilevel_allfiles;
 int			ct_auto_differential;
-long long		ct_max_mdcache_size = LLONG_MAX; /* unbounded */
+long long		ctfile_max_cachesize = LLONG_MAX; /* unbounded */
 int			ct_max_differentials;
 int			ct_secrets_upload = 0;
 int			ct_ctfile_expire_day = 0;
@@ -85,7 +85,7 @@ struct ct_settings	settings[] = {
 	{ "ctfile_differential_allfiles", CT_S_INT, &ct_multilevel_allfiles,
 	    NULL, NULL, NULL },
 	{ "md_cachedir_max_size", CT_S_SIZE, NULL, NULL, NULL,
-	    &ct_max_mdcache_size, NULL },
+	    &ctfile_max_cachesize, NULL },
 	{ "md_remote_auto_differential" , CT_S_INT, &ct_auto_differential,
 	    NULL, NULL, NULL },
 	{ "md_max_differentials" , CT_S_INT, &ct_max_differentials,
@@ -223,8 +223,8 @@ ct_create_config(void)
 	char			*conf = NULL, *dir = NULL;
 	char			*user = NULL, *password = NULL;
 	char			*crypto_password = NULL;
-	char			*md_mode = NULL, *md_cachedir = NULL;
-	int			md_remote_diff = 0;
+	char			*mode = NULL, *cachedir = NULL;
+	int			ctfile_remote_diff = 0;
 	int			rv, fd;
 	FILE			*f = NULL;
 
@@ -345,34 +345,34 @@ ct_create_config(void)
 	if (conf_buf == NULL)
 		CFATALX("strdup");
 	dir = dirname(conf_buf);
-	if (asprintf(&md_cachedir, "%s/ct_cachedir", dir) == -1)
-		CFATALX("default md_cachedir");
+	if (asprintf(&ctfile_cachedir, "%s/ct_cachedir", dir) == -1)
+		CFATALX("default ctfile_cachedir");
 
 	snprintf(prompt, sizeof prompt,
 	    "Choose a metadata operation mode (remote/local) [remote]: ");
 	rv = ct_get_answer(prompt, "remote", "local", "remote", answer,
 	    sizeof answer, 0);
-	md_mode = strdup(answer);
-	if (md_mode == NULL)
-		CFATALX("md_mode");
+	mode = strdup(answer);
+	if (mode == NULL)
+		CFATALX("mode");
 
 	if (rv == 1) {
 		snprintf(prompt, sizeof prompt,
-		    "Target metadata cache directory [%s]: ", md_cachedir);
-		ct_get_answer(prompt, NULL, NULL, md_cachedir, answer,
+		    "Target metadata cache directory [%s]: ", ctfile_cachedir);
+		ct_get_answer(prompt, NULL, NULL, ctfile_cachedir, answer,
 		    sizeof answer, 0);
-		if (md_cachedir != NULL)
-			free(md_cachedir);
-		md_cachedir = strdup(answer);
-		if (md_cachedir == NULL)
-			CFATALX("md_cachedir");
+		if (ctfile_cachedir != NULL)
+			free(cachedir);
+		ctfile_cachedir = strdup(answer);
+		if (ctfile_cachedir == NULL)
+			CFATALX("ctfile_cachedir");
 
 		snprintf(prompt, sizeof prompt,
 		    "Use automatic remote differentials? [no]: ");
 		rv = ct_get_answer(prompt, "yes", "no", "no", answer,
 		    sizeof answer, 0);
 		if (rv == 1)
-			md_remote_diff = 1;
+			ctfile_remote_diff = 1;
 	}
 
 	fprintf(f, "username\t\t\t= %s\n", user);
@@ -392,16 +392,17 @@ ct_create_config(void)
 	fprintf(f, "cert\t\t\t\t= %s/ct_certs/ct_%s.crt\n", dir, user);
 	fprintf(f, "key\t\t\t\t= %s/ct_certs/private/ct_%s.key\n", dir, user);
 
-	fprintf(f, "md_mode\t\t\t\t= %s\n", md_mode);
-	if (strcmp(md_mode, "remote") == 0) {
-		fprintf(f, "md_cachedir\t\t\t= %s\n", md_cachedir);
-		fprintf(f, "md_remote_auto_differential\t= %d\n", md_remote_diff);
+	fprintf(f, "md_mode\t\t\t\t= %s\n", mode);
+	if (strcmp(mode, "remote") == 0) {
+		fprintf(f, "md_cachedir\t\t\t= %s\n", ctfile_cachedir);
+		fprintf(f, "md_remote_auto_differential\t= %d\n",
+		    ctfile_remote_diff);
 	}
 	else
 	{
-		fprintf(f, "#md_cachedir\t\t\t= %s\n", md_cachedir);
+		fprintf(f, "#md_cachedir\t\t\t= %s\n", cachedir);
 		fprintf(f, "#md_remote_auto_differential\t= %d\n",
-		    md_remote_diff);
+		    ctfile_remote_diff);
 	}
 
 	printf("Configuration file created.\n");
@@ -418,10 +419,10 @@ ct_create_config(void)
 		bzero(crypto_password, strlen(crypto_password));
 		free(crypto_password);
 	}
-	if (md_mode)
-		free(md_mode);
-	if (md_cachedir)
-		free(md_cachedir);
+	if (mode)
+		free(mode);
+	if (cachedir)
+		free(cachedir);
 	if (f)
 		fclose(f);
 }
@@ -465,22 +466,23 @@ ct_load_config(struct ct_settings *mysettings)
 		}
 	}
 
-	ct_mdmode_setup(ct_mdmode_str);
-	/* Fix up md cachedir: code requires it to end with a slash. */
-	if (ct_md_cachedir != NULL &&
-	    ct_md_cachedir[strlen(ct_md_cachedir) - 1] != '/') {
+	ctfile_mode_setup(ctfile_mode_str);
+	/* Fix up cachedir: code requires it to end with a slash. */
+	if (ctfile_cachedir != NULL &&
+	    ctfile_cachedir[strlen(ctfile_cachedir) - 1] != '/') {
 		int rv;
 
 		if ((rv = snprintf(ct_fullcachedir, sizeof(ct_fullcachedir),
-		    "%s/", ct_md_cachedir)) == -1 || rv > PATH_MAX)
+		    "%s/", ctfile_cachedir)) == -1 || rv > PATH_MAX)
 			CFATALX("invalid metadata pathname");
-		ct_md_cachedir = ct_fullcachedir;
+		ctfile_cachedir = ct_fullcachedir;
 
 	}
 	/* And make sure it exists. */
-	if (ct_md_cachedir != NULL &&
-	    ct_make_full_path(ct_md_cachedir, 0700) != 0)
-		CFATALX("can't create metadata md_cachedir");
+	if (ctfile_cachedir != NULL &&
+	    ct_make_full_path(ctfile_cachedir, 0700) != 0)
+		CFATALX("can't create ctfile cache directory %s",
+		    ctfile_cachedir);
 
 	/* Apply compression from config. */
 	if (ct_compression_type == NULL) {

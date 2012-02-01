@@ -396,7 +396,7 @@ ct_sched_backup_file(struct stat *sb, char *filename, int forcedir)
 void
 ct_archive(struct ct_op *op)
 {
-	const char		*mfile = op->op_local_fname;
+	const char		*ctfile = op->op_local_fname;
 	char			**filelist = op->op_filelist;
 	const char		*basisbackup = op->op_basis;
 	ssize_t			rlen;
@@ -433,9 +433,9 @@ ct_archive(struct ct_op *op)
 
 		/* XXX - deal with stdin */
 		/* XXX - if basisbackup should the type change ? */
-		if ((cws = ctfile_write_init(mfile, CT_MD_REGULAR, basisbackup,
+		if ((cws = ctfile_write_init(ctfile, CT_MD_REGULAR, basisbackup,
 		    nextlvl, cwd, filelist)) == NULL)
-			CFATAL("can't create %s", mfile);
+			CFATAL("can't create %s", ctfile);
 		op->op_priv = cws;
 
 		if (basisbackup != NULL)

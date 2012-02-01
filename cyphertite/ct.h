@@ -57,14 +57,15 @@ extern struct ct_stat	*ct_stats;
 extern int		ct_no_cross_mounts;
 extern time_t		ct_prev_backup_time;
 extern int		ct_trans_id;
-extern int		ct_md_mode;
-extern char		*ct_md_cachedir;
 extern int		ct_max_differentials;
 extern char		*__progname;
 extern char		*ct_includefile;
 extern char		*ct_crypto_password;
 extern char		*ct_configfile;
 extern int		ct_ctfile_expire_day;
+extern int		ctfile_mode;
+extern char		*ctfile_cachedir;
+extern long long	ctfile_max_cachesize;
 
 /* crypto */
 extern unsigned char		ct_iv[CT_IV_LEN];
@@ -75,7 +76,6 @@ extern struct ct_settings	settings[];
 void			ct_shutdown(void);
 void			ct_process_input(void *);
 void			ct_process_file(void *);
-void			ct_process_md(void *);
 void			ct_compute_sha(void *);
 void			ct_compute_compress(void *);
 void			ct_compute_encrypt(void *);
@@ -236,8 +236,8 @@ struct ct_trans {
 	int			tr_size[3];
 
 	uint8_t			*tr_data[3];
-	uint32_t		tr_md_chunkno;
-	const char		*tr_md_name;
+	uint32_t		tr_ctfile_chunkno;
+	const char		*tr_ctfile_name;
 };
 
 struct ct_trans		*ct_trans_alloc(void);
@@ -270,7 +270,6 @@ extern char		*ct_crypto_secrets;
 extern char		*ct_polltype;
 extern int		 ct_secrets_upload;
 extern int		 ct_auto_differential;
-extern long long	 ct_max_mdcache_size;
 
 void			ct_prompt_for_login_password(void);
 void			ct_normalize_username(char *);
@@ -292,16 +291,15 @@ void			ct_archive(struct ct_op *);
 void			ct_extract(struct ct_op *);
 void			ct_list_op(struct ct_op *);
 int			ct_list(const char *, char **, char **, int);
-void			ct_md_archive(struct ct_op *);
-void			ct_md_extract(struct ct_op *);
-void			ct_md_list_start(struct ct_op *);
-void			ct_md_list_print(struct ct_op *);
-void			ct_md_delete(struct ct_op *);
+void			ctfile_archive(struct ct_op *);
+void			ctfile_extract(struct ct_op *);
+void			ctfile_list_start(struct ct_op *);
+void			ctfile_list_print(struct ct_op *);
+void			ctfile_delete(struct ct_op *);
+void			ctfile_trigger_delete(struct ct_op *);
+int			ctfile_verify_name(char *);
 void			ct_check_crypto_secrets_nextop(struct ct_op *);
 void			ct_free_remotename(struct ct_op *);
-void			ct_md_trigger_delete(struct ct_op *);
-int			ct_md_verify_ctfile(char *);
-void			ct_fetch_all_md_parse(struct ct_op *);
 
 /* CT context state */
 
@@ -333,9 +331,9 @@ struct ct_op	*ct_add_operation_after(struct ct_op *, ct_op_cb *, ct_op_cb *,
 void		 ct_nextop(void *);
 int		 ct_op_complete(void);
 ct_op_cb	 ct_shutdown_op;
-ct_op_cb	 ct_free_mdname;
+ct_op_cb	 ct_free_localname;
 ct_op_cb	 ct_free_remotename;
-ct_op_cb	 ct_free_mdname_and_remote;
+ct_op_cb	 ct_free_localname_and_remote;
 
 struct ct_global_state{
 	/* PADs? */
@@ -435,9 +433,8 @@ int				ctdb_insert(struct ct_trans *trans);
 #define CTDB_USE_SHA    (1)
 #define CTDB_USE_CSHA   (2)
 
-/* metadata */
 int				ct_s_to_e_type(int);
-char				*ct_metadata_check_prev(const char *);
+char				*ctfile_get_previous(const char *);
 
 struct dedup_digest {
 	char		dd_digest[SHA_DIGEST_LENGTH];
@@ -447,7 +444,7 @@ struct dedup_digest {
 typedef struct dedup_digest dedup_digest;	/* ugh typedef, blame XDR */
 
 /* XDR for metadata global hader */
-struct ct_md_gheader {
+struct ctfile_gheader {
 	int			cmg_beacon;	/* magic marker */
 #define CT_MD_BEACON		(0x43595048)
 	int			cmg_version;	/* version of the archive */
@@ -472,7 +469,7 @@ struct ct_md_gheader {
 };
 
 /* XDR for metadata header */
-struct ct_md_header {
+struct ctfile_header {
 	int			cmh_beacon;	/* magic marker */
 #define CT_HDR_BEACON		(0x4d4f306f)
 #define CT_HDR_EOF		(0x454f4621)
@@ -505,20 +502,20 @@ struct ct_md_header {
 #define C_ISLINK(h) (((h) & C_TY_MASK) == C_TY_LINK)
 #define C_ISSOCK(h) (((h) & C_TY_MASK) == C_TY_SOCK)
 
-struct ct_md_stdin {
+struct ctfile_stdin {
 	int			cms_beacon;	/* magic marker */
 #define CT_SIN_BEACON		(0x5354494e)
 	uint8_t			cms_sha[SHA_DIGEST_LENGTH];
 };
 
 /* XDR for metadata trailer */
-struct ct_md_trailer {
+struct ctfile_trailer {
 	uint64_t		cmt_orig_size;	/* original size */
 	uint64_t		cmt_comp_size;	/* deduped + comp size */
 	uint8_t			cmt_sha[SHA_DIGEST_LENGTH];
 };
 
-int			ct_read_header(struct ct_md_header *hdr);
+int			ct_read_header(struct ctfile_header *hdr);
 struct ct_assl_io_ctx	*ct_assl_ctx;
 int			ct_basis_setup(const char *, char **);
 
@@ -594,14 +591,12 @@ void			ct_ssl_init_bw_lim(struct ct_assl_io_ctx *);
 #define CT_MDMODE_LOCAL		(0)
 #define CT_MDMODE_REMOTE	(1)
 
-char			*ct_md_cook_filename(const char *);
-void			 ct_mdmode_setup(const char *);
-void			 ct_find_md_for_extract(struct ct_op *);
-void			 ct_find_md_for_extract_complete(struct ct_op *);
-char                    *ct_find_md_for_archive(const char *);
-int			 md_is_in_cache(const char *);
+void			 ctfile_mode_setup(const char *);
+void			 ctfile_find_for_extract(struct ct_op *);
+void			 ctfile_find_for_extract_complete(struct ct_op *);
+char                    *ctfile_find_for_archive(const char *);
 void			 ct_complete_metadata(struct ct_trans *);
-void			 ct_mdcache_trim(const char *, long long);
+void			 ctfile_trim_cache(const char *, long long);
 
 /* misc */
 int			ct_get_answer(char *, char *, char *, char *, char *,
@@ -625,10 +620,10 @@ struct ctfile_parse_state {
 	FILE			*xs_f;
 	const char		*xs_filename;
 	XDR			 xs_xdr;
-	struct ct_md_gheader	 xs_gh;
-	struct ct_md_header	 xs_hdr;
-	struct ct_md_header	 xs_lnkhdr;
-	struct ct_md_trailer	 xs_trl;
+	struct ctfile_gheader	 xs_gh;
+	struct ctfile_header	 xs_hdr;
+	struct ctfile_header	 xs_lnkhdr;
+	struct ctfile_trailer	 xs_trl;
 	int			 xs_state;
 	int			 xs_sha_cnt;
 	size_t			 xs_sha_sz;
@@ -690,14 +685,14 @@ void ct_cull_sha_insert(const uint8_t *);
 void ct_cull_kick(void);
 
 /*
- * Extract an individual file from md_filename at md_offset, op_localname is
+ * Extract an individual file from ctfile at ctfile_off, op_localname is
  * the local filename to save it as
  */
 struct ct_file_extract_priv {
 	struct ctfile_parse_state	 xdr_ctx;
 	struct fnode			*fl_ex_node;
-	const char			*md_filename;
-	off_t				 md_offset;
+	const char			*ctfile;
+	off_t				 ctfile_off;
 	int				 done;
 };
 ct_op_cb	ct_extract_file;

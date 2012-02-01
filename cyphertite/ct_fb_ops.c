@@ -152,7 +152,7 @@ ctfb_shell(int argc, const char **argv)
 }
 
 /*
- * lstat a path in a md file.
+ * lstat a path in a ctfile.
  * XXX should have stat that follows symlinks but that is fiddly.
  */
 int
@@ -206,7 +206,7 @@ struct ctfb_cmd {
 	 * for completion:
 	 *	r: file in md
 	 *	l: local fs
-	 *	v: version in md (includes files too)
+	 *	v: version in ctfile (includes files too)
 	 * Uppercase means multiple.
 	 */
 	char		*args;
@@ -259,7 +259,7 @@ ctfb_main(int argc, char *argv[])
 	const char		**l_argv;
 	const char		*buf;
 	char			*configfile = NULL;
-	char			*ct_mfile = NULL;
+	char			*ctfile = NULL;
 	char			*debugstring = NULL;
 	EditLine		*el = NULL;
 	History			*hist;
@@ -293,10 +293,10 @@ ctfb_main(int argc, char *argv[])
 		CWARNX("more than one ctfile provided");
 		ctfb_usage();
 	} else {
-		ct_mfile = argv[0];
+		ctfile = argv[0];
 	}
 
-	if (ct_mfile == NULL)
+	if (ctfile == NULL)
 		ctfb_usage();
 
 	if (ct_debug) {
@@ -326,10 +326,10 @@ ctfb_main(int argc, char *argv[])
 	ct_init(1, 1, 0);
 
 	/* if we're in remote mode, try and grab the appropriate files */
-	if (ct_md_mode == CT_MDMODE_REMOTE) {
+	if (ctfile_mode == CT_MDMODE_REMOTE) {
 		/* XXX how to get the name out of the event loop? */
-		ct_add_operation(ct_find_md_for_extract,
-		    ct_find_md_for_extract_complete, ct_mfile,
+		ct_add_operation(ctfile_find_for_extract,
+		    ctfile_find_for_extract_complete, ctfile,
 		    NULL, argv, NULL, NULL, 0, CT_A_JUSTDL);
 		ct_wakeup_file();
 		if ((ret = ct_event_dispatch()) != 0) {
@@ -339,7 +339,7 @@ ctfb_main(int argc, char *argv[])
 		}
 		ct_cleanup_eventloop();
 	} else {
-		ct_fb_filename = e_strdup(ct_mfile);
+		ct_fb_filename = e_strdup(ctfile);
 	}
 	/* now have name of the file we actually want to open... */
 	ct_build_tree(ct_fb_filename, &cfs.cfs_tree);
@@ -495,7 +495,7 @@ out:
 
 unsigned char
 complete_file(EditLine *el, const char *file, int lastarg, char quote,
-    int terminated, int mdfile, int versions)
+    int terminated, int ctfile, int versions)
 {
 	glob_t g;
 	char *tmp, *tmp2, ins[3];
@@ -509,8 +509,8 @@ complete_file(EditLine *el, const char *file, int lastarg, char quote,
 		e_asprintf(&tmp, "%s*", file);
 
 	memset(&g, 0, sizeof(g));
-	if (mdfile) {
-		glob_mdfile(tmp, GLOB_DOOFFS|GLOB_MARK, NULL, &g, versions);
+	if (ctfile) {
+		glob_ctfile(tmp, GLOB_DOOFFS|GLOB_MARK, NULL, &g, versions);
 	} else {
 		glob(tmp, GLOB_DOOFFS|GLOB_MARK, NULL, &g);
 	}

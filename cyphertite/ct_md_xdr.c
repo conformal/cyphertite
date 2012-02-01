@@ -23,8 +23,8 @@
 
 #include "ct.h"
 
-int	ct_populate_fnode(struct fnode *, struct ct_md_header *,
-	    struct ct_md_header *, int *);
+int	ct_populate_fnode(struct fnode *, struct ctfile_header *,
+	    struct ctfile_header *, int *);
 
 int64_t		ct_ex_dirnum = 0;
 const uint8_t	zerosha[SHA_DIGEST_LENGTH];
@@ -33,8 +33,8 @@ const uint8_t	zerosha[SHA_DIGEST_LENGTH];
  * Helper functions
  */
 int
-ct_populate_fnode(struct fnode *fnode, struct ct_md_header *hdr,
-    struct ct_md_header *hdrlnk, int *state)
+ct_populate_fnode(struct fnode *fnode, struct ctfile_header *hdr,
+    struct ctfile_header *hdrlnk, int *state)
 {
 	struct flist		flistnode;
 	struct dnode		*dnode;
@@ -372,7 +372,7 @@ struct ct_extract_priv {
 void
 ct_extract(struct ct_op *op)
 {
-	const char		*mfile = op->op_local_fname;
+	const char		*ctfile = op->op_local_fname;
 	char			**filelist = op->op_filelist;
 	int			 match_mode = op->op_matchmode;
 	struct fnode		*fnode;
@@ -395,7 +395,7 @@ ct_extract(struct ct_op *op)
 			op->op_priv = ex_priv;
 		}
 		ct_extract_setup(&ex_priv->extract_head,
-		    &ex_priv->xdr_ctx, mfile);
+		    &ex_priv->xdr_ctx, ctfile);
 		/* create rb tree head, prepare to start inserting */
 		if (ct_multilevel_allfiles) {
 			char *nothing = NULL;
@@ -444,7 +444,7 @@ ct_extract(struct ct_op *op)
 			    !ct_match(ex_priv->ex_match, fnode->fl_sname))
 				ex_priv->doextract = 0;
 			/*
-			 * If we're on the first md file in an allfiles backup
+			 * If we're on the first ctfile in an allfiles backup
 			 * put the matches with -1 on the rb tree so we'll
 			 * remember to extract it from older files.
 			 */
@@ -533,7 +533,7 @@ skip:
 			ct_queue_transfer(trans);
 			break;
 		case XS_RET_EOF:
-			CNDBG(CT_LOG_CTFILE, "Hit end of md");
+			CNDBG(CT_LOG_CTFILE, "Hit end of ctfile");
 			ctfile_parse_close(&ex_priv->xdr_ctx);
 			/* if rb tree and rb is empty, goto end state */
 			if ((ex_priv->haverb &&
@@ -581,7 +581,7 @@ skip:
 				/* XXX print out missing files */
 				if ((ex_priv->haverb || ex_priv->fillrb) &&
 				    !ct_match_rb_is_empty(ex_priv->inc_match))
-					CWARNX("out of md files but some "
+					CWARNX("out of ctfiles but some "
 					    "files are not found");
 
 we_re_done_here:
@@ -629,9 +629,9 @@ ct_extract_file(struct ct_op *op)
 		CNDBG(CT_LOG_TRANS, "starting");
 		/* open file and seek to beginning of file */
 		if (ctfile_parse_init_at(&ex_priv->xdr_ctx,
-		    ex_priv->md_filename, ex_priv->md_offset) != 0)
+		    ex_priv->ctfile, ex_priv->ctfile_off) != 0)
 			CFATALX("can't open metadata file %s",
-			    ex_priv->md_filename);
+			    ex_priv->ctfile);
 		ct_encrypt_enabled =
 		    (ex_priv->xdr_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO);
 		ct_multilevel_allfiles = (ex_priv->xdr_ctx.xs_gh.cmg_flags &
@@ -652,7 +652,7 @@ ct_extract_file(struct ct_op *op)
 		trans->tr_trans_id = ltrans_id = ct_trans_id++;
 
 		if (ex_priv->done) {
-			CNDBG(CT_LOG_CTFILE, "Hit end of md");
+			CNDBG(CT_LOG_CTFILE, "Hit end of ctfile");
 			ctfile_parse_close(&ex_priv->xdr_ctx);
 			trans->tr_state = TR_S_DONE;
 			ct_queue_transfer(trans);
@@ -768,7 +768,7 @@ next_file:
 	if (file[0] == '/') {
 		cachename = e_strdup(file);
 	} else {
-		e_asprintf(&cachename, "%s%s", ct_md_cachedir, file);
+		e_asprintf(&cachename, "%s%s", ctfile_cachedir, file);
 	}
 
 	ret = ctfile_parse_init(&xs_ctx, cachename);

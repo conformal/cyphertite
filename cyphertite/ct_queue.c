@@ -33,7 +33,7 @@ void ct_handle_exists_reply(struct ct_trans *, struct ct_header *, void *);
 void ct_handle_write_reply(struct ct_trans *, struct ct_header *, void *);
 void ct_handle_read_reply(struct ct_trans *, struct ct_header *, void *);
 
-void ct_write_md_special(struct ct_trans *);
+void ct_write_ctfile_special(struct ct_trans *);
 void ct_complete_normal(struct ct_trans *);
 
 /* ct flags - these are named wrongly, should come from config */
@@ -474,7 +474,7 @@ ct_reconnect_internal(void)
 			    trans->tr_state == TR_S_ENCRYPTED ||
 			    trans->tr_state == TR_S_READ) {
 				CNDBG(CT_LOG_NET, "write in queue chunkno %d",
-				    trans->tr_md_chunkno);
+				    trans->tr_ctfile_chunkno);
 				/*
 				 * Reopen the file at the point we are.
 				 * we do this polled to prevent races with
@@ -486,21 +486,21 @@ ct_reconnect_internal(void)
 				 * the queue after us and just do this polled.
 				 */
 				if (ct_xml_file_open_polled(ct_assl_ctx,
-				    trans->tr_md_name, MD_O_APPEND,
-				    trans->tr_md_chunkno))
+				    trans->tr_ctfile_name, MD_O_APPEND,
+				    trans->tr_ctfile_chunkno))
 					CFATALX("can't reopen metadata file");
 				break;
 			} else if (trans->tr_state == TR_S_EX_SHA) {
 				CNDBG(CT_LOG_NET, "read in queue chunkno %d",
-				    trans->tr_md_chunkno);
+				    trans->tr_ctfile_chunkno);
 				/*
 				 * We had a read in progress. reinject
 				 * the right open at chunkno
 				 * For how this works see above.
 				 */
 				if (ct_xml_file_open_polled(ct_assl_ctx,
-				    trans->tr_md_name, MD_O_READ,
-				    trans->tr_md_chunkno))
+				    trans->tr_ctfile_name, MD_O_READ,
+				    trans->tr_ctfile_chunkno))
 					CFATALX("can't reopen metadata file");
 				break;
 			}
@@ -842,7 +842,7 @@ ct_compute_csha(void *vctx)
 }
 
 void
-ct_write_md_special(struct ct_trans *trans)
+ct_write_ctfile_special(struct ct_trans *trans)
 {
 	struct fnode		*fnode = trans->tr_fl_node;
 	char			 mylink[PATH_MAX];
@@ -887,7 +887,7 @@ ct_complete_normal(struct ct_trans *trans)
 	case TR_S_SPECIAL:
 		if (ct_verbose)
 			printf("%s\n", fnode->fl_sname);
-		ct_write_md_special(trans);
+		ct_write_ctfile_special(trans);
 		release_fnode = 1;
 		break;
 	case TR_S_FILE_START:
@@ -1066,7 +1066,7 @@ ct_wakeup_write(void)
 		case TR_S_NEXISTS:
 		case TR_S_COMPRESSED:
 		case TR_S_ENCRYPTED: /* if dealing with metadata */
-		case TR_S_READ: /* if dealing with md non-comp/non-crypt */
+		case TR_S_READ: /* if dealing with ctfile non-comp/non-crypt */
 			/* doesn't exist in backend, need to send chunk */
 			slot = trans->tr_dataslot;
 			data = trans->tr_data[slot];
@@ -1128,7 +1128,7 @@ ct_wakeup_write(void)
 
 			iov = e_calloc(2, sizeof(*iov));
 			cmf = e_calloc(1, sizeof(*cmf));
-			cmf->cmf_chunkno = htonl(trans->tr_md_chunkno);
+			cmf->cmf_chunkno = htonl(trans->tr_ctfile_chunkno);
 			cmf->cmf_size = htonl(hdr->c_size);
 
 			iov[0].iov_base = data;
@@ -1217,10 +1217,10 @@ ct_handle_read_reply(struct ct_trans *trans, struct ct_header *hdr,
 		trans->tr_state = TR_S_EX_READ;
 		/*
 		 * Check the chunk number for sanity.
-		 * The server will only send md proto version 1 (ex_status == 0)
-		 * or v3 (ex_status == 2). v3 fixed a byteswapping problem in
-		 * v2, thus v2 will not be sent to any client that understands
-		 * v3.
+		 * The server will only send ctfileproto version 1
+		 * (ex_status == 0) or v3 (ex_status == 2). v3 fixed a
+		 * byteswapping problem in v2, thus v2 will not be sent to any
+		 * client that understands v3.
 		 */
 		if (hdr->c_flags & C_HDR_F_METADATA &&
 		    ((hdr->c_ex_status != 0) && (hdr->c_ex_status != 2)))
@@ -1236,9 +1236,9 @@ ct_handle_read_reply(struct ct_trans *trans, struct ct_header *hdr,
 
 			if (cmf->cmf_size != hdr->c_size - sizeof(*cmf))
 				CFATALX("invalid chunkfile footer");
-			if (cmf->cmf_chunkno != trans->tr_md_chunkno)
+			if (cmf->cmf_chunkno != trans->tr_ctfile_chunkno)
 				CFATALX("invalid chunkno %u %u",
-				    cmf->cmf_chunkno, trans->tr_md_chunkno);
+				    cmf->cmf_chunkno, trans->tr_ctfile_chunkno);
 			hdr->c_size -= sizeof(*cmf);
 		}
 	} else {
@@ -1398,7 +1398,7 @@ ct_compute_encrypt(void *vctx)
 			/* decrypt */
 			encr = 0;
 			break;
-		case TR_S_READ: /* uncompressed md data */
+		case TR_S_READ: /* uncompressed ctfile data */
 		case TR_S_UNCOMPSHA_ED:
 		case TR_S_COMPRESSED:
 			encr = 1;

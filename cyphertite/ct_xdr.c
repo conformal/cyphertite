@@ -41,22 +41,20 @@
 bool_t          ct_xdr_dedup_sha(XDR *, uint8_t *);
 bool_t		ct_xdr_dedup_sha_crypto(XDR *, uint8_t *, uint8_t *,
 			uint8_t *);
-bool_t          ct_xdr_header(XDR *, struct ct_md_header *, int);
-bool_t          ct_xdr_trailer(XDR *, struct ct_md_trailer *);
-bool_t          ct_xdr_stdin(XDR *, struct ct_md_stdin *);
-bool_t          ct_xdr_gheader(XDR *, struct ct_md_gheader *, int);
+bool_t          ct_xdr_header(XDR *, struct ctfile_header *, int);
+bool_t          ct_xdr_trailer(XDR *, struct ctfile_trailer *);
+bool_t          ct_xdr_stdin(XDR *, struct ctfile_stdin *);
+bool_t          ct_xdr_gheader(XDR *, struct ctfile_gheader *, int);
 
-FILE           *ct_metadata_open(const char *,
-			struct ct_md_gheader *, XDR *);
-void		ct_metadata_close(FILE *, XDR *);
-
-void		ct_metadata_cleanup_gheader(struct ct_md_gheader *);
+static FILE	*ctfile_open(const char *, struct ctfile_gheader *, XDR *);
+static void	 ctfile_close(FILE *, XDR *);
+static void	 ctfile_cleanup_gheader(struct ctfile_gheader *);
 
 time_t				ct_prev_backup_time;
 
-
-
-/* metadata */
+/*
+ * XDR manipulation functions.
+ */
 bool_t
 ct_xdr_dedup_sha(XDR *xdrs, uint8_t *sha)
 {
@@ -78,7 +76,7 @@ ct_xdr_dedup_sha_crypto(XDR *xdrs, uint8_t *sha, uint8_t *csha, uint8_t *iv)
 }
 
 bool_t
-ct_xdr_header(XDR *xdrs, struct ct_md_header *objp, int version)
+ct_xdr_header(XDR *xdrs, struct ctfile_header *objp, int version)
 {
 	if (!xdr_int(xdrs, &objp->cmh_beacon))
 		return (FALSE);
@@ -111,7 +109,7 @@ ct_xdr_header(XDR *xdrs, struct ct_md_header *objp, int version)
 }
 
 bool_t
-ct_xdr_trailer(XDR *xdrs, struct ct_md_trailer *objp)
+ct_xdr_trailer(XDR *xdrs, struct ctfile_trailer *objp)
 {
 	if (!ct_xdr_dedup_sha(xdrs, objp->cmt_sha))
 		return (FALSE);
@@ -123,7 +121,7 @@ ct_xdr_trailer(XDR *xdrs, struct ct_md_trailer *objp)
 }
 
 bool_t
-ct_xdr_stdin(XDR *xdrs, struct ct_md_stdin *objp)
+ct_xdr_stdin(XDR *xdrs, struct ctfile_stdin *objp)
 {
 	if (!xdr_int(xdrs, &objp->cms_beacon))
 		return (FALSE);
@@ -134,7 +132,7 @@ ct_xdr_stdin(XDR *xdrs, struct ct_md_stdin *objp)
 }
 
 bool_t
-ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp,
+ct_xdr_gheader(XDR *xdrs, struct ctfile_gheader *objp,
     int direction)
 {
 	char	 *basep, base[PATH_MAX], *prevlvl;
@@ -152,7 +150,7 @@ ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp,
 		return (FALSE);
 	if (!xdr_int(xdrs, &objp->cmg_flags))
 		return (FALSE);
-	if (direction  == XDR_ENCODE && ct_md_mode == CT_MDMODE_REMOTE &&
+	if (direction  == XDR_ENCODE && ctfile_mode == CT_MDMODE_REMOTE &&
 	    objp->cmg_prevlvl_filename != NULL &&
 	    objp->cmg_prevlvl_filename[0] != '\0') {
 		strlcpy(base, objp->cmg_prevlvl_filename, sizeof(base));
@@ -165,13 +163,13 @@ ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp,
 	}
 	if (!xdr_string(xdrs, &prevlvl, PATH_MAX))
 		return (FALSE);
-	if (direction == XDR_DECODE && ct_md_mode == CT_MDMODE_REMOTE &&
+	if (direction == XDR_DECODE && ctfile_mode == CT_MDMODE_REMOTE &&
 	    prevlvl != NULL && prevlvl[0] != '\0') {
 		strlcpy(base, prevlvl, sizeof(base));
 		if ((basep = basename(base)) == NULL)
 			CFATALX("can't basename %s", prevlvl);
 		if (asprintf(&objp->cmg_prevlvl_filename, "%s%s",
-		    ct_md_cachedir, basep) == -1)
+		    ctfile_cachedir, basep) == -1)
 			CFATALX("out of memory");
 	} else {
 		objp->cmg_prevlvl_filename = prevlvl;
@@ -195,8 +193,11 @@ ct_xdr_gheader(XDR *xdrs, struct ct_md_gheader *objp,
 	return (TRUE);
 }
 
+/*
+ * General helper functions
+ */
 void
-ct_metadata_close(FILE *file, XDR *xdr)
+ctfile_close(FILE *file, XDR *xdr)
 {
 	extern int64_t		ct_ex_dirnum;
 
@@ -209,12 +210,12 @@ ct_metadata_close(FILE *file, XDR *xdr)
 }
 
 FILE *
-ct_metadata_open(const char *filename, struct ct_md_gheader *gh, XDR *xdr)
+ctfile_open(const char *filename, struct ctfile_gheader *gh, XDR *xdr)
 {
 	FILE			*f;
 	time_t			ltime;
 
-	/* open metadata file */
+	/* open file */
 	f = fopen(filename, "rb");
 	if (f == NULL)
 		return (NULL);
@@ -257,7 +258,7 @@ ct_metadata_open(const char *filename, struct ct_md_gheader *gh, XDR *xdr)
  * xdr strings are malloced and thus need cleaning up.
  */
 void
-ct_metadata_cleanup_gheader(struct ct_md_gheader *gh)
+ctfile_cleanup_gheader(struct ctfile_gheader *gh)
 {
 	int	 i;
 	if (gh->cmg_prevlvl_filename)
@@ -344,19 +345,19 @@ ct_basis_setup(const char *basisbackup, char **filelist)
 }
 
 char *
-ct_metadata_check_prev(const char *mdname)
+ctfile_get_previous(const char *path)
 {
-	FILE			*md_file;
+	FILE			*ctfile;
 	char			*ret = NULL;
 	XDR			 xdr;
-	struct ct_md_gheader	 gh;
+	struct ctfile_gheader	 gh;
 
-	if ((md_file = ct_metadata_open(mdname, &gh, &xdr)) != NULL) {
+	if ((ctfile = ctfile_open(path, &gh, &xdr)) != NULL) {
 		if (gh.cmg_prevlvl_filename)
 			ret = e_strdup(gh.cmg_prevlvl_filename);
 
-		ct_metadata_cleanup_gheader(&gh);
-		ct_metadata_close(md_file, &xdr);
+		ctfile_cleanup_gheader(&gh);
+		ctfile_close(ctfile, &xdr);
 	}
 
 	return ret;
@@ -366,7 +367,7 @@ int
 ctfile_parse_init_at(struct ctfile_parse_state *ctx, const char *file,
     off_t offset)
 {
-	ctx->xs_f = ct_metadata_open(file,  &ctx->xs_gh, &ctx->xs_xdr);
+	ctx->xs_f = ctfile_open(file,  &ctx->xs_gh, &ctx->xs_xdr);
 	if (ctx->xs_f == NULL)
 		return 2;
 
@@ -385,7 +386,7 @@ ctfile_parse_init_at(struct ctfile_parse_state *ctx, const char *file,
 
 static int
 ctfile_parse_read_header(struct ctfile_parse_state *ctx,
-    struct ct_md_header *hdr)
+    struct ctfile_header *hdr)
 {
 	bzero(hdr, sizeof *hdr);
 
@@ -405,7 +406,7 @@ ctfile_parse_read_header(struct ctfile_parse_state *ctx,
 
 static int
 ctfile_parse_read_trailer(struct ctfile_parse_state *ctx,
-    struct ct_md_trailer *trl)
+    struct ctfile_trailer *trl)
 {
 	bool_t ret;
 
@@ -565,11 +566,11 @@ void
 ctfile_parse_close(struct ctfile_parse_state *ctx)
 {
 
-	ct_metadata_cleanup_gheader(&ctx->xs_gh);
+	ctfile_cleanup_gheader(&ctx->xs_gh);
 	if (ctx->xs_filename != NULL)
 		e_free(&ctx->xs_filename);
 
-	ct_metadata_close(ctx->xs_f, &ctx->xs_xdr);
+	ctfile_close(ctx->xs_f, &ctx->xs_xdr);
 }
 
 struct ctfile_write_state {
@@ -592,7 +593,7 @@ ctfile_write_init(const char *ctfile, int type, const char *basis, int lvl,
 {
 	struct ctfile_write_state	*ctx;
 	char				**fptr;
-	struct ct_md_gheader		 gh;
+	struct ctfile_gheader		 gh;
 
 	ctx = e_calloc(1, sizeof(*ctx));
 
@@ -676,7 +677,7 @@ int
 ctfile_write_header(struct ctfile_write_state *ctx, struct fnode *fnode,
     char *filename, int base)
 {
-	struct ct_md_header	hdr;
+	struct ctfile_header	hdr;
 
 	CNDBG(CT_LOG_CTFILE, "writing file header %s %s", fnode->fl_sname,
 	    filename);
@@ -855,7 +856,7 @@ out:
 int
 ctfile_write_file_end(struct ctfile_write_state *ctx, struct fnode *fnode)
 {
-	struct ct_md_trailer	trl;
+	struct ctfile_trailer	trl;
 	int			compression;
 	int			nrshas;
 	bool_t			ret;
@@ -903,7 +904,7 @@ ctfile_write_file_end(struct ctfile_write_state *ctx, struct fnode *fnode)
 void
 ctfile_write_close(struct ctfile_write_state *ctx)
 {
-	struct ct_md_header	hdr;
+	struct ctfile_header	hdr;
 	char			fake[1];
 
 	/* Write EOF header on close */
@@ -914,7 +915,7 @@ ctfile_write_close(struct ctfile_write_state *ctx)
 	if (ct_xdr_header(&ctx->cws_xdr, &hdr, ctx->cws_version) == FALSE)
 		CWARNX("Failed to write archive footer");
 	
-	ct_metadata_close(ctx->cws_f, &ctx->cws_xdr);
+	ctfile_close(ctx->cws_f, &ctx->cws_xdr);
 
 	CWARNX("close called");
 	e_free(&ctx);

@@ -44,10 +44,6 @@
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 #endif
 
-
-/* metadata file */
-FILE	*ct_mdf;
-
 /* assl pipe */
 struct ct_assl_io_ctx	*ct_assl_ctx;
 

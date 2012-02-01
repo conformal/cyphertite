@@ -48,11 +48,11 @@ struct ct_fb_state	*ctfb_cfs;
 
 __dead void		 ctfb_usage(void);
 struct ct_fb_entry	*ct_add_tree(struct ct_fb_entry *,
-			     struct ctfile_parse_state *, struct ct_fb_mdfile *,
+			     struct ctfile_parse_state *, struct ct_fb_ctfile *,
 			     off_t);
 struct ct_fb_entry	*ctfb_follow_path(struct ct_fb_state *, const char *,
 			     char *, size_t);
-int			 glob_mdfile(const char *, int,
+int			 glob_ctfile(const char *, int,
 			     int (*)(const char *, int), glob_t *, int);
 
 static inline int
@@ -67,15 +67,15 @@ RB_GENERATE_STATIC(ct_fb_entries, ct_fb_entry, cfb_entry, ct_cmp_entry);
 /*
  * Main guts of  ct_build tree. Factored out to avoid deep nesting.
  * Insert or update an entry in the tree with the information gotten from
- * the md file.
+ * the ctfile.
  */
 struct ct_fb_entry *
 ct_add_tree(struct ct_fb_entry *head, struct ctfile_parse_state *xdr_ctx,
-    struct ct_fb_mdfile *mdfile, off_t fileoffset)
+    struct ct_fb_ctfile *ctfile, off_t fileoffset)
 {
 	extern int64_t			 ct_ex_dirnum;
-	struct ct_md_header		*hdr = &xdr_ctx->xs_hdr;
-	struct ct_md_header		*hdrlnk= &xdr_ctx->xs_lnkhdr;
+	struct ctfile_header		*hdr = &xdr_ctx->xs_hdr;
+	struct ctfile_header		*hdrlnk= &xdr_ctx->xs_lnkhdr;
 	struct dnode 			*dnode;
 	struct ct_fb_dnode		*fb_dnode;
 	struct ct_fb_entry		*parent = NULL, sentry, *entry;
@@ -194,7 +194,7 @@ ct_add_tree(struct ct_fb_entry *head, struct ctfile_parse_state *xdr_ctx,
 			CFATALX("duplicate dentry");
 	} else if (C_ISREG(hdr->cmh_type)) {
 		/*
-		 * Allfiles md files may have shas == -1, so in some cases we
+		 * Allfiles ctfiles may have shas == -1, so in some cases we
 		 * may wish to update an existing file when we find the actual
 		 * shas. It is an error to have a file node with -1 for shas
 		 * after all metadata have been parsed. it means one was
@@ -209,10 +209,10 @@ ct_add_tree(struct ct_fb_entry *head, struct ctfile_parse_state *xdr_ctx,
 		if (hdr->cmh_nr_shas != -1)  {
 			file->cfb_nr_shas = hdr->cmh_nr_shas;
 			file->cfb_sha_offs = fileoffset;
-			file->cfb_file = mdfile;
+			file->cfb_file = ctfile;
 			if (ctfile_parse_seek(xdr_ctx))
 				CFATALX("failed to skip shas in %s",
-				    mdfile->cff_path);
+				    ctfile->cff_path);
 		}
 		if (ctfile_parse(xdr_ctx) != XS_RET_FILE_END)
 			CFATALX("no file trailer found");
@@ -223,14 +223,14 @@ ct_add_tree(struct ct_fb_entry *head, struct ctfile_parse_state *xdr_ctx,
 }
 
 /*
- * Build version tree on ``head'' from mfile (and dependant files).
+ * Build version tree on ``head'' from ``filename'' (and dependant files).
  */
 void
-ct_build_tree(const char *mfile, struct ct_fb_entry *head)
+ct_build_tree(const char *filename, struct ct_fb_entry *head)
 {
 	struct ct_extract_head		 extract_head;
 	struct ctfile_parse_state	 xdr_ctx;
-	struct ct_fb_mdfile		*mdfile = NULL;
+	struct ct_fb_ctfile		*ctfile = NULL;
 	struct ct_fb_dir		*root_dir;
 	struct ct_fb_key		*root_version;
 	off_t				 offset;
@@ -239,7 +239,7 @@ ct_build_tree(const char *mfile, struct ct_fb_entry *head)
 	CNDBG(CT_LOG_FILE, "entry");
 
 	TAILQ_INIT(&extract_head);
-	ct_extract_setup(&extract_head, &xdr_ctx, mfile);
+	ct_extract_setup(&extract_head, &xdr_ctx, filename);
 
 	TAILQ_INIT(&head->cfb_versions);
 	RB_INIT(&head->cfb_children);
@@ -257,9 +257,9 @@ nextfile:
 	TAILQ_INSERT_HEAD(&head->cfb_versions, root_version, cfb_link);
 
 	/* XXX keep these in a list? Right now they leak */
-	mdfile = calloc(1, sizeof(*mdfile));
-	strlcpy(mdfile->cff_path, xdr_ctx.xs_filename,
-	    sizeof(mdfile->cff_path));
+	ctfile = calloc(1, sizeof(*ctfile));
+	strlcpy(ctfile->cff_path, xdr_ctx.xs_filename,
+	    sizeof(ctfile->cff_path));
 	offset = ctfile_parse_tell(&xdr_ctx);
 
 	while ((ret = ctfile_parse(&xdr_ctx)) != XS_RET_EOF &&
@@ -267,7 +267,7 @@ nextfile:
 		switch(ret) {
 		case XS_RET_FILE:
 			(void)ct_add_tree(head, &xdr_ctx,
-			    mdfile, offset);
+			    ctfile, offset);
 			break;
 		case XS_RET_FILE_END:
 			break;
@@ -580,7 +580,7 @@ ctfb_get(int argc, const char **argv)
 	}
 
 	memset(&g, 0, sizeof(g));
-	if (glob_mdfile(argv[1], GLOB_MARK, NULL, &g, 1)) {
+	if (glob_ctfile(argv[1], GLOB_MARK, NULL, &g, 1)) {
 		CWARNX("%s not found", argv[1]);
 		goto out;
 	}
@@ -610,8 +610,8 @@ ctfb_get(int argc, const char **argv)
 			
 		file = (struct ct_fb_file *)key;
 		ex_priv = e_calloc(1, sizeof(*ex_priv));
-		ex_priv->md_filename = e_strdup(file->cfb_file->cff_path);
-		ex_priv->md_offset = file->cfb_sha_offs;
+		ex_priv->ctfile = e_strdup(file->cfb_file->cff_path);
+		ex_priv->ctfile_off = file->cfb_sha_offs;
 		/* not a directory so shouldn't have a / at the end */
 		if ((name = strrchr(g.gl_pathv[i], '/')) != NULL) {
 			name++;
@@ -628,7 +628,7 @@ ctfb_get(int argc, const char **argv)
 			dest = e_strdup(name); /* XXX version? */
 		}
 		CWARNX("getting %s to %s", g.gl_pathv[i], dest);
-		op = ct_add_operation(ct_extract_file, ct_free_mdname, dest,
+		op = ct_add_operation(ct_extract_file, ct_free_localname, dest,
 		    NULL, NULL, NULL, NULL, 0, 0);
 		op->op_priv = ex_priv;
 		count++;
@@ -642,7 +642,7 @@ ctfb_get(int argc, const char **argv)
 		}
 	}
 	ct_cleanup_eventloop();
-	e_free(&ex_priv->md_filename);
+	e_free(&ex_priv->ctfile);
 	e_free(&ex_priv);
 
 out:
@@ -664,7 +664,7 @@ ctfb_ls(int argc, const char **argv)
 		for (i = 1; i < argc; i++) {
 			memset(&g, 0, sizeof(g));
 
-			if (glob_mdfile(argv[i],
+			if (glob_ctfile(argv[i],
 			    GLOB_MARK|GLOB_NOCHECK|GLOB_BRACE, NULL, &g, 0) ||
 			    (g.gl_pathc  && !g.gl_matchc)) {
 				globfree(&g);
@@ -799,7 +799,7 @@ ctfb_help(int argc, const char **argv)
 __dead void
 ctfb_usage(void)
 {
-	fprintf(stderr, "%s [-D debugstring] ][-F configfile] ctfile\n",
+	fprintf(stderr, "%s [-D debugstring][-F configfile] ctfile\n",
 	    __progname);
 	exit(1);
 }
@@ -815,7 +815,7 @@ struct ctfb_opendir {
 };
 
 /*
- * Open a directory in the md file for reading.
+ * Open a directory in the ctfile file for reading.
  */
 void *
 ctfb_opendir(const char *path)
@@ -930,14 +930,14 @@ ctfb_closerdir(void *arg)
 }
 
 /*
- * Glob paths within a md file.
+ * Glob paths within a ctfile.
  *
  * If versions is non zero then we will also provide versions in the list of
  * paths, else just pathnames will be provided.
  * Other parameters are equal to glob(3).
  */
 int
-glob_mdfile(const char *pattern, int flags, int (*errfunc)(const char *, int),
+glob_ctfile(const char *pattern, int flags, int (*errfunc)(const char *, int),
     glob_t *pglob, int versions)
 {
 	pglob->gl_opendir = ctfb_opendir;

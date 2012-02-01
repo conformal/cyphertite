@@ -20,8 +20,8 @@
  * XXX ownership, times and mode can change in each differential,
  * perhaps needa a split
  */
-struct ct_fb_mdfile {
-	char		cff_path[PATH_MAX];	/* MD file name */
+struct ct_fb_ctfile {
+	char		cff_path[PATH_MAX];	/* ctfile name */
 };
 
 TAILQ_HEAD(ct_fb_vers, ct_fb_key);
@@ -42,7 +42,7 @@ struct ct_fb_entry {
  */
 struct ct_fb_key {
 	TAILQ_ENTRY(ct_fb_key)	 cfb_link;
-	u_char			 cfb_type;	/* same types as in md file */
+	u_char			 cfb_type;	/* same types as in ctfile */
 	uint32_t		 cfb_uid;	/* user id */
 	uint32_t		 cfb_gid;	/* group id */
 	uint32_t		 cfb_mode;	/* file mode */
@@ -53,7 +53,7 @@ struct ct_fb_key {
 struct ct_fb_file {
 	struct ct_fb_key	 cfb_base;
 	uint64_t		 cfb_nr_shas;	/* total shas */
-	struct ct_fb_mdfile	*cfb_file;	/* file containing shas */
+	struct ct_fb_ctfile	*cfb_file;	/* file containing shas */
 	off_t			 cfb_sha_offs;	/* offset into file */
 	uint64_t		 cfb_file_size;
 };
@@ -88,7 +88,7 @@ int		ctfb_lstat(const char *path, struct stat *sb);
 typedef void    (ctfb_cmd)(int, const char **);
 __dead void	ctfb_usage(void);
 void		ct_build_tree(const char *, struct ct_fb_entry *);
-int		glob_mdfile(const char *, int, int (*)(const char *, int),
+int		glob_ctfile(const char *, int, int (*)(const char *, int),
 		    glob_t *, int);
 void		 complete_display(char **, u_int);
 char		*complete_ambiguous(const char *, char **, size_t);

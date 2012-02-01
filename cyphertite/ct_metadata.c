@@ -38,10 +38,10 @@
 #include "ct.h"
 #include "ct_crypto.h"
 
-struct md_list_file {
+struct ctfile_list_file {
 	union {
-		RB_ENTRY(md_list_file)		nxt;
-		SLIST_ENTRY(md_list_file)	lnk;
+		RB_ENTRY(ctfile_list_file)	nxt;
+		SLIST_ENTRY(ctfile_list_file)	lnk;
 	}					mlf_entries;
 #define mlf_next	mlf_entries.nxt
 #define mlf_link	mlf_entries.lnk
@@ -51,22 +51,21 @@ struct md_list_file {
 	int					mlf_keep;
 };
 
-SLIST_HEAD(md_list, md_list_file);
-RB_HEAD(md_list_tree, md_list_file);
-RB_PROTOTYPE(md_list_tree, md_list_file, next, ct_cmp_md);
+SLIST_HEAD(ctfile_list, ctfile_list_file);
+RB_HEAD(ctfile_list_tree, ctfile_list_file);
+RB_PROTOTYPE(ctfile_list_tree, ctfile_list_file, next, ct_cmp_ctfile);
 
-struct md_list			ct_md_listfiles =
-				     SLIST_HEAD_INITIALIZER(&ct_md_listfiles);
-FILE				*md_backup_file = NULL;
-int				md_block_no = 0;
-int				md_is_open = 0;
-int				md_open_inflight = 0;
-off_t				md_size, md_offset;
-time_t				md_mtime;
+struct ctfile_list			ctfile_list_files =
+				     SLIST_HEAD_INITIALIZER(&ctfile_list_files);
+FILE				*ctfile_handle = NULL;
+int				ctfile_block_no = 0;
+int				ctfile_is_open = 0;
+int				ctfile_open_inflight = 0;
+off_t				ctfile_size, ctfile_offset;
 
 int			strcompare(const void *, const void *);
-void			ct_md_list_complete(int, char **, char **,
-			    struct md_list_tree *);
+
+void	ctfile_list_complete(int, char **, char **, struct ctfile_list_tree *);
 
 void ct_cull_send_shas(struct ct_op *);
 void ct_cull_setup(struct ct_op *);
@@ -74,8 +73,8 @@ void ct_cull_start_shas(struct ct_op *);
 void ct_cull_start_complete(struct ct_op *op);
 void ct_cull_send_complete(struct ct_op *op);
 void ct_cull_complete(struct ct_op *op);
-void ct_cull_collect_md_files(struct ct_op *op);
-void ct_fetch_all_md_parse(struct ct_op *op);
+void ct_cull_collect_ctfiles(struct ct_op *op);
+void ct_cull_fetch_all_ctfiles(struct ct_op *op);
 
 struct xmlsd_v_elements ct_xml_cmds[] = {
 	{ "ct_md_list", xe_ct_md_list },
@@ -93,7 +92,7 @@ struct xmlsd_v_elements ct_xml_cmds[] = {
 };
 
 char *
-ct_md_cook_filename(const char *path)
+ctfile_cook_name(const char *path)
 {
 	char	*bname;
 
@@ -106,18 +105,18 @@ ct_md_cook_filename(const char *path)
 	return (e_strdup(bname));
 }
 
-struct fnode	md_node;
+struct fnode	ctfile_node;
 void
-ct_md_archive(struct ct_op *op)
+ctfile_archive(struct ct_op *op)
 {
-	const char		*mfile = op->op_local_fname;
-	const char		*mdname = op->op_remote_fname;
+	const char		*ctfile = op->op_local_fname;
+	const char		*rname = op->op_remote_fname;
 	struct stat		sb;
 	ssize_t			rsz, rlen;
 	struct ct_trans		*ct_trans;
 	int			error;
 
-	CNDBG(CT_LOG_FILE, "md_fileio entered for block %d", md_block_no);
+	CNDBG(CT_LOG_FILE, "entered for block %d", ctfile_block_no);
 	ct_set_file_state(CT_S_RUNNING);
 loop:
 	ct_trans = ct_trans_alloc();
@@ -128,41 +127,40 @@ loop:
 		return;
 	}
 
-	if (md_is_open == 0) {
-		if (md_open_inflight) {
-			CNDBG(CT_LOG_FILE, "waiting on md open");
+	if (ctfile_is_open == 0) {
+		if (ctfile_open_inflight) {
+			CNDBG(CT_LOG_FILE, "waiting on remote open");
 			ct_trans_free(ct_trans);
 			ct_set_file_state(CT_S_WAITING_TRANS);
 			return;
 		}
 
-		CNDBG(CT_LOG_FILE, "opening md file for archive %s", mfile);
-		md_backup_file = fopen(mfile, "rb");
-		if (md_backup_file == NULL)
-			CFATAL("can't open %s for reading", mfile);
+		CNDBG(CT_LOG_FILE, "opening ctfile for archive %s", ctfile);
+		ctfile_handle = fopen(ctfile, "rb");
+		if (ctfile_handle == NULL)
+			CFATAL("can't open %s for reading", ctfile);
 
-		md_offset = 0;
-		md_block_no = 0;
+		ctfile_offset = 0;
+		ctfile_block_no = 0;
 
-		error = fstat(fileno(md_backup_file), &sb);
+		error = fstat(fileno(ctfile_handle), &sb);
 		if (error) {
-			CFATAL("can't stat backup file %s", mfile);
+			CFATAL("can't stat backup file %s", ctfile);
 		} else {
-			md_size = sb.st_size;
-			md_mtime = sb.st_mtime;
+			ctfile_size = sb.st_size;
 		}
 
-		if (mdname == NULL) {
-			mdname = ct_md_cook_filename(mfile);
-			op->op_remote_fname = (char *)mdname;
+		if (rname == NULL) {
+			rname = ctfile_cook_name(ctfile);
+			op->op_remote_fname = (char *)rname;
 		}
-		ct_xml_file_open(ct_trans, mdname, MD_O_WRITE, 0);
-		md_open_inflight = 1;
+		ct_xml_file_open(ct_trans, rname, MD_O_WRITE, 0);
+		ctfile_open_inflight = 1;
 		return;
 	}
 
 	/* Are we done here? */
-	if (md_size == md_offset) {
+	if (ctfile_size == ctfile_offset) {
 		ct_set_file_state(CT_S_FINISHED);
 		ct_trans->tr_fl_node = NULL;
 		ct_trans->tr_state = TR_S_XML_CLOSE;
@@ -171,13 +169,13 @@ loop:
 		CNDBG(CT_LOG_FILE, "setting eof on trans %" PRIu64,
 		    ct_trans->tr_trans_id);
 		ct_trans->hdr.c_flags = C_HDR_F_METADATA;
-		ct_trans->tr_md_name = mdname;
-		ct_stats->st_bytes_tot += md_size;
+		ct_trans->tr_ctfile_name = rname;
+		ct_stats->st_bytes_tot += ctfile_size;
 		ct_queue_transfer(ct_trans);
 		return;
 	}
 	/* perform read */
-	rsz = md_size - md_offset;
+	rsz = ctfile_size - ctfile_offset;
 
 	CNDBG(CT_LOG_FILE, "rsz %ld max %d", (long) rsz, ct_max_block_size);
 	if (rsz > ct_max_block_size) {
@@ -185,13 +183,13 @@ loop:
 	}
 
 	ct_trans->tr_dataslot = 0;
-	rlen = fread(ct_trans->tr_data[0], sizeof(char), rsz, md_backup_file);
+	rlen = fread(ct_trans->tr_data[0], sizeof(char), rsz, ctfile_handle);
 
 	CNDBG(CT_LOG_FILE, "read %ld", (long) rlen);
 
 	ct_stats->st_bytes_read += rlen;
 
-	ct_trans->tr_fl_node = &md_node;
+	ct_trans->tr_fl_node = &ctfile_node;
 	ct_trans->tr_chsize = ct_trans->tr_size[0] = rlen;
 	ct_trans->tr_state = TR_S_READ;
 	ct_trans->tr_type = TR_T_WRITE_CHUNK;
@@ -199,8 +197,8 @@ loop:
 	ct_trans->tr_eof = 0;
 	ct_trans->hdr.c_flags = C_HDR_F_METADATA;
 	ct_trans->hdr.c_ex_status = 2; /* we handle new metadata protocol */
-	ct_trans->tr_md_chunkno = md_block_no;
-	ct_trans->tr_md_name = mdname;
+	ct_trans->tr_ctfile_chunkno = ctfile_block_no;
+	ct_trans->tr_ctfile_name = rname;
 
 	CNDBG(CT_LOG_FILE, " trans %"PRId64", read size %ld, into %p rlen %ld",
 	    ct_trans->tr_trans_id, (long) rsz, ct_trans->tr_data[0],
@@ -211,31 +209,31 @@ loop:
 	 * has C_HDR_F_METADATA set.
 	 */
 	bzero(ct_trans->tr_iv, sizeof(ct_trans->tr_iv));
-	ct_trans->tr_iv[0] = (md_block_no >>  0) & 0xff;
-	ct_trans->tr_iv[1] = (md_block_no >>  8) & 0xff;
-	ct_trans->tr_iv[2] = (md_block_no >> 16) & 0xff;
-	ct_trans->tr_iv[3] = (md_block_no >> 24) & 0xff;
-	ct_trans->tr_iv[4] = (md_block_no >>  0) & 0xff;
-	ct_trans->tr_iv[5] = (md_block_no >>  8) & 0xff;
-	ct_trans->tr_iv[6] = (md_block_no >> 16) & 0xff;
-	ct_trans->tr_iv[7] = (md_block_no >> 24) & 0xff;
+	ct_trans->tr_iv[0] = (ctfile_block_no >>  0) & 0xff;
+	ct_trans->tr_iv[1] = (ctfile_block_no >>  8) & 0xff;
+	ct_trans->tr_iv[2] = (ctfile_block_no >> 16) & 0xff;
+	ct_trans->tr_iv[3] = (ctfile_block_no >> 24) & 0xff;
+	ct_trans->tr_iv[4] = (ctfile_block_no >>  0) & 0xff;
+	ct_trans->tr_iv[5] = (ctfile_block_no >>  8) & 0xff;
+	ct_trans->tr_iv[6] = (ctfile_block_no >> 16) & 0xff;
+	ct_trans->tr_iv[7] = (ctfile_block_no >> 24) & 0xff;
 	/* XXX - leaves the rest of the iv with 0 */
 
-	md_block_no++;
+	ctfile_block_no++;
 
 	CNDBG(CT_LOG_FILE, "sizes rlen %ld offset %ld size %ld", (long) rlen,
-	    (long) md_offset, (long) md_size);
+	    (long) ctfile_offset, (long) ctfile_size);
 
-	if (rsz != rlen || (rlen + md_offset) == md_size) {
+	if (rsz != rlen || (rlen + ctfile_offset) == ctfile_size) {
 		/* short read, file truncated or EOF */
 		CNDBG(CT_LOG_FILE, "DONE");
-		error = fstat(fileno(md_backup_file), &sb);
+		error = fstat(fileno(ctfile_handle), &sb);
 		if (error) {
 			CWARNX("file stat error %s %d %s",
-			    mdname, errno, strerror(errno));
-		} else if (sb.st_size != md_size) {
+			    ctfile, errno, strerror(errno));
+		} else if (sb.st_size != ctfile_size) {
 			CWARNX("file truncated during backup %s",
-			    mdname);
+			    ctfile);
 			/*
 			 * may need to perform special nop processing
 			 * to pad archive file to right number of chunks
@@ -245,9 +243,9 @@ loop:
 		 * we don't set eof here because the next go round
 		 * will hit the state done case above
 		 */
-		md_offset = md_size;
+		ctfile_offset = ctfile_size;
 	} else {
-		md_offset += rlen;
+		ctfile_offset += rlen;
 	}
 	ct_queue_transfer(ct_trans);
 	goto loop;
@@ -417,10 +415,10 @@ ct_xml_file_close(void)
 }
 
 void
-ct_md_extract(struct ct_op *op)
+ctfile_extract(struct ct_op *op)
 {
-	const char		*mfile = op->op_local_fname;
-	const char		*mdname = op->op_remote_fname;
+	const char		*ctfile = op->op_local_fname;
+	const char		*rname = op->op_remote_fname;
 	struct ct_trans		*trans;
 	struct ct_header	*hdr;
 
@@ -433,58 +431,58 @@ ct_md_extract(struct ct_op *op)
 		ct_set_file_state(CT_S_WAITING_TRANS);
 		return;
 	}
-	if (md_is_open == 0) {
-		if (md_open_inflight) {
-			CNDBG(CT_LOG_FILE, "waiting on md open");
+	if (ctfile_is_open == 0) {
+		if (ctfile_open_inflight) {
+			CNDBG(CT_LOG_FILE, "waiting on remote open");
 			ct_trans_free(trans);
 			ct_set_file_state(CT_S_WAITING_TRANS);
 			return;
 		}
 
 		/* XXX -chmod when done */
-		if (md_backup_file == NULL) { /* may have been opened for us */
-			if ((md_backup_file = fopen(mfile, "wb")) == NULL)
-				CFATALX("unable to open file %s", mfile);
+		if (ctfile_handle == NULL) { /* may have been opened for us */
+			if ((ctfile_handle = fopen(ctfile, "wb")) == NULL)
+				CFATALX("unable to open file %s", ctfile);
 		}
-		md_block_no = 0;
+		ctfile_block_no = 0;
 
-		if (mdname == NULL) {
-			mdname = ct_md_cook_filename(mfile);
-			op->op_remote_fname = (char *)mdname;
+		if (rname == NULL) {
+			rname = ctfile_cook_name(ctfile);
+			op->op_remote_fname = (char *)rname;
 		}
-		ct_xml_file_open(trans, mdname, MD_O_READ, 0);
-		md_open_inflight = 1;
+		ct_xml_file_open(trans, rname, MD_O_READ, 0);
+		ctfile_open_inflight = 1;
 		return;
 	}
 
-	trans->tr_fl_node = &md_node;
+	trans->tr_fl_node = &ctfile_node;
 	trans->tr_state = TR_S_EX_SHA;
 	trans->tr_type = TR_T_READ_CHUNK;
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_eof = 0;
-	trans->tr_md_chunkno = md_block_no;
-	trans->tr_md_name = mdname;
+	trans->tr_ctfile_chunkno = ctfile_block_no;
+	trans->tr_ctfile_name = rname;
 
 	hdr = &trans->hdr;
 	hdr->c_ex_status = 2;
 	hdr->c_flags |= C_HDR_F_METADATA;
 
 	bzero(trans->tr_sha, sizeof(trans->tr_sha));
-	trans->tr_sha[0] = (md_block_no >>  0) & 0xff;
-	trans->tr_sha[1] = (md_block_no >>  8) & 0xff;
-	trans->tr_sha[2] = (md_block_no >> 16) & 0xff;
-	trans->tr_sha[3] = (md_block_no >> 24) & 0xff;
+	trans->tr_sha[0] = (ctfile_block_no >>  0) & 0xff;
+	trans->tr_sha[1] = (ctfile_block_no >>  8) & 0xff;
+	trans->tr_sha[2] = (ctfile_block_no >> 16) & 0xff;
+	trans->tr_sha[3] = (ctfile_block_no >> 24) & 0xff;
 	bzero(trans->tr_iv, sizeof(trans->tr_iv));
-	trans->tr_iv[0] = (md_block_no >>  0) & 0xff;
-	trans->tr_iv[1] = (md_block_no >>  8) & 0xff;
-	trans->tr_iv[2] = (md_block_no >> 16) & 0xff;
-	trans->tr_iv[3] = (md_block_no >> 24) & 0xff;
-	trans->tr_iv[4] = (md_block_no >>  0) & 0xff;
-	trans->tr_iv[5] = (md_block_no >>  8) & 0xff;
-	trans->tr_iv[6] = (md_block_no >> 16) & 0xff;
-	trans->tr_iv[7] = (md_block_no >> 24) & 0xff;
+	trans->tr_iv[0] = (ctfile_block_no >>  0) & 0xff;
+	trans->tr_iv[1] = (ctfile_block_no >>  8) & 0xff;
+	trans->tr_iv[2] = (ctfile_block_no >> 16) & 0xff;
+	trans->tr_iv[3] = (ctfile_block_no >> 24) & 0xff;
+	trans->tr_iv[4] = (ctfile_block_no >>  0) & 0xff;
+	trans->tr_iv[5] = (ctfile_block_no >>  8) & 0xff;
+	trans->tr_iv[6] = (ctfile_block_no >> 16) & 0xff;
+	trans->tr_iv[7] = (ctfile_block_no >> 24) & 0xff;
 
-	md_block_no++; /* next chunk on next pass */
+	ctfile_block_no++; /* next chunk on next pass */
 
 	ct_queue_transfer(trans);
 }
@@ -504,9 +502,9 @@ ct_complete_metadata(struct ct_trans *trans)
 			CNDBG(CT_LOG_FILE, "writing packet sz %d",
 			    trans->tr_size[slot]);
 			wlen = fwrite(trans->tr_data[slot], sizeof(char),
-			    trans->tr_size[slot], md_backup_file);
+			    trans->tr_size[slot], ctfile_handle);
 			if (wlen != trans->tr_size[slot])
-				CWARN("unable to write to md file");
+				CWARN("unable to write to ctfile");
 		} else {
 			ct_state->ct_file_state = CT_S_FINISHED;
 		}
@@ -517,9 +515,9 @@ ct_complete_metadata(struct ct_trans *trans)
 		if (ct_op_complete())
 			done = 1;
 
-		/* Clean up md reconnect name, shared between all trans */
-		if (trans->tr_md_name != NULL)
-			e_free(&trans->tr_md_name);
+		/* Clean up reconnect name, shared between all trans */
+		if (trans->tr_ctfile_name != NULL)
+			e_free(&trans->tr_ctfile_name);
 
 		if (!done)
 			return;
@@ -538,9 +536,9 @@ ct_complete_metadata(struct ct_trans *trans)
 		break;
 	case TR_S_XML_CLOSE:
 		CNDBG(CT_LOG_FILE, "eof reached, closing file");
-		if (md_backup_file != NULL) {
-			fclose(md_backup_file);
-			md_backup_file = NULL;
+		if (ctfile_handle != NULL) {
+			fclose(ctfile_handle);
+			ctfile_handle = NULL;
 		}
 		ct_xml_file_close();
 		break;
@@ -555,7 +553,7 @@ ct_complete_metadata(struct ct_trans *trans)
 }
 
 void
-ct_md_list_start(struct ct_op *op)
+ctfile_list_start(struct ct_op *op)
 {
 	struct xmlsd_element_list	 xl;
 	struct xmlsd_element		*xe;
@@ -585,23 +583,23 @@ ct_md_list_start(struct ct_op *op)
 }
 
 void
-ct_md_list_complete(int matchmode, char **flist, char **excludelist,
-    struct md_list_tree *results)
+ctfile_list_complete(int matchmode, char **flist, char **excludelist,
+    struct ctfile_list_tree *results)
 {
 	struct ct_match		*match, *ex_match = NULL;
-	struct md_list_file	*file;
+	struct ctfile_list_file	*file;
 
-	if (SLIST_EMPTY(&ct_md_listfiles))
+	if (SLIST_EMPTY(&ctfile_list_files))
 		return;
 
 	match = ct_match_compile(matchmode, flist);
 	if (excludelist)
 		ex_match = ct_match_compile(matchmode, excludelist);
-	while ((file = SLIST_FIRST(&ct_md_listfiles)) != NULL) {
-		SLIST_REMOVE_HEAD(&ct_md_listfiles, mlf_link);
+	while ((file = SLIST_FIRST(&ctfile_list_files)) != NULL) {
+		SLIST_REMOVE_HEAD(&ctfile_list_files, mlf_link);
 		if (ct_match(match, file->mlf_name) == 0 && (ex_match == NULL ||
 		    ct_match(ex_match, file->mlf_name) == 1)) {
-			RB_INSERT(md_list_tree, results, file);
+			RB_INSERT(ctfile_list_tree, results, file);
 		} else {
 			e_free(&file);
 		}
@@ -612,35 +610,35 @@ ct_md_list_complete(int matchmode, char **flist, char **excludelist,
 }
 
 int
-ct_cmp_md(struct md_list_file *f1, struct md_list_file *f2)
+ct_cmp_ctfile(struct ctfile_list_file *f1, struct ctfile_list_file *f2)
 {
 	return (strcmp(f1->mlf_name, f2->mlf_name));
 }
 
-RB_GENERATE(md_list_tree, md_list_file, mlf_next, ct_cmp_md);
+RB_GENERATE(ctfile_list_tree, ctfile_list_file, mlf_next, ct_cmp_ctfile);
 
 void
-ct_md_delete(struct ct_op *op)
+ctfile_delete(struct ct_op *op)
 {
 	struct xmlsd_element_list	 xl;
 	struct xmlsd_element		*xe;
-	const char			*md = op->op_remote_fname;
+	const char			*rname = op->op_remote_fname;
 	struct ct_trans			*trans;
 	char				 b64[CT_MAX_MD_FILENAME * 2];
 	size_t				 sz;
 
-	md = ct_md_cook_filename(md);
+	rname = ctfile_cook_name(rname);
 
-	if (ct_base64_encode(CT_B64_M_ENCODE, (uint8_t *)md, strlen(md),
+	if (ct_base64_encode(CT_B64_M_ENCODE, (uint8_t *)rname, strlen(rname),
 	    (uint8_t *)b64, sizeof(b64)))
-		CFATALX("cant base64 encode %s", md);
+		CFATALX("cant base64 encode %s", rname);
 
 	xe = xmlsd_create(&xl, "ct_md_delete");
 	xmlsd_set_attr(xe, "version", CT_MD_DELETE_VERSION);
 	xe = xmlsd_add_element(&xl, xe, "file");
 	xmlsd_set_attr(xe, "name", b64);
 
-	e_free(&md);
+	e_free(&rname);
 
 	trans = ct_trans_alloc();
 	trans->tr_trans_id = ct_trans_id++;
@@ -703,20 +701,20 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 					CNDBG(CT_LOG_FILE, "%s opened\n",
 					    filename);
 					die = 0;
-					md_open_inflight = 0;
-					md_is_open = 1;
+					ctfile_open_inflight = 0;
+					ctfile_is_open = 1;
 					ct_wakeup_file();
 				}
 			}
 		}
 		if (die)
-			CFATALX("couldn't open md file");
+			CFATALX("couldn't open remote file");
 		trans->tr_state = TR_S_XML_OPENED;
 	} else if (strcmp(xe->name, "ct_md_close") == 0) {
-		md_is_open = 0;
+		ctfile_is_open = 0;
 		trans->tr_state = TR_S_DONE;
 	} else if (strcmp(xe->name, "ct_md_list") == 0) {
-		struct md_list_file	*file;
+		struct ctfile_list_file	*file;
 		const char		*errstr;
 		char			*tmp;
 
@@ -749,7 +747,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 				    &errstr);
 				if (errstr != NULL)
 					CFATAL("can't parse mtime: %s", errstr);
-				SLIST_INSERT_HEAD(&ct_md_listfiles, file,
+				SLIST_INSERT_HEAD(&ctfile_list_files, file,
 				    mlf_link);
 			}
 		}
@@ -796,31 +794,31 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 }
 
 void
-ct_mdmode_setup(const char *mdmode)
+ctfile_mode_setup(const char *mode)
 {
-	CNDBG(CT_LOG_CTFILE, "mdmode setup %s", mdmode ? mdmode : "");
-	if (mdmode == NULL)
+	CNDBG(CT_LOG_CTFILE, "%s", mode ? mode : "");
+	if (mode == NULL)
 		return;
 
-	if (strcmp(mdmode, "remote") == 0)
-		ct_md_mode = CT_MDMODE_REMOTE;
-	else if (strcmp(mdmode, "local") == 0)
-		ct_md_mode = CT_MDMODE_LOCAL;
+	if (strcmp(mode, "remote") == 0)
+		ctfile_mode = CT_MDMODE_REMOTE;
+	else if (strcmp(mode, "local") == 0)
+		ctfile_mode = CT_MDMODE_LOCAL;
 	else
-		CFATALX("invalid metadata mode specified");
+		CFATALX("invalid ctfile mode specified");
 }
 
 int
-md_is_in_cache(const char *mdfile)
+ctfile_in_cache(const char *ctfile)
 {
 	struct dirent	*dp;
 	DIR		*dirp;
 	int		 found = 0;
 
-	if ((dirp = opendir(ct_md_cachedir)) == NULL)
+	if ((dirp = opendir(ctfile_cachedir)) == NULL)
 		CFATALX("can't open metadata cache dir");
 	while ((dp = readdir(dirp)) != NULL) {
-		if (strcmp(dp->d_name, mdfile) == 0) {
+		if (strcmp(dp->d_name, ctfile) == 0) {
 			CNDBG(CT_LOG_CTFILE, "found in cachedir");
 			found = 1;
 			break;
@@ -832,25 +830,25 @@ md_is_in_cache(const char *mdfile)
 }
 
 /*
- * return the filename in the cache directory that a mdfile would have
+ * return the filename in the cache directory that a ctfile would have
  * if it extisted.
  */
 char *
-ct_md_get_cachename(const char *mdfile)
+ctfile_get_cachename(const char *ctfile)
 {
 	char	*cachename;
 
-	/* ct_md_cachedir was made sure to terminate with / earlier */
-	e_asprintf(&cachename, "%s%s", ct_md_cachedir, mdfile);
+	/* cachedir was made sure to terminate with / earlier */
+	e_asprintf(&cachename, "%s%s", ctfile_cachedir, ctfile);
 	return cachename;
 }
 
 /*
- * returns boolean 1/0 whether or not the mdname in question is the full tag
+ * returns boolean 1/0 whether or not the ctfile in question is the full tag
  * with date/time or not.
  */
 int
-ct_md_is_full_mdname(const char *mdname)
+ctfile_is_fullname(const char *ctfile)
 {
 	char			*pattern = "^[[:digit:]]{8}-[[:digit:]]{6}-";
 	char			error[1024];
@@ -860,7 +858,7 @@ ct_md_is_full_mdname(const char *mdname)
 		regerror(rv, &re, error, sizeof(error) - 1);
 		CFATALX("%s: regcomp failed: %s", __func__, error);
 	}
-	if (regexec(&re, mdname, 0, NULL, 0) == 0)
+	if (regexec(&re, ctfile, 0, NULL, 0) == 0)
 		match = 1;
 
 	regfree(&re);
@@ -877,38 +875,38 @@ strcompare(const void *a, const void *b)
 }
 
 /*
- * filenames passed in remote mode are opaque tags for the md.
+ * filenames passed in remote mode are opaque tags for the backup.
  * the are stored on the server and in remote mode in the form
  * YYYYMMDD-HHMMSS-<strnvis(mname)>
  */
 void
-ct_find_md_for_extract(struct ct_op *op)
+ctfile_find_for_extract(struct ct_op *op)
 {
-	const char	*mdname = op->op_local_fname;
+	const char	*ctfile = op->op_local_fname;
 	struct ct_op	*list_fakeop;
 	char	 	**bufp;
 	int		 matchmode;
 
-	/* cook the mdname so we only search for the actual tag */
-	mdname = ct_md_cook_filename(mdname);
+	/* cook the ctfile so we only search for the actual tag */
+	ctfile = ctfile_cook_name(ctfile);
 
 	list_fakeop = e_calloc(1, sizeof(*list_fakeop));
 	bufp = e_calloc(2, sizeof(char **));
-	if (ct_md_is_full_mdname(mdname)) {
-		/* use md_list as stat() for now */
-		*bufp = e_strdup(mdname);
+	if (ctfile_is_fullname(ctfile)) {
+		/* use list as stat() for now */
+		*bufp = e_strdup(ctfile);
 		matchmode = CT_MATCH_GLOB;
 	} else {
-		e_asprintf(bufp, "^[[:digit:]]{8}-[[:digit:]]{6}-%s$", mdname);
+		e_asprintf(bufp, "^[[:digit:]]{8}-[[:digit:]]{6}-%s$", ctfile);
 
 		matchmode = CT_MATCH_REGEX;
 		/*
-		 * get the list of md matching this tag from the server.
-		 * ct_md_list returns an empty list if it found
+		 * get the list of files matching this tag from the server.
+		 * list returns an empty list if it found
 		 * nothing and NULL upon failure.
 		 */
 	}
-	e_free(&mdname);
+	e_free(&ctfile);
 
 	CNDBG(CT_LOG_CTFILE, "looking for %s", bufp[0]);
 
@@ -916,11 +914,11 @@ ct_find_md_for_extract(struct ct_op *op)
 	list_fakeop->op_matchmode = matchmode;
 
 	op->op_priv = list_fakeop;
-	ct_md_list_start(list_fakeop);
+	ctfile_list_start(list_fakeop);
 }
 
 void
-ct_free_mdname(struct ct_op *op)
+ct_free_localname(struct ct_op *op)
 {
 
 	if (op->op_local_fname != NULL)
@@ -935,59 +933,59 @@ ct_free_remotename(struct ct_op *op)
 }
 
 void
-ct_free_mdname_and_remote(struct ct_op *op)
+ct_free_localname_and_remote(struct ct_op *op)
 {
-	ct_free_mdname(op);
+	ct_free_localname(op);
 	ct_free_remotename(op);
 }
 
-void ct_md_download_next(struct ct_op *op);
+void ctfile_download_next(struct ct_op *op);
 void
-ct_md_download_next(struct ct_op *op)
+ctfile_download_next(struct ct_op *op)
 {
-	const char		*mfile = op->op_local_fname;
-	const char		*mfilename = op->op_remote_fname;
-	char			*md_prev;
+	const char		*ctfile = op->op_local_fname;
+	const char		*rfile = op->op_remote_fname;
+	char			*prevfile;
 	char			*cachename;
 	char			*cookedname;
 
-	md_is_open = 0;	/* prevent trying to close upon next download */
+	ctfile_is_open = 0;	/* prevent trying to close upon next download */
 again:
-	CNDBG(CT_LOG_CTFILE, "mfile %s", mfile);
+	CNDBG(CT_LOG_CTFILE, "ctfile %s", ctfile);
 
 	/* this will provide us the path that we need to use */
-	md_prev = ct_metadata_check_prev(mfile);
-	if (md_prev == NULL)
+	prevfile = ctfile_get_previous(ctfile);
+	if (prevfile == NULL)
 		goto out;
 
-	if (md_prev[0] != '\0') {
-		cookedname = ct_md_cook_filename(md_prev);
-		cachename = ct_md_get_cachename(cookedname);
-		CNDBG(CT_LOG_CTFILE, "prev file %s cachename %s", md_prev,
+	if (prevfile[0] != '\0') {
+		cookedname = ctfile_cook_name(prevfile);
+		cachename = ctfile_get_cachename(cookedname);
+		CNDBG(CT_LOG_CTFILE, "prev file %s cachename %s", prevfile,
 		    cachename);
-		if (!md_is_in_cache(cachename)) {
+		if (!ctfile_in_cache(cachename)) {
 			e_free(&cachename);
-			ct_add_operation_after(op, ct_md_extract,
-			    ct_md_download_next, (char *)md_prev, cookedname,
+			ct_add_operation_after(op, ctfile_extract,
+			    ctfile_download_next, (char *)prevfile, cookedname,
 				NULL, NULL, NULL, 0, 0);
 		} else {
-			if (mfile)
-				e_free(&mfile);
-			if (mfilename)
-				e_free(&mfilename);
+			if (ctfile)
+				e_free(&ctfile);
+			if (rfile)
+				e_free(&rfile);
 			e_free(&cookedname);
 			e_free(&cachename);
-			mfile = md_prev;
+			ctfile = prevfile;
 			goto again;
 		}
 	} else
-		e_free(&md_prev);
+		e_free(&prevfile);
 
 out:
-	if (mfile)
-		e_free(&mfile);
-	if (mfilename)
-		e_free(&mfilename);
+	if (ctfile)
+		e_free(&ctfile);
+	if (rfile)
+		e_free(&rfile);
 
 }
 
@@ -996,12 +994,11 @@ out:
  * that everything has been set up for it.
  */
 void
-ct_md_extract_nextop(struct ct_op *op)
+ctfile_extract_nextop(struct ct_op *op)
 {
-	char	*mfile;
-	char	*tmfile, *trfile;
+	char	*ctfile, *tctfile, *trfile;
 
-	md_is_open = 0;
+	ctfile_is_open = 0;
 	/*
 	 * need to determine if this is a layered backup, if so, we need to
 	 * queue download of that file
@@ -1012,14 +1009,14 @@ ct_md_extract_nextop(struct ct_op *op)
 		 * we need to keep these files, but download_next normally
 		 * needs to free them, make a temporary copy.
 		 */
-		tmfile = op->op_local_fname;
+		tctfile = op->op_local_fname;
 		trfile = op->op_remote_fname;
-		if (tmfile)
-			op->op_local_fname = e_strdup(tmfile);
+		if (tctfile)
+			op->op_local_fname = e_strdup(tctfile);
 		if (trfile)
 			op->op_remote_fname = e_strdup(trfile);
-		ct_md_download_next(op);
-		op->op_local_fname = tmfile;
+		ctfile_download_next(op);
+		op->op_local_fname = tctfile;
 		op->op_remote_fname = trfile;
 	}
 
@@ -1030,12 +1027,12 @@ ct_md_extract_nextop(struct ct_op *op)
 	 */
 	switch (op->op_action) {
 	case CT_A_EXTRACT:
-		ct_add_operation(ct_extract, ct_free_mdname_and_remote,
+		ct_add_operation(ct_extract, ct_free_localname_and_remote,
 		    op->op_local_fname, op->op_remote_fname, op->op_filelist,
 		    op->op_excludelist, NULL, op->op_matchmode, 0);
 		break;
 	case CT_A_LIST:
-		ct_add_operation(ct_list_op, ct_free_mdname_and_remote,
+		ct_add_operation(ct_list_op, ct_free_localname_and_remote,
 		    op->op_local_fname, op->op_remote_fname, op->op_filelist,
 		    op->op_excludelist, NULL, op->op_matchmode, 0);
 		break;
@@ -1043,18 +1040,18 @@ ct_md_extract_nextop(struct ct_op *op)
 		if (op->op_remote_fname)
 			e_free(&op->op_remote_fname);
 		/*
-		 * Since we were searching for previous, original mdname
+		 * Since we were searching for previous, original ctfile
 		 * is stored in basis. Swap them.
 		 */
-		mfile = ct_find_md_for_archive(op->op_basis);
+		ctfile = ctfile_find_for_archive(op->op_basis);
 		CNDBG(CT_LOG_CTFILE, "setting basisname %s",
 		    op->op_local_fname);
 		/* XXX does this leak cachename? */
-		ct_add_operation(ct_archive, NULL, mfile, NULL,
+		ct_add_operation(ct_archive, NULL, ctfile, NULL,
 		    op->op_filelist, op->op_excludelist, op->op_local_fname,
 		    op->op_matchmode, 0);
-		ct_add_operation(ct_md_archive, ct_free_mdname_and_remote,
-		    mfile, NULL, NULL, NULL, NULL, 0, 0);
+		ct_add_operation(ctfile_archive, ct_free_localname_and_remote,
+		    ctfile, NULL, NULL, NULL, NULL, 0, 0);
 		break;
 	case CT_A_JUSTDL:
 		{
@@ -1070,22 +1067,22 @@ ct_md_extract_nextop(struct ct_op *op)
 }
 
 void
-ct_find_md_for_extract_complete(struct ct_op *op)
+ctfile_find_for_extract_complete(struct ct_op *op)
 {
 	struct ct_op		*list_fakeop = op->op_priv;
-	struct md_list_tree	 result;
-	struct md_list_file	*tmp;
+	struct ctfile_list_tree	 result;
+	struct ctfile_list_file	*tmp;
 	char	 		*best, *cachename = NULL;
 
 	RB_INIT(&result);
-	ct_md_list_complete(list_fakeop->op_matchmode, list_fakeop->op_filelist,
-	    list_fakeop->op_excludelist, &result);
+	ctfile_list_complete(list_fakeop->op_matchmode,
+	    list_fakeop->op_filelist, list_fakeop->op_excludelist, &result);
 	e_free(list_fakeop->op_filelist);
 	e_free(&list_fakeop->op_filelist);
 	e_free(&list_fakeop);
 
 	/* grab the newest one */
-	if ((tmp = RB_MAX(md_list_tree, &result)) == NULL) {
+	if ((tmp = RB_MAX(ctfile_list_tree, &result)) == NULL) {
 		if (op->op_action == CT_A_ARCHIVE) {
 			goto do_operation;
 		} else  {
@@ -1099,7 +1096,7 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 	CNDBG(CT_LOG_CTFILE, "backup file is %s", best);
 
 	while((tmp = RB_ROOT(&result)) != NULL) {
-		RB_REMOVE(md_list_tree, &result, tmp);
+		RB_REMOVE(ctfile_list_tree, &result, tmp);
 		e_free(&tmp);
 	}
 
@@ -1110,58 +1107,58 @@ ct_find_md_for_extract_complete(struct ct_op *op)
 	 * those operations too. If we have it, we still need to check
 	 * that all others in the chain exist, however.
 	 */
-	cachename = ct_md_get_cachename(best);
-	if (!md_is_in_cache(best)) {
+	cachename = ctfile_get_cachename(best);
+	if (!ctfile_in_cache(best)) {
 		/*
 		 * since archive needs the original metadata name still
 		 * and is searching for a prior archive for differentials
 		 * we put local_fname (the original) in the basis slot here.
 		 * nextop will fix it for us.
 		 */
-		ct_add_operation(ct_md_extract, ct_md_extract_nextop,
+		ct_add_operation(ctfile_extract, ctfile_extract_nextop,
 		    cachename, best, op->op_filelist, op->op_excludelist,
 		    op->op_local_fname, op->op_matchmode, op->op_action);
 	} else {
 		e_free(&best);
 do_operation:
 		/*
-		 * Don't need to grab this mdfile, but may need one later in
+		 * Don't need to grab this ctfile, but may need one later in
 		 * the differential chain, recurse. When we know more we can
 		 * prepare the final operation
 		 */
 		op->op_basis = op->op_local_fname;
 		op->op_local_fname = cachename;
-		ct_md_extract_nextop(op);
+		ctfile_extract_nextop(op);
 	}
 
 }
 
 char *
-ct_find_md_for_archive(const char *mdname)
+ctfile_find_for_archive(const char *ctfile)
 {
 	char	 buf[TIMEDATA_LEN], *fullname, *cachename;
 	time_t	 now;
 
-	/* cook the mdname so we only search for the actual tag */
-	mdname = ct_md_cook_filename(mdname);
+	/* cook the ctfile so we only search for the actual tag */
+	ctfile = ctfile_cook_name(ctfile);
 
-	if (ct_md_is_full_mdname(mdname) != 0)
+	if (ctfile_is_fullname(ctfile) != 0)
 		CFATALX("metadata name with date tag already filled in");
 
 	now = time(NULL);
 	if (strftime(buf, TIMEDATA_LEN, "%Y%m%d-%H%M%S",
 	    localtime(&now)) == 0)
 		CFATALX("can't format time");
-	e_asprintf(&fullname, "%s-%s", buf, mdname);
+	e_asprintf(&fullname, "%s-%s", buf, ctfile);
 	CNDBG(CT_LOG_CTFILE, "backup file is %s", fullname);
 
 	/* check it isn't already in the cache */
-	cachename = ct_md_get_cachename(fullname);
-	if (md_is_in_cache(fullname))
+	cachename = ctfile_get_cachename(fullname);
+	if (ctfile_in_cache(fullname))
 		CFATALX("generated metadata name %s already in cache dir",
 		    fullname);
 
-	e_free(&mdname);
+	e_free(&ctfile);
 	e_free(&fullname);
 
 	return (cachename);
@@ -1184,17 +1181,17 @@ ct_check_crypto_secrets_nextop(struct ct_op *op)
 	char			*t, *remote_name = NULL;
 	char			 *dirp, dir[PATH_MAX], tmp[PATH_MAX];
 	const char		*errstr;
-	struct md_list_tree	 results;
-	struct md_list_file	*file = NULL;
+	struct ctfile_list_tree	 results;
+	struct ctfile_list_file	*file = NULL;
 	struct stat		 sb;
 	time_t			 mtime = 0, local_mtime = 0;
 	int			 crypto_fd;
 
 	RB_INIT(&results);
-	ct_md_list_complete(op->op_matchmode, op->op_filelist,
+	ctfile_list_complete(op->op_matchmode, op->op_filelist,
 	    op->op_excludelist, &results);
 	/* We're interested in the newest. */
-	if ((file = RB_MAX(md_list_tree, &results)) == NULL)
+	if ((file = RB_MAX(ctfile_list_tree, &results)) == NULL)
 		goto check_local;
 
 	CNDBG(CT_LOG_CRYPTO, "latest secrets file on server: %s",
@@ -1210,7 +1207,7 @@ ct_check_crypto_secrets_nextop(struct ct_op *op)
 	*t = '-'; /* put it back */
 	remote_name = e_strdup(file->mlf_name);
 	while((file = RB_ROOT(&results)) != NULL) {
-		RB_REMOVE(md_list_tree, &results, file);
+		RB_REMOVE(ctfile_list_tree, &results, file);
 		e_free(&file);
 	}
 
@@ -1234,7 +1231,7 @@ check_local:
 			e_free(&remote_name);
 		e_asprintf(&remote_name, "%020" PRId64 "-crypto.secrets",
 		    (long long)local_mtime);
-		ct_add_operation_after(op, ct_md_archive, ct_secrets_unlock,
+		ct_add_operation_after(op, ctfile_archive, ct_secrets_unlock,
 		    current_secrets, remote_name, NULL, NULL, NULL, 0, 0);
 	} else { /* mtime > local_mtime */
 		CNDBG(CT_LOG_CRYPTO, "downloading remote file");
@@ -1245,11 +1242,11 @@ check_local:
 		strlcat(tmp, "/.ctcrypto.XXXXXXXX", sizeof(tmp));
 		if ((crypto_fd = mkstemp(tmp)) == -1)
 			CFATAL("can't make temporary file");
-		if ((md_backup_file = fdopen(crypto_fd, "w+")) == NULL)
+		if ((ctfile_handle = fdopen(crypto_fd, "w+")) == NULL)
 			CFATAL("can't associate stream with temporary file");
 		CNDBG(CT_LOG_CRYPTO, "temp file: %s", tmp);
 		/* stash current name in basis in case we need to fallback */
-		ct_add_operation_after(op, ct_md_extract, ct_secrets_unlock,
+		ct_add_operation_after(op, ctfile_extract, ct_secrets_unlock,
 		    e_strdup(tmp), remote_name, NULL, NULL,  current_secrets,
 		    0, 0);
 	}
@@ -1341,32 +1338,33 @@ again:
  * Delete all metadata files that were found by the preceding list operation.
  */
 void
-ct_md_trigger_delete(struct ct_op *op)
+ctfile_trigger_delete(struct ct_op *op)
 {
-	struct md_list_tree	 results;
-	struct md_list_file	*file = NULL;
+	struct ctfile_list_tree	 results;
+	struct ctfile_list_file	*file = NULL;
 
 	RB_INIT(&results);
-	ct_md_list_complete(op->op_matchmode, op->op_filelist,
+	ctfile_list_complete(op->op_matchmode, op->op_filelist,
 	    op->op_excludelist, &results);
 	while((file = RB_ROOT(&results)) != NULL) {
 		CNDBG(CT_LOG_CRYPTO, "deleting remote crypto secrets file %s",
 		    file->mlf_name);
-		ct_add_operation_after(op, ct_md_delete, NULL, NULL,
+		ct_add_operation_after(op, ctfile_delete, NULL, NULL,
 		    e_strdup(file->mlf_name), NULL, NULL, NULL, 0, 0);
-		RB_REMOVE(md_list_tree, &results, file);
+		RB_REMOVE(ctfile_list_tree, &results, file);
 		e_free(&file);
 	}
 }
 
 /*
  * Verify that the ctfile name is kosher.
+<<<<<<< HEAD
  * - Encode the name (with a fake prefix) to make sure it fits.
  * - To help with interoperability, scan for a few special characters
  *   and punt if we find those.
  */
 int
-ct_md_verify_ctfile(char *ctfile)
+ctfile_verify_name(char *ctfile)
 {
 	const char	*set = CT_CTFILE_REJECTCHRS;
 	char		 b[CT_CTFILE_MAXLEN], b64[CT_CTFILE_MAXLEN];
@@ -1377,7 +1375,7 @@ ct_md_verify_ctfile(char *ctfile)
 		return 1;
 
 	/* No processing for local mode. */
-	if (ct_md_mode == CT_MDMODE_LOCAL)
+	if (ctfile_mode == CT_MDMODE_LOCAL)
 		return 0;
 
 	sz = snprintf(b, sizeof(b), "YYYYMMDD-HHMMSS-%s", ctfile);
@@ -1451,9 +1449,9 @@ ct_cull_kick(void)
 	CNDBG(CT_LOG_TRANS, "add_op cull_setup");
 	CNDBG(CT_LOG_SHA, "shacnt %" PRIu64 , shacnt);
 
-	ct_add_operation(ct_md_list_start, ct_fetch_all_md_parse, 
+	ct_add_operation(ctfile_list_start, ct_cull_fetch_all_ctfiles, 
               NULL, NULL, NULL, NULL, NULL, 0, 0);
-	ct_add_operation(ct_cull_collect_md_files, NULL, 
+	ct_add_operation(ct_cull_collect_ctfiles, NULL, 
               NULL, NULL, NULL, NULL, NULL, 0, 0);
 	ct_add_operation(ct_cull_setup, NULL,
 	    NULL, NULL, NULL, NULL, NULL, 0, 0);
@@ -1570,7 +1568,6 @@ ct_cull_send_shas(struct ct_op *op)
 	CNDBG(CT_LOG_TRANS, "cull_send_shas");
 	node = RB_ROOT(&ct_sha_rb_head);
 	if (shacnt == 0 || node == NULL) {
-CINFO("finished");
 		ct_set_file_state(CT_S_FINISHED);
 		return;
 	}
@@ -1631,42 +1628,44 @@ CINFO("finished");
  * Code to get all metadata files on the server.
  * to be used for cull.
  */
-struct md_list_tree ct_cull_all_mds = RB_INITIALIZER(&ct_cull_all_mds);
-char		*all_mds_pattern[] = {
+struct ctfile_list_tree ct_cull_all_ctfiles =
+    RB_INITIALIZER(&ct_cull_all_ctfiles);
+char		*all_ctfiles_pattern[] = {
 			"^[[:digit:]]{8}-[[:digit:]]{6}-.*",
 			NULL,
 		 };
 
 void
-ct_fetch_all_md_parse(struct ct_op *op)
+ct_cull_fetch_all_ctfiles(struct ct_op *op)
 {
-	struct md_list_tree	 results;
-	struct md_list_file	*file;
+	struct ctfile_list_tree	 results;
+	struct ctfile_list_file	*file;
 	char			*cachename;
 
 	RB_INIT(&results);
-	ct_md_list_complete(CT_MATCH_REGEX, all_mds_pattern, NULL, &results);
+	ctfile_list_complete(CT_MATCH_REGEX, all_ctfiles_pattern, NULL,
+	    &results);
 	while ((file = RB_ROOT(&results)) != NULL) {
-		RB_REMOVE(md_list_tree, &results, file);
+		RB_REMOVE(ctfile_list_tree, &results, file);
 		CNDBG(CT_LOG_CTFILE, "looking for file %s ", file->mlf_name);
-		if (!md_is_in_cache(file->mlf_name)) {
-			cachename = ct_md_get_cachename(file->mlf_name);
+		if (!ctfile_in_cache(file->mlf_name)) {
+			cachename = ctfile_get_cachename(file->mlf_name);
 			CNDBG(CT_LOG_CTFILE, "getting %s to %s", file->mlf_name,
 			    cachename);
-			ct_add_operation_after(op, ct_md_extract,
-			    ct_free_mdname_and_remote, cachename,
+			ct_add_operation_after(op, ctfile_extract,
+			    ct_free_localname_and_remote, cachename,
 			    e_strdup(file->mlf_name), NULL, NULL, NULL, 0, 0);
 		} else {
 			CNDBG(CT_LOG_CTFILE, "already got %s", file->mlf_name);
 		}
-		RB_INSERT(md_list_tree, &ct_cull_all_mds, file);
+		RB_INSERT(ctfile_list_tree, &ct_cull_all_ctfiles, file);
 	}
 }
 
 void
-ct_cull_collect_md_files(struct ct_op *op)
+ct_cull_collect_ctfiles(struct ct_op *op)
 {
-	struct md_list_file	*file, *prevfile, filesearch;
+	struct ctfile_list_file	*file, *prevfile, filesearch;
 	char			*prev_filename;
 	int			timelen;
 	char			buf[TIMEDATA_LEN];
@@ -1684,7 +1683,7 @@ ct_cull_collect_md_files(struct ct_op *op)
 
 	timelen = strlen(buf);
 
-	RB_FOREACH(file, md_list_tree, &ct_cull_all_mds) {
+	RB_FOREACH(file, ctfile_list_tree, &ct_cull_all_ctfiles) {
 		if (strncmp (file->mlf_name, buf, timelen) < 0) {
 			file->mlf_keep = 0;
 		} else {
@@ -1696,18 +1695,18 @@ ct_cull_collect_md_files(struct ct_op *op)
 	if (keep_files == 0)
 		CFATALX("All ctfiles are old and would be deleted, aborting.");
 
-	RB_FOREACH(file, md_list_tree, &ct_cull_all_mds) {
+	RB_FOREACH(file, ctfile_list_tree, &ct_cull_all_ctfiles) {
 		if (file->mlf_keep == 0)
 			continue;
 
-		prev_filename = ct_metadata_check_prev(file->mlf_name);
+		prev_filename = ctfile_get_previous(file->mlf_name);
 prev_ct_file:
 		if (prev_filename != NULL) {
 			CINFO("prev filename %s", prev_filename);
 			strncpy(filesearch.mlf_name, prev_filename,
 			    sizeof(filesearch.mlf_name));
-			prevfile = RB_FIND(md_list_tree, &ct_cull_all_mds,
-			    &filesearch);
+			prevfile = RB_FIND(ctfile_list_tree,
+			    &ct_cull_all_ctfiles, &filesearch);
 			if (prevfile == NULL) {
 				CWARNX("file not found in ctfilelist [%s]",
 				    prev_filename);
@@ -1719,18 +1718,18 @@ prev_ct_file:
 				prevfile->mlf_keep++;
 				e_free(&prev_filename);
 
-				prev_filename = ct_metadata_check_prev(
+				prev_filename = ctfile_get_previous(
 				    prevfile->mlf_name);
 				goto prev_ct_file;
 			}
 			e_free(&prev_filename);
 		}
 	}
-	RB_FOREACH(file, md_list_tree, &ct_cull_all_mds) {
+	RB_FOREACH(file, ctfile_list_tree, &ct_cull_all_ctfiles) {
 		if (file->mlf_keep == 0) {
 			CNDBG(CT_LOG_CTFILE, "adding %s to delete list",
 			    file->mlf_name);
-			ct_add_operation(ct_md_delete, NULL, NULL,
+			ct_add_operation(ctfile_delete, NULL, NULL,
 			    e_strdup(file->mlf_name), NULL, NULL, NULL, 0, 0);
 		} else {
 			CNDBG(CT_LOG_CTFILE, "adding %s to keep list",
@@ -1740,8 +1739,8 @@ prev_ct_file:
 	}
 
 	/* cleanup */
-	while((file = RB_ROOT(&ct_cull_all_mds)) != NULL) {
-		RB_REMOVE(md_list_tree, &ct_cull_all_mds, file);
+	while((file = RB_ROOT(&ct_cull_all_ctfiles)) != NULL) {
+		RB_REMOVE(ctfile_list_tree, &ct_cull_all_ctfiles, file);
 		e_free(&file);
 		/* XXX - name  */
 	}
