@@ -21,7 +21,7 @@ SRCS= ct_main.c ct_files.c ct_util.c ct_queue.c ct_event.c
 SRCS+= ct_aes_xts.c ct_crypto.c ct_match.c ct_metadata.c
 SRCS+= ct_db.c ct_xdr.c ct_xml.c ct_bw_lim.c ct_ctl.c ct_md_xdr.c
 SRCS+= ct_config.c ct_md_traverse.c ct_fb.c ct_fb_ops.c
-MAN= cyphertite.1 cyphertite.conf.5 cyphertitefb.1
+MAN= ctctl.1 cyphertite.1 cyphertite.conf.5 cyphertitefb.1
 
 .if ${.CURDIR} == ${.OBJDIR}
 LDADD+= -L${.CURDIR}/../ctutil

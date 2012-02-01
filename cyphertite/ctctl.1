@@ -1,0 +1,84 @@
+.\"
+.\" Copyright (c) 2012 Conformal Systems LLC <info@conformal.com>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate: October 12 2011 $
+.Dt CTCTL 1
+.Os
+.Sh NAME
+.Nm ctctl
+.Nd cyphertite control utility
+.Sh SYNOPSIS
+.Nm
+.Bk -words
+.Op Fl D Ar debugstring
+.Fl F Ar conffile
+.Ar command
+.Ek
+.Sh DESCRIPTION
+The
+.Nm
+command enables changing the crypto password or culling old data.
+.Pp
+The options are as follows:
+.Pp
+.Bl -tag -width "-D debugstring"
+.It Fl D Ar debugstring
+Turn on debugging output.
+.Ar debugstring
+is a comma delimited list of the following types:
+.Pp
+.Bl -tag -width "vertreeXX" -compact
+.It Ar socket
+Low level socket routines.
+.It Ar config
+Configuration parsing.
+.It Ar exude
+Memory debugging.
+.It Ar xml
+Xml commands.
+.It Ar all
+All of the above.
+.El
+.Xc
+.It Fl F Ar conffile
+Use the specified file
+.Ar configfile
+as the config file.
+.El
+.Pp
+The commands are as follows:
+.Pp
+.Bl -tag -width "cpasswd"
+.It Cm cpasswd
+prompts for a new crypto password and writes the new one in the
+specified
+.Xc
+.Ar conffile .
+.Xc
+.It Cm cull
+removes meta data files older than ct_expired_days in the specified
+.Ar conffile .
+Only meta data files that are
+.Em not
+referenced by later meta data files are actually removed.
+.Xc
+.El
+.Sh SEE ALSO
+.Xr cyphertite 1 ,
+.Xr cyphertite.conf 5 ,
+.Sh AUTHORS
+.Nm
+was written by
+.An Conformal Systems, LLC. Aq info@conformal.com .
