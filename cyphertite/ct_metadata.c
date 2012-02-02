@@ -640,8 +640,6 @@ ct_md_delete(struct ct_op *op)
 	xe = xmlsd_add_element(&xl, xe, "file");
 	xmlsd_set_attr(xe, "name", b64);
 
-	CINFO("deleting file [%s]", md);
-
 	e_free(&md);
 
 	trans = ct_trans_alloc();
@@ -762,7 +760,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 				filename = xmlsd_get_attr(xe, "name");
 				if (filename == NULL || filename[0] == '\0')
 					printf("specified archive does not "
-					    "exist [%s]\n", filename);
+					    "exist\n");
 				else {
 					if (ct_base64_encode(CT_B64_M_DECODE,
 					    (uint8_t *)filename, strlen(filename),
