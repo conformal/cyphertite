@@ -384,8 +384,6 @@ ct_create_config(void)
 
 	fprintf(f, "cache_db\t\t\t= %s/ct_db\n", dir);
 	fprintf(f, "session_compression\t\t= lzo\n");
-	fprintf(f, "host\t\t\t\t= beta.cyphertite.com\n");
-	fprintf(f, "hostport\t\t\t= 31337\n");
 	fprintf(f, "crypto_secrets\t\t\t= %s/ct_crypto\n", dir);
 	fprintf(f, "ca_cert\t\t\t\t= %s/ct_certs/ct_ca.crt\n", dir);
 	fprintf(f, "cert\t\t\t\t= %s/ct_certs/ct_%s.crt\n", dir, user);

@@ -567,6 +567,12 @@ main(int argc, char *argv[])
 	if (clog_set_flags(cflags))
 		errx(1, "illegal clog flags");
 
+	/* set string defaults, don't use e_ functions for now */
+	ct_host = strdup("auth.cyphertite.com");
+	ct_hostport = strdup("48879");
+	if (ct_host == NULL || ct_hostport == NULL)
+		CFATALX("no memory for defaults");
+
 	executablepath = strdup(argv[0]);
 	executablename = basename(executablepath);
 	executablestem = ct_remove_ext(executablename);
