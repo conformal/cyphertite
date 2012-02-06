@@ -614,6 +614,7 @@ void			ct_init_eventloop(void);
 void			ct_update_secrets(void);
 void			ct_cleanup(void);
 void			ct_cleanup_eventloop(void);
+void			ct_cleanup_login_cache(void);
 
 /* XDR parser for cyphertite MD archives */
 struct ct_xdr_state {

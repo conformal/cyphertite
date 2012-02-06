@@ -59,6 +59,7 @@ void			ct_print_scaled_stat(FILE *, const char *, int64_t,
 			    int64_t, int);
 int			ct_validate_xml_negotiate_xml(struct ct_header *,
 			    char *);
+char			*ct_getloginbyuid(uid_t);
 
 struct ct_op *
 ct_add_operation(ct_op_cb *start, ct_op_cb *complete, char *localname,
@@ -666,7 +667,7 @@ ct_display_assl_stats(FILE *outfh)
 void
 ct_pr_fmt_file(struct fnode *fnode)
 {
-	struct passwd *passwd;
+	char *loginname;
 	struct group *group;
 	char *link_ty;
 	char filemode[11];
@@ -706,9 +707,9 @@ ct_pr_fmt_file(struct fnode *fnode)
 		filemode[9] = (fnode->fl_mode & 0001) ? 'x' : '-';
 		filemode[10] = '\0';
 
-		passwd = getpwuid(fnode->fl_uid);
-		if (passwd && (strlen(passwd->pw_name) < sizeof(uid)))
-			snprintf(uid, sizeof(uid), "%10s", passwd->pw_name);
+		loginname = ct_getloginbyuid(fnode->fl_uid);
+		if (loginname && (strlen(loginname) < sizeof(uid)))
+			snprintf(uid, sizeof(uid), "%10s", loginname);
 		else
 			snprintf(uid, sizeof(uid), "%-10d", fnode->fl_uid);
 		group = getgrgid(fnode->fl_gid);
@@ -750,7 +751,7 @@ ct_pr_fmt_file(struct fnode *fnode)
 void
 ct_fb_print_entry(char *name, struct ct_fb_key *key, int verbose)
 {
-	struct passwd *passwd;
+	char *loginname;
 	struct group *group;
 	char *link_ty;
 	char filemode[11];
@@ -790,12 +791,14 @@ ct_fb_print_entry(char *name, struct ct_fb_key *key, int verbose)
 		filemode[9] = (key->cfb_mode & 0001) ? 'x' : '-';
 		filemode[10] = '\0';
 
-		passwd = getpwuid(key->cfb_uid);
-		if (passwd && (strlen(passwd->pw_name) < sizeof(uid)))
-			snprintf(uid, sizeof(uid), "%10s", passwd->pw_name);
+		loginname = ct_getloginbyuid(key->cfb_uid);
+		if (loginname && (strlen(loginname) < sizeof(uid)))
+			snprintf(uid, sizeof(uid), "%10s", loginname);
 		else
 			snprintf(uid, sizeof(uid), "%-10d", key->cfb_uid);
 		group = getgrgid(key->cfb_gid);
+
+
 		if (group && (strlen(group->gr_name) < sizeof(gid)))
 			snprintf(gid, sizeof(gid), "%10s", group->gr_name);
 		else
@@ -827,4 +830,79 @@ ct_fb_print_entry(char *name, struct ct_fb_key *key, int verbose)
 			}
 		}
 	}
+}
+
+struct ct_login_cache {
+	RB_ENTRY(ct_login_cache)	 lc_next;
+	uid_t				 lc_uid;
+	char				*lc_name;
+};
+
+
+int ct_cmp_logincache(struct ct_login_cache *, struct ct_login_cache *);
+
+RB_HEAD(ct_login_cache_tree, ct_login_cache) ct_login_cache =
+     RB_INITIALIZER(&login_cache);
+
+#define MAX_LC_CACHE_SIZE 100
+int ct_login_cache_size;
+
+RB_PROTOTYPE(ct_login_cache_tree, ct_login_cache, lc_next, ct_cmp_logincache);
+RB_GENERATE(ct_login_cache_tree, ct_login_cache, lc_next, ct_cmp_logincache);
+
+void
+ct_cleanup_login_cache(void)
+{
+	struct ct_login_cache *tmp;
+
+	while ((tmp = RB_ROOT(&ct_login_cache)) != NULL) {
+		RB_REMOVE(ct_login_cache_tree, &ct_login_cache, tmp);
+		e_free(&tmp->lc_name);
+		e_free(&tmp);
+	}
+	ct_login_cache_size  = 0;
+}
+
+char *
+ct_getloginbyuid(uid_t uid)
+{
+	struct passwd *passwd;
+	struct ct_login_cache *entry, search;
+
+	search.lc_uid = uid;
+
+	entry = RB_FIND(ct_login_cache_tree, &ct_login_cache, &search);
+
+	if (entry != NULL) {
+		return entry->lc_name;
+	}
+	printf("uid lookup failed %d\n", uid);
+
+	/* if the cache gets too big, dump all entries and refill. */
+	if (ct_login_cache_size > MAX_LC_CACHE_SIZE) {
+		ct_cleanup_login_cache();
+	}
+
+	/* yes, this even caches negative entries */
+	ct_login_cache_size++;
+
+	entry = e_calloc(1, sizeof(*entry));
+	entry->lc_uid = uid;
+
+	passwd = getpwuid(uid);
+	if (passwd)
+		entry->lc_name = e_strdup(passwd->pw_name);
+	else
+		entry->lc_name = NULL; /* entry not found cache NULL */
+
+	RB_INSERT(ct_login_cache_tree, &ct_login_cache, entry);
+	
+	return entry->lc_name;
+}
+
+int
+ct_cmp_logincache(struct ct_login_cache *f1, struct ct_login_cache *f2)
+{
+	return ((f1->lc_uid < f2->lc_uid) ? -1 :
+	    (f1->lc_uid == f2->lc_uid ? 0 : 1));
 }

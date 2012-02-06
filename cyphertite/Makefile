@@ -6,7 +6,7 @@ SYSTEM != uname -s
 
 .if ${.TARGETS:M*analyze*}
 CC=clang
-CFLAGS+=--analzye
+CFLAGS+=--analyze
 .elif ${.TARGETS:M*clang*}
 CC=clang
 .endif
