@@ -269,7 +269,7 @@ ctfb_main(int argc, char *argv[])
 	int		 	 c, cnt, l_argc, ret;
 
 	bzero(&cfs, sizeof(cfs));
-	while ((c = getopt(argc, argv, "D:F:f:")) != -1) {
+	while ((c = getopt(argc, argv, "D:F:")) != -1) {
 		switch (c) {
 		case 'D':
 			if (debugstring != NULL)
@@ -280,9 +280,6 @@ ctfb_main(int argc, char *argv[])
 		case 'F':
 			configfile = optarg;
 			break;
-		case 'f': /* metadata file */
-			ct_mfile = optarg;
-			break;
 		default:
 			ctfb_usage();
 			/* NOTREACHED */
@@ -291,6 +288,13 @@ ctfb_main(int argc, char *argv[])
 	}
 	argc -= optind;
 	argv += optind;
+
+	if (argc > 1) {
+		CWARNX("more than one ctfile provided");
+		ctfb_usage();
+	} else {
+		ct_mfile = argv[0];
+	}
 
 	if (ct_mfile == NULL)
 		ctfb_usage();
