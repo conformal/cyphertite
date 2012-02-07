@@ -178,7 +178,7 @@ struct ct_cli_cmd	cmd_list[] = {
 void
 ctctl_usage(void)
 {
-	fprintf(stderr, "%s [-d][-F configfile] action...\n",
+	fprintf(stderr, "%s [-D debugstring] [-F configfile] action...\n",
 	    __progname);
 	exit(1);
 }

@@ -80,10 +80,10 @@ void
 ct_usage(void)
 {
 	fprintf(stderr,
-	    "usage: %s {-ctxV} [-0BCDEFIPRXadprv] -f <ctfile> [filelist]\n",
+	    "usage: %s {-ctxV} [-0PRXadprv] [-B basisctfile] [-C directory] [-D debugstring] [-E excludefile] [-F conffile] [-I includefile] -f <ctfile> [filelist]\n",
 	    __progname);
 	fprintf(stderr,
-	    "       %s -m {-cetx} [-CFdr] -f <metadata-tag> [pattern]\n",
+	    "       %s -m {-cetx} [-r] [-C directory] [-D debugstring] [-F conffile] -f <metadata-tag> [pattern]\n",
 	    __progname);
 	exit(1);
 }

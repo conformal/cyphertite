@@ -799,7 +799,7 @@ ctfb_help(int argc, const char **argv)
 __dead void
 ctfb_usage(void)
 {
-	fprintf(stderr, "%s [-d][-F configfile] -f mdfile\n",
+	fprintf(stderr, "%s [-D debugstring] ][-F configfile] -f mdfile\n",
 	    __progname);
 	exit(1);
 }
