@@ -146,6 +146,13 @@ ct_op_complete(void)
 void
 ct_load_certs(struct assl_context *c)
 {
+	if (ct_cert == NULL)
+		CFATALX("no cert provided in config");
+	if (ct_ca_cert == NULL)
+		CFATALX("no ca_cert provided in config");
+	if (ct_key == NULL)
+		CFATALX("no key provided in config");
+
 	if (assl_load_file_certs(c, ct_ca_cert, ct_cert, ct_key))
 		assl_fatalx("assl_load_file_certs %s %s %s", ct_ca_cert,
 		    ct_cert, ct_key);
