@@ -697,6 +697,9 @@ ct_traverse(char **paths, char **exclude, int match_mode)
 	if (ftsp == NULL)
 		CFATAL("fts_open failed");
 
+	if (ct_verbose)
+		CINFO("Generating filelist, this may take a few minutes...");
+
 	ecnt = cnt = 0;
 	while ((fe = fts_read(ftsp)) != NULL) {
 		switch (fe->fts_info) {
@@ -769,6 +772,8 @@ ct_traverse(char **paths, char **exclude, int match_mode)
 	if (exclude_match)
 		ct_match_unwind(exclude_match);
 	gettimeofday(&ct_stats->st_time_scan_end, NULL);
+	if (ct_verbose)
+		CINFO("Done! Initiating backup...");
 }
 
 char *
