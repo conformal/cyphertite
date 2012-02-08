@@ -48,9 +48,6 @@ int				ctfile_is_open = 0;
 int				ctfile_open_inflight = 0;
 off_t				ctfile_size, ctfile_offset;
 
-int			strcompare(const void *, const void *);
-
-
 void ct_cull_send_shas(struct ct_op *);
 void ct_cull_setup(struct ct_op *);
 void ct_cull_start_shas(struct ct_op *);
@@ -762,14 +759,6 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 	ct_body_free(NULL, vbody, hdr);
 	ct_header_free(NULL, hdr);
 	xmlsd_unwind(&xl);
-}
-
-#define			TIMEDATA_LEN	17	/* including NUL */
-int
-strcompare(const void *a, const void *b)
-{
-	/* sort purely based on date */
-	return (strncmp(*(char **)b, *(char **)a, TIMEDATA_LEN - 1));
 }
 
 /*
