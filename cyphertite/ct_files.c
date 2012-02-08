@@ -47,7 +47,7 @@ struct dir_stat;
 int			 ct_cmp_dirlist(struct dir_stat *, struct dir_stat *);
 struct fnode		*ct_populate_fnode_from_flist(struct flist *);
 char			*ct_name_to_safename(char *);
-void			 ct_traverse(char **, char **, int);
+void			 ct_traverse(char **, char *, char **, int);
 
 RB_HEAD(ct_dir_lookup, dir_stat) ct_dir_rb_head =
     RB_INITIALIZER(&ct_dir_rb_head);
@@ -427,7 +427,8 @@ ct_archive(struct ct_op *op)
 
 		if (ct_tdir && chdir(ct_tdir) != 0)
 			CFATALX("can't chdir to %s", ct_tdir);
-		ct_traverse(filelist, caa->caa_excllist, caa->caa_matchmode);
+		ct_traverse(filelist, caa->caa_includefile, caa->caa_excllist,
+		    caa->caa_matchmode);
 
 		if (ct_tdir && chdir(cwd) != 0)
 			CFATALX("can't chdir back to %s", cwd);
@@ -684,7 +685,7 @@ done:
 }
 
 void
-ct_traverse(char **paths, char **exclude, int match_mode)
+ct_traverse(char **paths, char *includefile, char **exclude, int match_mode)
 {
 	FTS			*ftsp;
 	FTSENT			*fe;
@@ -693,8 +694,8 @@ ct_traverse(char **paths, char **exclude, int match_mode)
 	int			 fts_options;
 	int			 cnt, ecnt;
 
-	if (ct_includefile)
-		include_match = ct_match_fromfile(ct_includefile, match_mode);
+	if (includefile)
+		include_match = ct_match_fromfile(includefile, match_mode);
 	if (exclude)
 		exclude_match = ct_match_compile(match_mode, exclude);
 

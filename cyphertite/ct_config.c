@@ -53,7 +53,6 @@ char			*ct_compression_type;
 char			*ct_polltype;
 char			*ctfile_mode_str;
 char			*ctfile_cachedir;
-char			*ct_includefile;
 int			ctfile_mode = CT_MDMODE_LOCAL;
 int			ct_compress_enabled;
 int			ct_encrypt_enabled;

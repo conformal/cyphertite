@@ -60,7 +60,6 @@ extern time_t		ct_prev_backup_time;
 extern int		ct_trans_id;
 extern int		ct_max_differentials;
 extern char		*__progname;
-extern char		*ct_includefile;
 extern char		*ct_crypto_passphrase;
 extern char		*ct_configfile;
 extern int		ct_ctfile_keep_days;

@@ -302,6 +302,7 @@ ct_main(int argc, char **argv)
 	char		tpath[PATH_MAX];
 	char		*ct_basisbackup = NULL;
 	char		*ctfile = NULL;
+	char		*ct_includefile = NULL;
 	char		*ct_excludefile = NULL;
 	char		**excludelist = NULL;
 	char		**includelist = NULL;
