@@ -40,23 +40,6 @@
 #include "ct.h"
 #include "ct_crypto.h"
 
-struct ctfile_list_file {
-	union {
-		RB_ENTRY(ctfile_list_file)	nxt;
-		SLIST_ENTRY(ctfile_list_file)	lnk;
-	}					mlf_entries;
-#define mlf_next	mlf_entries.nxt
-#define mlf_link	mlf_entries.lnk
-	char					mlf_name[CT_CTFILE_MAXLEN];
-	off_t					mlf_size;
-	time_t					mlf_mtime;
-};
-
-RB_HEAD(ctfile_list_tree, ctfile_list_file);
-RB_PROTOTYPE(ctfile_list_tree, ctfile_list_file, next, ct_cmp_ctfile);
-
-void	ctfile_list_complete(int, char **, char **, struct ctfile_list_tree *);
-
 /* Taken from OpenBSD ls */
 static void
 printtime(time_t ftime)

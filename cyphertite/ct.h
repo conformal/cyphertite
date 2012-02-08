@@ -289,6 +289,27 @@ struct ct_assl_io_ctx	*ct_assl_ctx;
 
 struct ct_op;
 
+/* length of a ctfile tag's time string */
+#define			TIMEDATA_LEN	17	/* including NUL */
+/*
+ * remote listing structures.
+ */
+RB_HEAD(ctfile_list_tree, ctfile_list_file);
+RB_PROTOTYPE(ctfile_list_tree, ctfile_list_file, next, ct_cmp_ctfile);
+struct ctfile_list_file {
+	union {
+		RB_ENTRY(ctfile_list_file)	nxt;
+		SLIST_ENTRY(ctfile_list_file)	lnk;
+	}					mlf_entries;
+#define mlf_next	mlf_entries.nxt
+#define mlf_link	mlf_entries.lnk
+	char					mlf_name[CT_CTFILE_MAXLEN];
+	off_t					mlf_size;
+	time_t					mlf_mtime;
+	int					mlf_keep;
+};
+
+
 void			ct_archive(struct ct_op *);
 void			ct_extract(struct ct_op *);
 void			ct_list_op(struct ct_op *);
@@ -297,6 +318,8 @@ void			ctfile_archive(struct ct_op *);
 void			ctfile_extract(struct ct_op *);
 void			ctfile_list_start(struct ct_op *);
 void			ctfile_list_print(struct ct_op *);
+void			ctfile_list_complete(int, char **, char **,
+			    struct ctfile_list_tree *);
 void			ctfile_delete(struct ct_op *);
 void			ctfile_trigger_delete(struct ct_op *);
 int			ctfile_verify_name(char *);
@@ -605,6 +628,10 @@ char                    *ctfile_find_for_archive(const char *);
 void			 ct_complete_metadata(struct ct_trans *);
 void			 ctfile_trim_cache(const char *, long long);
 
+char			*ctfile_cook_name(const char *);
+int			 ctfile_in_cache(const char *);
+char			*ctfile_get_cachename(const char *);
+
 /* misc */
 int			ct_get_answer(char *, char *, char *, char *, char *,
 			    size_t, int);
@@ -703,6 +730,8 @@ struct ct_file_extract_priv {
 	int				 done;
 };
 ct_op_cb	ct_extract_file;
+
+
 
 /* debug log levels */
 /* 0x1 and 0x2 taken by ctutil */
