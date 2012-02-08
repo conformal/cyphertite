@@ -396,9 +396,10 @@ ct_sched_backup_file(struct stat *sb, char *filename, int forcedir)
 void
 ct_archive(struct ct_op *op)
 {
-	const char		*ctfile = op->op_local_fname;
-	char			**filelist = op->op_filelist;
-	const char		*basisbackup = op->op_basis;
+	struct ct_archive_args	*caa = op->op_args;
+	const char		*ctfile = caa->caa_local_ctfile;
+	char			**filelist = caa->caa_filelist;
+	const char		*basisbackup = caa->caa_basis;
 	ssize_t			rlen;
 	off_t			rsz;
 	struct stat		sb;
@@ -426,7 +427,7 @@ ct_archive(struct ct_op *op)
 
 		if (ct_tdir && chdir(ct_tdir) != 0)
 			CFATALX("can't chdir to %s", ct_tdir);
-		ct_traverse(filelist, op->op_excludelist, op->op_matchmode);
+		ct_traverse(filelist, caa->caa_excllist, caa->caa_matchmode);
 
 		if (ct_tdir && chdir(cwd) != 0)
 			CFATALX("can't chdir back to %s", cwd);

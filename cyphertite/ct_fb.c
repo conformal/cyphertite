@@ -567,8 +567,7 @@ ctfb_get(int argc, const char **argv)
 	struct ct_fb_entry		*entry;
 	struct ct_fb_key		*key;
 	struct ct_fb_file		*file;
-	struct ct_file_extract_priv	*ex_priv;
-	struct ct_op			*op;
+	struct ct_extract_file_args	*cefa;
 	char				*dest, *name;
 	struct stat			 sb;
 	glob_t				 g;
@@ -609,9 +608,9 @@ ctfb_get(int argc, const char **argv)
 		}
 			
 		file = (struct ct_fb_file *)key;
-		ex_priv = e_calloc(1, sizeof(*ex_priv));
-		ex_priv->ctfile = e_strdup(file->cfb_file->cff_path);
-		ex_priv->ctfile_off = file->cfb_sha_offs;
+		cefa = e_calloc(1, sizeof(*cefa));
+		cefa->cefa_ctfile = e_strdup(file->cfb_file->cff_path);
+		cefa->cefa_ctfile_off = file->cfb_sha_offs;
 		/* not a directory so shouldn't have a / at the end */
 		if ((name = strrchr(g.gl_pathv[i], '/')) != NULL) {
 			name++;
@@ -627,10 +626,10 @@ ctfb_get(int argc, const char **argv)
 		} else {
 			dest = e_strdup(name); /* XXX version? */
 		}
+		cefa->cefa_filename = dest;
 		CWARNX("getting %s to %s", g.gl_pathv[i], dest);
-		op = ct_add_operation(ct_extract_file, ct_free_localname, dest,
-		    NULL, NULL, NULL, NULL, 0, 0);
-		op->op_priv = ex_priv;
+		ct_add_operation(ct_extract_file, ct_extract_file_cleanup,
+			cefa);
 		count++;
 	}
 
@@ -642,8 +641,6 @@ ctfb_get(int argc, const char **argv)
 		}
 	}
 	ct_cleanup_eventloop();
-	e_free(&ex_priv->ctfile);
-	e_free(&ex_priv);
 
 out:
 	globfree(&g);

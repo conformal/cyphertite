@@ -316,6 +316,7 @@ void			ct_list_op(struct ct_op *);
 int			ct_list(const char *, char **, char **, int);
 void			ctfile_archive(struct ct_op *);
 void			ctfile_extract(struct ct_op *);
+void			ctfile_op_cleanup(struct ct_op *);
 void			ctfile_list_start(struct ct_op *);
 void			ctfile_list_print(struct ct_op *);
 void			ctfile_list_complete(int, char **, char **,
@@ -339,26 +340,53 @@ struct ct_op {
 	TAILQ_ENTRY(ct_op)	 op_link;
 	ct_op_cb		*op_start;
 	ct_op_cb		*op_complete;
-	char			*op_local_fname;
-	char			**op_filelist;
-	char			**op_excludelist;
-	char			*op_remote_fname;
-	char			*op_basis;
-	int			 op_action;
-	int			 op_matchmode;
+	void			*op_args;
 	void			*op_priv;	/* operation private data */
 };
 
-struct ct_op	*ct_add_operation(ct_op_cb *, ct_op_cb *, char *, char *,
-		    char **, char **, char *, int, int);
+/*
+ * shared between extract and list in remote mode
+ */
+struct ct_extract_args {
+	char			*cea_local_ctfile;
+	char			**cea_filelist;
+	char			**cea_excllist;
+	int			 cea_matchmode;
+};
+
+struct ct_archive_args {
+	char			*caa_local_ctfile;
+	char			*caa_includefile;
+	char			*caa_tag;
+	char			*caa_basis;
+	char			**caa_filelist;
+	char			**caa_excllist;
+	int			 caa_matchmode;
+};
+
+struct ct_extract_file_args {
+	const char		*cefa_filename;
+	const char		*cefa_ctfile;
+	off_t			 cefa_ctfile_off;
+};
+
+struct ct_ctfile_list_args {
+	char		**ccla_search;
+	char		**ccla_exclude;
+	int		 ccla_matchmode;
+};
+
+struct ct_ctfileop_args {
+	char		*cca_localname;
+	char		*cca_remotename;
+};
+
+struct ct_op	*ct_add_operation(ct_op_cb *, ct_op_cb *, void *);
 struct ct_op	*ct_add_operation_after(struct ct_op *, ct_op_cb *, ct_op_cb *,
-		    char *, char *, char **, char **, char *, int, int);
+		    void *);
 void		 ct_nextop(void *);
 int		 ct_op_complete(void);
 ct_op_cb	 ct_shutdown_op;
-ct_op_cb	 ct_free_localname;
-ct_op_cb	 ct_free_remotename;
-ct_op_cb	 ct_free_localname_and_remote;
 
 struct ct_global_state{
 	/* PADs? */
@@ -622,9 +650,18 @@ void			ct_ssl_init_bw_lim(struct ct_assl_io_ctx *);
 #define CT_MDMODE_REMOTE	(1)
 
 void			 ctfile_mode_setup(const char *);
-void			 ctfile_find_for_extract(struct ct_op *);
-void			 ctfile_find_for_extract_complete(struct ct_op *);
-char                    *ctfile_find_for_archive(const char *);
+
+typedef void	(ctfile_find_callback)(char *, void *);
+void			 ctfile_find_for_operation(char *,
+			     ctfile_find_callback *, void *, int, int);
+		
+
+ctfile_find_callback	 ctfile_nextop_extract;
+ctfile_find_callback	 ctfile_nextop_list;
+ctfile_find_callback	 ctfile_nextop_archive;
+ctfile_find_callback	 ctfile_nextop_justdl;
+
+
 void			 ct_complete_metadata(struct ct_trans *);
 void			 ctfile_trim_cache(const char *, long long);
 
@@ -722,14 +759,8 @@ void ct_cull_kick(void);
  * Extract an individual file from ctfile at ctfile_off, op_localname is
  * the local filename to save it as
  */
-struct ct_file_extract_priv {
-	struct ctfile_parse_state	 xdr_ctx;
-	struct fnode			*fl_ex_node;
-	const char			*ctfile;
-	off_t				 ctfile_off;
-	int				 done;
-};
 ct_op_cb	ct_extract_file;
+ct_op_cb	ct_extract_file_cleanup;
 
 
 

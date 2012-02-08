@@ -69,14 +69,15 @@ printtime(time_t ftime)
 void
 ctfile_list_print(struct ct_op *op)
 {
-	struct ctfile_list_tree	 results;
-	struct ctfile_list_file	*file;
-	int64_t			maxsz = 8;
-	int			numlen;
+	struct ct_ctfile_list_args	*ccla = op->op_args;
+	struct ctfile_list_tree		 results;
+	struct ctfile_list_file		*file;
+	int64_t				 maxsz = 8;
+	int				 numlen;
 
 	RB_INIT(&results);
-	ctfile_list_complete(op->op_matchmode, op->op_filelist,
-	    op->op_excludelist, &results);
+	ctfile_list_complete(ccla->ccla_matchmode, ccla->ccla_search,
+	    ccla->ccla_exclude, &results);
 	RB_FOREACH(file, ctfile_list_tree, &results) {
 		if (maxsz < (int64_t)file->mlf_size)
 			maxsz  = (int64_t)file->mlf_size;

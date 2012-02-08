@@ -36,9 +36,12 @@
 
 #include "ct.h"
 
+void	ctfile_find_for_extract(struct ct_op *);
 void	ctfile_find_for_extract_complete(struct ct_op *);
 void	ctfile_extract_nextop(struct ct_op *);
 void	ctfile_download_next(struct ct_op *);
+void	ctfile_nextop_extract_cleanup(struct ct_op *);
+void	ctfile_nextop_archive_cleanup(struct ct_op *);
 
 void
 ctfile_mode_setup(const char *mode)
@@ -129,6 +132,36 @@ ctfile_is_fullname(const char *ctfile)
 	return match;
 }
 
+struct ct_ctfile_find_args {
+	char			*ccfa_tag;
+	ctfile_find_callback	*ccfa_nextop;
+	void			*ccfa_nextop_args;
+	int			 ccfa_download_chain;
+	int			 ccfa_empty_ok;
+};
+
+struct ct_ctfile_find_fileop_args {
+	struct ct_ctfileop_args	 ccffa_base;
+	ctfile_find_callback	*ccffa_nextop;
+	void			*ccffa_nextop_args;
+	int			 ccffa_download_chain;
+};
+
+void
+ctfile_find_for_operation(char *tag, ctfile_find_callback *nextop,
+    void *nextop_args, int download_chain, int empty_ok)
+{
+	struct ct_ctfile_find_args  *ccfa;
+	ccfa = e_calloc(1, sizeof(*ccfa));
+	ccfa->ccfa_tag = tag;
+	ccfa->ccfa_nextop = nextop;
+	ccfa->ccfa_nextop_args = nextop_args;
+	ccfa->ccfa_download_chain = download_chain;
+	ccfa->ccfa_empty_ok = empty_ok;
+
+	ct_add_operation(ctfile_find_for_extract,
+	    ctfile_find_for_extract_complete, ccfa);
+}
 /*
  * filenames passed in remote mode are opaque tags for the backup.
  * they are stored on the server and in remote mode in the form
@@ -137,24 +170,27 @@ ctfile_is_fullname(const char *ctfile)
 void
 ctfile_find_for_extract(struct ct_op *op)
 {
-	const char	*ctfile = op->op_local_fname;
-	struct ct_op	*list_fakeop;
-	char	 	**bufp;
-	int		 matchmode;
+	struct ct_ctfile_find_args	*ccfa = op->op_args;
+	const char			*ctfile = ccfa->ccfa_tag;
+	struct ct_op			*list_fakeop;
+	struct ct_ctfile_list_args	*ccla;
 
 	/* cook the ctfile so we only search for the actual tag */
 	ctfile = ctfile_cook_name(ctfile);
 
 	list_fakeop = e_calloc(1, sizeof(*list_fakeop));
-	bufp = e_calloc(2, sizeof(char **));
+	ccla = e_calloc(1, sizeof(*ccla));
+	list_fakeop->op_args = ccla;
+	ccla->ccla_search = e_calloc(2, sizeof(char **));
 	if (ctfile_is_fullname(ctfile)) {
 		/* use list as stat() for now */
-		*bufp = e_strdup(ctfile);
-		matchmode = CT_MATCH_GLOB;
+		*ccla->ccla_search = e_strdup(ctfile);
+		ccla->ccla_matchmode = CT_MATCH_GLOB;
 	} else {
-		e_asprintf(bufp, "^[[:digit:]]{8}-[[:digit:]]{6}-%s$", ctfile);
+		e_asprintf(ccla->ccla_search,
+		    "^[[:digit:]]{8}-[[:digit:]]{6}-%s$", ctfile);
 
-		matchmode = CT_MATCH_REGEX;
+		ccla->ccla_matchmode = CT_MATCH_REGEX;
 		/*
 		 * get the list of files matching this tag from the server.
 		 * list returns an empty list if it found
@@ -163,38 +199,53 @@ ctfile_find_for_extract(struct ct_op *op)
 	}
 	e_free(&ctfile);
 
-	CNDBG(CT_LOG_CTFILE, "looking for %s", bufp[0]);
-
-	list_fakeop->op_filelist = bufp;
-	list_fakeop->op_matchmode = matchmode;
+	CNDBG(CT_LOG_CTFILE, "looking for %s", ccla->ccla_search[0]);
 
 	op->op_priv = list_fakeop;
 	ctfile_list_start(list_fakeop);
 }
 
+/*
+ * List has completed.
+ *
+ * Select the best filename for download, and download it if missing.
+ */
 void
 ctfile_find_for_extract_complete(struct ct_op *op)
 {
-	struct ct_op		*list_fakeop = op->op_priv;
-	struct ctfile_list_tree	 result;
-	struct ctfile_list_file	*tmp;
-	char	 		*best, *cachename = NULL;
+	struct ct_ctfile_find_args		*ccfa = op->op_args;
+	struct ct_ctfile_find_fileop_args	*ccffa;
+	struct ct_op				*list_fakeop = op->op_priv;
+	struct ct_ctfile_list_args		*ccla = list_fakeop->op_args;
+	struct ctfile_list_tree			 result;
+	struct ctfile_list_file			*tmp;
+	char	 				*best, *cachename = NULL;
 
 	RB_INIT(&result);
-	ctfile_list_complete(list_fakeop->op_matchmode,
-	    list_fakeop->op_filelist, list_fakeop->op_excludelist, &result);
-	e_free(list_fakeop->op_filelist);
-	e_free(&list_fakeop->op_filelist);
+	ctfile_list_complete(ccla->ccla_matchmode, ccla->ccla_search,
+	    ccla->ccla_exclude, &result);
+	e_free(ccla->ccla_search);
+	e_free(&ccla->ccla_search);
+	e_free(&ccla);
 	e_free(&list_fakeop);
+
+	/*
+	 * Prepare arguments for next operation.
+	 * either we'll download the next file, or skip straight to
+	 * the callback for after the download, either way we need the nextop
+	 */
+	ccffa = e_calloc(1, sizeof(*ccffa));
+	ccffa->ccffa_nextop = ccfa->ccfa_nextop;
+	ccffa->ccffa_nextop_args = ccfa->ccfa_nextop_args;
+	ccffa->ccffa_download_chain = ccfa->ccfa_download_chain;
 
 	/* grab the newest one */
 	if ((tmp = RB_MAX(ctfile_list_tree, &result)) == NULL) {
-		if (op->op_action == CT_A_ARCHIVE) {
+		if (ccfa->ccfa_empty_ok) 
 			goto do_operation;
-		} else  {
+		else 
 			CFATALX("unable to find metadata tagged %s",
-			    op->op_local_fname);
-		}
+			    ccfa->ccfa_tag);
 	}
 
 	/* pick the newest one */
@@ -215,28 +266,22 @@ ctfile_find_for_extract_complete(struct ct_op *op)
 	 */
 	cachename = ctfile_get_cachename(best);
 	if (!ctfile_in_cache(best)) {
-		/*
-		 * since archive needs the original metadata name still
-		 * and is searching for a prior archive for differentials
-		 * we put local_fname (the original) in the basis slot here.
-		 * nextop will fix it for us.
-		 */
+		ccffa->ccffa_base.cca_localname = cachename;
+		ccffa->ccffa_base.cca_remotename = best;
 		ct_add_operation(ctfile_extract, ctfile_extract_nextop,
-		    cachename, best, op->op_filelist, op->op_excludelist,
-		    op->op_local_fname, op->op_matchmode, op->op_action);
+		    ccffa);
 	} else {
 		e_free(&best);
 do_operation:
 		/*
-		 * Don't need to grab this ctfile, but may need one later in
-		 * the differential chain, recurse. When we know more we can
-		 * prepare the final operation
+		 * No download needed, fake the next operation callback
+		 * to see if we need anymore.
 		 */
-		op->op_basis = op->op_local_fname;
-		op->op_local_fname = cachename;
+		ccffa->ccffa_base.cca_localname = cachename;
+		op->op_args = ccffa;
 		ctfile_extract_nextop(op);
 	}
-
+	e_free(&ccfa);
 }
 
 /*
@@ -246,75 +291,43 @@ do_operation:
 void
 ctfile_extract_nextop(struct ct_op *op)
 {
-	char			*ctfile, *tctfile, *trfile;
-	extern int		 ctfile_is_open; /* XXX */
+	struct ct_ctfile_find_fileop_args	*ccffa = op->op_args;
+	struct ct_ctfileop_args			*cca;
+	extern int		 		 ctfile_is_open; /* XXX */
 
 	ctfile_is_open = 0;
+
 	/*
-	 * need to determine if this is a layered backup, if so, we need to
-	 * queue download of that file
+	 * If this is an operation that needs the full differential chain
+	 * recursively fetch the next one in the chain till done.
 	 */
-	if (op->op_action == CT_A_EXTRACT || op->op_action == CT_A_LIST ||
-	    op->op_action == CT_A_JUSTDL) {
+	if (ccffa->ccffa_download_chain) {
 		/*
-		 * we need to keep these files, but download_next normally
-		 * needs to free them, make a temporary copy.
+		 * download_next takes ownership of the pointers it is given,
+		 * duplicate our copy.
 		 */
-		tctfile = op->op_local_fname;
-		trfile = op->op_remote_fname;
-		if (tctfile)
-			op->op_local_fname = e_strdup(tctfile);
-		if (trfile)
-			op->op_remote_fname = e_strdup(trfile);
+		cca = e_calloc(1, sizeof(*cca));
+		if (ccffa->ccffa_base.cca_localname)
+			cca->cca_localname =
+			    e_strdup(ccffa->ccffa_base.cca_localname);
+		if (ccffa->ccffa_base.cca_remotename)
+			cca->cca_remotename =
+			    e_strdup(ccffa->ccffa_base.cca_remotename);
+		op->op_args = cca;
 		ctfile_download_next(op);
-		op->op_local_fname = tctfile;
-		op->op_remote_fname = trfile;
 	}
 
 	/*
-	 * Any recursive download after here will be placed after the
-	 * current operation in the queue of ops. So we can now add the final
-	 * operation to the end of the queue without difficulty.
+	 * We now have the name of the file we wish to perform the main
+	 * operation on, the nextop callback will add this operation
+	 * to the operation list. Ownership of the allocated pointer
+	 * passes to the child.
 	 */
-	switch (op->op_action) {
-	case CT_A_EXTRACT:
-		ct_add_operation(ct_extract, ct_free_localname_and_remote,
-		    op->op_local_fname, op->op_remote_fname, op->op_filelist,
-		    op->op_excludelist, NULL, op->op_matchmode, 0);
-		break;
-	case CT_A_LIST:
-		ct_add_operation(ct_list_op, ct_free_localname_and_remote,
-		    op->op_local_fname, op->op_remote_fname, op->op_filelist,
-		    op->op_excludelist, NULL, op->op_matchmode, 0);
-		break;
-	case CT_A_ARCHIVE:
-		if (op->op_remote_fname)
-			e_free(&op->op_remote_fname);
-		/*
-		 * Since we were searching for previous, original ctfile
-		 * is stored in basis. Swap them.
-		 */
-		ctfile = ctfile_find_for_archive(op->op_basis);
-		CNDBG(CT_LOG_CTFILE, "setting basisname %s",
-		    op->op_local_fname);
-		/* XXX does this leak cachename? */
-		ct_add_operation(ct_archive, NULL, ctfile, NULL,
-		    op->op_filelist, op->op_excludelist, op->op_local_fname,
-		    op->op_matchmode, 0);
-		ct_add_operation(ctfile_archive, ct_free_localname_and_remote,
-		    ctfile, NULL, NULL, NULL, NULL, 0, 0);
-		break;
-	case CT_A_JUSTDL:
-		{
-		extern char * ct_fb_filename; 
-		ct_fb_filename = op->op_local_fname; /* XXX ick */
-		ct_add_operation(ct_shutdown_op, NULL, NULL, NULL, NULL, NULL,
-		    NULL, 0, 0);
-		}
-		break;
-	default:
-		CFATALX("invalid action");
-	}
+	ccffa->ccffa_nextop(ccffa->ccffa_base.cca_localname,
+	    ccffa->ccffa_nextop_args);
+	if (ccffa->ccffa_base.cca_remotename)
+		e_free(&ccffa->ccffa_base.cca_remotename);
+	e_free(&ccffa);
 }
 
 /*
@@ -324,8 +337,9 @@ ctfile_extract_nextop(struct ct_op *op)
 void
 ctfile_download_next(struct ct_op *op)
 {
-	const char		*ctfile = op->op_local_fname;
-	const char		*rfile = op->op_remote_fname;
+	struct ct_ctfileop_args	*cca = op->op_args, *nextcca; 
+	const char		*ctfile = cca->cca_localname;
+	const char		*rfile = cca->cca_remotename;
 	char			*prevfile;
 	char			*cachename;
 	char			*cookedname;
@@ -347,9 +361,11 @@ again:
 		    cachename);
 		if (!ctfile_in_cache(cachename)) {
 			e_free(&cachename);
+			nextcca = e_calloc(1, sizeof(*nextcca));
+			nextcca->cca_localname = prevfile;
+			nextcca->cca_remotename = cookedname;
 			ct_add_operation_after(op, ctfile_extract,
-			    ctfile_download_next, (char *)prevfile, cookedname,
-				NULL, NULL, NULL, 0, 0);
+			    ctfile_download_next, nextcca);
 		} else {
 			if (ctfile)
 				e_free(&ctfile);
@@ -368,17 +384,53 @@ out:
 		e_free(&ctfile);
 	if (rfile)
 		e_free(&rfile);
-
+	e_free(&cca);
 }
 
-char *
-ctfile_find_for_archive(const char *ctfile)
+void
+ctfile_nextop_extract(char *ctfile, void *args)
 {
-	char	 buf[TIMEDATA_LEN], *fullname, *cachename;
-	time_t	 now;
+	struct ct_extract_args	*cea = args;
 
-	/* cook the ctfile so we only search for the actual tag */
-	ctfile = ctfile_cook_name(ctfile);
+	cea->cea_local_ctfile = ctfile;
+	ct_add_operation(ct_extract, ctfile_nextop_extract_cleanup, cea);
+}
+
+void
+ctfile_nextop_list(char *ctfile, void *args)
+{
+	struct ct_extract_args	*cea = args;
+
+	cea->cea_local_ctfile = ctfile;
+	ct_add_operation(ct_list_op, ctfile_nextop_extract_cleanup, cea);
+}
+
+void
+ctfile_nextop_extract_cleanup(struct ct_op *op)
+{
+	struct ct_extract_args	*cea = op->op_args;
+
+	if (cea->cea_local_ctfile)
+		e_free(&cea->cea_local_ctfile);
+}
+
+void
+ctfile_nextop_archive(char *basis, void *args)
+{
+	struct ct_archive_args	*caa = args;
+	struct ct_ctfileop_args	*cca;
+	char			*ctfile;
+	char	 		 buf[TIMEDATA_LEN], *fullname, *cachename;
+	time_t	 		 now;
+
+	CNDBG(CT_LOG_CTFILE, "setting basisname %s", basis);
+	caa->caa_basis = basis;
+
+	/*
+	 * We now have the basis found for us, cook and prepare the tag
+	 * we wish to create then add the operation.
+	 */
+	ctfile = ctfile_cook_name(caa->caa_tag);
 
 	if (ctfile_is_fullname(ctfile) != 0)
 		CFATALX("metadata name with date tag already filled in");
@@ -399,28 +451,36 @@ ctfile_find_for_archive(const char *ctfile)
 	e_free(&ctfile);
 	e_free(&fullname);
 
-	return (cachename);
+	caa->caa_local_ctfile = cachename;
+	ct_add_operation(ct_archive, NULL, caa);
+	/*
+	 * set up an additional operation to upload the newly created
+	 * ctfile after the archive is completed.
+	 */
+	cca = e_calloc(1, sizeof(*cca));
+	cca->cca_localname = cachename;
+	ct_add_operation(ctfile_archive, ctfile_nextop_archive_cleanup, cca);
 }
 
 void
-ct_free_localname(struct ct_op *op)
+ctfile_nextop_archive_cleanup(struct ct_op *op)
 {
+	struct ct_ctfileop_args	*cca = op->op_args;
 
-	if (op->op_local_fname != NULL)
-		e_free(&op->op_local_fname);
+	if (cca->cca_localname)
+		e_free(&cca->cca_localname);
+	if (cca->cca_remotename)
+		e_free(&cca->cca_remotename);
+	e_free(&cca);
 }
 
 void
-ct_free_remotename(struct ct_op *op)
+ctfile_nextop_justdl(char *ctfile, void *args)
 {
-	if (op->op_remote_fname != NULL)
-		e_free(&op->op_remote_fname);
-}
+	char		**filename = args;
 
-void
-ct_free_localname_and_remote(struct ct_op *op)
-{
-	ct_free_localname(op);
-	ct_free_remotename(op);
-}
+	*filename = ctfile;
 
+	/* done, jump out of the loop */
+	ct_add_operation(ct_shutdown_op, NULL, NULL);
+}

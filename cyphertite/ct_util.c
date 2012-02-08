@@ -59,22 +59,14 @@ int			ct_validate_xml_negotiate_xml(struct ct_header *,
 char			*ct_getloginbyuid(uid_t);
 
 struct ct_op *
-ct_add_operation(ct_op_cb *start, ct_op_cb *complete, char *localname,
-    char *remotename, char **flist, char **exlist, char *basis, int matchmode,
-    int action)
+ct_add_operation(ct_op_cb *start, ct_op_cb *complete, void *args)
 {
 	struct ct_op	*op;
 
 	op = e_calloc(1, sizeof(*op));
 	op->op_start = start;
 	op->op_complete = complete;
-	op->op_local_fname = localname;
-	op->op_remote_fname = remotename;
-	op->op_filelist = flist;
-	op->op_excludelist = exlist;
-	op->op_basis = basis;
-	op->op_matchmode = matchmode;
-	op->op_action = action;
+	op->op_args = args;
 
 	TAILQ_INSERT_TAIL(&ct_state->ct_operations, op, op_link);
 
@@ -83,21 +75,14 @@ ct_add_operation(ct_op_cb *start, ct_op_cb *complete, char *localname,
 
 struct ct_op *
 ct_add_operation_after(struct ct_op *after, ct_op_cb *start, ct_op_cb *complete,
-    char *localname, char *remotename, char **flist, char **exlist, char *basis,
-    int matchmode, int action)
+    void *args)
 {
 	struct ct_op	*op;
 
 	op = e_calloc(1, sizeof(*op));
 	op->op_start = start;
 	op->op_complete = complete;
-	op->op_local_fname = localname;
-	op->op_remote_fname = remotename;
-	op->op_filelist = flist;
-	op->op_excludelist = exlist;
-	op->op_basis = basis;
-	op->op_matchmode = matchmode;
-	op->op_action = action;
+	op->op_args = args;
 
 	TAILQ_INSERT_AFTER(&ct_state->ct_operations, after, op, op_link);
 

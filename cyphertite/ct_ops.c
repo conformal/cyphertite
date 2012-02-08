@@ -101,10 +101,11 @@ ct_populate_fnode(struct fnode *fnode, struct ctfile_header *hdr,
 void
 ct_list_op(struct ct_op *op)
 {
+	struct ct_extract_args	*cea = op->op_args;
 	struct ct_trans		*trans;
 
-	ct_list(op->op_local_fname, op->op_filelist, op->op_excludelist,
-	    op->op_matchmode);
+	ct_list(cea->cea_local_ctfile, cea->cea_filelist, cea->cea_excllist,
+	    cea->cea_matchmode);
 	/*
 	 * Technicaly should be a local transaction.
 	 * However, since this is just so that list can fit into the normal
@@ -372,9 +373,10 @@ struct ct_extract_priv {
 void
 ct_extract(struct ct_op *op)
 {
-	const char		*ctfile = op->op_local_fname;
-	char			**filelist = op->op_filelist;
-	int			 match_mode = op->op_matchmode;
+	struct ct_extract_args	*cea = op->op_args;
+	const char		*ctfile = cea->cea_local_ctfile;
+	char			**filelist = cea->cea_filelist;
+	int			 match_mode = cea->cea_matchmode;
 	struct fnode		*fnode;
 	struct ct_extract_priv	*ex_priv = op->op_priv;
 	int			ret;
@@ -389,9 +391,9 @@ ct_extract(struct ct_op *op)
 
 			ex_priv->inc_match = ct_match_compile(match_mode,
 			    filelist);
-			if (op->op_excludelist != NULL)
+			if (cea->cea_excllist != NULL)
 				ex_priv->ex_match = ct_match_compile(match_mode,
-				    op->op_excludelist);
+				    cea->cea_excllist);
 			op->op_priv = ex_priv;
 		}
 		ct_extract_setup(&ex_priv->extract_head,
@@ -611,14 +613,20 @@ we_re_done_here:
 	}
 }
 
+struct ct_file_extract_priv {
+	struct ctfile_parse_state	 xdr_ctx;
+	struct fnode			*fl_ex_node;
+	int				 done;
+};
 /*
  * Extract an individual file that has been passed into the op by op_priv.
  */
 void
 ct_extract_file(struct ct_op *op)
 {
+	struct ct_extract_file_args	*cefa = op->op_args;
 	struct ct_file_extract_priv	*ex_priv = op->op_priv;
-	const char			*localfile = op->op_local_fname;
+	const char			*localfile = cefa->cefa_filename;
 	struct ct_trans			*trans;
 	uint64_t			 ltrans_id;
 	int				 ret;
@@ -627,11 +635,12 @@ ct_extract_file(struct ct_op *op)
 	CNDBG(CT_LOG_TRANS, "entry");
 	if (ct_state->ct_file_state == CT_S_STARTING) {
 		CNDBG(CT_LOG_TRANS, "starting");
+		ex_priv = e_calloc(1, sizeof(*ex_priv));
 		/* open file and seek to beginning of file */
 		if (ctfile_parse_init_at(&ex_priv->xdr_ctx,
-		    ex_priv->ctfile, ex_priv->ctfile_off) != 0)
+		    cefa->cefa_ctfile, cefa->cefa_ctfile_off) != 0)
 			CFATALX("can't open metadata file %s",
-			    ex_priv->ctfile);
+			    cefa->cefa_ctfile);
 		ct_encrypt_enabled =
 		    (ex_priv->xdr_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO);
 		ct_multilevel_allfiles = (ex_priv->xdr_ctx.xs_gh.cmg_flags &
@@ -654,6 +663,7 @@ ct_extract_file(struct ct_op *op)
 		if (ex_priv->done) {
 			CNDBG(CT_LOG_CTFILE, "Hit end of ctfile");
 			ctfile_parse_close(&ex_priv->xdr_ctx);
+			e_free(&ex_priv);
 			trans->tr_state = TR_S_DONE;
 			ct_queue_transfer(trans);
 			CNDBG(CT_LOG_TRANS, "extract finished");
@@ -726,8 +736,6 @@ ct_extract_file(struct ct_op *op)
 			    ex_priv->xdr_ctx.xs_trl.cmt_orig_size;
 			/* Done now, don't parse further. */
 			ex_priv->done = 1;
-			ct_queue_transfer(trans);
-			return;
 			break;
 		case XS_RET_FAIL:
 			CFATALX("failed to parse metadata file");
@@ -737,6 +745,16 @@ ct_extract_file(struct ct_op *op)
 		}
 		ct_queue_transfer(trans);
 	}
+}
+
+void
+ct_extract_file_cleanup(struct ct_op *op)
+{
+	struct ct_extract_file_args	*cefa = op->op_args;
+
+	e_free(&cefa->cefa_filename);
+	e_free(&cefa->cefa_ctfile);
+	e_free(&cefa);
 }
 
 /*

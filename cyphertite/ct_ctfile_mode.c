@@ -73,12 +73,24 @@ struct xmlsd_v_elements ct_xml_cmds[] = {
 };
 
 
+/*
+ * clean up after a ctfile archive/extract operation by freeing the remotename
+ */
+void
+ctfile_op_cleanup(struct ct_op *op)
+{
+	struct ct_ctfileop_args	*cca = op->op_args;
+
+	e_free(&cca->cca_remotename);
+}
+
 struct fnode	ctfile_node;
 void
 ctfile_archive(struct ct_op *op)
 {
-	const char		*ctfile = op->op_local_fname;
-	const char		*rname = op->op_remote_fname;
+	struct ct_ctfileop_args	*cca = op->op_args;
+	const char		*ctfile = cca->cca_localname;
+	const char		*rname = cca->cca_remotename;
 	struct stat		sb;
 	ssize_t			rsz, rlen;
 	struct ct_trans		*ct_trans;
@@ -120,7 +132,7 @@ loop:
 
 		if (rname == NULL) {
 			rname = ctfile_cook_name(ctfile);
-			op->op_remote_fname = (char *)rname;
+			cca->cca_remotename = (char *)rname;
 		}
 		ct_xml_file_open(ct_trans, rname, MD_O_WRITE, 0);
 		ctfile_open_inflight = 1;
@@ -385,8 +397,9 @@ ct_xml_file_close(void)
 void
 ctfile_extract(struct ct_op *op)
 {
-	const char		*ctfile = op->op_local_fname;
-	const char		*rname = op->op_remote_fname;
+	struct ct_ctfileop_args	*cca = op->op_args;
+	const char		*ctfile = cca->cca_localname;
+	const char		*rname = cca->cca_remotename;
 	struct ct_trans		*trans;
 	struct ct_header	*hdr;
 
@@ -416,7 +429,7 @@ ctfile_extract(struct ct_op *op)
 
 		if (rname == NULL) {
 			rname = ctfile_cook_name(ctfile);
-			op->op_remote_fname = (char *)rname;
+			cca->cca_remotename = (char *)rname;
 		}
 		ct_xml_file_open(trans, rname, MD_O_READ, 0);
 		ctfile_open_inflight = 1;
@@ -590,7 +603,7 @@ ctfile_delete(struct ct_op *op)
 {
 	struct xmlsd_element_list	 xl;
 	struct xmlsd_element		*xe;
-	const char			*rname = op->op_remote_fname;
+	const char			*rname = op->op_args;
 	struct ct_trans			*trans;
 	char				 b64[CT_MAX_MD_FILENAME * 2];
 	size_t				 sz;
@@ -761,6 +774,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 	xmlsd_unwind(&xl);
 }
 
+#if 0
 /*
  * Functions for automatic crypto secrets storage on the server.
  */
@@ -952,6 +966,7 @@ ctfile_trigger_delete(struct ct_op *op)
 		e_free(&file);
 	}
 }
+#endif
 
 /*
  * Verify that the ctfile name is kosher.
@@ -1045,16 +1060,11 @@ ct_cull_kick(void)
 	CNDBG(CT_LOG_TRANS, "add_op cull_setup");
 	CNDBG(CT_LOG_SHA, "shacnt %" PRIu64 , shacnt);
 
-	ct_add_operation(ctfile_list_start, ct_cull_fetch_all_ctfiles, 
-              NULL, NULL, NULL, NULL, NULL, 0, 0);
-	ct_add_operation(ct_cull_collect_ctfiles, NULL, 
-              NULL, NULL, NULL, NULL, NULL, 0, 0);
-	ct_add_operation(ct_cull_setup, NULL,
-	    NULL, NULL, NULL, NULL, NULL, 0, 0);
-	ct_add_operation(ct_cull_send_shas, NULL,
-	    NULL, NULL, NULL, NULL, NULL, 0, 0);
-	ct_add_operation(ct_cull_send_complete, ct_cull_complete,
-	    NULL, NULL, NULL, NULL, NULL, 0, 0);
+	ct_add_operation(ctfile_list_start, ct_cull_fetch_all_ctfiles, NULL);
+	ct_add_operation(ct_cull_collect_ctfiles, NULL,  NULL);
+	ct_add_operation(ct_cull_setup, NULL, NULL);
+	ct_add_operation(ct_cull_send_shas, NULL, NULL);
+	ct_add_operation(ct_cull_send_complete, ct_cull_complete, NULL);
 }
 
 void
@@ -1231,9 +1241,11 @@ char		*all_ctfiles_pattern[] = {
 			NULL,
 		 };
 
+void	ct_cull_extract_cleanup(struct ct_op *);
 void
 ct_cull_fetch_all_ctfiles(struct ct_op *op)
 {
+	struct ct_ctfileop_args	*cca;
 	struct ctfile_list_tree	 results;
 	struct ctfile_list_file	*file;
 	char			*cachename;
@@ -1248,9 +1260,11 @@ ct_cull_fetch_all_ctfiles(struct ct_op *op)
 			cachename = ctfile_get_cachename(file->mlf_name);
 			CNDBG(CT_LOG_CTFILE, "getting %s to %s", file->mlf_name,
 			    cachename);
+			cca = e_calloc(1, sizeof(*cca));
+			cca->cca_localname = cachename;
+			cca->cca_remotename = e_strdup(file->mlf_name);
 			ct_add_operation_after(op, ctfile_extract,
-			    ct_free_localname_and_remote, cachename,
-			    e_strdup(file->mlf_name), NULL, NULL, NULL, 0, 0);
+			    ct_cull_extract_cleanup, cca);
 		} else {
 			CNDBG(CT_LOG_CTFILE, "already got %s", file->mlf_name);
 		}
@@ -1258,6 +1272,17 @@ ct_cull_fetch_all_ctfiles(struct ct_op *op)
 	}
 }
 
+void
+ct_cull_extract_cleanup(struct ct_op *op)
+{
+	struct ct_ctfileop_args *cca = op->op_args;
+
+	e_free(&cca->cca_localname);
+	e_free(&cca->cca_remotename);
+	e_free(&cca);
+}
+
+void	ct_cull_delete_cleanup(struct ct_op *);
 void
 ct_cull_collect_ctfiles(struct ct_op *op)
 {
@@ -1326,8 +1351,8 @@ prev_ct_file:
 		if (file->mlf_keep == 0) {
 			CNDBG(CT_LOG_CTFILE, "adding %s to delete list",
 			    file->mlf_name);
-			ct_add_operation(ctfile_delete, NULL, NULL,
-			    e_strdup(file->mlf_name), NULL, NULL, NULL, 0, 0);
+			ct_add_operation(ctfile_delete, ct_cull_delete_cleanup,
+			    e_strdup(file->mlf_name));
 		} else {
 			CNDBG(CT_LOG_CTFILE, "adding %s to keep list",
 			    file->mlf_name);
@@ -1342,4 +1367,12 @@ prev_ct_file:
 		/* XXX - name  */
 	}
 	ct_op_complete();
+}
+
+void
+ct_cull_delete_cleanup(struct ct_op *op)
+{
+	char	*ctfile = op->op_args;
+
+	e_free(&ctfile);
 }

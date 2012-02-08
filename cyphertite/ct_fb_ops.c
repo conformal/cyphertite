@@ -327,10 +327,8 @@ ctfb_main(int argc, char *argv[])
 
 	/* if we're in remote mode, try and grab the appropriate files */
 	if (ctfile_mode == CT_MDMODE_REMOTE) {
-		/* XXX how to get the name out of the event loop? */
-		ct_add_operation(ctfile_find_for_extract,
-		    ctfile_find_for_extract_complete, ctfile,
-		    NULL, argv, NULL, NULL, 0, CT_A_JUSTDL);
+		ctfile_find_for_operation(ctfile, ctfile_nextop_justdl,
+		    &ct_fb_filename, 1, 0);
 		ct_wakeup_file();
 		if ((ret = ct_event_dispatch()) != 0) {
 			CWARNX("event loop returned error %d, exiting", ret);

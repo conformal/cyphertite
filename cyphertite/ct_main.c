@@ -202,6 +202,7 @@ ct_init_eventloop(void)
 void
 ct_update_secrets(void)
 {
+#if 0
 	if (ct_secrets_upload > 0) {
 		CNDBG(CT_LOG_CRYPTO, "doing list for crypto secrets");
 		ct_add_operation(ctfile_list_start,
@@ -214,6 +215,7 @@ ct_update_secrets(void)
 		    secrets_file_pattern, NULL, NULL,
 		    CT_MATCH_REGEX, 0);
 	}
+#endif
 }
 
 void
@@ -293,6 +295,10 @@ ct_get_debugmask(char *debugstring)
 int
 ct_main(int argc, char **argv)
 {
+	struct ct_extract_args		cea;
+	struct ct_archive_args		caa;
+	struct ct_ctfileop_args 	cca;
+	struct ct_ctfile_list_args	ccla;
 	char		tpath[PATH_MAX];
 	char		*ct_basisbackup = NULL;
 	char		*ctfile = NULL;
@@ -491,24 +497,31 @@ ct_main(int argc, char **argv)
 		switch (ct_action) {
 		case CT_A_EXTRACT:
 		case CT_A_LIST:
-			ct_add_operation(ctfile_find_for_extract,
-			    ctfile_find_for_extract_complete, ctfile, NULL,
-			    includelist, excludelist, NULL, ct_match_mode,
-			    ct_action);
+			cea.cea_local_ctfile = NULL; /* to be found */
+			cea.cea_filelist = includelist;
+			cea.cea_excllist = excludelist;
+			cea.cea_matchmode = ct_match_mode;
+			ctfile_find_for_operation(ctfile,
+			    ((ct_action == CT_A_EXTRACT)  ?
+			    ctfile_nextop_extract : ctfile_nextop_list),
+			    &cea, 1, 0);
 			break;
 		case CT_A_ARCHIVE:
+			caa.caa_filelist = argv;
+			caa.caa_excllist = excludelist;
+			caa.caa_matchmode = ct_match_mode;
+			caa.caa_includefile = ct_includefile;
+			caa.caa_tag = ctfile;
 			if (ct_auto_differential)
-				ct_add_operation(ctfile_find_for_extract,
-				    ctfile_find_for_extract_complete, ctfile,
-				    NULL, argv, excludelist, NULL,
-				    ct_match_mode, ct_action);
+				/*
+				 * Need to work out basis filename and
+				 * download it if necessary
+				 */
+				ctfile_find_for_operation(ctfile,
+				    ctfile_nextop_archive, &caa, 0, 1);
 			else   {
-				ctfile = ctfile_find_for_archive(ctfile);
-				ct_add_operation(ct_archive, NULL, ctfile,
-				    NULL, argv, excludelist, NULL,
-				    ct_match_mode, 0);
-				ct_add_operation(ctfile_archive, NULL, ctfile,
-				    NULL, NULL, NULL, NULL, ct_match_mode, 0);
+				/* No basis, just start the op */
+				ctfile_nextop_archive(NULL, &caa);
 			}
 			break;
 		default:
@@ -525,47 +538,44 @@ ct_main(int argc, char **argv)
 			} else {
 				strlcpy(tpath, ctfile, sizeof(tpath));
 			}
-		}
-		switch (ct_action) {
-		case CT_A_ARCHIVE:
-			ct_add_operation(ctfile_archive, ct_free_remotename,
-			    tpath, NULL, NULL, NULL, NULL, 0, 0);
-			break;
-		case CT_A_EXTRACT:
-			ct_add_operation(ctfile_extract, ct_free_remotename,
-			    tpath, NULL, NULL, NULL, NULL, 0, 0);
-			break;
-		case CT_A_LIST:
+			cca.cca_localname = tpath;
+			cca.cca_remotename = NULL;
+			ct_add_operation(((ct_action == CT_A_ARCHIVE) ?
+			    ctfile_archive : ctfile_extract), ctfile_op_cleanup,
+			    &cca);
+		} else if (ct_action == CT_A_ERASE) {
+			ct_add_operation(ctfile_delete, NULL, ctfile);
+		} else if (ct_action == CT_A_LIST) {
+			ccla.ccla_search = includelist;
+			ccla.ccla_exclude = excludelist;
+			ccla.ccla_matchmode = ct_match_mode;
 			ct_add_operation(ctfile_list_start, ctfile_list_print,
-			    NULL, NULL, includelist, excludelist, NULL,
-			    ct_match_mode, 0);
-			break;
-		case CT_A_ERASE:
-			ct_add_operation(ctfile_delete, NULL, NULL,
-			    ctfile, NULL, NULL, NULL, 0, 0);
-			break;
-		default:
+			    &ccla);
+		} else {
 			CWARNX("must specify action");
 			ct_usage();
 			/* NOTREACHED */
-			break;
 		}
 	} else {
-		/* list handled above. */
-		switch (ct_action) {
-		case CT_A_ARCHIVE:
-			ct_add_operation(ct_archive, NULL, ctfile, NULL, argv,
-			    excludelist, ct_basisbackup, ct_match_mode, 0);
-			break;
-		case CT_A_EXTRACT:
-			ct_add_operation(ct_extract, NULL, ctfile, NULL,
-			    includelist, excludelist, NULL, ct_match_mode, 0);
-			break;
-		case CT_A_ERASE:
-		default:
+		/* list is handled above */
+		if (ct_action == CT_A_ARCHIVE) {
+			caa.caa_local_ctfile = ctfile;
+			caa.caa_filelist = argv;
+			caa.caa_excllist = excludelist;
+			caa.caa_matchmode = ct_match_mode;
+			caa.caa_includefile = ct_includefile;
+			caa.caa_tag = ctfile;
+			ct_add_operation(ct_archive, NULL, &caa);
+		} else if (ct_action == CT_A_EXTRACT) {
+			cea.cea_local_ctfile = ctfile;
+			cea.cea_filelist = includelist;
+			cea.cea_excllist = excludelist;
+			cea.cea_matchmode = ct_match_mode;
+			ct_add_operation(ct_extract, NULL, &cea);
+		} else {
 			CWARNX("must specify action");
 			ct_usage();
-			break;
+			/* NOTREACHED */
 		}
 	}
 
