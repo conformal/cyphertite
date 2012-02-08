@@ -295,30 +295,30 @@ ct_get_debugmask(char *debugstring)
 int
 ct_main(int argc, char **argv)
 {
-	struct ct_extract_args		cea;
-	struct ct_archive_args		caa;
-	struct ct_ctfileop_args 	cca;
-	struct ct_ctfile_list_args	ccla;
-	char		tpath[PATH_MAX];
-	char		*ct_basisbackup = NULL;
-	char		*ctfile = NULL;
-	char		*ct_includefile = NULL;
-	char		*ct_excludefile = NULL;
-	char		**excludelist = NULL;
-	char		**includelist = NULL;
-	uint64_t	debug_mask = 0;
-	int		ct_metadata = 0;
-	int		ct_match_mode = CT_MATCH_GLOB;
-	int		c;
-	int		foreground = 1;
-	int		ret = 0;
-	int		level0 = 0;
-	int		freeincludes = 0;
-	int		need_secrets;
-	int		force_allfiles = -1;
-	char		*configfile = NULL;
-	char		*basisfile = NULL;
-	char		*debugstring = NULL;
+	struct ct_extract_args		 cea;
+	struct ct_archive_args		 caa;
+	struct ct_ctfileop_args 	 cca;
+	struct ct_ctfile_list_args	 ccla;
+	char				 tpath[PATH_MAX];
+	char				*ct_basisbackup = NULL;
+	char				*ctfile = NULL;
+	char				*ct_includefile = NULL;
+	char				*ct_excludefile = NULL;
+	char				*configfile = NULL;
+	char				*basisfile = NULL;
+	char				*debugstring = NULL;
+	char				**excludelist = NULL;
+	char				**includelist = NULL;
+	uint64_t			 debug_mask = 0;
+	int				 ct_metadata = 0;
+	int				 ct_match_mode = CT_MATCH_GLOB;
+	int				 c;
+	int				 foreground = 1;
+	int				 ret = 0;
+	int				 level0 = 0;
+	int				 freeincludes = 0;
+	int				 need_secrets;
+	int				 force_allfiles = -1;
 
 	while ((c = getopt(argc, argv,
 	    "AB:C:D:E:F:I:PRVXacdef:mprtvx0")) != -1) {
