@@ -36,6 +36,10 @@
 
 #include "ct.h"
 
+void	ctfile_find_for_extract_complete(struct ct_op *);
+void	ctfile_extract_nextop(struct ct_op *);
+void	ctfile_download_next(struct ct_op *);
+
 void
 ctfile_mode_setup(const char *mode)
 {
@@ -169,75 +173,69 @@ ctfile_find_for_extract(struct ct_op *op)
 }
 
 void
-ct_free_localname(struct ct_op *op)
+ctfile_find_for_extract_complete(struct ct_op *op)
 {
+	struct ct_op		*list_fakeop = op->op_priv;
+	struct ctfile_list_tree	 result;
+	struct ctfile_list_file	*tmp;
+	char	 		*best, *cachename = NULL;
 
-	if (op->op_local_fname != NULL)
-		e_free(&op->op_local_fname);
-}
+	RB_INIT(&result);
+	ctfile_list_complete(list_fakeop->op_matchmode,
+	    list_fakeop->op_filelist, list_fakeop->op_excludelist, &result);
+	e_free(list_fakeop->op_filelist);
+	e_free(&list_fakeop->op_filelist);
+	e_free(&list_fakeop);
 
-void
-ct_free_remotename(struct ct_op *op)
-{
-	if (op->op_remote_fname != NULL)
-		e_free(&op->op_remote_fname);
-}
-
-void
-ct_free_localname_and_remote(struct ct_op *op)
-{
-	ct_free_localname(op);
-	ct_free_remotename(op);
-}
-
-void ctfile_download_next(struct ct_op *op);
-void
-ctfile_download_next(struct ct_op *op)
-{
-	const char		*ctfile = op->op_local_fname;
-	const char		*rfile = op->op_remote_fname;
-	char			*prevfile;
-	char			*cachename;
-	char			*cookedname;
-	extern int		 ctfile_is_open; /* XXX */
-
-	ctfile_is_open = 0;	/* prevent trying to close upon next download */
-again:
-	CNDBG(CT_LOG_CTFILE, "ctfile %s", ctfile);
-
-	/* this will provide us the path that we need to use */
-	prevfile = ctfile_get_previous(ctfile);
-	if (prevfile == NULL)
-		goto out;
-
-	if (prevfile[0] != '\0') {
-		cookedname = ctfile_cook_name(prevfile);
-		cachename = ctfile_get_cachename(cookedname);
-		CNDBG(CT_LOG_CTFILE, "prev file %s cachename %s", prevfile,
-		    cachename);
-		if (!ctfile_in_cache(cachename)) {
-			e_free(&cachename);
-			ct_add_operation_after(op, ctfile_extract,
-			    ctfile_download_next, (char *)prevfile, cookedname,
-				NULL, NULL, NULL, 0, 0);
-		} else {
-			if (ctfile)
-				e_free(&ctfile);
-			if (rfile)
-				e_free(&rfile);
-			e_free(&cookedname);
-			e_free(&cachename);
-			ctfile = prevfile;
-			goto again;
+	/* grab the newest one */
+	if ((tmp = RB_MAX(ctfile_list_tree, &result)) == NULL) {
+		if (op->op_action == CT_A_ARCHIVE) {
+			goto do_operation;
+		} else  {
+			CFATALX("unable to find metadata tagged %s",
+			    op->op_local_fname);
 		}
-	} else
-		e_free(&prevfile);
+	}
 
-out:
-	if (ctfile)
-		e_free(&ctfile);
-	if (rfile)
-		e_free(&rfile);
+	/* pick the newest one */
+	best = e_strdup(tmp->mlf_name);
+	CNDBG(CT_LOG_CTFILE, "backup file is %s", best);
+
+	while((tmp = RB_ROOT(&result)) != NULL) {
+		RB_REMOVE(ctfile_list_tree, &result, tmp);
+		e_free(&tmp);
+	}
+
+	/*
+	 * if the metadata file is not in the cache directory then we
+	 * need to download it first. if we need to recursively download
+	 * a differential chain then that code will handle scheduling
+	 * those operations too. If we have it, we still need to check
+	 * that all others in the chain exist, however.
+	 */
+	cachename = ctfile_get_cachename(best);
+	if (!ctfile_in_cache(best)) {
+		/*
+		 * since archive needs the original metadata name still
+		 * and is searching for a prior archive for differentials
+		 * we put local_fname (the original) in the basis slot here.
+		 * nextop will fix it for us.
+		 */
+		ct_add_operation(ctfile_extract, ctfile_extract_nextop,
+		    cachename, best, op->op_filelist, op->op_excludelist,
+		    op->op_local_fname, op->op_matchmode, op->op_action);
+	} else {
+		e_free(&best);
+do_operation:
+		/*
+		 * Don't need to grab this ctfile, but may need one later in
+		 * the differential chain, recurse. When we know more we can
+		 * prepare the final operation
+		 */
+		op->op_basis = op->op_local_fname;
+		op->op_local_fname = cachename;
+		ctfile_extract_nextop(op);
+	}
 
 }
 
@@ -319,70 +317,57 @@ ctfile_extract_nextop(struct ct_op *op)
 	}
 }
 
+/*
+ * Download all dependant ctfiles of the current ctfile.
+ * (called repeatedly until all are fetched).
+ */
 void
-ctfile_find_for_extract_complete(struct ct_op *op)
+ctfile_download_next(struct ct_op *op)
 {
-	struct ct_op		*list_fakeop = op->op_priv;
-	struct ctfile_list_tree	 result;
-	struct ctfile_list_file	*tmp;
-	char	 		*best, *cachename = NULL;
+	const char		*ctfile = op->op_local_fname;
+	const char		*rfile = op->op_remote_fname;
+	char			*prevfile;
+	char			*cachename;
+	char			*cookedname;
+	extern int		 ctfile_is_open; /* XXX */
 
-	RB_INIT(&result);
-	ctfile_list_complete(list_fakeop->op_matchmode,
-	    list_fakeop->op_filelist, list_fakeop->op_excludelist, &result);
-	e_free(list_fakeop->op_filelist);
-	e_free(&list_fakeop->op_filelist);
-	e_free(&list_fakeop);
+	ctfile_is_open = 0;	/* prevent trying to close upon next download */
+again:
+	CNDBG(CT_LOG_CTFILE, "ctfile %s", ctfile);
 
-	/* grab the newest one */
-	if ((tmp = RB_MAX(ctfile_list_tree, &result)) == NULL) {
-		if (op->op_action == CT_A_ARCHIVE) {
-			goto do_operation;
-		} else  {
-			CFATALX("unable to find metadata tagged %s",
-			    op->op_local_fname);
+	/* this will provide us the path that we need to use */
+	prevfile = ctfile_get_previous(ctfile);
+	if (prevfile == NULL)
+		goto out;
+
+	if (prevfile[0] != '\0') {
+		cookedname = ctfile_cook_name(prevfile);
+		cachename = ctfile_get_cachename(cookedname);
+		CNDBG(CT_LOG_CTFILE, "prev file %s cachename %s", prevfile,
+		    cachename);
+		if (!ctfile_in_cache(cachename)) {
+			e_free(&cachename);
+			ct_add_operation_after(op, ctfile_extract,
+			    ctfile_download_next, (char *)prevfile, cookedname,
+				NULL, NULL, NULL, 0, 0);
+		} else {
+			if (ctfile)
+				e_free(&ctfile);
+			if (rfile)
+				e_free(&rfile);
+			e_free(&cookedname);
+			e_free(&cachename);
+			ctfile = prevfile;
+			goto again;
 		}
-	}
+	} else
+		e_free(&prevfile);
 
-	/* pick the newest one */
-	best = e_strdup(tmp->mlf_name);
-	CNDBG(CT_LOG_CTFILE, "backup file is %s", best);
-
-	while((tmp = RB_ROOT(&result)) != NULL) {
-		RB_REMOVE(ctfile_list_tree, &result, tmp);
-		e_free(&tmp);
-	}
-
-	/*
-	 * if the metadata file is not in the cache directory then we
-	 * need to download it first. if we need to recursively download
-	 * a differential chain then that code will handle scheduling
-	 * those operations too. If we have it, we still need to check
-	 * that all others in the chain exist, however.
-	 */
-	cachename = ctfile_get_cachename(best);
-	if (!ctfile_in_cache(best)) {
-		/*
-		 * since archive needs the original metadata name still
-		 * and is searching for a prior archive for differentials
-		 * we put local_fname (the original) in the basis slot here.
-		 * nextop will fix it for us.
-		 */
-		ct_add_operation(ctfile_extract, ctfile_extract_nextop,
-		    cachename, best, op->op_filelist, op->op_excludelist,
-		    op->op_local_fname, op->op_matchmode, op->op_action);
-	} else {
-		e_free(&best);
-do_operation:
-		/*
-		 * Don't need to grab this ctfile, but may need one later in
-		 * the differential chain, recurse. When we know more we can
-		 * prepare the final operation
-		 */
-		op->op_basis = op->op_local_fname;
-		op->op_local_fname = cachename;
-		ctfile_extract_nextop(op);
-	}
+out:
+	if (ctfile)
+		e_free(&ctfile);
+	if (rfile)
+		e_free(&rfile);
 
 }
 
@@ -415,5 +400,27 @@ ctfile_find_for_archive(const char *ctfile)
 	e_free(&fullname);
 
 	return (cachename);
+}
+
+void
+ct_free_localname(struct ct_op *op)
+{
+
+	if (op->op_local_fname != NULL)
+		e_free(&op->op_local_fname);
+}
+
+void
+ct_free_remotename(struct ct_op *op)
+{
+	if (op->op_remote_fname != NULL)
+		e_free(&op->op_remote_fname);
+}
+
+void
+ct_free_localname_and_remote(struct ct_op *op)
+{
+	ct_free_localname(op);
+	ct_free_remotename(op);
 }
 
