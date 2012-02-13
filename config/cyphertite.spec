@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		0.6.1
+%define version		1.0.0
 %define release		1
 
 Name: 		%{name}
@@ -51,6 +51,17 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Mon Feb 13 2012 - drahn 1.0.0-1
+- Handle files truncated or growing during backup, best effort will be
+  made to archive the files
+- Report useful error message when a user runs out of space on a limited
+  space account
+- Add a method to implment backups instead of archives,
+  for more information see the manpage 'BACKUP vs ARCHIVE' section
+- Change internal encoding of filenames as ct archives are backed up on
+  server to  provide better internationalization support
+- Cyphertite file browser usage changes and operation improvements
+- Minor fixes and improvements
 * Fri Jan 06 2012 - davec 0.6.1-1
 - Improve file browser utility (cyphertitefb)
 - Recommend .ct as the extension for metadata archive files

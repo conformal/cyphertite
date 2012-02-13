@@ -1,3 +1,18 @@
+cyphertite (1.0.0-1) unstable; urgency=low
+
+  * Handle files truncated or growing during backup, best effort will be
+    made to archive the files
+  * Report useful error message when a user runs out of space on a limited
+    space account
+  * Add a method to implment backups instead of archives,
+    for more information see the manpage 'BACKUP vs ARCHIVE' section
+  * Change internal encoding of filenames as ct archives are backed up on
+    server to  provide better internationalization support
+  * Cyphertite file browser usage changes and operation improvements
+  * Minor fixes and improvements
+
+ -- Conformal Systems <package-discuss@conformal.com>  Mon, 13 Feb 2012 10:11:32 -0600
+
 cyphertite (0.6.1-1) unstable; urgency=low
 
   * Improve file browser utility (cyphertitefb)
