@@ -32,7 +32,6 @@ The
 command enables changing the crypto password or culling old data.
 .Pp
 The options are as follows:
-.Pp
 .Bl -tag -width "-D debugstring"
 .It Fl D Ar debugstring
 Turn on debugging output.
@@ -51,7 +50,6 @@ Xml commands.
 .It Ar all
 All of the above.
 .El
-.Xc
 .It Fl F Ar conffile
 Use the specified file
 .Ar configfile
@@ -59,21 +57,17 @@ as the config file.
 .El
 .Pp
 The commands are as follows:
-.Pp
 .Bl -tag -width "cpasswd"
 .It Cm cpasswd
 prompts for a new crypto password and writes the new one in the
 specified
-.Xc
 .Ar conffile .
-.Xc
 .It Cm cull
 removes meta data files older than ct_expired_days in the specified
 .Ar conffile .
 Only meta data files that are
 .Em not
 referenced by later meta data files are actually removed.
-.Xc
 .El
 .Sh SEE ALSO
 .Xr cyphertite 1 ,
