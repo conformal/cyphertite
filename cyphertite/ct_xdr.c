@@ -199,12 +199,6 @@ ct_xdr_gheader(XDR *xdrs, struct ctfile_gheader *objp,
 void
 ctfile_close(FILE *file, XDR *xdr)
 {
-	extern int64_t		ct_ex_dirnum;
-
-	 /* These counters only apply for the file in question. reset. */
-	ct_dnode_cleanup();
-	ct_ex_dirnum = 0;
-
 	xdr_destroy(xdr);
 	fclose(file);
 }
@@ -580,10 +574,14 @@ struct ctfile_write_state {
 	int		 cws_flags;
 	int64_t		 cws_dirnum;
 };
-void		ctfile_alloc_dirnum(struct ctfile_write_state *,
+static int	ctfile_alloc_dirnum(struct ctfile_write_state *,
 		    struct dnode *, struct dnode *);
-int		ctfile_write_header(struct ctfile_write_state *,
+static int	ctfile_write_header(struct ctfile_write_state *,
 		    struct fnode *, char *, int);
+static int	 ctfile_write_header_entry(struct ctfile_write_state *, char *,
+		    int, uint64_t, uint32_t, uint32_t, int, dev_t, int64_t,
+		    int64_t, struct dnode *, int);
+
 /*
  * API for creating ctfiles.
  */
@@ -646,102 +644,108 @@ fail:
 	return (NULL);
 }
 
-void
+/*
+ * Allocate directory numbers for directory and its parents and write to
+ * the ctfile
+ */
+int
 ctfile_alloc_dirnum(struct ctfile_write_state *ctx, struct dnode *dnode,
     struct dnode *parentdir)
 {
-	struct fnode	*fnode_dir;
+	int		 ret;
 
 	if (dnode->d_num != -1)
-		return;
+		return (0);
 
 	/* flag as allocate dirnum */
 	dnode->d_num = -2;
 
+	/* Recursively write all unwritten parents to the ctfile */
 	if (parentdir && parentdir->d_num == -1) {
-		ctfile_alloc_dirnum(ctx, parentdir, parentdir->d_parent);
+		if ((ret = ctfile_alloc_dirnum(ctx, parentdir,
+		    parentdir->d_parent)) != 0)
+			return (ret);
 	}
 
-	/*
-	 * lazy directory header writing
-	 */
-	fnode_dir = ct_populate_fnode_from_flist(dnode->d_flnode);
-	CNDBG(CT_LOG_CTFILE, "alloc_dirnum dir %"PRId64" %s", dnode->d_num,
-	    fnode_dir->fl_sname);
-	ctfile_write_header(ctx, fnode_dir, fnode_dir->fl_sname, 1);
-	ct_free_fnode(fnode_dir);
-}
+	dnode->d_num = ++ctx->cws_dirnum;
 
+	CNDBG(CT_LOG_CTFILE, "alloc_dirnum dir %"PRId64" %s", dnode->d_num,
+	    dnode->d_name);
+	return (ctfile_write_header_entry(ctx, dnode->d_name, C_TY_DIR,
+	    0, dnode->d_uid, dnode->d_gid, dnode->d_mode, 0, dnode->d_atime,
+	    dnode->d_mtime, dnode->d_parent, 1));
+}
 
 int
 ctfile_write_header(struct ctfile_write_state *ctx, struct fnode *fnode,
     char *filename, int base)
 {
-	struct ctfile_header	hdr;
+	uint64_t nr_shas = 0;
 
 	CNDBG(CT_LOG_CTFILE, "writing file header %s %s", fnode->fl_sname,
 	    filename);
-	bzero(&hdr, sizeof hdr);
 
 	if (C_ISDIR(fnode->fl_type)) {
 		if (fnode->fl_curdir_dir->d_num == -2) {
-			fnode->fl_curdir_dir->d_num = ++ctx->cws_dirnum;
-			CNDBG(CT_LOG_CTFILE, "tagging dir %s as %" PRId64,
-			    fnode->fl_curdir_dir->d_name,
-			    fnode->fl_curdir_dir->d_num);
-
-		} else if (fnode->fl_curdir_dir->d_num == -1) {
-			if (fnode->fl_skip_file == 0) {
-				/* timestamp newer, back up this node */
-
-				/* alloc_dirnum will write the node */
-				ctfile_alloc_dirnum(ctx, fnode->fl_curdir_dir,
-				    fnode->fl_parent_dir);
-			} else {
-				CNDBG(CT_LOG_CTFILE,
-				     "skipping dir %s", filename);
-				/* do not write 'unused' dirs */
-			}
-			return 0;
+			CFATALX("directory for allocation in write path");
+		} else if (fnode->fl_curdir_dir->d_num != -1) {
+			CFATALX("already allocated directory %" PRIu64
+			    " in write path", fnode->fl_curdir_dir->d_num);
 		}
-		CNDBG(CT_LOG_CTFILE, "WRITING %s tag %" PRId64,
-		    fnode->fl_curdir_dir->d_name,
-		    fnode->fl_curdir_dir->d_num);
+		/* alloc_dirnum will write the node */
+		return (ctfile_alloc_dirnum(ctx, fnode->fl_curdir_dir,
+		    fnode->fl_parent_dir));
 	} else if (fnode->fl_skip_file)
-		hdr.cmh_nr_shas = -1LL;
+		nr_shas = -1LL;
 	else if (C_ISREG(fnode->fl_type)) {
-		hdr.cmh_nr_shas = fnode->fl_size / ct_max_block_size;
+		nr_shas = fnode->fl_size / ct_max_block_size;
 		if (fnode->fl_size % ct_max_block_size)
-			hdr.cmh_nr_shas++;
+			nr_shas++;
 	}
 
-	if (fnode->fl_parent_dir) {
-		if (fnode->fl_parent_dir->d_num == -1) {
-			ctfile_alloc_dirnum(ctx, fnode->fl_parent_dir,
-			    fnode->fl_parent_dir->d_parent);
+	return (ctfile_write_header_entry(ctx, filename, fnode->fl_type,
+	    nr_shas, fnode->fl_uid, fnode->fl_gid, fnode->fl_mode,
+	    fnode->fl_rdev, fnode->fl_atime, fnode->fl_mtime,
+	    fnode->fl_parent_dir, base));
+}
+
+int
+ctfile_write_header_entry(struct ctfile_write_state *ctx, char *filename,
+    int type, uint64_t nr_shas, uint32_t uid, uint32_t gid, int mode,
+    dev_t rdev, int64_t atime, int64_t mtime, struct dnode *parent_dir,
+    int base)
+{
+	struct ctfile_header	hdr;
+
+	bzero(&hdr, sizeof hdr);
+
+	/* -3 for parent dir means this is the fake root, ignore it */
+	if (parent_dir && parent_dir->d_num != -3) {
+		if (parent_dir->d_num == -1) {
+			ctfile_alloc_dirnum(ctx, parent_dir,
+			    parent_dir->d_parent);
 		}
-		hdr.cmh_parent_dir = fnode->fl_parent_dir->d_num;
+		hdr.cmh_parent_dir = parent_dir->d_num;
+	} else if (base && filename[0] == '/') {
+		/* this is a rooted directory element */
+		hdr.cmh_parent_dir = -2;
 	} else {
-		if (base && filename[0] == '/') {
-			/* this is a rooted directory element */
-			hdr.cmh_parent_dir = -2;
-		} else {
-			hdr.cmh_parent_dir = -1;
-		}
+		hdr.cmh_parent_dir = -1;
 	}
+
 	hdr.cmh_beacon = CT_HDR_BEACON;
-	hdr.cmh_uid = fnode->fl_uid;
-	hdr.cmh_gid = fnode->fl_gid;
-	hdr.cmh_mode = fnode->fl_mode;
-	hdr.cmh_rdev = fnode->fl_rdev;
-	hdr.cmh_atime = fnode->fl_atime;
-	hdr.cmh_mtime = fnode->fl_mtime;
+	hdr.cmh_nr_shas = nr_shas;
+	hdr.cmh_uid = uid;
+	hdr.cmh_gid = gid;
+	hdr.cmh_mode = mode;
+	hdr.cmh_rdev = rdev;
+	hdr.cmh_atime = atime;
+	hdr.cmh_mtime = mtime;
 	if (base)
 		hdr.cmh_filename = basename(filename);
 	else
 		hdr.cmh_filename = filename;
-	hdr.cmh_type = fnode->fl_type;
-
+	hdr.cmh_type = type;
 	if (ct_xdr_header(&ctx->cws_xdr, &hdr, ctx->cws_version) == FALSE)
 		return 1;
 

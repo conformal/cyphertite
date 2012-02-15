@@ -30,7 +30,6 @@
 #include <fts.h>
 #include <pwd.h>
 #include <limits.h>
-#include <readpassphrase.h>
 
 #include <clog.h>
 #include <exude.h>
@@ -38,43 +37,12 @@
 #include "ct.h"
 
 
+extern int		ct_follow_symlinks;
 struct flist_head	fl_list_head = TAILQ_HEAD_INITIALIZER(fl_list_head);
-struct fnode		*fl_curnode;
-struct flist		*fl_lcurnode;
 
-struct dir_stat;
-
-int			 ct_cmp_dirlist(struct dir_stat *, struct dir_stat *);
 struct fnode		*ct_populate_fnode_from_flist(struct flist *);
 char			*ct_name_to_safename(char *);
 void			 ct_traverse(char **);
-
-RB_HEAD(ct_dir_lookup, dir_stat) ct_dir_rb_head =
-    RB_INITIALIZER(&ct_dir_rb_head);
-
-/* dir stat data */
-struct dir_stat {
-	SIMPLEQ_ENTRY(dir_stat) ds_list;
-	RB_ENTRY(dir_stat)	ds_rb;
-	char                    *ds_name;
-	uint32_t                ds_uid;         /* user id */
-	uint32_t                ds_gid;         /* group id */
-	uint32_t                ds_mode;        /* file mode */
-	int                     ds_atime;       /* last access time */
-	int                     ds_mtime;       /* last modification time */
-};
-
-void			ct_insert_dir(struct dir_stat *);
-
-RB_GENERATE(ct_dir_lookup, dir_stat, ds_rb, ct_cmp_dirlist);
-
-int
-ct_cmp_dirlist(struct dir_stat *d1, struct dir_stat *d2)
-{
-	return strcmp(d1->ds_name, d2->ds_name);
-}
-
-RB_PROTOTYPE(ct_dir_lookup, dir_stat, ds_rb, ct_cmp_dirlist);
 
 int                      ct_dname_cmp(struct dnode *, struct dnode *);
 int                      ct_dnum_cmp(struct dnode *, struct dnode *);
@@ -97,27 +65,6 @@ ct_dnum_cmp(struct dnode *d1, struct dnode *d2)
 	return (d1->d_num < d2->d_num ? -1 : d1->d_num > d2->d_num);
 }
 
-SIMPLEQ_HEAD(, dir_stat) dirlist;
-
-void
-ct_insert_dir(struct dir_stat *ds)
-{
-	struct dir_stat *oldds;
-	oldds = RB_INSERT(ct_dir_lookup, &ct_dir_rb_head, ds);
-	if (oldds) {
-		if (ct_multilevel_allfiles == 0) {
-			oldds->ds_mode = ds->ds_mode;
-			oldds->ds_atime = ds->ds_atime;
-			oldds->ds_mtime = ds->ds_mtime;
-			oldds->ds_uid = ds->ds_uid;
-			oldds->ds_gid = ds->ds_gid;
-		}
-		e_free(&ds);
-	} else {
-		SIMPLEQ_INSERT_HEAD(&dirlist, ds, ds_list);
-	}
-}
-
 void
 ct_flnode_cleanup(void)
 {
@@ -135,18 +82,26 @@ ct_flnode_cleanup(void)
 }
 
 void
+ct_dnum_cleanup(void)
+{
+	struct dnode *dnode;
+
+	/*
+	 * d_num_tree is just a slave of d_name_tree, empty it but
+	 * don't free the nodes
+	 */
+	while ((dnode = RB_ROOT(&ct_dnum_head)) != NULL)
+		RB_REMOVE(d_num_tree, &ct_dnum_head, dnode);
+}
+
+void
 ct_dnode_cleanup(void)
 {
 	struct dnode *dnode;
 
+	ct_dnum_cleanup();
 	while ((dnode = RB_ROOT(&ct_dname_head)) != NULL) {
 		RB_REMOVE(d_name_tree, &ct_dname_head, dnode);
-		e_free(&dnode->d_name);
-		e_free(&dnode);
-	}
-
-	while ((dnode = RB_ROOT(&ct_dnum_head)) != NULL) {
-		RB_REMOVE(d_num_tree, &ct_dnum_head, dnode);
 		e_free(&dnode->d_name);
 		e_free(&dnode);
 	}
@@ -161,6 +116,8 @@ ct_free_fnode(struct fnode *fnode)
 		e_free(&fnode->fl_sname);
 	if (fnode->fl_fname)
 		e_free(&fnode->fl_fname);
+	if (fnode->fl_name)
+		e_free(&fnode->fl_name);
 	e_free(&fnode);
 
 }
@@ -169,13 +126,11 @@ int				stop;
 
 char *eat_double_dots(char *, char *);
 int backup_prefix(char *);
-int ct_sched_backup_file(struct stat *, char *, int);
+int ct_sched_backup_file(struct stat *, char *, int, int);
 int s_to_e_type(int);
 
 int current_fd = -1;
 int ct_extract_fd = -1;
-struct fnode *ct_ex_curnode;
-char	tpath[PATH_MAX];
 
 struct fl_tree		fl_rb_head = RB_INITIALIZER(&fl_rb_head);
 
@@ -223,7 +178,7 @@ gen_fname(struct flist *flnode)
 {
 	char *name;
 
-	if (flnode->fl_parent_dir) {
+	if (flnode->fl_parent_dir && flnode->fl_parent_dir->d_num != -3) {
 		e_asprintf(&name, "%s/%s", flnode->fl_parent_dir->d_name,
 		    flnode->fl_fname);
 	} else {
@@ -231,6 +186,18 @@ gen_fname(struct flist *flnode)
 	}
 
 	return name;
+}
+
+char *
+gen_sname(struct flist *flnode)
+{
+	char		*name, *sname;
+
+	name = gen_fname(flnode);
+	sname = e_strdup(ct_name_to_safename(name));
+	e_free(&name);
+
+	return sname;
 }
 
 struct dnode *
@@ -285,19 +252,26 @@ struct fnode *
 ct_populate_fnode_from_flist(struct flist *flnode)
 {
 	struct fnode		*fnode;
-	const char		*safe;
 	struct stat		*sb, sbstore;
 	struct dnode		dsearch, *dfound;
-	char			*hlname;
-	int			 rc;
-	char			*fname;
+	int			dopenflags;
 
-	fname = gen_fname(flnode);
+	if (flnode->fl_flags & C_FF_CLOSEDIR) {
+		dsearch.d_name = gen_sname(flnode);
+		if ((dfound = RB_FIND(d_name_tree, &ct_dname_head,
+		    &dsearch)) == NULL)
+			CFATALX("close entry for non existant directory %s",
+			    dsearch.d_name);
+		e_free(&dsearch.d_name);
+		if (dfound->d_fd != -1)
+			close(dfound->d_fd);
+		dfound->d_fd = -1;
+		return (NULL);
+	}
 
 	sb = &sbstore;
-	rc = lstat(fname, sb);
-
-	if (rc == -1) {
+	if (fstatat(flnode->fl_parent_dir->d_fd, flnode->fl_fname,
+	    sb, ct_follow_symlinks ? 0 : AT_SYMLINK_NOFOLLOW) != 0) {
 		/* file no longer available return failure */
 		return NULL;
 	}
@@ -306,11 +280,10 @@ ct_populate_fnode_from_flist(struct flist *flnode)
 
 	/*
 	 * ct_name_to_safename has run before and not returned failure
-	 * so safe to not check for failure here
+	 * so safe to not check for failure of gen_sname() here.
 	 */
-
-	fnode->fl_fname = fname;
-	fnode->fl_sname = e_strdup(ct_name_to_safename(fnode->fl_fname));
+	fnode->fl_fname = e_strdup(flnode->fl_fname);
+	fnode->fl_sname = gen_sname(flnode);
 	fnode->fl_dev = sb->st_dev;
 	fnode->fl_rdev = sb->st_rdev;
 	fnode->fl_ino = sb->st_ino;
@@ -323,8 +296,19 @@ ct_populate_fnode_from_flist(struct flist *flnode)
 	fnode->fl_size = sb->st_size;
 	fnode->fl_offset = 0;
 
-	if (flnode->fl_forcedir) {
+	if (flnode->fl_flags & C_FF_FORCEDIR)
 		fnode->fl_type = C_TY_DIR;
+	/*
+	 * If we someone tries to perform a symlink race and it happens before
+	 * we stat the directory this second time then we may hit the case
+	 * where we think a file is a directory, but it is a symlink,
+	 * allowing evil path manipulation games. Therefore, if we think it is
+	 * a directory then check that it is, in case we have children. 
+	 */
+	if (flnode->fl_flags & C_FF_WASDIR && fnode->fl_type != C_TY_DIR) {
+		CWARNX("%s is no longer a directory", fnode->fl_sname);
+		ct_free_fnode(fnode);
+		return (NULL);
 	}
 
 	/* either the parent is NULL (which is fine) or is our parent */
@@ -334,28 +318,81 @@ ct_populate_fnode_from_flist(struct flist *flnode)
 	ct_sha1_setup(&fnode->fl_shactx);
 
 	if (C_ISDIR(fnode->fl_type)) {
-		dsearch.d_name = fnode->fl_fname;
+		dsearch.d_name = fnode->fl_sname;
 		dfound = RB_FIND(d_name_tree, &ct_dname_head, &dsearch);
 		if (dfound == NULL)
 			CFATALX("directory not found in d_name_tree %s",
 			    fnode->fl_fname);
 		fnode->fl_curdir_dir = dfound;
+
+		/* XXX O_SEARCH */
+		dopenflags = O_DIRECTORY | O_RDONLY | O_NOFOLLOW;
+		if ((flnode->fl_flags & C_FF_FORCEDIR) || ct_follow_symlinks)
+			dopenflags &= ~O_NOFOLLOW;
+			
+		if ((dfound->d_fd = openat(fnode->fl_parent_dir->d_fd,
+		    fnode->fl_fname, dopenflags)) == -1) {
+			CWARN("can't open directory %s", fnode->fl_sname);
+		}
 	}
 
 	if (flnode->fl_hlnode != NULL) {
 		fnode->fl_hardlink = 1;
 		fnode->fl_type = C_TY_LINK;
-		hlname = gen_fname(flnode->fl_hlnode);
-		safe = ct_name_to_safename(hlname);
-		fnode->fl_hlname = e_strdup(safe);
-		e_free(&hlname);
+		fnode->fl_hlname = gen_sname(flnode->fl_hlnode);
+	} else if (C_ISLINK(fnode->fl_type) && fnode->fl_hardlink == 0) {
+		char			 mylink[PATH_MAX];
+		int			 ret;
+
+		ret = readlinkat(fnode->fl_parent_dir->d_fd, fnode->fl_fname,
+		    mylink, sizeof(mylink));
+		if (ret == -1 || ret == sizeof(mylink)) {
+			CWARN("can't read link for %s", fnode->fl_sname);
+			ct_free_fnode(fnode);
+			return (NULL);
+		}
+		fnode->fl_hlname = e_strdup(mylink);
 	}
 
 	return fnode;
 }
 
+struct dnode ct_rootdir;
+void
+ct_setup_root_dir(const char *tdir)
+{
+	ct_rootdir.d_num = -3;
+	ct_rootdir.d_parent = NULL;
+
+	if ((ct_rootdir.d_fd = open(tdir ? tdir : ".",
+	    O_RDONLY | O_DIRECTORY)) == -1) {
+		CFATAL("can't open %s directory", tdir ? tdir : "current");
+	}
+}
+
+void
+ct_cleanup_root_dir(void)
+{
+	struct dnode	*dnode;
+	/*
+	 * ct -cf foo.md foo/bar/baz will have foo and foo/bar open at this
+	 * point (no fts postorder visiting), close them since we have just
+	 * finished with the filesystem.
+	 */
+	RB_FOREACH(dnode, d_name_tree, &ct_dname_head) {
+		if (dnode->d_fd != -1) {
+			CNDBG(CT_LOG_FILE, "%s wasn't closed", dnode->d_name);
+			close(dnode->d_fd);
+			dnode->d_fd = -1;
+		}
+	}
+	close(ct_rootdir.d_fd);
+	ct_rootdir.d_fd = -1;
+}
+
 int
-ct_sched_backup_file(struct stat *sb, char *filename, int forcedir)
+ct_sched_backup_file(struct stat *sb, char *filename, int forcedir,
+    int closedir)
 {
 	struct flist		*flnode;
 	const char		*safe;
@@ -369,9 +406,15 @@ ct_sched_backup_file(struct stat *sb, char *filename, int forcedir)
 	if (safe == NULL)
 		return 0;
 
-	if (forcedir || S_ISDIR(sb->st_mode)) {
+	if (closedir) {
+		dsearch.d_name = (char *)safe;
+		dnode = RB_FIND(d_name_tree, &ct_dname_head, &dsearch);
+		if (dnode == NULL)
+			CFATALX("close directory for nonexistant dir %s",
+			    safe);
+	} else if (forcedir || S_ISDIR(sb->st_mode)) {
 		dnode = e_calloc(1, sizeof(*dnode));
-		dnode->d_name = e_strdup(filename);
+		dnode->d_name = e_strdup(safe);
 		dnode->d_num = -1; /* numbers are allocated on xdr write */
 		e_dnode = RB_INSERT(d_name_tree, &ct_dname_head, dnode);
 		if (e_dnode != NULL) {
@@ -381,6 +424,7 @@ ct_sched_backup_file(struct stat *sb, char *filename, int forcedir)
 			return 0;
 		} else
 			CNDBG(CT_LOG_CTFILE, "inserted %s", filename);
+		/* The rest of the intialisation happens below */
 	}
 
 	//ct_numalloc++;
@@ -403,18 +447,34 @@ ct_sched_backup_file(struct stat *sb, char *filename, int forcedir)
 		    flnode->fl_fname);
 	} else {
 		flnode->fl_fname = e_strdup(filename);
+		flnode->fl_parent_dir = &ct_rootdir;
 		CNDBG(CT_LOG_CTFILE, "parent of %s is not found [%s]",
 		    flnode->fl_fname, dsearch.d_name);
 	}
 
-	if (dnode != NULL) {
-		dnode->d_flnode = flnode;
-		dnode->d_parent = flnode->fl_parent_dir;
+	if (closedir) {
+		flnode->fl_flags |= C_FF_CLOSEDIR;
+		goto insert;
 	}
 
-	flnode->fl_hlnode = NULL;
-	flnode->fl_forcedir = forcedir;
+	/* fill in directory data now that we have the parent information */
+	if (dnode != NULL) {
+		dnode->d_parent = flnode->fl_parent_dir;
+		dnode->d_sname = e_strdup(flnode->fl_fname);
+		dnode->d_fd = -1;
+		dnode->d_mode = sb->st_mode;
+		dnode->d_atime = sb->st_atime;
+		dnode->d_mtime = sb->st_mtime;
+		dnode->d_uid = sb->st_uid;
+		dnode->d_gid = sb->st_gid;
+		 /* we may have children, enforce this being a directory. */
+		flnode->fl_flags |= C_FF_WASDIR;
+	}
 
+	if (forcedir)
+		flnode->fl_flags |= C_FF_FORCEDIR;
+
+	flnode->fl_hlnode = NULL;
 	/* deal with hardlink */
 	flnode_exists = RB_INSERT(fl_tree, &fl_rb_head, flnode);
 	if (flnode_exists != NULL) {
@@ -427,6 +487,7 @@ ct_sched_backup_file(struct stat *sb, char *filename, int forcedir)
 	}
 	ct_stats->st_files_scanned++;
 
+insert:
 	TAILQ_INSERT_TAIL(&fl_list_head, flnode, fl_list);
 
 	return 0;
@@ -436,6 +497,8 @@ struct ct_archive_priv {
 	struct ctfile_write_state	*cap_cws;
 	struct ct_match			*cap_include;
 	struct ct_match			*cap_exclude;
+	struct fnode			*cap_curnode;
+	struct flist			*cap_curlist;
 };
 
 void
@@ -457,7 +520,6 @@ ct_archive(struct ct_op *op)
 	int			nextlvl = 0;
 
 	CNDBG(CT_LOG_TRANS, "processing");
-	/* XXX if state finished jump to done */
 	if (ct_state->ct_file_state == CT_S_STARTING) {
 		if (*filelist == NULL) {
 			CFATALX("no files specified");
@@ -480,6 +542,7 @@ ct_archive(struct ct_op *op)
 		if (getcwd(cwd, PATH_MAX) == NULL)
 			CFATAL("can't get current working directory");
 
+		ct_setup_root_dir(ct_tdir);
 		if (ct_tdir && chdir(ct_tdir) != 0)
 			CFATALX("can't chdir to %s", ct_tdir);
 		ct_traverse(filelist);
@@ -488,8 +551,8 @@ ct_archive(struct ct_op *op)
 		 * Do this before we open the ctfile for writing so
 		 * if all are excluded we don't then have to unlink it.
 		 */
-		fl_lcurnode = NULL;
-		if ((fl_curnode = ct_get_next_fnode(&fl_lcurnode,
+		cap->cap_curlist = NULL;
+		if ((cap->cap_curnode = ct_get_next_fnode(&cap->cap_curlist,
 		    cap->cap_include, cap->cap_exclude)) == NULL)
 			CFATALX("all files specified excluded or nonexistant");
 
@@ -508,18 +571,17 @@ ct_archive(struct ct_op *op)
 		/* change back to -C directory so relative paths work again */
 		if (ct_tdir && chdir(ct_tdir) != 0)
 			CFATALX("can't chdir to %s", ct_tdir);
-
 	} else if (ct_state->ct_file_state == CT_S_FINISHED)
 		return;
 
 	ct_set_file_state(CT_S_RUNNING);
 
-	if (fl_curnode == NULL)
+	if (cap->cap_curnode == NULL)
 		goto done;
 loop:
-	CNDBG(CT_LOG_CTFILE, "file %s state %d", fl_curnode->fl_sname,
-	    fl_curnode->fl_state);
-	new_file = (fl_curnode->fl_state == CT_FILE_START);
+	CNDBG(CT_LOG_CTFILE, "file %s state %d", cap->cap_curnode->fl_sname,
+	    cap->cap_curnode->fl_state);
+	new_file = (cap->cap_curnode->fl_state == CT_FILE_START);
 
 	/* allocate transaction */
 	ct_trans = ct_trans_alloc();
@@ -534,33 +596,37 @@ loop:
 	 * Only regular files that haven't just been opened need to talk
 	 * to the server. don't waste slots.
 	 */
-	if (!C_ISREG(fl_curnode->fl_type) || new_file)
+	if (!C_ISREG(cap->cap_curnode->fl_type) || new_file)
 		ct_trans = ct_trans_realloc_local(ct_trans);
 
 	/* handle special files */
-	if (!C_ISREG(fl_curnode->fl_type)) {
-		if (C_ISDIR(fl_curnode->fl_type)) {
+	if (!C_ISREG(cap->cap_curnode->fl_type)) {
+		if (C_ISDIR(cap->cap_curnode->fl_type)) {
 			/*
 			 * we do want to skip old directories with
 			 * no (new) files in them
 			 */
-			error = lstat(fl_curnode->fl_fname, &sb);
-			if (error) {
+			if (fstatat(cap->cap_curnode->fl_parent_dir->d_fd,
+			    cap->cap_curnode->fl_fname, &sb,
+			    ct_follow_symlinks ? 0 :
+			    AT_SYMLINK_NOFOLLOW) != 0) {
 				CWARN("archive: dir %s stat error",
-				    fl_curnode->fl_sname);
+				    cap->cap_curnode->fl_sname);
 			} else {
 				if (sb.st_mtime < ct_prev_backup_time) {
 					CNDBG(CT_LOG_FILE, "skipping dir"
 					    " based on mtime %s",
-					    fl_curnode->fl_sname);
-					fl_curnode->fl_skip_file = 1;
+					    cap->cap_curnode->fl_sname);
+					ct_free_fnode(cap->cap_curnode);
+					ct_trans_free(ct_trans);
+					goto skip;
 				}
 			}
 		}
 		ct_trans->tr_ctfile = cap->cap_cws;;
-		ct_trans->tr_fl_node = fl_curnode;
-		fl_curnode->fl_state = CT_FILE_FINISHED;
-		fl_curnode->fl_size = 0;
+		ct_trans->tr_fl_node = cap->cap_curnode;
+		cap->cap_curnode->fl_state = CT_FILE_FINISHED;
+		cap->cap_curnode->fl_size = 0;
 		ct_trans->tr_state = TR_S_SPECIAL;
 		ct_trans->tr_type = TR_T_SPECIAL;
 		ct_trans->tr_trans_id = ct_trans_id++;
@@ -571,20 +637,22 @@ loop:
 
 	/* do not open zero length files */
 	if (new_file) {
-		fl_curnode->fl_state = CT_FILE_PROCESSING;
+		cap->cap_curnode->fl_state = CT_FILE_PROCESSING;
 		if (current_fd != -1) {
 			CFATALX("state error, new file open,"
 			    " sz %" PRId64 " offset %" PRId64,
-			    (int64_t) fl_curnode->fl_size,
-			    (int64_t) fl_curnode->fl_offset);
+			    (int64_t) cap->cap_curnode->fl_size,
+			    (int64_t) cap->cap_curnode->fl_offset);
 		}
-		current_fd = open(fl_curnode->fl_fname, O_RDONLY);
+		current_fd = openat(cap->cap_curnode->fl_parent_dir->d_fd,
+		    cap->cap_curnode->fl_fname, O_RDONLY |
+		    ct_follow_symlinks ? 0 : O_NOFOLLOW);
 
 		if (current_fd == -1) {
 			CWARN("archive: unable to open file '%s'",
-			    fl_curnode->fl_sname);
+			    cap->cap_curnode->fl_sname);
 			ct_trans_free(ct_trans);
-			fl_curnode->fl_state = CT_FILE_FINISHED;
+			cap->cap_curnode->fl_state = CT_FILE_FINISHED;
 			goto next_file;
 		}
 
@@ -592,31 +660,52 @@ loop:
 		error = fstat(current_fd, &sb);
 		if (error) {
 			CWARN("archive: file %s stat error",
-			    fl_curnode->fl_sname);
+			    cap->cap_curnode->fl_sname);
 		} else {
 			if (sb.st_mtime < ct_prev_backup_time) {
 				if (ct_verbose > 1)
 					CINFO("skipping file based on mtime %s",
-					    fl_curnode->fl_sname);
+					    cap->cap_curnode->fl_sname);
 				skip_file = 1;
-				fl_curnode->fl_skip_file = skip_file;
+				cap->cap_curnode->fl_skip_file = skip_file;
 			}
 		}
+		/*
+		 * Now we have actually statted the file atomically
+		 * confirm the permissions bits that we got with the last
+		 * stat.
+		 */
+		if (!S_ISREG(sb.st_mode)) {
+			CWARNX("%s is no longer a regular file, skipping",
+			    cap->cap_curnode->fl_sname);
+			skip_file = 1;
+			cap->cap_curnode->fl_skip_file = skip_file;
+		}
+		cap->cap_curnode->fl_dev = sb.st_dev;
+		cap->cap_curnode->fl_rdev = sb.st_rdev;
+		cap->cap_curnode->fl_ino = sb.st_ino;
+		cap->cap_curnode->fl_uid = sb.st_uid;
+		cap->cap_curnode->fl_gid = sb.st_gid;
+		cap->cap_curnode->fl_mode = sb.st_mode;
+		cap->cap_curnode->fl_atime = sb.st_atime;
+		cap->cap_curnode->fl_mtime = sb.st_mtime;
+		cap->cap_curnode->fl_size = sb.st_size;
+
 		ct_trans->tr_ctfile = cap->cap_cws;;
-		ct_trans->tr_fl_node = fl_curnode;
+		ct_trans->tr_fl_node = cap->cap_curnode;
 		ct_trans->tr_state = TR_S_FILE_START;
 		ct_trans->tr_type = TR_T_WRITE_HEADER;
 		ct_trans->tr_trans_id = ct_trans_id++;
-		if (fl_curnode->fl_size == 0 || skip_file) {
+		if (cap->cap_curnode->fl_size == 0 || skip_file) {
 			close(current_fd);
 			current_fd = -1;
 			ct_trans->tr_eof = 1;
-			fl_curnode->fl_state = CT_FILE_FINISHED;
+			cap->cap_curnode->fl_state = CT_FILE_FINISHED;
 		} else {
 			ct_trans->tr_eof = 0;
 		}
 		ct_queue_transfer(ct_trans);
-		if (fl_curnode->fl_size == 0 || skip_file) {
+		if (cap->cap_curnode->fl_size == 0 || skip_file) {
 			goto next_file;
 		}
 		goto loop;
@@ -624,13 +713,13 @@ loop:
 		if (current_fd == -1) {
 			CFATALX("state error, old file not open,"
 			    " sz %" PRId64 " offset %" PRId64,
-			    (int64_t) fl_curnode->fl_size,
-			    (int64_t) fl_curnode->fl_offset);
+			    (int64_t) cap->cap_curnode->fl_size,
+			    (int64_t) cap->cap_curnode->fl_offset);
 		}
 	}
 
 	/* perform read */
-	rsz = fl_curnode->fl_size - fl_curnode->fl_offset;
+	rsz = cap->cap_curnode->fl_size - cap->cap_curnode->fl_offset;
 	CNDBG(CT_LOG_FILE, "rsz %lu max %d", (unsigned long) rsz,
 	    ct_max_block_size);
 	if (rsz > ct_max_block_size) {
@@ -645,7 +734,7 @@ loop:
 		ct_stats->st_bytes_read += rlen;
 
 	ct_trans->tr_ctfile = cap->cap_cws;;
-	ct_trans->tr_fl_node = fl_curnode;
+	ct_trans->tr_fl_node = cap->cap_curnode;
 	ct_trans->tr_size[0] = rlen;
 	ct_trans->tr_chsize = rlen;
 	ct_trans->tr_state = TR_S_READ;
@@ -657,8 +746,8 @@ loop:
 	    ct_trans->tr_trans_id);
 
 	/* update offset */
-	if (rsz != rlen || rlen == 0 ||
-	    ((fl_curnode->fl_offset + rlen) == fl_curnode->fl_size)) {
+	if (rsz != rlen || rlen == 0 || ((cap->cap_curnode->fl_offset + rlen) ==
+	        cap->cap_curnode->fl_size)) {
 		/* short read, file truncated, or end of file */
 		/* restat file for modifications */
 		error = fstat(current_fd, &sb);
@@ -666,25 +755,25 @@ loop:
 		close(current_fd);
 		current_fd = -1;
 		ct_trans->tr_eof = 1;
-		fl_curnode->fl_state = CT_FILE_FINISHED;
+		cap->cap_curnode->fl_state = CT_FILE_FINISHED;
 
 		if (error) {
 			CWARN("archive: file %s stat error",
-			    fl_curnode->fl_sname);
-		} else if (sb.st_size != fl_curnode->fl_size) {
+			    cap->cap_curnode->fl_sname);
+		} else if (sb.st_size != cap->cap_curnode->fl_size) {
 			CWARNX("\"%s\" %s during backup",
-			    fl_curnode->fl_sname,
-			    (sb.st_size > fl_curnode->fl_size) ? "grew" :
+			    cap->cap_curnode->fl_sname,
+			    (sb.st_size > cap->cap_curnode->fl_size) ? "grew" :
 				"truncated");
 			ct_trans->tr_state = TR_S_WMD_READY;
 			ct_trans->tr_eof = 2;
 		}
 		CNDBG(CT_LOG_FILE, "going to next file %s",
-		    fl_curnode->fl_sname);
+		    cap->cap_curnode->fl_sname);
 		CNDBG(CT_LOG_TRANS, "setting eof on trans %" PRIu64 " %s",
-		    ct_trans->tr_trans_id, fl_curnode->fl_sname);
+		    ct_trans->tr_trans_id, cap->cap_curnode->fl_sname);
 	} else {
-		fl_curnode->fl_offset += rlen;
+		cap->cap_curnode->fl_offset += rlen;
 	}
 	ct_queue_transfer(ct_trans);
 
@@ -692,17 +781,18 @@ loop:
 	/* XXX is there other file metadata that needs to be saved?  */
 next_file:
 	/* XXX should node be removed from list at this time? */
-	if (fl_curnode->fl_state == CT_FILE_FINISHED) {
-		if ((fl_curnode = ct_get_next_fnode(&fl_lcurnode,
+	if (cap->cap_curnode->fl_state == CT_FILE_FINISHED) {
+skip:
+		if ((cap->cap_curnode = ct_get_next_fnode(&cap->cap_curlist,
 		    cap->cap_include, cap->cap_exclude)) == NULL) {
 			CNDBG(CT_LOG_FILE, "no more files");
 		} else {
 			CNDBG(CT_LOG_FILE, "going to next file %s",
-			    fl_curnode->fl_sname);
+			    cap->cap_curnode->fl_sname);
 		}
 	}
 
-	if (fl_curnode != NULL)
+	if (cap->cap_curnode != NULL)
 		goto loop;
 
 done:
@@ -721,6 +811,7 @@ done:
 		ct_match_unwind(cap->cap_include);
 	if (cap->cap_exclude)
 		ct_match_unwind(cap->cap_exclude);
+	ct_cleanup_root_dir();
 	ct_trans->tr_ctfile = cap->cap_cws;;
 	ct_trans->tr_fl_node = NULL;
 	ct_trans->tr_state = TR_S_DONE;
@@ -738,7 +829,11 @@ ct_traverse(char **paths)
 	int			 fts_options;
 	int			 cnt;
 
-	fts_options = FTS_PHYSICAL | FTS_NOCHDIR;
+	fts_options = FTS_NOCHDIR;
+	if (ct_follow_symlinks)
+		fts_options |= FTS_LOGICAL;
+	else
+		fts_options |= FTS_PHYSICAL;
 	if (ct_no_cross_mounts)
 		fts_options |= FTS_XDEV;
 	ftsp = fts_open(paths, fts_options, NULL);
@@ -758,9 +853,14 @@ ct_traverse(char **paths)
 		case FTS_SLNONE:
 			cnt++;
 			/* these are ok */
+			/* FALLTHROUGH */
+		case FTS_DP: /* Setup for close dir, no stats */
+			/* sanitize path */
+			if (eat_double_dots(fe->fts_path, clean) == NULL)
+				CFATAL("can't sanitize %s", fe->fts_path);
+			if (fe->fts_info == FTS_DP)
+				goto sched;
 			break;
-		case FTS_DP:
-			continue;
 		case FTS_DC:
 			CWARNX("file system cycle found");
 			continue;
@@ -773,10 +873,6 @@ ct_traverse(char **paths)
 			CFATALX("bad fts_info (%d)", fe->fts_info);
 		}
 
-		/* sanitize path */
-		if (eat_double_dots(fe->fts_path, clean) == NULL)
-			CFATAL("can't sanitize %s", fe->fts_path);
-
 		/* backup dirs above fts starting point */
 		if (fe->fts_level == 0)
 			if (backup_prefix(clean))
@@ -784,7 +880,9 @@ ct_traverse(char **paths)
 
 		CNDBG(CT_LOG_FILE, "scheduling backup of %s", clean);
 		/* backup all other files */
-		if (ct_sched_backup_file(fe->fts_statp, clean, 0))
+sched:
+		if (ct_sched_backup_file(fe->fts_statp, clean, 0,
+		    fe->fts_info == FTS_DP ? 1 : 0))
 			CFATAL("backup_file failed: %s", clean);
 
 	}
@@ -910,6 +1008,7 @@ backup_prefix(char *root)
 		/* extend prefix */
 		strlcat(dir, cp, sizeof dir);
 
+		/* XXX racy? */
 		if (stat(dir, &sb))
 			return (1);
 
@@ -919,7 +1018,7 @@ backup_prefix(char *root)
 			return (1);
 		}
 
-		if (ct_sched_backup_file(&sb, dir, 1))
+		if (ct_sched_backup_file(&sb, dir, 1, 0))
 			return (1);
 	}
 
@@ -949,44 +1048,92 @@ s_to_e_type(int mode)
 	return (rv);
 }
 
+void ct_file_extract_nextdir(struct fnode *);
+
+#define TEMPCHARS	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+#define NUM_CHARS	(sizeof(TEMPCHARS) - 1)
+
+/*
+ * mkstemp() using openat in the specified directory fd. Semantics remain the
+ * same.
+ * Code borrowed from OpenBSD libc under the following license:
+*
+ * Copyright (c) 1996-1998, 2008 Theo de Raadt
+ * Copyright (c) 1997, 2008-2009 Todd C. Miller
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+static int
+mkstemp_at(int dir, char *path)
+{
+	char *start, *cp, *ep;
+	const char *tempchars = TEMPCHARS;
+	unsigned int r, tries;
+	size_t len;
+	int fd;
+
+	len = strlen(path);
+	if (len == 0) {
+		errno = EINVAL;
+		return(-1);
+	}
+	ep = path + len;
+
+	tries = 1;
+	for (start = ep; start > path && start[-1] == 'X'; start--) {
+		if (tries < INT_MAX / NUM_CHARS)
+			tries *= NUM_CHARS;
+	}
+	tries *= 2;
+
+	do {
+		for (cp = start; cp != ep; cp++) {
+			r = arc4random_uniform(NUM_CHARS);
+			*cp = tempchars[r];
+		}
+
+		fd = openat(dir, path, O_CREAT|O_EXCL|O_RDWR, S_IRUSR|S_IWUSR);
+		if (fd != -1 || errno != EEXIST)
+			return(fd);
+	} while (--tries);
+
+	errno = EEXIST;
+	return(-1);
+}
+
+
 int
 ct_file_extract_open(struct fnode *fnode)
 {
-	char		dirpath[PATH_MAX], *dirp;
-	int		tries = 0;
-	/*
-	 * XXX - this should open a temporary file and rename
-	 * XXX - on EX_FILE_END
-	 */
-	CNDBG(CT_LOG_FILE, "opening %s for writing", fnode->fl_sname);
 	if (ct_extract_fd != -1) {
 		CFATALX("file open on extract_open");
 	}
-	snprintf(tpath, sizeof tpath, "%s%s%s",
-	    ct_tdir ? ct_tdir : "", ct_tdir ? "/" : "", fnode->fl_sname);
-	ct_ex_curnode = fnode;
 
-	strlcpy(dirpath, tpath, sizeof(dirpath));
-	if ((dirp = dirname(dirpath)) == NULL)
-		CFATALX("can't get dirname of secrets file");
+	ct_file_extract_nextdir(fnode);
+
+	CNDBG(CT_LOG_FILE, "opening %s for writing", fnode->fl_sname);
+
 	if (fnode->fl_fname)
 		e_free(&fnode->fl_fname);
-	e_asprintf(&fnode->fl_fname, "%s/%s", dirp, "cyphertite.XXXXXXXXXX");
-again:
-	if ((ct_extract_fd = mkstemp(fnode->fl_fname)) == -1) {
-		/*
-		 * with -C or regex we may not have dependant directories in
-		 * our list of paths to operate on. ENOENT here means we're
-		 * lacking one of the path elements, so try to recursively
-		 * create the directory.
-		 */
-		if (errno == ENOENT && tries++ == 0 &&
-		    ct_make_full_path(tpath, 0777) == 0)
-			goto again;
-		/* XXX make_full_path may modify the path we want */
-		CWARN("unable to open file for writing %s%s%s",
-		    ct_tdir ? ct_tdir : "", ct_tdir ? "/" : "",
-		    fnode->fl_sname);
+	fnode->fl_fname = e_strdup("cyphertite.XXXXXXXXXX");
+	/*
+	 * All previous directories should have been created when we changed
+	 * directory above. If this is not the case then something changed
+	 * after we made them. just warn and continue.
+	 */
+	if ((ct_extract_fd = mkstemp_at(fnode->fl_parent_dir->d_fd,
+	    fnode->fl_fname)) == -1) {
+		CWARN("unable to open file for writing %s", fnode->fl_sname);
 		return (1);
 	}
 
@@ -1016,67 +1163,61 @@ ct_file_extract_close(struct fnode *fnode)
 		if (fchown(ct_extract_fd, fnode->fl_uid, fnode->fl_gid) == -1) {
 			if (errno == EPERM && geteuid() != 0) {
 				if (ct_verbose)
-					CWARN("chown failed: %s", tpath);
+					CWARN("chown failed: %s",
+					    fnode->fl_sname);
 			} else {
-				CFATAL("chown failed %s", tpath);
+				CFATAL("chown failed %s", fnode->fl_sname);
 			}
 		} else
 			safe_mode = ~0;
 	}
 
 	if (fchmod(ct_extract_fd, fnode->fl_mode & safe_mode) == -1)
-		CFATAL("chmod failed on %s", tpath);
+		CFATAL("chmod failed on %s", fnode->fl_sname);
 
 	if (ct_attr) {
-
 		tv[0].tv_sec = fnode->fl_atime;
 		tv[1].tv_sec = fnode->fl_mtime;
 		tv[0].tv_usec = tv[1].tv_usec = 0;
 		if (futimes(ct_extract_fd, tv) == -1)
 			CFATAL("utimes failed");
 	}
-	if (rename(fnode->fl_fname, tpath) != 0)
-		CFATAL("rename to %s failed", tpath);
+	if (renameat(fnode->fl_parent_dir->d_fd, fnode->fl_fname,
+	    fnode->fl_parent_dir->d_fd, fnode->fl_name) != 0)
+		CFATAL("rename to %s failed", fnode->fl_sname);
 
 	close(ct_extract_fd);
-	ct_ex_curnode = NULL;
 	ct_extract_fd = -1;
 }
 
 void
 ct_file_extract_special(struct fnode *fnode)
 {
-	struct timeval          tv[2];
+	struct timespec         ts[2];
 	char			apath[PATH_MAX];
 	char			*appath;
-	char			ltpath[PATH_MAX];
-	int			tries = 0, ret = 0;
+	int			ret = 0;
 	int                     safe_mode;
 
-	snprintf(ltpath, sizeof ltpath, "%s%s%s",
-	    ct_tdir ? ct_tdir : "", ct_tdir ? "/" : "", fnode->fl_sname);
-	CNDBG(CT_LOG_FILE, "special %s mode %d", ltpath, fnode->fl_mode);
+	/*
+	 * Create dependant directories and open/close any relvevant directory
+	 * filedescriptors.
+	 */
+	ct_file_extract_nextdir(fnode);
 
-	if(C_ISDIR(fnode->fl_type)) {
-mkdir_again:
-		if (mkdir(ltpath, 0700) != 0) {
-			if (errno == ENOENT && tries == 0 &&
-			    ct_make_full_path(ltpath, 0777) == 0) {
-				tries++;
-				goto mkdir_again;
-			}
+	CNDBG(CT_LOG_FILE, "special %s mode %d", fnode->fl_sname,
+	    fnode->fl_mode);
+
+	if (C_ISDIR(fnode->fl_type)) {
+		if (mkdirat(fnode->fl_parent_dir->d_fd, fnode->fl_name,
+		    0700) != 0) {
 			if (errno != EEXIST) /* XXX check it is a dir */
 				CWARN("can't create directory %s",
 				    fnode->fl_sname);
 		}
 	} else if (C_ISBLK(fnode->fl_type) || C_ISCHR(fnode->fl_type))  {
-mknod_again:
-		if (mknod(ltpath, fnode->fl_mode, fnode->fl_dev) != 0) {
-			if (errno == ENOENT && tries == 0 &&
-			    ct_make_full_path(ltpath, 0777) == 0) {
-				tries++;
-				goto mknod_again;
-			}
+		if (mknodat(fnode->fl_parent_dir->d_fd, fnode->fl_name,
+		    fnode->fl_mode, fnode->fl_dev) != 0) {
 			if (errno != EEXIST) /* XXX check it is a spec node */
 				CWARN("can't create special file %s",
 				    fnode->fl_sname);
@@ -1092,31 +1233,42 @@ mknod_again:
 
 link_again:
 		if (fnode->fl_hardlink) {
-			ret = link(appath, ltpath);
+			/*
+			 * XXX AT_FDCWD is dangerous here but we don't have
+			 * sufficient information.
+			 * We pass SYMLINK_FOLLOW to give the same semantics
+			 * as link()
+			 */
+			ret = linkat(AT_FDCWD, appath,
+			    fnode->fl_parent_dir->d_fd, fnode->fl_name,
+			    AT_SYMLINK_FOLLOW);
 		} else {
-			ret = symlink(appath, ltpath);
-		}
-		if (ret && errno == ENOENT && tries == 0 &&
-		    ct_make_full_path(ltpath, 0777) == 0) {
-			tries++;
-			goto link_again;
+			ret = symlinkat(fnode->fl_hlname,
+			    fnode->fl_parent_dir->d_fd, fnode->fl_name);
 		}
 		if (ret && errno == EEXIST) {
 			if (fnode->fl_hardlink) {
 				struct stat	tsb, lsb;
 
+				/*
+				 * XXX don't necessarily have the cwd of
+				 * the hardlink open. 
+				 */
 				if (lstat(appath, &tsb) != 0) {
 					CWARN("can't stat %s", appath);
 					goto link_out;
 				}
-				if (lstat(ltpath, &lsb) != 0) {
-					CWARN("can't stat %s", ltpath);
+				if (fstatat(fnode->fl_parent_dir->d_fd,
+				    fnode->fl_name, &lsb,
+				    ct_follow_symlinks ? 0 : 
+				    AT_SYMLINK_NOFOLLOW) != 0) {
+					CWARN("can't stat %s", fnode->fl_sname);
 					goto link_out;
 				}
 				if (tsb.st_dev != lsb.st_dev) {
 					CWARNX("%s and %s no longer on same "
 					    "device: can't link",
-					    appath, ltpath);
+					    appath, fnode->fl_sname);
 					goto link_out;
 				}
 				/*
@@ -1129,51 +1281,45 @@ link_again:
 				}
 			}
 
-			if (unlink(ltpath) == 0)
+			/* unlinkat() */
+			if (unlinkat(fnode->fl_parent_dir->d_fd,
+			    fnode->fl_name, 0) == 0)
 				goto link_again;
-			CWARN("can't remove old link %s", ltpath);
+			CWARN("can't remove old link %s", fnode->fl_sname);
 		}
 link_out:
 		if (ret) {
 			CWARN("%s failed: %s to %s", fnode->fl_hardlink ?
-			    "link" : "symlink", ltpath, appath);
+			    "link" : "symlink", fnode->fl_sname, appath);
 			return;
 		}
 	} else {
-		CFATALX("illegal file %s of type %d", ltpath, fnode->fl_mode);
+		CFATALX("illegal file %s of type %d", fnode->fl_sname,
+		    fnode->fl_mode);
 	}
 
-	if(C_ISDIR(fnode->fl_type)) {
-		/* XXX - copy this data or just have pointer to fnode? */
-		struct dir_stat *ds;
-		ds = e_malloc(sizeof(struct dir_stat) +
-		    strlen(fnode->fl_sname) + 1);
-
-		ds->ds_name = (char *)ds + sizeof(struct dir_stat);
-		strlcpy(ds->ds_name, fnode->fl_sname,
-		    strlen(fnode->fl_sname) + 1);
-		ds->ds_mode = fnode->fl_mode;
-		ds->ds_atime = fnode->fl_atime;
-		ds->ds_mtime = fnode->fl_mtime;
-		ds->ds_uid = fnode->fl_uid;
-		ds->ds_gid = fnode->fl_gid;
-
-		/* insert at head to process in reverse order */
-		ct_insert_dir(ds);
+	if (C_ISDIR(fnode->fl_type)) {
+		/*
+		 * Directory permissions are handled at directory close
+		 * time when all dependancies are finished.
+		 */
+		;
 	} else if (C_ISLINK(fnode->fl_type)){
 		if (!fnode->fl_hardlink) {
 			/* symlinks have no 'real' permissions */
 			if (ct_attr) {
 				/* set the link's ownership */
-				if (lchown(ltpath, fnode->fl_uid, fnode->fl_gid)
-				    == -1) {
+				if (fchownat(fnode->fl_parent_dir->d_fd,
+				    fnode->fl_name, fnode->fl_uid,
+				    fnode->fl_gid, AT_SYMLINK_NOFOLLOW) == -1) {
 					if (errno == EPERM && geteuid() != 0) {
 						if (ct_verbose)
 							CWARN("lchown failed:"
-							    " %s", ltpath);
+							    " %s",
+							    fnode->fl_sname);
 					} else {
 						CFATAL("lchown failed %s",
-						    ltpath);
+						    fnode->fl_sname);
 					}
 				}
 			}
@@ -1184,73 +1330,208 @@ link_out:
 	} else {
 		safe_mode = S_IRWXU | S_IRWXG | S_IRWXO;
 		if (ct_attr) {
-			if (chown(ltpath, fnode->fl_uid, fnode->fl_gid) == -1) {
+			if (fchownat(fnode->fl_parent_dir->d_fd,
+			    fnode->fl_name, fnode->fl_uid,
+			    fnode->fl_gid, 0) == -1) {
 				if (errno == EPERM && geteuid() != 0) {
 					if (ct_verbose)
 						CWARN("chown failed: %s",
-						    ltpath);
+						    fnode->fl_sname);
 				} else {
-					CFATAL("chown failed %s", ltpath);
+					CFATAL("chown failed %s",
+					    fnode->fl_sname);
 				}
 			} else
 				safe_mode = ~0;
 		}
 
-		if (chmod(ltpath, fnode->fl_mode & safe_mode) == -1)
-			CFATAL("chmod failed on %s", ltpath);
+		if (fchmodat(fnode->fl_parent_dir->d_fd, fnode->fl_name,
+		    fnode->fl_mode & safe_mode, 0) == -1 )
+			CFATAL("chmod failed on %s", fnode->fl_sname);
 
 		if (ct_attr) {
-			tv[0].tv_sec = fnode->fl_atime;
-			tv[1].tv_sec = fnode->fl_mtime;
-			tv[0].tv_usec = tv[1].tv_usec = 0;
-			if (utimes(ltpath, tv) == -1)
+			ts[0].tv_sec = fnode->fl_atime;
+			ts[1].tv_sec = fnode->fl_mtime;
+			ts[0].tv_nsec = ts[1].tv_nsec = 0;
+			if (utimensat(fnode->fl_parent_dir->d_fd,
+			    fnode->fl_name, ts, 0) == -1)
 				CFATAL("utimes failed");
 		}
 	}
 }
 
+void	ct_file_extract_closefrom(struct dnode *, struct dnode *);
+void	ct_file_extract_opento(struct dnode *, struct dnode *);
+struct dnode	 ct_ex_rootdir;
+struct dnode	*ct_ex_prevdir = NULL;
+struct dnode	**ct_ex_prevdir_list = NULL;
+
 void
-ct_file_extract_fixup(void)
+ct_file_extract_setup_dir(const char *tdir)
 {
-	struct dir_stat		*dsn;
-	struct timeval		tv[2];
-	char			tp[PATH_MAX];
-	int                     safe_mode;
+	char	tpath[PATH_MAX];
+	int	tries = 0;
+	ct_ex_rootdir.d_num = -3;
+	ct_ex_rootdir.d_parent = NULL;
+try_again:
+	/* ct_make_full_path can mess with the string we are using */
+	if (tdir != NULL) {
+		strlcpy(tpath, tdir, sizeof(tpath));
+	} else {
+		strlcpy(tpath, ".", sizeof(tpath));
+	}
+	/* Open the root directory fd node */
+	if ((ct_ex_rootdir.d_fd = open(tpath, O_RDONLY | O_DIRECTORY)) == -1) {
+		/*
+		 * We will only hit this case for tdir.
+		 * XXX a more restrictive mask wanted?
+		 */
+		if (errno == ENOENT && tries++ == 0 &&
+		    ct_make_full_path(tpath, 0777) == 0 &&
+		    mkdir(tdir, 0777) == 0)
+			goto try_again;
+		CFATAL("can't open %s directory", tdir ? "-C" : "current");
+	}
+}
 
-	while(!SIMPLEQ_EMPTY(&dirlist)) {
-		dsn = SIMPLEQ_FIRST(&dirlist);
-		SIMPLEQ_REMOVE_HEAD(&dirlist, ds_list);
-		RB_REMOVE(ct_dir_lookup, &ct_dir_rb_head, dsn);
+void
+ct_file_extract_cleanup_dir(void)
+{
+	close(ct_ex_rootdir.d_fd);
+}
 
-		snprintf(tp, sizeof tp, "%s%s%s",
-		    ct_tdir ? ct_tdir : "", ct_tdir ? "/" : "", dsn->ds_name);
+void
+ct_file_extract_nextdir(struct fnode *fnode)
+{
+	struct dnode	*newdir = fnode->fl_parent_dir, *tdir;
+	struct dnode	**newdirlist;
+	int		 ndirs, i;
 
-		safe_mode = S_IRWXU | S_IRWXG | S_IRWXO;
-		if (ct_attr) {
-			if (chown(tp, dsn->ds_uid,
-			    dsn->ds_gid) == -1) {
-				if (errno == EPERM && geteuid() != 0) {
-					if (ct_verbose)
-						CWARN("chown failed: %s",
-						    tp);
-				} else {
-					CFATAL("chown failed %s", tp);
-				}
-			} else
-				safe_mode = ~0;
-		}
-
-		if (chmod(tp, dsn->ds_mode & safe_mode) == -1)
-			CFATAL("chmod failed on %s", dsn->ds_name);
-
-		if (ct_attr) {
-			tv[0].tv_sec = dsn->ds_atime;
-			tv[1].tv_sec = dsn->ds_mtime;
-			tv[0].tv_usec = tv[1].tv_usec = 0;
-			if (utimes(tp, tv) == -1)
-				CFATAL("futimes failed");
-		}
-		e_free(&dsn);
+	/* If we're in the same directory, we're done */
+	if (newdir == ct_ex_prevdir) {
+		return;
 	}
 
+	/* count number of directories. */
+	for (tdir = newdir, ndirs = 0; tdir != NULL;
+	    (tdir = tdir->d_parent), ndirs++)
+		;
+
+	/* should never happen */
+	if (ndirs == 0) {
+		CFATALX("no dirs");
+	}
+
+	newdirlist = e_calloc(ndirs + 1, sizeof(*newdirlist));
+
+	/* newdirlist is NULL terminated, build it backwards */
+	for (tdir = newdir, i = ndirs - 1; tdir != NULL; tdir = tdir->d_parent) 
+		newdirlist[i--] = tdir;
+	if (ct_ex_prevdir_list == NULL) {
+		i = 0;
+		goto open;
+	}
+
+	/*
+	 * find the common parent
+	 * we know the directories are not the same, so this should halt
+	 */
+	for (i = 0; ; i++) {
+		if (newdirlist[i + 1] != ct_ex_prevdir_list[i + 1])
+			break;
+	}
+	
+	/* close all children from common parent up to old dir */
+	ct_file_extract_closefrom(ct_ex_prevdir_list[i], ct_ex_prevdir);
+open:
+	/* open all children from common parent up to new dir */
+	ct_file_extract_opento(newdirlist[i], newdir);
+
+	ct_ex_prevdir = newdir;
+	e_free(&ct_ex_prevdir_list);
+	ct_ex_prevdir_list = newdirlist;
+}
+
+void
+ct_file_extract_enddir()
+{
+	if (ct_ex_prevdir == NULL)
+		return;
+	/* Close all open directories, we are switching files */
+	ct_file_extract_closefrom(ct_ex_prevdir_list[0], ct_ex_prevdir);
+	e_free(&ct_ex_prevdir_list);
+	ct_ex_prevdir = NULL;
+}
+
+void
+ct_file_extract_closefrom(struct dnode *parent, struct dnode *child)
+{
+	struct timespec		ts[2];
+	int                     safe_mode;
+
+	if (child == parent)
+		return;
+
+	/* Set directory permissions to what they should be, then close it. */
+	safe_mode = S_IRWXU | S_IRWXG | S_IRWXO;
+
+	if (ct_attr) {
+		if (fchown(child->d_fd, child->d_uid, child->d_gid) == -1) {
+			if (errno == EPERM && geteuid() != 0) {
+				if (ct_verbose)
+					CWARN("can't chown directory: %s",
+					    child->d_name);
+			} else {
+				CFATAL("can't chown directory \"%s\"",
+				    child->d_name);
+			}
+		} else {
+			safe_mode = ~0;
+		}
+	}
+	if (fchmod(child->d_fd, child->d_mode & safe_mode) == -1)
+		CFATAL("can't chmod directory \"%s\"", child->d_name);
+	if (ct_attr) {
+		ts[0].tv_sec = child->d_atime;
+		ts[1].tv_sec = child->d_mtime;
+		ts[0].tv_nsec = ts[1].tv_nsec = 0;
+		if (futimens(child->d_fd, ts) == -1)
+			CFATAL("futimens on \"%s\" failed", child->d_name);
+	}
+	close(child->d_fd);
+	child->d_fd = -2;
+
+	ct_file_extract_closefrom(parent, child->d_parent);
+}
+
+void
+ct_file_extract_opento(struct dnode *parent, struct dnode *child)
+{
+	int	createtries = 0, chmodtries = 0, savederrno;
+
+	if (child == parent)
+		return;
+
+	ct_file_extract_opento(parent, child->d_parent);
+	/* check it exists, if it does not, create it */
+try_again:
+	/* XXX O_SEARCH would be applicable here but openbsd doesn't have it */
+	if ((child->d_fd = openat(child->d_parent->d_fd, child->d_sname,
+	    O_DIRECTORY | O_RDONLY |
+	    ct_follow_symlinks ? 0 : O_NOFOLLOW)) == -1) {
+		savederrno = errno;
+		/* if it doesn't exist, make the file with safe permissions */
+		if (errno == ENOENT && createtries++ == 0 &&
+		    mkdirat(child->d_parent->d_fd, child->d_sname,
+		    S_IRWXU) == 0)
+			goto try_again;
+		/* if it exists but we can't access it, try and chmod the dir */
+		if (errno == EACCES && chmodtries++ == 0 &&
+		    fchmodat(child->d_parent->d_fd, child->d_sname,
+			S_IRWXU, ct_follow_symlinks ? 0 :
+			AT_SYMLINK_NOFOLLOW) == 0)
+			goto try_again;
+		errno = savederrno;
+		CWARN("can't open directory %s", child->d_name);
+	}
 }

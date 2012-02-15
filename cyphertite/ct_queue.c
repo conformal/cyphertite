@@ -33,7 +33,6 @@ void ct_handle_exists_reply(struct ct_trans *, struct ct_header *, void *);
 void ct_handle_write_reply(struct ct_trans *, struct ct_header *, void *);
 void ct_handle_read_reply(struct ct_trans *, struct ct_header *, void *);
 
-void ct_write_ctfile_special(struct ct_trans *);
 void ct_complete_normal(struct ct_trans *);
 
 /* ct flags - these are named wrongly, should come from config */
@@ -886,28 +885,6 @@ ct_compute_csha(void *vctx)
 	CT_UNLOCK(&ct_state->ct_csha_lock);
 }
 
-void
-ct_write_ctfile_special(struct ct_trans *trans)
-{
-	struct fnode		*fnode = trans->tr_fl_node;
-	char			 mylink[PATH_MAX];
-	int			 ret;
-
-	if (C_ISLINK(fnode->fl_type) && fnode->fl_hardlink == 0) {
-		ret = readlink(fnode->fl_fname, mylink, sizeof(mylink));
-		if (ret == -1 || ret == sizeof(mylink)) {
-			/* readlink failed, do not record */
-			CWARNX("unable to read mylink for %s",
-			    fnode->fl_sname);
-			return;
-		}
-		mylink[ret] = '\0';
-		fnode->fl_hlname = e_strdup(mylink);
-	}
-
-	ctfile_write_special(trans->tr_ctfile, fnode);
-}
-
 /* completion handler for states for non-metadata actions. */
 void
 ct_complete_normal(struct ct_trans *trans)
@@ -926,13 +903,12 @@ ct_complete_normal(struct ct_trans *trans)
 			return;
 		if (ct_verbose_ratios)
 			ct_dump_stats(stdout);
-		ct_file_extract_fixup();
 		ct_shutdown();
 		break;
 	case TR_S_SPECIAL:
 		if (ct_verbose)
 			printf("%s\n", fnode->fl_sname);
-		ct_write_ctfile_special(trans);
+		ctfile_write_special(trans->tr_ctfile, fnode);
 		release_fnode = 1;
 		break;
 	case TR_S_FILE_START:

@@ -23,7 +23,7 @@
 .Nm cyphertite
 .Bk -words
 .Fl ctxV
-.Op Fl 0APRXapr
+.Op Fl 0APRXhpr
 .Op Fl B Ar ctfile
 .Op Fl C Ar tmpdir
 .Op Fl D Ar debugstring
@@ -306,6 +306,9 @@ Delete remote
 .Ar ctfile
 from the server.
 This option is used in conjunction with -m.
+.It Fl h
+Follow symbolic links as if they were a normal file or directory in
+archive or extract mode.
 .It Fl m
 Run in remote
 .Ar ctfile

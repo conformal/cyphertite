@@ -105,6 +105,7 @@ struct fnode {
 	off_t			fl_offset;
 	off_t			fl_comp_size;
 	char			*fl_fname;
+	char			*fl_name; /* name without directory */
 	char			*fl_sname;
 	int			fl_state;
 #define CT_FILE_START		(0)
@@ -123,7 +124,10 @@ struct flist {
 	struct fnode		*fl_node;
 	dev_t			fl_dev;
 	ino_t			fl_ino;
-	int			fl_forcedir;
+#define C_FF_FORCEDIR	0x1
+#define C_FF_CLOSEDIR	0x2
+#define C_FF_WASDIR	0x4
+	int			fl_flags;
 };
 
 struct dnode * gen_finddir(int64_t idx);
@@ -143,7 +147,13 @@ struct dnode {
 	int64_t			 d_num;
 	struct dnode		*d_parent;
 	char			*d_name;
-	struct flist		*d_flnode;
+	char			*d_sname;
+	int			 d_fd; /* valid if processing */
+	uint32_t                 d_uid;         /* user id */
+	uint32_t                 d_gid;         /* group id */
+	uint32_t                 d_mode;        /* file mode */
+	int                      d_atime;       /* last access time */
+	int                      d_mtime;       /* last modification time */
 };
 
 int	ct_dname_cmp(struct dnode *, struct dnode *);
@@ -157,6 +167,7 @@ RB_PROTOTYPE(d_num_tree, dnode, ds_rb, ct_dnum_cmp);
 struct fnode *ct_populate_fnode_from_flist(struct flist *);
 
 extern struct d_num_tree	ct_dnum_head;
+extern struct d_name_tree	ct_dname_head;
 extern struct flist_head	fl_list_head;
 
 /* FILE STATUS */
@@ -246,6 +257,7 @@ struct ct_trans		*ct_trans_realloc_local(struct ct_trans *);
 void			ct_trans_free(struct ct_trans *trans);
 void			ct_trans_cleanup(void);
 void			ct_flnode_cleanup(void);
+void			ct_dnum_cleanup(void);
 void			ct_dnode_cleanup(void);
 void			ct_free_fnode(struct fnode *);
 void			ct_ssl_cleanup(void);
@@ -348,6 +360,7 @@ struct ct_op {
  */
 struct ct_extract_args {
 	char			*cea_local_ctfile;
+	char			*cea_tdir;
 	char			**cea_filelist;
 	char			**cea_excllist;
 	int			 cea_matchmode;
@@ -358,6 +371,7 @@ struct ct_archive_args {
 	char			*caa_includefile;
 	char			*caa_tag;
 	char			*caa_basis;
+	char			*caa_tdir;
 	char			**caa_filelist;
 	char			**caa_excllist;
 	int			 caa_matchmode;
@@ -581,7 +595,9 @@ int  ct_file_extract_open(struct fnode *fnode);
 void ct_file_extract_write(struct fnode *, uint8_t *buf, size_t size);
 void ct_file_extract_close(struct fnode *fnode);
 void ct_file_extract_special(struct fnode *fnode);
-void ct_file_extract_fixup(void);
+void ct_file_extract_enddir(void);
+void ct_file_extract_setup_dir(const char *);
+void ct_file_extract_cleanup_dir();
 void ct_create_config(void);
 char *ct_system_config(void);
 char *ct_user_config(void);
@@ -743,6 +759,7 @@ struct ct_extract_stack   {
 };
 void	ct_extract_setup(struct ct_extract_head *, struct ctfile_parse_state *,
 	    const char *);
+void	ct_extract_setup_dir(const char *);
 void	ct_extract_setup_queue(struct ct_extract_head *,
 	    struct ctfile_parse_state *, const char *);
 void	ct_extract_open_next(struct ct_extract_head *,

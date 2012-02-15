@@ -17,6 +17,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
+#include <fcntl.h> /* XXX portability */
+#include <unistd.h>
 
 #include <clog.h>
 #include <exude.h>
@@ -26,8 +28,8 @@
 int	ct_populate_fnode(struct fnode *, struct ctfile_header *,
 	    struct ctfile_header *, int *);
 
-int64_t		ct_ex_dirnum = 0;
-const uint8_t	zerosha[SHA_DIGEST_LENGTH];
+int64_t		 ct_ex_dirnum = 0;
+const uint8_t	 zerosha[SHA_DIGEST_LENGTH];
 
 /*
  * Helper functions
@@ -36,8 +38,10 @@ int
 ct_populate_fnode(struct fnode *fnode, struct ctfile_header *hdr,
     struct ctfile_header *hdrlnk, int *state)
 {
-	struct flist		flistnode;
-	struct dnode		*dnode;
+	struct flist		 flistnode;
+	struct dnode		*dnode, *tdnode;
+	char			*name;
+	extern struct dnode	 ct_ex_rootdir;
 
 	if (C_ISLINK(hdr->cmh_type)) {
 		/* hardlink/symlink */
@@ -62,15 +66,21 @@ ct_populate_fnode(struct fnode *fnode, struct ctfile_header *hdr,
 	fnode->fl_atime = hdr->cmh_atime;
 	fnode->fl_type = hdr->cmh_type;
 
+	/* Default to parent being the ``root''. */
+	fnode->fl_parent_dir = &ct_ex_rootdir;
+	name = hdr->cmh_filename;
+	/* fnode->fl_parent_dir default to NULL */
 	if (hdr->cmh_parent_dir == -2) {
 		/* rooted directory */
 		flistnode.fl_fname = hdr->cmh_filename;
 		e_asprintf(&fnode->fl_sname , "%s%s",
 		    ct_strip_slash ? "" : "/", flistnode.fl_fname);
+		name = fnode->fl_sname;
 	} else if (hdr->cmh_parent_dir != -1) {
 		flistnode.fl_fname = hdr->cmh_filename;
 
-		flistnode.fl_parent_dir = gen_finddir(hdr->cmh_parent_dir);
+		fnode->fl_parent_dir = flistnode.fl_parent_dir =
+		    gen_finddir(hdr->cmh_parent_dir);
 		CNDBG(CT_LOG_CTFILE,
 		    "parent_dir %p %" PRId64, flistnode.fl_parent_dir,
 		    hdr->cmh_parent_dir);
@@ -78,6 +88,10 @@ ct_populate_fnode(struct fnode *fnode, struct ctfile_header *hdr,
 		fnode->fl_sname = gen_fname(&flistnode);
 	} else
 		fnode->fl_sname = e_strdup(hdr->cmh_filename);
+
+	/* name needed for openat() */
+	fnode->fl_name = e_strdup(name);
+
 	CNDBG(CT_LOG_CTFILE,
 	    "name %s from %s %" PRId64, fnode->fl_sname, hdr->cmh_filename,
 	    hdr->cmh_parent_dir);
@@ -85,7 +99,36 @@ ct_populate_fnode(struct fnode *fnode, struct ctfile_header *hdr,
 	if (C_ISDIR(hdr->cmh_type)) {
 		dnode = e_calloc(1,sizeof (*dnode));
 		dnode->d_name = e_strdup(fnode->fl_sname);
+		dnode->d_sname = e_strdup(name);
 		dnode->d_num = ct_ex_dirnum++;
+		dnode->d_fd = -1;
+		dnode->d_parent = fnode->fl_parent_dir;
+		dnode->d_mode = fnode->fl_mode;
+		dnode->d_atime = fnode->fl_atime;
+		dnode->d_mtime = fnode->fl_mtime;
+		dnode->d_uid = fnode->fl_uid;
+		dnode->d_gid = fnode->fl_gid;
+
+		/* Insert into the name tree first to check for duplicates. */
+		if ((tdnode = RB_INSERT(d_name_tree, &ct_dname_head, dnode))
+		    != NULL) {
+			if (ct_multilevel_allfiles == 0) {
+				/* update stat data */
+				tdnode->d_mode = dnode->d_mode;
+				tdnode->d_atime = dnode->d_atime;
+				tdnode->d_mtime = dnode->d_mtime;
+				tdnode->d_uid = dnode->d_uid;
+				tdnode->d_gid = dnode->d_gid;
+			}
+			/*
+			 * d_num is only used on inital file tree generation
+			 * so updating an older dnode when we are already
+			 * processing the next file is perfectly ok.
+			 */
+			 tdnode->d_num = dnode->d_num;
+			 e_free(&dnode);
+			 dnode = tdnode;
+		}
 		RB_INSERT(d_num_tree, &ct_dnum_head, dnode);
 		CNDBG(CT_LOG_CTFILE, "inserting %s as %" PRId64,
 		    dnode->d_name, dnode->d_num );
@@ -398,6 +441,7 @@ ct_extract(struct ct_op *op)
 		}
 		ct_extract_setup(&ex_priv->extract_head,
 		    &ex_priv->xdr_ctx, ctfile);
+		ct_file_extract_setup_dir(cea->cea_tdir);
 		/* create rb tree head, prepare to start inserting */
 		if (ct_multilevel_allfiles) {
 			char *nothing = NULL;
@@ -536,6 +580,8 @@ skip:
 			break;
 		case XS_RET_EOF:
 			CNDBG(CT_LOG_CTFILE, "Hit end of ctfile");
+			ct_dnum_cleanup();
+			ct_ex_dirnum = 0;
 			ctfile_parse_close(&ex_priv->xdr_ctx);
 			/* if rb tree and rb is empty, goto end state */
 			if ((ex_priv->haverb &&
@@ -550,6 +596,7 @@ skip:
 				    &ex_priv->extract_head);
 				goto we_re_done_here;
 			}
+
 
 			if (!TAILQ_EMPTY(&ex_priv->extract_head)) {
 				/*
@@ -641,6 +688,7 @@ ct_extract_file(struct ct_op *op)
 		    cefa->cefa_ctfile, cefa->cefa_ctfile_off) != 0)
 			CFATALX("can't open metadata file %s",
 			    cefa->cefa_ctfile);
+		ct_file_extract_setup_dir(NULL);
 		ct_encrypt_enabled =
 		    (ex_priv->xdr_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO);
 		ct_multilevel_allfiles = (ex_priv->xdr_ctx.xs_gh.cmg_flags &
@@ -662,12 +710,15 @@ ct_extract_file(struct ct_op *op)
 
 		if (ex_priv->done) {
 			CNDBG(CT_LOG_CTFILE, "Hit end of ctfile");
+			ct_dnum_cleanup();
+			ct_ex_dirnum = 0;
 			ctfile_parse_close(&ex_priv->xdr_ctx);
 			e_free(&ex_priv);
 			trans->tr_state = TR_S_DONE;
 			ct_queue_transfer(trans);
 			CNDBG(CT_LOG_TRANS, "extract finished");
 			ct_set_file_state(CT_S_FINISHED);
+			e_free(&ex_priv);
 			return;
 		}
 

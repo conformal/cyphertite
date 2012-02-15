@@ -505,7 +505,6 @@ ct_complete_metadata(struct ct_trans *trans)
 		if (ct_verbose_ratios)
 			ct_dump_stats(stdout);
 
-		ct_file_extract_fixup();
 		ct_shutdown();
 		break;
 	case TR_S_WMD_READY:

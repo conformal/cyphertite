@@ -65,6 +65,7 @@ char			*ct_tdir;
 int			ct_strip_slash = 1;
 int			ct_verbose_ratios;
 int			ct_no_cross_mounts;
+int			ct_follow_symlinks = 0;
 int			ct_verbose;
 char			*ct_configfile;
 int			ct_attr;
@@ -86,7 +87,7 @@ ct_usage(void)
 
 	/* ct general usage */
 	fprintf(stderr,
-	    "usage: %s {-ctxV} [-0APRXadprv] [-B basisctfile] [-C directory]\n",
+	    "usage: %s {-ctxV} [-0APRXadhprv] [-B basisctfile] [-C directory]\n",
 	    __progname);
 	fprintf(stderr,
 	    "%s [-D debugstring] [-E excludefile] [-F conffile] [-I includefile]\n",
@@ -321,7 +322,7 @@ ct_main(int argc, char **argv)
 	int				 force_allfiles = -1;
 
 	while ((c = getopt(argc, argv,
-	    "AB:C:D:E:F:I:PRVXacdef:mprtvx0")) != -1) {
+	    "AB:C:D:E:F:I:PRVXacdef:hmprtvx0")) != -1) {
 		switch (c) {
 		case 'A':
 			force_allfiles = 0;
@@ -375,6 +376,9 @@ ct_main(int argc, char **argv)
 			break;
 		case 'f': /* metadata file */
 			ctfile = optarg;
+			break;
+		case 'h':
+			ct_follow_symlinks = 1;
 			break;
 		case 'm': /* metadata processing - XXX temporary? */
 			ct_metadata = 1;
@@ -502,6 +506,7 @@ ct_main(int argc, char **argv)
 			cea.cea_filelist = includelist;
 			cea.cea_excllist = excludelist;
 			cea.cea_matchmode = ct_match_mode;
+			cea.cea_tdir = ct_tdir;
 			ctfile_find_for_operation(ctfile,
 			    ((ct_action == CT_A_EXTRACT)  ?
 			    ctfile_nextop_extract : ctfile_nextop_list),
@@ -512,6 +517,7 @@ ct_main(int argc, char **argv)
 			caa.caa_excllist = excludelist;
 			caa.caa_matchmode = ct_match_mode;
 			caa.caa_includefile = ct_includefile;
+			caa.caa_tdir = ct_tdir;
 			caa.caa_tag = ctfile;
 			if (ct_auto_differential)
 				/*
