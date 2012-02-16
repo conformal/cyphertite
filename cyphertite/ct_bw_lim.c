@@ -50,7 +50,7 @@ ct_assl_io_over_bw_check_func ct_ssl_over_bw_func;
 
 struct event	wakeuptimer_ev;
 
-void ct_ssl_over_bw_wakeup(int, short, void *);
+void ct_ssl_over_bw_wakeup(evutil_socket_t, short, void *);
 
 void
 ct_ssl_init_bw_lim(struct ct_assl_io_ctx *ctx)
@@ -73,7 +73,7 @@ ct_ssl_init_bw_lim(struct ct_assl_io_ctx *ctx)
 }
 
 void
-ct_ssl_over_bw_wakeup(int fd_unused, short reason, void *varg)
+ct_ssl_over_bw_wakeup(evutil_socket_t fd_unused, short reason, void *varg)
 {
 	struct timeval		now;
 	struct ct_assl_io_ctx	*ctx = varg;

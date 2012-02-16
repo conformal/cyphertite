@@ -19,8 +19,12 @@
 
 #include <event.h>
 
+#ifndef evutil_socket_t
+#define evutil_socket_t int
+#endif
+
 /* provide a typedef for the libevent callback type */
-typedef void (eventcb_ty)(int, short, void *);
+typedef void (eventcb_ty)(evutil_socket_t, short, void *);
 
 typedef void (msgdeliver_ty)(void *, struct ct_header *, void *);
 typedef void (msgcomplete_ty)(void *, struct ct_header *, void *, int);

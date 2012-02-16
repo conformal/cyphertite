@@ -24,6 +24,12 @@
 #include <ctutil.h>
 #include <ct_socket.h>
 
+#include <event.h>
+
+#ifndef evutil_socket_t
+#define evutil_socket_t int
+#endif
+
 #include "ct_crypto.h"
 
 /* versioning */
@@ -392,7 +398,7 @@ void ct_setup_wakeup_csha(void *, ct_func_cb *);
 void ct_setup_wakeup_encrypt(void *, ct_func_cb *);
 void ct_setup_wakeup_write(void *, ct_func_cb *);
 void ct_setup_wakeup_complete(void *, ct_func_cb *);
-void ct_set_reconnect_timeout(void (*)(int, short, void*), void *,
+void ct_set_reconnect_timeout(void (*)(evutil_socket_t, short, void*), void *,
     int);
 extern int ct_reconnect_pending;
 
@@ -565,7 +571,7 @@ struct ct_stat {
 
 void			ct_dump_stats(FILE *);
 struct ct_assl_io_ctx	*ct_ssl_connect(int);
-void			ct_reconnect(int, short, void *);
+void			ct_reconnect(evutil_socket_t, short, void *);
 int			ct_reconnect_internal(void);
 void			ct_load_certs(struct assl_context *);
 int			ct_assl_negotiate_poll(struct ct_assl_io_ctx *);

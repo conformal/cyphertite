@@ -37,7 +37,7 @@ void ct_unwire_header(struct ct_header *h);
 pid_t c_pid;
 
 void
-ct_event_assl_write(int fd_notused, short events, void *arg)
+ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 {
 	struct assl_context	*c;
 	struct ct_assl_io_ctx	*ioctx = arg;
@@ -186,7 +186,7 @@ done:
 }
 
 void
-ct_event_assl_read(int fd, short events, void *arg)
+ct_event_assl_read(evutil_socket_t fd, short events, void *arg)
 {
 	struct assl_context	*c;
 	struct ct_assl_io_ctx	*ioctx = arg;
@@ -288,12 +288,13 @@ ct_event_assl_read(int fd, short events, void *arg)
 
 		break;
 	default:
-		CFATALX("invalid io state %d fd %d", ioctx->io_i_state, fd);
+		CFATALX("invalid io state %d fd %"PRId64, ioctx->io_i_state,
+		    (int64_t)fd);
 	}
 }
 
 void
-ct_event_io_write(int fd, short events, void *arg)
+ct_event_io_write(evutil_socket_t fd, short events, void *arg)
 {
 	struct ct_io_ctx	*ioctx = arg;
 	struct ct_header	*hdr;
@@ -436,7 +437,7 @@ done:
 }
 
 void
-ct_event_io_read(int fd, short events, void *arg)
+ct_event_io_read(evutil_socket_t fd, short events, void *arg)
 {
 	struct ct_io_ctx	*ioctx = arg;
 	struct ct_header	*hdr;
@@ -534,7 +535,8 @@ ct_event_io_read(int fd, short events, void *arg)
 
 		break;
 	default:
-		CFATALX("invalid io state %d fd %d", ioctx->io_i_state, fd);
+		CFATALX("invalid io state %d fd %"PRId64, ioctx->io_i_state,
+		    (int64_t)fd);
 	}
 }
 

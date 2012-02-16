@@ -521,7 +521,7 @@ ct_reconnect_internal(void)
 }
 
 void
-ct_reconnect(int unused, short event, void *varg)
+ct_reconnect(evutil_socket_t unused, short event, void *varg)
 {
 	if (ct_reconnect_internal() == 0) {
 		ct_reconnect_timeout = CT_RECONNECT_DEFAULT_TIMEOUT;
