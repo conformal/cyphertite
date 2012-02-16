@@ -237,7 +237,8 @@ ct_get_debugmask(char *debugstring)
 {
 	char		*cur, *next;
 	uint64_t	 debug_mask = 0;
-	int		 i;
+	int		 i, neg;
+
 	struct debuglvl {
 		const char	*name;
 		uint64_t	 mask;
@@ -260,8 +261,13 @@ ct_get_debugmask(char *debugstring)
 	CWARNX("%s", __func__);
 	next = debugstring;
 	while ((cur = next) != NULL) {
+		neg = 0;
 		if ((next = strchr(next + 1, ',')) != NULL) {
 			*(next++) = '\0';
+		}
+		if (*cur == '-') {
+			neg = 1;
+			cur++;
 		}
 		for (i = 0; i < nitems(debuglevels); i++) {
 			if (strcasecmp(debuglevels[i].name,
@@ -274,7 +280,10 @@ ct_get_debugmask(char *debugstring)
 			 continue;
 		}
 
-		debug_mask |= debuglevels[i].mask;
+		if (neg)
+			debug_mask &= ~debuglevels[i].mask;
+		else
+			debug_mask |= debuglevels[i].mask;
 	}
 
 	return (debug_mask);
