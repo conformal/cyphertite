@@ -14,6 +14,11 @@ LIBDIR ?= ${LOCALBASE}/lib
 INCDIR ?= ${LOCALBASE}/include
 MANDIR ?= $(LOCALBASE)/share/man
 
+BUILDVERSION=$(shell sh ${CURDIR}/../buildver.sh)
+ifneq ("${BUILDVERSION}", "")
+CPPFLAGS+= -DBUILDSTR=\"$(BUILDVERSION)\"
+endif
+
 # Use obj directory if it exists.
 OBJPREFIX ?= obj/
 ifeq "$(wildcard $(OBJPREFIX))" ""
