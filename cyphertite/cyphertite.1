@@ -37,12 +37,18 @@
 .Nm
 .Bk -words
 .Fl m
-.Fl cetx
-.Op Fl r
-.Op Fl C Ar tmpdir
+.Fl e
 .Op Fl D Ar debugstring
 .Op Fl F Ar conffile
-.Op Fl f Ar metadata-tag
+.Op Fl f Ar ctfile
+.Ek
+.Nm
+.Bk -words
+.Fl m
+.Fl t
+.Op Fl r
+.Op Fl D Ar debugstring
+.Op Fl F Ar conffile
 .Op Ar pattern
 .Ek
 .Sh DESCRIPTION
@@ -163,6 +169,14 @@ option,
 patterns) and
 .Nm
 will list all archive members that match that pattern.
+.Pp
+When used with the
+.Fl m
+modifier
+.Nm
+will list the remote
+.Ar ctfiles
+on the server.
 .It Fl x
 Extract files from archive.
 If any files are named on the command line, only those files will
@@ -257,10 +271,10 @@ The option prevents
 from descending into directories that have a different device number
 than the file from which the descent began.
 .It Fl e
-Deletes a remotely stored archive metadata file.  The option is used in
+Delete remote metadata from the server.  This option is used in
 conjunction with -m.
 .It Fl m
-run in metadata mode.
+Run in metadata mode.
 See
 .Sx METADATA MODE
 for an explanation.
@@ -281,18 +295,49 @@ Display version information.  All other options are ignored.
 .Sh METADATA MODE
 If
 .Fl m
-is provided on the command mode then
+is provided on the command line then
 .Nm
-will operate in metadata mode.
-The
-.Fl x ,
-.Fl c
-and
+will operate on the remote
+.Ar ctfile
+store.  The
 .Fl t
-commands now operate on the remote archive metadata store.
-Additionally
+flag now operates on the remote
+.Ar ctfile
+store.  Additionally
 .Fl e
-may be used to delete remote metadata from the server.
+may be used to delete remote
+.Ar ctfiles
+from the server.
+.Bl -tag -width Ds
+.It Fl me
+Delete a remote
+.Ar ctfile
+from the server.  This combination must be used with the
+.Fl f
+flag to identify which
+.Ar ctfile
+to remove.  The exact
+.Ar ctfile
+as displayed with the
+.Fl mt
+option must be specified.
+.It Fl mt
+List remote
+.Ar ctfiles .
+If any
+.Ar ctfiles
+are named on the command line, only those will be listed.  The arguments may be
+specified as
+.Xr glob 7
+patterns (or, with the
+.Fl r
+option,
+.Xr regex 3
+patterns) and
+.Nm
+will list only the matching
+.Ar ctfiles .
+.El
 .Sh METADATA OPERATION MODES
 Two different metadata modes are supported by
 .Nm :
