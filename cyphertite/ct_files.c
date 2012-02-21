@@ -47,7 +47,7 @@ struct dir_stat;
 int			 ct_cmp_dirlist(struct dir_stat *, struct dir_stat *);
 struct fnode		*ct_populate_fnode_from_flist(struct flist *);
 char			*ct_name_to_safename(char *);
-void			 ct_traverse(char **, char *, char **, int);
+void			 ct_traverse(char **);
 
 RB_HEAD(ct_dir_lookup, dir_stat) ct_dir_rb_head =
     RB_INITIALIZER(&ct_dir_rb_head);
@@ -244,6 +244,44 @@ gen_finddir(int64_t idx)
 
 
 struct fnode *
+ct_get_next_fnode(struct flist **flist, struct ct_match *include,
+    struct ct_match *exclude)
+{
+	struct fnode	*fnode;
+again:
+	if (*flist == NULL)
+		*flist = TAILQ_FIRST(&fl_list_head);
+	else
+		*flist = TAILQ_NEXT(*flist, fl_list);
+	if (*flist == NULL)
+		return (NULL);
+	/*
+	 * Deleted files will return NULL here, so keep looking until
+	 * we find a valid file or we run out of options.
+	 */
+	while ((fnode = ct_populate_fnode_from_flist(*flist)) == NULL &&
+	    (*flist = TAILQ_NEXT(*flist, fl_list)) != NULL)
+		;
+	if (fnode == NULL)
+		return (NULL);
+
+	if (include && ct_match(include, fnode->fl_sname)) {
+		CNDBG(CT_LOG_FILE, "%s not in include list, skipping",
+		    fnode->fl_sname);
+		ct_free_fnode(fnode);
+		goto again;
+	}
+	if (exclude && !ct_match(exclude, fnode->fl_sname)) {
+		CNDBG(CT_LOG_FILE, "%s in exclude list, skipping",
+		    fnode->fl_sname);
+		ct_free_fnode(fnode);
+		goto again;
+	}
+
+	return (fnode);
+}
+
+struct fnode *
 ct_populate_fnode_from_flist(struct flist *flnode)
 {
 	struct fnode		*fnode;
@@ -352,10 +390,6 @@ ct_sched_backup_file(struct stat *sb, char *filename, int forcedir)
 	flnode->fl_ino = sb->st_ino;
 	flnode->fl_parent_dir = NULL;
 
-	if (dnode != NULL) {
-		dnode->d_flnode = flnode;
-	}
-
 	strlcpy(fname_buf, filename, sizeof(fname_buf));
 	dsearch.d_name = dirname(fname_buf);
 	dfound = RB_FIND(d_name_tree, &ct_dname_head, &dsearch);
@@ -371,6 +405,11 @@ ct_sched_backup_file(struct stat *sb, char *filename, int forcedir)
 		flnode->fl_fname = e_strdup(filename);
 		CNDBG(CT_LOG_CTFILE, "parent of %s is not found [%s]",
 		    flnode->fl_fname, dsearch.d_name);
+	}
+
+	if (dnode != NULL) {
+		dnode->d_flnode = flnode;
+		dnode->d_parent = flnode->fl_parent_dir;
 	}
 
 	flnode->fl_hlnode = NULL;
@@ -393,6 +432,12 @@ ct_sched_backup_file(struct stat *sb, char *filename, int forcedir)
 	return 0;
 }
 
+struct ct_archive_priv {
+	struct ctfile_write_state	*cap_cws;
+	struct ct_match			*cap_include;
+	struct ct_match			*cap_exclude;
+};
+
 void
 ct_archive(struct ct_op *op)
 {
@@ -404,7 +449,7 @@ ct_archive(struct ct_op *op)
 	off_t			rsz;
 	struct stat		sb;
 	struct ct_trans		*ct_trans;
-	struct ctfile_write_state	*cws = op->op_priv;
+	struct ct_archive_priv	*cap = op->op_priv;
 	char			cwd[PATH_MAX];
 	int			new_file = 0;
 	int			error;
@@ -418,6 +463,16 @@ ct_archive(struct ct_op *op)
 			CFATALX("no files specified");
 		}
 
+		cap = e_calloc(1, sizeof(*cap));
+		op->op_priv = cap;
+		if (caa->caa_includefile)
+			cap->cap_include =
+			    ct_match_fromfile(caa->caa_includefile,
+			    caa->caa_matchmode);
+		if (caa->caa_excllist)
+			cap->cap_exclude = ct_match_compile(caa->caa_matchmode,
+			    caa->caa_excllist);
+
 		if (basisbackup != NULL &&
 		    (nextlvl = ct_basis_setup(basisbackup, filelist)) == 0)
 			e_free(&basisbackup);
@@ -427,18 +482,25 @@ ct_archive(struct ct_op *op)
 
 		if (ct_tdir && chdir(ct_tdir) != 0)
 			CFATALX("can't chdir to %s", ct_tdir);
-		ct_traverse(filelist, caa->caa_includefile, caa->caa_excllist,
-		    caa->caa_matchmode);
+		ct_traverse(filelist);
+		/*
+		 * Get the first file we must operate on.
+		 * Do this before we open the ctfile for writing so
+		 * if all are excluded we don't then have to unlink it.
+		 */
+		fl_lcurnode = NULL;
+		if ((fl_curnode = ct_get_next_fnode(&fl_lcurnode,
+		    cap->cap_include, cap->cap_exclude)) == NULL)
+			CFATALX("all files specified excluded or nonexistant");
 
 		if (ct_tdir && chdir(cwd) != 0)
 			CFATALX("can't chdir back to %s", cwd);
 
 		/* XXX - deal with stdin */
 		/* XXX - if basisbackup should the type change ? */
-		if ((cws = ctfile_write_init(ctfile, CT_MD_REGULAR, basisbackup,
-		    nextlvl, cwd, filelist)) == NULL)
+		if ((cap->cap_cws = ctfile_write_init(ctfile, CT_MD_REGULAR,
+		    basisbackup, nextlvl, cwd, filelist)) == NULL)
 			CFATAL("can't create %s", ctfile);
-		op->op_priv = cws;
 
 		if (basisbackup != NULL)
 			e_free(&basisbackup);
@@ -447,17 +509,6 @@ ct_archive(struct ct_op *op)
 		if (ct_tdir && chdir(ct_tdir) != 0)
 			CFATALX("can't chdir to %s", ct_tdir);
 
-		/*
-		 * it is possible the first files may have been deleted
-		 * before the scan completes, in that case skip
-		 * to the first existing node for fl_lcurnode/fl_curnode
-		 */
-		fl_lcurnode = TAILQ_FIRST(&fl_list_head);
-		do {
-			fl_curnode = ct_populate_fnode_from_flist(fl_lcurnode);
-			if (fl_curnode == NULL)
-				fl_lcurnode = TAILQ_NEXT(fl_lcurnode, fl_list);
-		} while (fl_lcurnode != NULL && fl_curnode == NULL);
 	} else if (ct_state->ct_file_state == CT_S_FINISHED)
 		return;
 
@@ -506,7 +557,7 @@ loop:
 				}
 			}
 		}
-		ct_trans->tr_ctfile = cws;
+		ct_trans->tr_ctfile = cap->cap_cws;;
 		ct_trans->tr_fl_node = fl_curnode;
 		fl_curnode->fl_state = CT_FILE_FINISHED;
 		fl_curnode->fl_size = 0;
@@ -551,7 +602,7 @@ loop:
 				fl_curnode->fl_skip_file = skip_file;
 			}
 		}
-		ct_trans->tr_ctfile = cws;
+		ct_trans->tr_ctfile = cap->cap_cws;;
 		ct_trans->tr_fl_node = fl_curnode;
 		ct_trans->tr_state = TR_S_FILE_START;
 		ct_trans->tr_type = TR_T_WRITE_HEADER;
@@ -593,7 +644,7 @@ loop:
 	if (rlen > 0)
 		ct_stats->st_bytes_read += rlen;
 
-	ct_trans->tr_ctfile = cws;
+	ct_trans->tr_ctfile = cap->cap_cws;;
 	ct_trans->tr_fl_node = fl_curnode;
 	ct_trans->tr_size[0] = rlen;
 	ct_trans->tr_chsize = rlen;
@@ -642,23 +693,13 @@ loop:
 next_file:
 	/* XXX should node be removed from list at this time? */
 	if (fl_curnode->fl_state == CT_FILE_FINISHED) {
-		/*
-		 * if files are deleted ct_populate_fnode_from_flist()
-		 * will return NULL, so keep walking the list
-		 */
-		do {
-			fl_lcurnode = TAILQ_NEXT(fl_lcurnode, fl_list);
-			if (fl_lcurnode == NULL) {
-				CNDBG(CT_LOG_FILE, "no more files");
-				fl_curnode = NULL;
-			} else {
-				fl_curnode =
-				    ct_populate_fnode_from_flist(fl_lcurnode);
-			}
-		} while (fl_lcurnode != NULL && fl_curnode == NULL);
-		if (fl_curnode != NULL)
+		if ((fl_curnode = ct_get_next_fnode(&fl_lcurnode,
+		    cap->cap_include, cap->cap_exclude)) == NULL) {
+			CNDBG(CT_LOG_FILE, "no more files");
+		} else {
 			CNDBG(CT_LOG_FILE, "going to next file %s",
 			    fl_curnode->fl_sname);
+		}
 	}
 
 	if (fl_curnode != NULL)
@@ -676,7 +717,11 @@ done:
 		ct_set_file_state(CT_S_WAITING_TRANS);
 		return;
 	}
-	ct_trans->tr_ctfile = cws;
+	if (cap->cap_include)
+		ct_match_unwind(cap->cap_include);
+	if (cap->cap_exclude)
+		ct_match_unwind(cap->cap_exclude);
+	ct_trans->tr_ctfile = cap->cap_cws;;
 	ct_trans->tr_fl_node = NULL;
 	ct_trans->tr_state = TR_S_DONE;
 	ct_trans->tr_eof = 0;
@@ -685,19 +730,13 @@ done:
 }
 
 void
-ct_traverse(char **paths, char *includefile, char **exclude, int match_mode)
+ct_traverse(char **paths)
 {
 	FTS			*ftsp;
 	FTSENT			*fe;
-	struct ct_match		*include_match = NULL, *exclude_match = NULL;
 	char			 clean[PATH_MAX];
 	int			 fts_options;
-	int			 cnt, ecnt;
-
-	if (includefile)
-		include_match = ct_match_fromfile(includefile, match_mode);
-	if (exclude)
-		exclude_match = ct_match_compile(match_mode, exclude);
+	int			 cnt;
 
 	fts_options = FTS_PHYSICAL | FTS_NOCHDIR;
 	if (ct_no_cross_mounts)
@@ -709,7 +748,7 @@ ct_traverse(char **paths, char *includefile, char **exclude, int match_mode)
 	if (ct_verbose)
 		CINFO("Generating filelist, this may take a few minutes...");
 
-	ecnt = cnt = 0;
+	cnt = 0;
 	while ((fe = fts_read(ftsp)) != NULL) {
 		switch (fe->fts_info) {
 		case FTS_D:
@@ -743,23 +782,6 @@ ct_traverse(char **paths, char *includefile, char **exclude, int match_mode)
 			if (backup_prefix(clean))
 				CFATAL("backup_prefix failed");
 
-		/*
-		 * First check to see if it matches any include file we have
-		 * Then, if it is matched by the exclude file then ignore it
-		 * anyway.
-		 */
-		if (include_match && ct_match(include_match, clean)) {
-			CNDBG(CT_LOG_FILE, "failing %s: not in include list",
-			    clean);
-			continue;
-		}
-		if (exclude_match && !ct_match(exclude_match, clean)) {
-			CNDBG(CT_LOG_FILE, "failing %s: in exclude list",
-			    clean);
-			ecnt++;
-			continue;
-		}
-
 		CNDBG(CT_LOG_FILE, "scheduling backup of %s", clean);
 		/* backup all other files */
 		if (ct_sched_backup_file(fe->fts_statp, clean, 0))
@@ -770,17 +792,10 @@ ct_traverse(char **paths, char *includefile, char **exclude, int match_mode)
 	if (cnt == 0)
 		CFATALX("can't access any of the specified file(s)");
 
-	if (ecnt == cnt)
-		CFATALX("all specified files are excluded");
-
 	if (fe == NULL && errno)
 		CFATAL("fts_read failed");
 	if (fts_close(ftsp))
 		CFATAL("fts_close failed");
-	if (include_match)
-		ct_match_unwind(include_match);
-	if (exclude_match)
-		ct_match_unwind(exclude_match);
 	gettimeofday(&ct_stats->st_time_scan_end, NULL);
 	if (ct_verbose)
 		CINFO("Done! Initiating backup...");

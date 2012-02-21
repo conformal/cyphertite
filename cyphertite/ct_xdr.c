@@ -684,9 +684,6 @@ ctfile_write_header(struct ctfile_write_state *ctx, struct fnode *fnode,
 	bzero(&hdr, sizeof hdr);
 
 	if (C_ISDIR(fnode->fl_type)) {
-		if (fnode->fl_curdir_dir->d_parent == NULL)
-			fnode->fl_curdir_dir->d_parent = fnode->fl_parent_dir;
-
 		if (fnode->fl_curdir_dir->d_num == -2) {
 			fnode->fl_curdir_dir->d_num = ++ctx->cws_dirnum;
 			CNDBG(CT_LOG_CTFILE, "tagging dir %s as %" PRId64,
