@@ -271,6 +271,8 @@ extern int		 ct_secrets_upload;
 extern int		 ct_auto_differential;
 extern long long	 ct_max_mdcache_size;
 
+void			ct_normalize_username(char *);
+
 /* what are we doing? */
 extern int		ct_action;
 #define CT_A_ARCHIVE	(1)

@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <grp.h>
 #include <pwd.h>
+#include <ctype.h>
 
 #include <clog.h>
 #include <assl.h>
@@ -912,4 +913,12 @@ ct_cmp_logincache(struct ct_login_cache *f1, struct ct_login_cache *f2)
 {
 	return ((f1->lc_uid < f2->lc_uid) ? -1 :
 	    (f1->lc_uid == f2->lc_uid ? 0 : 1));
+}
+
+void
+ct_normalize_username(char *username)
+{
+	/* Assume ASCII. */
+	for (; *username != '\0'; username++)
+		*username = tolower(*username);
 }
