@@ -1141,14 +1141,14 @@ ct_wakeup_write(void)
 		ct_reconnect_pending = 0;
 	}
 
-	CNDBG(CT_LOG_NET, "wakup write");
+	CNDBG(CT_LOG_NET, "wakeup write");
 	while (ct_disconnected == 0 &&
 	    !TAILQ_EMPTY(&ct_state->ct_write_queue)) {
 		trans = TAILQ_FIRST(&ct_state->ct_write_queue);
 		TAILQ_REMOVE(&ct_state->ct_write_queue, trans, tr_next);
 		ct_state->ct_write_qlen--;
 
-		CNDBG(CT_LOG_NET, "wakup write going");
+		CNDBG(CT_LOG_NET, "wakeup write going");
 		hdr = &trans->hdr;
 
 		hdr->c_version = C_HDR_VERSION;
