@@ -358,7 +358,7 @@ ct_create_config(void)
 		CFATALX("default cachedir");
 
 	snprintf(prompt, sizeof prompt,
-	    "Choose a metadata operation mode (remote/local) [remote]: ");
+	    "Choose a ctfile operation mode (remote/local) [remote]: ");
 	rv = ct_get_answer(prompt, "remote", "local", "remote", answer,
 	    sizeof answer, 0);
 	mode = strdup(answer);
@@ -367,7 +367,7 @@ ct_create_config(void)
 
 	if (rv == 1) {
 		snprintf(prompt, sizeof prompt,
-		    "Target metadata cache directory [%s]: ", cachedir);
+		    "Target ctfile cache directory [%s]: ", cachedir);
 		ct_get_answer(prompt, NULL, NULL, cachedir, answer,
 		    sizeof answer, 0);
 		if (cachedir != NULL)
