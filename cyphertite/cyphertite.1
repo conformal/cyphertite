@@ -23,7 +23,7 @@
 .Nm cyphertite
 .Bk -words
 .Fl ctxV
-.Op Fl 0APRXhpr
+.Op Fl 0AHPRXhpr
 .Op Fl B Ar ctfile
 .Op Fl C Ar tmpdir
 .Op Fl D Ar debugstring
@@ -276,6 +276,8 @@ is specified.
 .It Fl F Ar config
 Specify the location of the configuration file to use, overriding
 the default values.
+.It Fl H
+Follow symlinks passsed on the command line.
 .It Fl I Ar pattern_file
 Specify the location of a file containing a list of patterns to included
 in list, archive and extract modes.

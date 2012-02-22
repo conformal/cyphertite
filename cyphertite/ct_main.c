@@ -66,6 +66,7 @@ int			ct_strip_slash = 1;
 int			ct_verbose_ratios;
 int			ct_no_cross_mounts;
 int			ct_follow_symlinks = 0;
+int			ct_root_symlink = 0;
 int			ct_verbose;
 char			*ct_configfile;
 int			ct_attr;
@@ -87,7 +88,7 @@ ct_usage(void)
 
 	/* ct general usage */
 	fprintf(stderr,
-	    "usage: %s {-ctxV} [-0APRXadhprv] [-B basisctfile] [-C directory]\n",
+	    "usage: %s {-ctxV} [-0AHPRXadhprv] [-B basisctfile] [-C directory]\n",
 	    __progname);
 	fprintf(stderr,
 	    "%s [-D debugstring] [-E excludefile] [-F conffile] [-I includefile]\n",
@@ -322,7 +323,7 @@ ct_main(int argc, char **argv)
 	int				 force_allfiles = -1;
 
 	while ((c = getopt(argc, argv,
-	    "AB:C:D:E:F:I:PRVXacdef:hmprtvx0")) != -1) {
+	    "AB:C:D:E:F:HI:PRVXacdef:hmprtvx0")) != -1) {
 		switch (c) {
 		case 'A':
 			force_allfiles = 0;
@@ -344,6 +345,9 @@ ct_main(int argc, char **argv)
 			break;
 		case 'F':
 			configfile = optarg;
+			break;
+		case 'H':
+			ct_root_symlink = 1;
 			break;
 		case 'I':
 			ct_includefile = optarg;

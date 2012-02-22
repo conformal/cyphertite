@@ -828,12 +828,18 @@ ct_traverse(char **paths)
 	char			 clean[PATH_MAX];
 	int			 fts_options;
 	int			 cnt;
+	int			 forcedir;
+	extern int		 ct_root_symlink;
 
 	fts_options = FTS_NOCHDIR;
 	if (ct_follow_symlinks)
 		fts_options |= FTS_LOGICAL;
 	else
 		fts_options |= FTS_PHYSICAL;
+	if (ct_root_symlink) {
+		CWARNX("-H");
+		fts_options |= FTS_COMFOLLOW;
+	}
 	if (ct_no_cross_mounts)
 		fts_options |= FTS_XDEV;
 	ftsp = fts_open(paths, fts_options, NULL);
@@ -845,6 +851,7 @@ ct_traverse(char **paths)
 
 	cnt = 0;
 	while ((fe = fts_read(ftsp)) != NULL) {
+		forcedir = 0;
 		switch (fe->fts_info) {
 		case FTS_D:
 		case FTS_DEFAULT:
@@ -874,14 +881,18 @@ ct_traverse(char **paths)
 		}
 
 		/* backup dirs above fts starting point */
-		if (fe->fts_level == 0)
+		if (fe->fts_level == 0) {
+			/* XXX technically this should apply to files too */
+			if (ct_root_symlink && fe->fts_info == FTS_D)
+				forcedir = 1;
 			if (backup_prefix(clean))
 				CFATAL("backup_prefix failed");
+		}
 
 		CNDBG(CT_LOG_FILE, "scheduling backup of %s", clean);
 		/* backup all other files */
 sched:
-		if (ct_sched_backup_file(fe->fts_statp, clean, 0,
+		if (ct_sched_backup_file(fe->fts_statp, clean, forcedir,
 		    fe->fts_info == FTS_DP ? 1 : 0))
 			CFATAL("backup_file failed: %s", clean);
 
