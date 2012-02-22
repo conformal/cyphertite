@@ -922,5 +922,3 @@ ctfile_write_close(struct ctfile_write_state *ctx)
 
 	e_free(&ctx);
 }
-
-

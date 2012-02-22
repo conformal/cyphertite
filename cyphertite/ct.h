@@ -174,8 +174,9 @@ extern struct flist_head	fl_list_head;
 
 #define CT_S_STARTING		(0)
 #define CT_S_RUNNING		(1)
-#define CT_S_WAITING_TRANS	(2)
-#define CT_S_FINISHED		(3)
+#define CT_S_WAITING_SERVER	(2)
+#define CT_S_WAITING_TRANS	(3)
+#define CT_S_FINISHED		(4)
 
 void				ct_set_file_state(int);
 

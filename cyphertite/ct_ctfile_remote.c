@@ -293,9 +293,6 @@ ctfile_extract_nextop(struct ct_op *op)
 {
 	struct ct_ctfile_find_fileop_args	*ccffa = op->op_args;
 	struct ct_ctfileop_args			*cca;
-	extern int		 		 ctfile_is_open; /* XXX */
-
-	ctfile_is_open = 0;
 
 	/*
 	 * If this is an operation that needs the full differential chain
@@ -343,9 +340,7 @@ ctfile_download_next(struct ct_op *op)
 	char			*prevfile;
 	char			*cachename;
 	char			*cookedname;
-	extern int		 ctfile_is_open; /* XXX */
 
-	ctfile_is_open = 0;	/* prevent trying to close upon next download */
 again:
 	CNDBG(CT_LOG_CTFILE, "ctfile %s", ctfile);
 

@@ -42,11 +42,6 @@ SLIST_HEAD(ctfile_list, ctfile_list_file);
 
 struct ctfile_list			ctfile_list_files =
 				     SLIST_HEAD_INITIALIZER(&ctfile_list_files);
-FILE				*ctfile_handle = NULL;
-int				ctfile_block_no = 0;
-int				ctfile_is_open = 0;
-int				ctfile_open_inflight = 0;
-off_t				ctfile_size, ctfile_offset;
 
 void ct_cull_send_shas(struct ct_op *);
 void ct_cull_setup(struct ct_op *);
@@ -84,19 +79,52 @@ ctfile_op_cleanup(struct ct_op *op)
 	e_free(&cca->cca_remotename);
 }
 
+struct ctfile_archive_state {
+	 FILE		*cas_handle;
+	off_t		 cas_size;
+	off_t		 cas_offset;
+	int		 cas_block_no;
+	int		 cas_open_sent;
+};
+
 struct fnode	ctfile_node;
 void
 ctfile_archive(struct ct_op *op)
 {
-	struct ct_ctfileop_args	*cca = op->op_args;
-	const char		*ctfile = cca->cca_localname;
-	const char		*rname = cca->cca_remotename;
-	struct stat		sb;
-	ssize_t			rsz, rlen;
-	struct ct_trans		*ct_trans;
-	int			error;
+	struct ct_ctfileop_args		*cca = op->op_args;
+	struct ctfile_archive_state	*cas = op->op_priv;
+	const char			*ctfile = cca->cca_localname;
+	const char			*rname = cca->cca_remotename;
+	struct ct_trans			*ct_trans;
+	struct stat			 sb;
+	ssize_t				 rsz, rlen;
+	int				 error;
 
-	CNDBG(CT_LOG_FILE, "entered for block %d", ctfile_block_no);
+	if (ct_state->ct_file_state == CT_S_STARTING) {
+		cas = e_calloc(1, sizeof(*cas));
+		op->op_priv = cas;
+
+		CNDBG(CT_LOG_FILE, "opening ctfile for archive %s", ctfile);
+		if ((cas->cas_handle = fopen(ctfile, "rb")) == NULL)
+			CFATAL("can't open %s for reading", ctfile);
+
+		if (fstat(fileno(cas->cas_handle), &sb) == -1)
+			CFATAL("can't stat backup file %s", ctfile);
+		cas->cas_size = sb.st_size;
+
+		if (rname == NULL) {
+			rname = ctfile_cook_name(ctfile);
+			cca->cca_remotename = (char *)rname;
+		}
+	} else if (ct_state->ct_file_state == CT_S_FINISHED) {
+		/* We're done here */
+		return;
+	} else if (ct_state->ct_file_state == CT_S_WAITING_SERVER) {
+		CNDBG(CT_LOG_FILE, "waiting on remote open");
+		return;
+	}
+
+	CNDBG(CT_LOG_FILE, "entered for block %d", cas->cas_block_no);
 	ct_set_file_state(CT_S_RUNNING);
 loop:
 	ct_trans = ct_trans_alloc();
@@ -107,41 +135,18 @@ loop:
 		return;
 	}
 
-	if (ctfile_is_open == 0) {
-		if (ctfile_open_inflight) {
-			CNDBG(CT_LOG_FILE, "waiting on remote open");
-			ct_trans_free(ct_trans);
-			ct_set_file_state(CT_S_WAITING_TRANS);
-			return;
-		}
-
-		CNDBG(CT_LOG_FILE, "opening ctfile for archive %s", ctfile);
-		ctfile_handle = fopen(ctfile, "rb");
-		if (ctfile_handle == NULL)
-			CFATAL("can't open %s for reading", ctfile);
-
-		ctfile_offset = 0;
-		ctfile_block_no = 0;
-
-		error = fstat(fileno(ctfile_handle), &sb);
-		if (error) {
-			CFATAL("can't stat backup file %s", ctfile);
-		} else {
-			ctfile_size = sb.st_size;
-		}
-
-		if (rname == NULL) {
-			rname = ctfile_cook_name(ctfile);
-			cca->cca_remotename = (char *)rname;
-		}
+	if (cas->cas_open_sent == 0) {
+		cas->cas_open_sent = 1;
 		ct_xml_file_open(ct_trans, rname, MD_O_WRITE, 0);
-		ctfile_open_inflight = 1;
+		/* xml thread will wake us up when it gets the open */
+		ct_set_file_state(CT_S_WAITING_SERVER);
 		return;
 	}
 
 	/* Are we done here? */
-	if (ctfile_size == ctfile_offset) {
+	if (cas->cas_size == cas->cas_offset) {
 		ct_set_file_state(CT_S_FINISHED);
+
 		ct_trans->tr_fl_node = NULL;
 		ct_trans->tr_state = TR_S_XML_CLOSE;
 		ct_trans->tr_eof = 1;
@@ -150,12 +155,14 @@ loop:
 		    ct_trans->tr_trans_id);
 		ct_trans->hdr.c_flags = C_HDR_F_METADATA;
 		ct_trans->tr_ctfile_name = rname;
-		ct_stats->st_bytes_tot += ctfile_size;
+		ct_stats->st_bytes_tot += cas->cas_size;
+		e_free(&cas);
+		op->op_priv = NULL;
 		ct_queue_transfer(ct_trans);
 		return;
 	}
 	/* perform read */
-	rsz = ctfile_size - ctfile_offset;
+	rsz = cas->cas_size - cas->cas_offset;
 
 	CNDBG(CT_LOG_FILE, "rsz %ld max %d", (long) rsz, ct_max_block_size);
 	if (rsz > ct_max_block_size) {
@@ -163,7 +170,7 @@ loop:
 	}
 
 	ct_trans->tr_dataslot = 0;
-	rlen = fread(ct_trans->tr_data[0], sizeof(char), rsz, ctfile_handle);
+	rlen = fread(ct_trans->tr_data[0], sizeof(char), rsz, cas->cas_handle);
 
 	CNDBG(CT_LOG_FILE, "read %ld", (long) rlen);
 
@@ -177,7 +184,7 @@ loop:
 	ct_trans->tr_eof = 0;
 	ct_trans->hdr.c_flags = C_HDR_F_METADATA;
 	ct_trans->hdr.c_ex_status = 2; /* we handle new metadata protocol */
-	ct_trans->tr_ctfile_chunkno = ctfile_block_no;
+	ct_trans->tr_ctfile_chunkno = cas->cas_block_no;
 	ct_trans->tr_ctfile_name = rname;
 
 	CNDBG(CT_LOG_FILE, " trans %"PRId64", read size %ld, into %p rlen %ld",
@@ -189,29 +196,29 @@ loop:
 	 * has C_HDR_F_METADATA set.
 	 */
 	bzero(ct_trans->tr_iv, sizeof(ct_trans->tr_iv));
-	ct_trans->tr_iv[0] = (ctfile_block_no >>  0) & 0xff;
-	ct_trans->tr_iv[1] = (ctfile_block_no >>  8) & 0xff;
-	ct_trans->tr_iv[2] = (ctfile_block_no >> 16) & 0xff;
-	ct_trans->tr_iv[3] = (ctfile_block_no >> 24) & 0xff;
-	ct_trans->tr_iv[4] = (ctfile_block_no >>  0) & 0xff;
-	ct_trans->tr_iv[5] = (ctfile_block_no >>  8) & 0xff;
-	ct_trans->tr_iv[6] = (ctfile_block_no >> 16) & 0xff;
-	ct_trans->tr_iv[7] = (ctfile_block_no >> 24) & 0xff;
+	ct_trans->tr_iv[0] = (cas->cas_block_no >>  0) & 0xff;
+	ct_trans->tr_iv[1] = (cas->cas_block_no >>  8) & 0xff;
+	ct_trans->tr_iv[2] = (cas->cas_block_no >> 16) & 0xff;
+	ct_trans->tr_iv[3] = (cas->cas_block_no >> 24) & 0xff;
+	ct_trans->tr_iv[4] = (cas->cas_block_no >>  0) & 0xff;
+	ct_trans->tr_iv[5] = (cas->cas_block_no >>  8) & 0xff;
+	ct_trans->tr_iv[6] = (cas->cas_block_no >> 16) & 0xff;
+	ct_trans->tr_iv[7] = (cas->cas_block_no >> 24) & 0xff;
 	/* XXX - leaves the rest of the iv with 0 */
 
-	ctfile_block_no++;
+	cas->cas_block_no++;
 
 	CNDBG(CT_LOG_FILE, "sizes rlen %ld offset %ld size %ld", (long) rlen,
-	    (long) ctfile_offset, (long) ctfile_size);
+	    (long)cas->cas_offset, (long)cas->cas_size);
 
-	if (rsz != rlen || (rlen + ctfile_offset) == ctfile_size) {
+	if (rsz != rlen || (rlen + cas->cas_offset) == cas->cas_size) {
 		/* short read, file truncated or EOF */
 		CNDBG(CT_LOG_FILE, "DONE");
-		error = fstat(fileno(ctfile_handle), &sb);
+		error = fstat(fileno(cas->cas_handle), &sb);
 		if (error) {
 			CWARNX("file stat error %s %d %s",
 			    ctfile, errno, strerror(errno));
-		} else if (sb.st_size != ctfile_size) {
+		} else if (sb.st_size != cas->cas_size) {
 			CWARNX("file truncated during backup %s",
 			    ctfile);
 			/*
@@ -223,9 +230,9 @@ loop:
 		 * we don't set eof here because the next go round
 		 * will hit the state done case above
 		 */
-		ctfile_offset = ctfile_size;
+		cas->cas_offset = cas->cas_size;
 	} else {
-		ctfile_offset += rlen;
+		cas->cas_offset += rlen;
 	}
 	ct_queue_transfer(ct_trans);
 	goto loop;
@@ -394,14 +401,44 @@ ct_xml_file_close(void)
 	ct_queue_transfer(trans);
 }
 
+FILE	*ctfile_handle = NULL;
+struct ctfile_extract_state {
+	/* FILE		*ces_handle; */
+	int		 ces_block_no;
+	int		 ces_open_sent;
+
+};
 void
 ctfile_extract(struct ct_op *op)
 {
-	struct ct_ctfileop_args	*cca = op->op_args;
-	const char		*ctfile = cca->cca_localname;
-	const char		*rname = cca->cca_remotename;
-	struct ct_trans		*trans;
-	struct ct_header	*hdr;
+	struct ct_ctfileop_args		*cca = op->op_args;
+	struct ctfile_extract_state	*ces = op->op_priv;
+	const char			*ctfile = cca->cca_localname;
+	const char			*rname = cca->cca_remotename;
+	struct ct_trans			*trans;
+	struct ct_header		*hdr;
+
+	if (ct_state->ct_file_state == CT_S_STARTING) {
+		ces = e_calloc(1, sizeof(*ces));
+		op->op_priv = ces;
+
+		/* XXX -chmod when done */
+		if (ctfile_handle == NULL) { /* may already be open */
+			if ((ctfile_handle = fopen(ctfile, "wb")) == NULL)
+				CFATALX("unable to open file %s", ctfile);
+		}
+
+
+		if (rname == NULL) {
+			rname = ctfile_cook_name(ctfile);
+			cca->cca_remotename = (char *)rname;
+		}
+	} else if (ct_state->ct_file_state == CT_S_FINISHED) {
+		return;
+	} else if (ct_state->ct_file_state == CT_S_WAITING_SERVER) {
+		CNDBG(CT_LOG_FILE, "waiting on remote open");
+		return;
+	}
 
 	ct_set_file_state(CT_S_RUNNING);
 
@@ -412,27 +449,11 @@ ctfile_extract(struct ct_op *op)
 		ct_set_file_state(CT_S_WAITING_TRANS);
 		return;
 	}
-	if (ctfile_is_open == 0) {
-		if (ctfile_open_inflight) {
-			CNDBG(CT_LOG_FILE, "waiting on remote open");
-			ct_trans_free(trans);
-			ct_set_file_state(CT_S_WAITING_TRANS);
-			return;
-		}
-
-		/* XXX -chmod when done */
-		if (ctfile_handle == NULL) { /* may have been opened for us */
-			if ((ctfile_handle = fopen(ctfile, "wb")) == NULL)
-				CFATALX("unable to open file %s", ctfile);
-		}
-		ctfile_block_no = 0;
-
-		if (rname == NULL) {
-			rname = ctfile_cook_name(ctfile);
-			cca->cca_remotename = (char *)rname;
-		}
+	if (ces->ces_open_sent == 0) {
 		ct_xml_file_open(trans, rname, MD_O_READ, 0);
-		ctfile_open_inflight = 1;
+		ces->ces_open_sent = 1;
+		/* xml thread will wake us up when it gets the open */
+		ct_set_file_state(CT_S_WAITING_SERVER);
 		return;
 	}
 
@@ -441,7 +462,7 @@ ctfile_extract(struct ct_op *op)
 	trans->tr_type = TR_T_READ_CHUNK;
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_eof = 0;
-	trans->tr_ctfile_chunkno = ctfile_block_no;
+	trans->tr_ctfile_chunkno = ces->ces_block_no;
 	trans->tr_ctfile_name = rname;
 
 	hdr = &trans->hdr;
@@ -449,21 +470,21 @@ ctfile_extract(struct ct_op *op)
 	hdr->c_flags |= C_HDR_F_METADATA;
 
 	bzero(trans->tr_sha, sizeof(trans->tr_sha));
-	trans->tr_sha[0] = (ctfile_block_no >>  0) & 0xff;
-	trans->tr_sha[1] = (ctfile_block_no >>  8) & 0xff;
-	trans->tr_sha[2] = (ctfile_block_no >> 16) & 0xff;
-	trans->tr_sha[3] = (ctfile_block_no >> 24) & 0xff;
+	trans->tr_sha[0] = (ces->ces_block_no >>  0) & 0xff;
+	trans->tr_sha[1] = (ces->ces_block_no >>  8) & 0xff;
+	trans->tr_sha[2] = (ces->ces_block_no >> 16) & 0xff;
+	trans->tr_sha[3] = (ces->ces_block_no >> 24) & 0xff;
 	bzero(trans->tr_iv, sizeof(trans->tr_iv));
-	trans->tr_iv[0] = (ctfile_block_no >>  0) & 0xff;
-	trans->tr_iv[1] = (ctfile_block_no >>  8) & 0xff;
-	trans->tr_iv[2] = (ctfile_block_no >> 16) & 0xff;
-	trans->tr_iv[3] = (ctfile_block_no >> 24) & 0xff;
-	trans->tr_iv[4] = (ctfile_block_no >>  0) & 0xff;
-	trans->tr_iv[5] = (ctfile_block_no >>  8) & 0xff;
-	trans->tr_iv[6] = (ctfile_block_no >> 16) & 0xff;
-	trans->tr_iv[7] = (ctfile_block_no >> 24) & 0xff;
+	trans->tr_iv[0] = (ces->ces_block_no >>  0) & 0xff;
+	trans->tr_iv[1] = (ces->ces_block_no >>  8) & 0xff;
+	trans->tr_iv[2] = (ces->ces_block_no >> 16) & 0xff;
+	trans->tr_iv[3] = (ces->ces_block_no >> 24) & 0xff;
+	trans->tr_iv[4] = (ces->ces_block_no >>  0) & 0xff;
+	trans->tr_iv[5] = (ces->ces_block_no >>  8) & 0xff;
+	trans->tr_iv[6] = (ces->ces_block_no >> 16) & 0xff;
+	trans->tr_iv[7] = (ces->ces_block_no >> 24) & 0xff;
 
-	ctfile_block_no++; /* next chunk on next pass */
+	ces->ces_block_no++; /* next chunk on next pass */
 
 	ct_queue_transfer(trans);
 }
@@ -681,8 +702,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 					CNDBG(CT_LOG_FILE, "%s opened\n",
 					    filename);
 					die = 0;
-					ctfile_open_inflight = 0;
-					ctfile_is_open = 1;
+					ct_set_file_state(CT_S_RUNNING);
 					ct_wakeup_file();
 				}
 			}
@@ -691,7 +711,6 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 			CFATALX("couldn't open remote file");
 		trans->tr_state = TR_S_XML_OPENED;
 	} else if (strcmp(xe->name, "ct_md_close") == 0) {
-		ctfile_is_open = 0;
 		trans->tr_state = TR_S_DONE;
 	} else if (strcmp(xe->name, "ct_md_list") == 0) {
 		struct ctfile_list_file	*file;
