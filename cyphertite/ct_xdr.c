@@ -50,8 +50,6 @@ static FILE	*ctfile_open(const char *, struct ctfile_gheader *, XDR *);
 static void	 ctfile_close(FILE *, XDR *);
 static void	 ctfile_cleanup_gheader(struct ctfile_gheader *);
 
-time_t				ct_prev_backup_time;
-
 /*
  * XDR manipulation functions.
  */
@@ -269,10 +267,11 @@ ctfile_cleanup_gheader(struct ctfile_gheader *gh)
 
 
 int
-ct_basis_setup(const char *basisbackup, char **filelist)
+ct_basis_setup(const char *basisbackup, char **filelist, time_t *prev_backup)
 {
 	struct ctfile_parse_state	 xs_ctx;
 	char				 cwd[PATH_MAX], **fptr;
+	time_t				 prev_backup_time = 0;
 	int			 	 nextlvl, i, rooted = 1, ret;
 
 	if (ctfile_parse_init(&xs_ctx, basisbackup))
@@ -281,8 +280,8 @@ ct_basis_setup(const char *basisbackup, char **filelist)
 
 	if (ct_max_differentials == 0 ||
 	    xs_ctx.xs_gh.cmg_cur_lvl < ct_max_differentials) {
-		ct_prev_backup_time = xs_ctx.xs_gh.cmg_created;
-		CINFO("prev backup time %s %s", ctime(&ct_prev_backup_time),
+		prev_backup_time = xs_ctx.xs_gh.cmg_created;
+		CINFO("prev backup time %s %s", ctime(&prev_backup_time),
 		    basisbackup);
 		nextlvl = ++xs_ctx.xs_gh.cmg_cur_lvl;
 	} else {
@@ -334,6 +333,9 @@ ct_basis_setup(const char *basisbackup, char **filelist)
 
 	}
 	ctfile_parse_close(&xs_ctx);
+
+	if (nextlvl != 0 && prev_backup != NULL)
+		*prev_backup = prev_backup_time;
 
 	return (nextlvl);
 }

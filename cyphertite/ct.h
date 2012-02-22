@@ -587,7 +587,7 @@ struct ctfile_trailer {
 
 int			ct_read_header(struct ctfile_header *hdr);
 struct ct_assl_io_ctx	*ct_assl_ctx;
-int			ct_basis_setup(const char *, char **);
+int			ct_basis_setup(const char *, char **, time_t *);
 
 /* ct_file.c: extract functions */
 int  ct_file_extract_open(struct fnode *fnode);

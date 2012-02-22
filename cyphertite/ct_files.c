@@ -499,6 +499,7 @@ struct ct_archive_priv {
 	struct ct_match			*cap_exclude;
 	struct fnode			*cap_curnode;
 	struct flist			*cap_curlist;
+	time_t				 cap_prev_backup_time;
 };
 
 void
@@ -536,7 +537,8 @@ ct_archive(struct ct_op *op)
 			    caa->caa_excllist);
 
 		if (basisbackup != NULL &&
-		    (nextlvl = ct_basis_setup(basisbackup, filelist)) == 0)
+		    (nextlvl = ct_basis_setup(basisbackup, filelist,
+		    &cap->cap_prev_backup_time)) == 0)
 			e_free(&basisbackup);
 
 		if (getcwd(cwd, PATH_MAX) == NULL)
@@ -613,7 +615,7 @@ loop:
 				CWARN("archive: dir %s stat error",
 				    cap->cap_curnode->fl_sname);
 			} else {
-				if (sb.st_mtime < ct_prev_backup_time) {
+				if (sb.st_mtime < cap->cap_prev_backup_time) {
 					CNDBG(CT_LOG_FILE, "skipping dir"
 					    " based on mtime %s",
 					    cap->cap_curnode->fl_sname);
@@ -662,7 +664,7 @@ loop:
 			CWARN("archive: file %s stat error",
 			    cap->cap_curnode->fl_sname);
 		} else {
-			if (sb.st_mtime < ct_prev_backup_time) {
+			if (sb.st_mtime < cap->cap_prev_backup_time) {
 				if (ct_verbose > 1)
 					CINFO("skipping file based on mtime %s",
 					    cap->cap_curnode->fl_sname);
