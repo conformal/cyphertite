@@ -122,14 +122,11 @@ ct_free_fnode(struct fnode *fnode)
 
 }
 
-int				stop;
-
 char *eat_double_dots(char *, char *);
 int backup_prefix(char *);
 int ct_sched_backup_file(struct stat *, char *, int, int);
 int s_to_e_type(int);
 
-int current_fd = -1;
 int ct_extract_fd = -1;
 
 struct fl_tree		fl_rb_head = RB_INITIALIZER(&fl_rb_head);
@@ -500,6 +497,7 @@ struct ct_archive_priv {
 	struct fnode			*cap_curnode;
 	struct flist			*cap_curlist;
 	time_t				 cap_prev_backup_time;
+	int				 cap_fd;
 };
 
 void
@@ -527,6 +525,7 @@ ct_archive(struct ct_op *op)
 		}
 
 		cap = e_calloc(1, sizeof(*cap));
+		cap->cap_fd = -1;
 		op->op_priv = cap;
 		if (caa->caa_includefile)
 			cap->cap_include =
@@ -640,17 +639,17 @@ loop:
 	/* do not open zero length files */
 	if (new_file) {
 		cap->cap_curnode->fl_state = CT_FILE_PROCESSING;
-		if (current_fd != -1) {
+		if (cap->cap_fd != -1) {
 			CFATALX("state error, new file open,"
 			    " sz %" PRId64 " offset %" PRId64,
 			    (int64_t) cap->cap_curnode->fl_size,
 			    (int64_t) cap->cap_curnode->fl_offset);
 		}
-		current_fd = openat(cap->cap_curnode->fl_parent_dir->d_fd,
+
+		cap->cap_fd = openat(cap->cap_curnode->fl_parent_dir->d_fd,
 		    cap->cap_curnode->fl_fname, O_RDONLY |
 		    ct_follow_symlinks ? 0 : O_NOFOLLOW);
-
-		if (current_fd == -1) {
+		if (cap->cap_fd == -1) {
 			CWARN("archive: unable to open file '%s'",
 			    cap->cap_curnode->fl_sname);
 			ct_trans_free(ct_trans);
@@ -659,7 +658,7 @@ loop:
 		}
 
 		skip_file = 0;
-		error = fstat(current_fd, &sb);
+		error = fstat(cap->cap_fd, &sb);
 		if (error) {
 			CWARN("archive: file %s stat error",
 			    cap->cap_curnode->fl_sname);
@@ -699,8 +698,8 @@ loop:
 		ct_trans->tr_type = TR_T_WRITE_HEADER;
 		ct_trans->tr_trans_id = ct_trans_id++;
 		if (cap->cap_curnode->fl_size == 0 || skip_file) {
-			close(current_fd);
-			current_fd = -1;
+			close(cap->cap_fd);
+			cap->cap_fd = -1;
 			ct_trans->tr_eof = 1;
 			cap->cap_curnode->fl_state = CT_FILE_FINISHED;
 		} else {
@@ -712,7 +711,7 @@ loop:
 		}
 		goto loop;
 	} else {
-		if (current_fd == -1) {
+		if (cap->cap_fd == -1) {
 			CFATALX("state error, old file not open,"
 			    " sz %" PRId64 " offset %" PRId64,
 			    (int64_t) cap->cap_curnode->fl_size,
@@ -730,7 +729,7 @@ loop:
 	ct_trans->tr_dataslot = 0;
 	rlen = 0;
 	if (rsz > 0)
-		rlen = read(current_fd, ct_trans->tr_data[0], rsz);
+		rlen = read(cap->cap_fd, ct_trans->tr_data[0], rsz);
 
 	if (rlen > 0)
 		ct_stats->st_bytes_read += rlen;
@@ -752,10 +751,10 @@ loop:
 	        cap->cap_curnode->fl_size)) {
 		/* short read, file truncated, or end of file */
 		/* restat file for modifications */
-		error = fstat(current_fd, &sb);
+		error = fstat(cap->cap_fd, &sb);
 
-		close(current_fd);
-		current_fd = -1;
+		close(cap->cap_fd);
+		cap->cap_fd = -1;
 		ct_trans->tr_eof = 1;
 		cap->cap_curnode->fl_state = CT_FILE_FINISHED;
 
