@@ -155,8 +155,9 @@ ct_load_certs(struct assl_context *c)
 		CFATALX("no key provided in config");
 
 	if (assl_load_file_certs(c, ct_ca_cert, ct_cert, ct_key))
-		assl_fatalx("assl_load_file_certs %s %s %s", ct_ca_cert,
-		    ct_cert, ct_key);
+		assl_fatalx("Failed to load certs. Ensure that "
+		    "the ca_cert, cert and key are set to valid paths in %s",
+		    ct_configfile);
 }
 
 
