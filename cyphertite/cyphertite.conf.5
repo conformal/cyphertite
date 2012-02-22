@@ -77,9 +77,10 @@ Specify the port to connect to.
 .It Ic key = Ar file
 Specify the path to the client certificate key file.
 .Pp
-.It Ic ctfile_cachedir =  Ar string
-Specify the path to the directory to be used to cache metadata files in
-remote mode.
+.It Ic ctfile_cachdir =  Ar string
+Specify the path to the directory to be used to cache
+.Ar ctfiles
+in remote mode.
 .Pp
 .It Ic ctfile_cachedir_max_size =  Ar size
 Specify the maximum size of the
@@ -110,14 +111,18 @@ mode is set then the
 option is required.
 See
 .Xr cyphertite 1
-for a description of the different metadata modes.
+for a description of the different
+.Ar ctfile
+operation modes.
 .Pp
 .It Xo
 .Ic ctfile_remote_auto_differential =
 .Pq Ic 0 Ns \&| Ns Ic 1
 .Xc
 Specify if differentials should be generated for remote mode.
-This only applies for remote metadata mode.
+This only applies for remote
+.Ar ctfile
+mode.
 .Pp
 .It Xo
 .Ic ctfile_max_differentials = Ar number
