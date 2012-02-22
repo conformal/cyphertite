@@ -82,7 +82,9 @@ Specify the path to the directory to be used to cache metadata files in
 remote mode.
 .Pp
 .It Ic ctfile_cachedir_max_size =  Ar size
-Specify the maximum size of the metadata cache directory.
+Specify the maximum size of the
+.Ar ctfile
+cache directory.
 If this is set then when the size of the directory is larger than this
 directive the oldest files will be deleted from the cache to make the
 cache directory take at most
@@ -96,8 +98,11 @@ equal 128 megabytes.
 .Ic ctfile_mode =
 .Pq Ic local Ns \&| Ns Ic remote
 .Xc
-Specify whether to operate in local or remote metadata mode.
-The default is local.
+Specify whether to operate in local or remote
+.Ar ctfile
+mode.
+The default is
+.Em local .
 If
 .Em remote
 mode is set then the

@@ -77,10 +77,13 @@ DEDUPLICATION,
 chunks
 are stored only once and subsequent instances of
 the same data are stored as references to the existing data.
-Files (called "archive metadata files") reference the chunks needed to
-retrieve any archived file.
+Files (called "
+.Ar ctfiles
+") reference the chunks needed to retrieve any archived file.
 Each chunk is identified by its SHA1 hash.
-Many archive metadata files may reference the same chunk.
+Many
+.Ar ctfiles
+may reference the same chunk.
 .Ed
 .Pp
 COMPRESSION
@@ -104,9 +107,12 @@ in IEEE 1619-2007: the 256-bit tweak key, K2, is normally taken
 as the sector number on a hard drive, here it is generated as an
 HMAC SHA1 of the chunk itself using a separate 256-bit key.
 .Pp
-All locally stored metadata is unencrypted. Metadata stored on
-a remote machine is encrypted using standard AES-XTS, with the
-chunk number used as the tweak key.
+All locally stored
+.Ar ctfiles
+are unencrypted.
+.Ar ctfiles
+stored on a remote machine are encrypted using standard AES-XTS, with the chunk
+number used as the tweak key.
 .Pp
 Network traffic is encrypted using per-user certificates signed
 by a 521-bit ECDSA CA key and a corresponding per-user 521-bit
@@ -137,15 +143,23 @@ These machines must share an account to obtain the benefit
 of deduplication.
 .Ed
 .Pp
-In all cases except those involving metadata (
+In all cases except those involving remote
+.Ar ctfile
+management (
 .Fl m
-), the path to the archive metadata file is required:
+), the path to the
+.Ar ctfile
+is required:
 .Bl -tag -width Ds
 .It Fl f Ar ctfile
 Filename where the archive metadata is stored.
-For list and extract commands this is the existing archive metadata file
-to extract from. For create commands it is the archive metadata file to
-create. There are limitations placed on the
+For list and extract commands, this is the existing
+.Ar ctfile
+to extract from.
+For create commands, it is the
+.Ar ctfile
+to create.
+There are limitations placed on the
 .Ar ctfile
 in terms of length (128 bytes) and that it may not include certain special
 characters, e.g. ?, *, !, \\, / etc.
@@ -154,9 +168,11 @@ characters, e.g. ?, *, !, \\, / etc.
 One of the following flags must be present:
 .Bl -tag -width Ds
 .It Fl c
-Create new archive or overwrite an existing archive metadata file.
+Create new or overwrite an existing
+.Ar ctfile .
 .It Fl t
-List contents of an archive.
+List contents of a
+.Ar ctfile .
 If any files are named on the command line, only those files will
 be listed. The
 .Ar file
@@ -198,8 +214,10 @@ In addition to the flags mentioned above, the following flags may be
 used:
 .Bl -tag -width Ds
 .It Fl 0
-Generate a level 0 (full) backup. Only applicable to remote metadata archive
-mode.
+Generate a level 0 (full) backup.
+Only applicable to remote
+.Ar ctfile
+management mode.
 .It Fl A
 override the config file directive
 .Em ctfile_differential_allfiles
@@ -210,12 +228,13 @@ This option will cancel out
 Specify the archive to be used as the basis of a differential backup.
 Files with a modification time (mtime) newer than the previous backup
 will be archived.
-The behavior is dump-like and helps limit the size of the archive metadata
-file and the backup window.
+The behavior is dump-like and helps limit the size of the
+.Ar ctfile
+and the backup window.
 .It Fl C Ar directory
-Set the current working directory.  When extracting, files will be
-extracted into the specified directory; when creating, the specified
-files will be matched from the directory.
+Set the current working directory.
+When extracting, files will be extracted into the specified directory;
+when creating, the specified files will be matched from the directory.
 .It Fl D Ar debugstring
 Run in debug mode.
 .Ar debugstring
@@ -283,12 +302,16 @@ and turn that feature on.
 This option will cancel out
 .Fl A .
 .It Fl e
-Delete remote metadata from the server.  This option is used in
-conjunction with -m.
+Delete remote
+.Ar ctfile
+from the server.
+This option is used in conjunction with -m.
 .It Fl m
-Run in metadata mode.
+Run in remote
+.Ar ctfile
+management mode.
 See
-.Sx METADATA MODE
+.Sx REMOTE CTFILE MANAGEMENT MODE
 for an explanation.
 .It Fl p
 Preserve user and group ID as well as file mode regardless of the
@@ -304,7 +327,7 @@ Turn on verbose output.
 .It Fl V
 Display version information.  All other options are ignored.
 .El
-.Sh METADATA MODE
+.Sh REMOTE CTFILE MANAGEMENT MODE
 If
 .Fl m
 is provided on the command line then
@@ -350,8 +373,10 @@ patterns) and
 will list only the matching
 .Ar ctfiles .
 .El
-.Sh METADATA OPERATION MODES
-Two different metadata modes are supported by
+.Sh CTFILE OPERATION MODES
+Two different
+.Ar ctfile
+operation modes are supported by
 .Nm :
 .Em local
 and
@@ -362,25 +387,31 @@ mode,
 .Nm
 operates similarly to
 .Xr tar 1
-with the archive metadata files operating analogously to the tar archive
-files.
+with the
+.Ar ctfiles
+operating analogously to the tar archive files.
 .Pp
 In
 .Em remote
 mode,
 .Nm
-will instead operate on metadata stored on the remote server.
-In this case the names provided by
+will instead operate on
+.Ar ctfiles
+stored on the remote server.
+In this case, the names provided by
 .Fl f
-are used as tags to the metadata.
+are used as tags.
 They are stored on the remote server with the form:
 YYYYMMDD-HHMMSS-tag .
-Extract commands will operate on the newest archive metadata file on the
-server unless the full metadata name is provided.
+Extract commands will operate on the newest
+.Ar ctfile
+on the server unless the full
+.Ar ctfile
+name is provided.
 The cache directory defined in the
 .Xr cyphertite.conf 5
-configuration file will be used to store
-local copies of the archive metadata files.
+configuration file will be used to store local copies of the
+.Ar ctfiles .
 .Sh BACKUP vs ARCHIVE
 By default
 .Nm
@@ -469,8 +500,8 @@ information needed to setup the account as follows:
 .Dl confirm:
 .Dl Save cyphertite crypto passphrase to configuration file? [yes]:
 .Dl Automatically generate crypto passphrase? [yes]:
-.Dl Choose a metadata operation mode (remote/local) [remote]:
-.Dl Target metadata cache directory [/root/.cyphertite/ct_cachedir]:
+.Dl Choose a ctfile operation mode (remote/local) [remote]:
+.Dl Target ctfile cache directory [/root/.cyphertite/ct_cachedir]:
 .Dl Use automatic remote differentials? [no]:
 .Dl Configuration file created.
 .Pp
