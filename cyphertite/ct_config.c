@@ -354,8 +354,8 @@ ct_create_config(void)
 	if (conf_buf == NULL)
 		CFATALX("strdup");
 	dir = dirname(conf_buf);
-	if (asprintf(&ctfile_cachedir, "%s/ct_cachedir", dir) == -1)
-		CFATALX("default ctfile_cachedir");
+	if (asprintf(&cachedir, "%s/ct_cachedir", dir) == -1)
+		CFATALX("default cachedir");
 
 	snprintf(prompt, sizeof prompt,
 	    "Choose a metadata operation mode (remote/local) [remote]: ");
@@ -367,14 +367,14 @@ ct_create_config(void)
 
 	if (rv == 1) {
 		snprintf(prompt, sizeof prompt,
-		    "Target metadata cache directory [%s]: ", ctfile_cachedir);
-		ct_get_answer(prompt, NULL, NULL, ctfile_cachedir, answer,
+		    "Target metadata cache directory [%s]: ", cachedir);
+		ct_get_answer(prompt, NULL, NULL, cachedir, answer,
 		    sizeof answer, 0);
-		if (ctfile_cachedir != NULL)
+		if (cachedir != NULL)
 			free(cachedir);
-		ctfile_cachedir = strdup(answer);
-		if (ctfile_cachedir == NULL)
-			CFATALX("ctfile_cachedir");
+		cachedir = strdup(answer);
+		if (cachedir == NULL)
+			CFATALX("cachedir");
 
 		snprintf(prompt, sizeof prompt,
 		    "Use automatic remote differentials? [no]: ");
@@ -403,7 +403,7 @@ ct_create_config(void)
 
 	fprintf(f, "ctfile_mode\t\t\t\t= %s\n", mode);
 	if (strcmp(mode, "remote") == 0) {
-		fprintf(f, "ctfile_cachedir\t\t\t= %s\n", ctfile_cachedir);
+		fprintf(f, "ctfile_cachedir\t\t\t= %s\n", cachedir);
 		fprintf(f, "ctfile_remote_auto_differential\t= %d\n",
 		    ctfile_remote_diff);
 	}
