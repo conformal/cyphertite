@@ -80,10 +80,9 @@ void
 ct_usage(void)
 {
 	char		padding[1024];
-	size_t		size_needed;
 
 	/* Padding for aligning wrapped usage lines. + 7 is for "usage: " */
-	size_needed = ct_str_repeat(padding, 1024, " ", strlen(__progname) + 7);
+	(void) ct_str_repeat(padding, 1024, " ", strlen(__progname) + 7);
 
 	/* ct general usage */
 	fprintf(stderr,
