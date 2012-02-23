@@ -276,7 +276,7 @@ ct_get_debugmask(char *debugstring)
 int
 ct_main(int argc, char **argv)
 {
-	char		pwd[PASS_MAX], tpath[PATH_MAX];
+	char		tpath[PATH_MAX];
 	char		*ct_basisbackup = NULL;
 	char		*ct_mfile = NULL;
 	char		*ct_excludefile = NULL;
@@ -460,14 +460,7 @@ ct_main(int argc, char **argv)
 		goto out;
 	}
 
-	if (ct_password == NULL) {
-		if (ct_get_password(pwd, sizeof pwd, "Login password: ", 0))
-			CFATALX("invalid password");
-		ct_password = strdup(pwd);
-		if (ct_password == NULL)
-			CFATAL("ct_password");
-		bzero(pwd, sizeof pwd);
-	}
+	ct_prompt_for_login_password();
 
 	need_secrets = (ct_action == CT_A_EXTRACT ||
 	    ct_action == CT_A_ARCHIVE || (ct_action == CT_A_LIST &&

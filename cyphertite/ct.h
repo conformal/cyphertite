@@ -271,6 +271,7 @@ extern int		 ct_secrets_upload;
 extern int		 ct_auto_differential;
 extern long long	 ct_max_mdcache_size;
 
+void			ct_prompt_for_login_password(void);
 void			ct_normalize_username(char *);
 
 /* what are we doing? */

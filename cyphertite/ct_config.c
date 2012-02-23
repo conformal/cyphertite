@@ -430,7 +430,6 @@ int
 ct_load_config(struct ct_settings *mysettings)
 {
 	char		*config_path = NULL;
-	char		answer[1024];
 	int		config_try = 0;
 	static char	ct_fullcachedir[PATH_MAX];
 
@@ -500,16 +499,6 @@ ct_load_config(struct ct_settings *mysettings)
 		ct_init_compression(ct_compress_enabled);
 		ct_cur_compress_mode = ct_compress_enabled;
 	}
-
-	if (ct_username == NULL) {
-		if (ct_get_answer("Login username: ", NULL, NULL, NULL,
-			answer, sizeof answer, 0)) {
-			CFATALX("invalid username");
-		}
-		ct_username = e_strdup(answer);
-		bzero(answer, sizeof answer);
-	}
-	ct_normalize_username(ct_username);
 
 	return (0);
 }

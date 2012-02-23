@@ -916,6 +916,30 @@ ct_cmp_logincache(struct ct_login_cache *f1, struct ct_login_cache *f2)
 }
 
 void
+ct_prompt_for_login_password(void)
+{
+	char	answer[1024];
+
+	if (ct_username == NULL) {
+		if (ct_get_answer("Login username: ", NULL, NULL, NULL,
+			answer, sizeof answer, 0)) {
+			CFATALX("invalid username");
+		}
+		ct_username = e_strdup(answer);
+		bzero(answer, sizeof answer);
+	}
+	ct_normalize_username(ct_username);
+
+	if (ct_password == NULL) {
+		if (ct_get_password(answer, PASS_MAX, "Login password: ", 0))
+			CFATALX("invalid password");
+		ct_password = e_strdup(answer);
+		bzero(answer, sizeof answer);
+	}
+
+}
+
+void
 ct_normalize_username(char *username)
 {
 	/* Assume ASCII. */

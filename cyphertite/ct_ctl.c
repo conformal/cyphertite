@@ -237,6 +237,8 @@ ctctl_main(int argc, char *argv[])
 	if ((cc = ct_cli_validate(cmd_list, &argc, &argv)) == NULL)
 		ct_cli_usage(cmd_list, NULL);
 
+	ct_prompt_for_login_password();
+
 	ct_cli_execute(cc, &argc, &argv);
 
 	return (0);
@@ -246,20 +248,10 @@ ctctl_main(int argc, char *argv[])
 void
 cull(struct ct_cli_cmd *c, int argc, char **argv)
 {
-	char			pwd[PASS_MAX];
-	int			need_secrets;
-	int			ret;
+	int	need_secrets;
+	int	ret;
 
 	/* XXX */
-
-	if (ct_password == NULL) {
-		if (ct_get_password(pwd, sizeof pwd, "Login password: ", 0))
-			CFATALX("invalid password");
-		ct_password = strdup(pwd);
-		if (ct_password == NULL)
-			CFATAL("ct_password");
-		bzero(pwd, sizeof pwd);
-	}
 
 	need_secrets = 1;
 

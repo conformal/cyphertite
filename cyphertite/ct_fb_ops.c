@@ -320,6 +320,8 @@ ctfb_main(int argc, char *argv[])
 		CFATALX("config file not found.  Use the -F option to "
 		    "specify its path.");
 
+	ct_prompt_for_login_password();
+
 	/* We may have to download files later, always set up */
 	ct_init(1, 1, 0);
 
