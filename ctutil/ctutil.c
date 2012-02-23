@@ -113,7 +113,7 @@ ct_text2sha(char *shat, uint8_t *sha)
 
 /* opcode to error string tables; see ctutil.h/ct_header_strerror(); */
 char *c_hdr_login_reply_ex_errstrs[] = {
-	"Invalid login credentials. Please check your username,"
+	"Invalid login credentials. Please check your username, "
 	    "password and certificates.",
 	"Account Disabled - Please log in to your cyphertite.com account or "
 	    "contact support@cyphertite.com",
