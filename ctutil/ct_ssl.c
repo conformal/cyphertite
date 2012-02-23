@@ -85,6 +85,24 @@ ct_sha512(uint8_t *src, uint8_t *dst, size_t len)
 }
 
 void
+ct_sha512_setup(SHA512_CTX *ctx)
+{
+	SHA512_Init(ctx);
+}
+
+void
+ct_sha512_add(uint8_t *src, SHA512_CTX *ctx, size_t len)
+{
+	SHA512_Update(ctx, src, len);
+}
+
+void
+ct_sha512_final(uint8_t *dst, SHA512_CTX *ctx)
+{
+	SHA512_Final(dst, ctx);
+}
+
+void
 ct_sha512_encode(uint8_t *sha, char *s)
 {
 	int			i;

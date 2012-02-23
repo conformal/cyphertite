@@ -200,6 +200,11 @@ void		ct_sha1_setup(SHA_CTX *);
 void		ct_sha1_add(uint8_t *, SHA_CTX *, size_t);
 void		ct_sha1_final(uint8_t *, SHA_CTX *);
 
+#define SHA512_DIGEST_STRING_LENGTH ((SHA512_DIGEST_LENGTH *2) + 1)
+void		ct_sha512_setup(SHA512_CTX *);
+void		ct_sha512_add(uint8_t *, SHA512_CTX *, size_t);
+void		ct_sha512_final(uint8_t *, SHA512_CTX *);
+
 /* error handling */
 char		*ct_header_strerror(struct ct_header *);
 
