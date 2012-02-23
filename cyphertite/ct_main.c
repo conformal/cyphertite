@@ -79,12 +79,32 @@ char			*secrets_file_pattern[] =
 void
 ct_usage(void)
 {
+	char		padding[1024];
+	size_t		size_needed;
+
+	/* Padding for aligning wrapped usage lines. + 7 is for "usage: " */
+	size_needed = ct_str_repeat(padding, 1024, " ", strlen(__progname) + 7);
+
+	/* ct general usage */
 	fprintf(stderr,
-	    "usage: %s {-ctxV} [-0APRXadprv] [-B basisctfile] [-C directory] [-D debugstring] [-E excludefile] [-F conffile] [-I includefile] -f <ctfile> [filelist]\n",
+	    "usage: %s {-ctxV} [-0APRXadprv] [-B basisctfile] [-C directory]\n",
 	    __progname);
 	fprintf(stderr,
-	    "       %s -m {-cetx} [-r] [-C directory] [-D debugstring] [-F conffile] -f <metadata-tag> [pattern]\n",
+	    "%s [-D debugstring] [-E excludefile] [-F conffile] [-I includefile]\n",
+	    padding);
+	fprintf(stderr,
+	    "%s -f ctfile [filelist]\n", padding);
+
+	/* ct -me usage */
+	fprintf(stderr,
+	    "       %s -m -e [-D debugstring] [-F conffile] -f ctfile\n",
 	    __progname);
+
+	/* ct -mt usage */
+	fprintf(stderr,
+	    "       %s -m -t [-r] [-D debugstring] [-F conffile] [pattern]\n",
+	    __progname);
+
 	exit(1);
 }
 

@@ -479,3 +479,22 @@ ct_cli_execute(struct ct_cli_cmd *c, int *argc, char **argv[])
 
 	c->cc_cb(c, *argc, *argv);
 }
+
+size_t
+ct_str_repeat(char *dest, size_t buf_size, const char *src, int repeat)
+{
+	size_t		required_len;
+	int		i;
+
+	required_len = strlen(src) * repeat;
+	if (buf_size == 0)
+		return required_len;
+
+	strlcpy(dest, src, buf_size);
+	for (i = 1; i < repeat; i++) {
+		strlcat(dest, src, buf_size);
+	}
+
+	return required_len;
+}
+
