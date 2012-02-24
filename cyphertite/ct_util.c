@@ -924,6 +924,8 @@ ct_prompt_for_login_password(void)
 		if (ct_get_answer("Login username: ", NULL, NULL, NULL,
 			answer, sizeof answer, 0)) {
 			CFATALX("invalid username");
+		} else if (!strlen(answer)) {
+			CFATALX("username must not be empty");
 		}
 		ct_username = e_strdup(answer);
 		bzero(answer, sizeof answer);
@@ -931,8 +933,12 @@ ct_prompt_for_login_password(void)
 	ct_normalize_username(ct_username);
 
 	if (ct_password == NULL) {
-		if (ct_get_password(answer, PASS_MAX, "Login password: ", 0))
+		if (ct_get_answer("Login password: ", NULL, NULL, NULL,
+			answer, sizeof answer, 1)) {
 			CFATALX("invalid password");
+		} else if (!strlen(answer)) {
+			CFATALX("password must not be empty");
+		}
 		ct_password = e_strdup(answer);
 		bzero(answer, sizeof answer);
 	}
