@@ -19,6 +19,7 @@ CFLAGS+=-I${.CURDIR}
 CFLAGS+= -O2
 CFLAGS+= -Wall -Werror
 CFLAGS+= -ggdb3
+CFLAGS+=${CTHREAD}
 
 afterinstall:
 	mkdir -p  ${DESTDIR}${INCDIR}/cyphertite

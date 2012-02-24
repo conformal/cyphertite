@@ -39,13 +39,15 @@ CFLAGS+= -Wall -Werror -ggdb3
 CPPFLAGS+= -DBUILDSTR=\"$(BUILDVERSION)\"
 .endif
 
+CFLAGS+=${CTHREAD}
+LDFLAGS+=${LDTHREAD}
 LDADD+= -L${LOCALBASE}/lib
 LDADD+=	-lassl -lclog -lcrypto -levent -lexpat -lexude -lshrink
 LDADD+=	-lsqlite3 -lssl -lutil -lxmlsd -lctutil -ledit -lncurses
 LDADD+= ${LDADDSSL}
 CLEANFILES= cyphertite.cat1 cyphertite.conf.cat5
 
-CFLAGS+= -I${.CURDIR}/../libshrink -I.
+CFLAGS+= -I${.CURDIR}/../libshrink -I${.CURDIR}
 
 LINKS=${BINDIR}/cyphertite ${BINDIR}/ct
 LINKS+=${BINDIR}/cyphertite ${BINDIR}/cyphertitectl

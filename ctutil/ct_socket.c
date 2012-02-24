@@ -51,8 +51,10 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 	int			s_errno;
 
 	c = ioctx->c;
+	CT_LOCK(&ioctx->io_lock);
 	iob = TAILQ_FIRST(&ioctx->io_o_q);
 	hdr = iob->io_hdr;
+	CT_UNLOCK(&ioctx->io_lock);
 	body = NULL;
 
 	CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" hdr op %d state %d, off %d "
@@ -167,17 +169,21 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 			CFATALX("amount of data written does not match %d %d",
 			    hdr->c_size, ioctx->io_o_written);
 
+		CT_LOCK(&ioctx->io_lock);
 		TAILQ_REMOVE(&ioctx->io_o_q, iob, io_next);
+		CT_UNLOCK(&ioctx->io_lock);
 
 		ioctx->io_wrcomplete_cb(ioctx->io_cb_arg, hdr, iob->io_data,
 		    iob->iovcnt);
 
 		ioctx->io_ioctx_free(iob);
 
+		CT_LOCK(&ioctx->io_lock);
 		if (TAILQ_EMPTY(&ioctx->io_o_q) ||
 		    (ioctx->io_write_io_enabled == 0)) {
 			assl_event_disable_write(c);
 		}
+		CT_UNLOCK(&ioctx->io_lock);
 	}
 	if (ioctx->io_over_bw_check != NULL)
 		ioctx->io_over_bw_check(ioctx->io_cb_arg, ioctx);
@@ -306,7 +312,9 @@ ct_event_io_write(evutil_socket_t fd, short events, void *arg)
 	int			write_complete = 0;
 	int			s_errno;
 
+	CT_LOCK(&ioctx->io_lock);
 	iob = TAILQ_FIRST(&ioctx->io_o_q);
+	CT_UNLOCK(&ioctx->io_lock);
 	hdr = iob->io_hdr;
 	body = NULL;
 
@@ -421,16 +429,20 @@ write_next_iov:
 			CFATALX("amount of data written does not match %d %d",
 			    hdr->c_size, ioctx->io_o_written);
 
+		CT_LOCK(&ioctx->io_lock);
 		TAILQ_REMOVE(&ioctx->io_o_q, iob, io_next);
+		CT_UNLOCK(&ioctx->io_lock);
 
 		ioctx->io_wrcomplete_cb(ioctx->io_cb_arg, hdr, iob->io_data,
 		    iob->iovcnt);
 
 		ioctx->io_ioctx_free(iob);
 
+		CT_LOCK(&ioctx->io_lock);
 		if (TAILQ_EMPTY(&ioctx->io_o_q)) {
 			event_del(&ioctx->io_ev_wr);
 		}
+		CT_UNLOCK(&ioctx->io_lock);
 	}
 done:
 	return;
@@ -547,14 +559,17 @@ ct_assl_write_op(struct ct_assl_io_ctx *ioctx, struct ct_header *hdr,
 	struct ct_io_queue	*iob;
 	int			start_write = 0;
 
-	if (TAILQ_EMPTY(&ioctx->io_o_q) && ioctx->io_write_io_enabled)
-		start_write = 1;
 
 	iob = ioctx->io_ioctx_alloc();
 	iob->io_hdr = hdr;
 	iob->io_data = data;
 	iob->iovcnt = 0;
+
+	CT_LOCK(&ioctx->io_lock);
+	if (TAILQ_EMPTY(&ioctx->io_o_q) && ioctx->io_write_io_enabled)
+		start_write = 1;
 	TAILQ_INSERT_TAIL(&ioctx->io_o_q, iob, io_next);
+	CT_UNLOCK(&ioctx->io_lock);
 
 	if (start_write) {
 		assl_event_enable_write(ioctx->c);
@@ -572,9 +587,6 @@ ct_assl_writev_op(struct ct_assl_io_ctx *ioctx, struct ct_header *hdr,
 	if (iovcnt == 0 || iovcnt > IOV_MAX)
 		return 1;
 
-	if (TAILQ_EMPTY(&ioctx->io_o_q) && ioctx->io_write_io_enabled)
-		start_write = 1;
-
 	iob = ioctx->io_ioctx_alloc();
 	iob->io_hdr = hdr;
 	iob->io_data = iov;
@@ -586,11 +598,16 @@ ct_assl_writev_op(struct ct_assl_io_ctx *ioctx, struct ct_header *hdr,
 	if (sz != hdr->c_size)
 		CFATALX("invalid message length, len != sum iov[*].iov_len");
 
+	CT_LOCK(&ioctx->io_lock);
+	if (TAILQ_EMPTY(&ioctx->io_o_q) && ioctx->io_write_io_enabled)
+		start_write = 1;
+
 	TAILQ_INSERT_TAIL(&ioctx->io_o_q, iob, io_next);
 
 	if (start_write) {
 		assl_event_enable_write(ioctx->c);
 	}
+	CT_UNLOCK(&ioctx->io_lock);
 
 	return 0;
 }
@@ -601,18 +618,21 @@ ct_io_write_op(struct ct_io_ctx *ioctx, struct ct_header *hdr, void *data)
 	struct ct_io_queue	*iob;
 	int			start_write = 0;
 
-	if (TAILQ_EMPTY(&ioctx->io_o_q) && ioctx->io_write_io_enabled)
-		start_write = 1;
-
 	iob = ioctx->io_ioctx_alloc();
 	iob->io_hdr = hdr;
 	iob->io_data = data;
 	iob->iovcnt = 0;
+
+	CT_LOCK(&ioctx->io_lock);
+	if (TAILQ_EMPTY(&ioctx->io_o_q) && ioctx->io_write_io_enabled)
+		start_write = 1;
+
 	TAILQ_INSERT_TAIL(&ioctx->io_o_q, iob, io_next);
 
 	if (start_write) {
 		event_add(&ioctx->io_ev_wr, NULL);
 	}
+	CT_UNLOCK(&ioctx->io_lock);
 }
 
 int
@@ -625,8 +645,6 @@ ct_io_writev_op(struct ct_io_ctx *ioctx, struct ct_header *hdr,
 
 	if (iovcnt == 0 || iovcnt > IOV_MAX)
 		return 1;
-	if (TAILQ_EMPTY(&ioctx->io_o_q) && ioctx->io_write_io_enabled)
-		start_write = 1;
 
 	CNDBG(CTUTIL_LOG_SOCKET, "scheduling iov cnt %d sz %d", iovcnt,
 	    hdr->c_size);
@@ -641,11 +659,15 @@ ct_io_writev_op(struct ct_io_ctx *ioctx, struct ct_header *hdr,
 	if (sz != hdr->c_size)
 		CFATALX("invalid message length, len != sum iov[*].iov_len");
 
+	CT_LOCK(&ioctx->io_lock);
+	if (TAILQ_EMPTY(&ioctx->io_o_q) && ioctx->io_write_io_enabled)
+		start_write = 1;
 	TAILQ_INSERT_TAIL(&ioctx->io_o_q, iob, io_next);
 
 	if (start_write) {
 		event_add(&ioctx->io_ev_wr, NULL);
 	}
+	CT_UNLOCK(&ioctx->io_lock);
 	return 0;
 }
 
@@ -695,15 +717,19 @@ ct_io_disconnect(struct ct_io_ctx *ioctx)
 	if (ioctx->io_i_hdr != NULL)
 		ioctx->io_header_free(ioctx->io_cb_arg, ioctx->io_i_hdr);
 
+	CT_LOCK(&ioctx->io_lock);
 	while (!TAILQ_EMPTY(&ioctx->io_o_q)) {
 		ioq = TAILQ_FIRST(&ioctx->io_o_q);
 		TAILQ_REMOVE(&ioctx->io_o_q, ioq, io_next);
 
+		CT_UNLOCK(&ioctx->io_lock);
 		ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
 		    ioq->io_hdr, ioq->io_data, ioq->iovcnt);
 
 		ioctx->io_ioctx_free(ioq);
+		CT_LOCK(&ioctx->io_lock);
 	}
+	CT_UNLOCK(&ioctx->io_lock);
 }
 
 /*
@@ -737,15 +763,19 @@ ct_assl_disconnect(struct ct_assl_io_ctx *ioctx)
 			ct_unwire_header(ioq->io_hdr);
 	}
 
+	CT_LOCK(&ioctx->io_lock);
 	while (!TAILQ_EMPTY(&ioctx->io_o_q)) {
 		ioq = TAILQ_FIRST(&ioctx->io_o_q);
 		TAILQ_REMOVE(&ioctx->io_o_q, ioq, io_next);
 
+		CT_UNLOCK(&ioctx->io_lock);
 		ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
 		    ioq->io_hdr, ioq->io_data, ioq->iovcnt);
 
 		ioctx->io_ioctx_free(ioq);
+		CT_LOCK(&ioctx->io_lock);
 	}
+	CT_UNLOCK(&ioctx->io_lock);
 }
 
 void
@@ -775,6 +805,7 @@ ct_assl_io_ctx_init(struct ct_assl_io_ctx *ctx, struct assl_context *c,
 	ctx->io_cb_arg = cb_arg;
 
 	TAILQ_INIT(&ctx->io_o_q);
+	CT_LOCK_INIT(&ctx->io_lock);
 	ctx->io_i_hdr   = NULL;
 	ctx->io_i_data  = NULL;
 	ctx->io_i_state = ctx->io_o_state = 0;
@@ -803,6 +834,7 @@ ct_io_ctx_init(struct ct_io_ctx *ctx, msgdeliver_ty *rd_cb,
 	ctx->io_cb_arg = cb_arg;
 
 	TAILQ_INIT(&ctx->io_o_q);
+	CT_LOCK_INIT(&ctx->io_lock);
 	ctx->io_i_hdr   = NULL;
 	ctx->io_i_data  = NULL;
 	ctx->io_i_state = ctx->io_o_state = 0;

@@ -91,7 +91,8 @@ ct_setup_state(void)
 	ct_state->ct_file_state = CT_S_STARTING;
 	ct_state->ct_comp_state = CT_S_WAITING_TRANS;
 	ct_state->ct_crypt_state = CT_S_WAITING_TRANS;
-	ct_state->ct_write_state = CT_S_WAITING_TRANS;
+	/* XXX: We need this? */
+	/* ct_state->ct_write_state = CT_S_WAITING_TRANS; */
 
 	TAILQ_INIT(&ct_state->ct_sha_queue);
 	TAILQ_INIT(&ct_state->ct_comp_queue);
@@ -119,6 +120,77 @@ ct_set_file_state(int newstate)
 }
 
 void
+ct_queue_sha(struct ct_trans *trans)
+{
+	CT_LOCK(&ct_state->ct_sha_lock);
+	TAILQ_INSERT_TAIL(&ct_state->ct_sha_queue, trans, tr_next);
+	ct_state->ct_sha_qlen++;
+	ct_wakeup_sha();
+	CT_UNLOCK(&ct_state->ct_sha_lock);
+}
+
+void
+ct_queue_compress(struct ct_trans *trans)
+{
+	CT_LOCK(&ct_state->ct_comp_lock);
+	TAILQ_INSERT_TAIL(&ct_state->ct_comp_queue, trans, tr_next);
+	ct_state->ct_comp_qlen++;
+	ct_wakeup_compress();
+	CT_UNLOCK(&ct_state->ct_comp_lock);
+}
+
+void
+ct_queue_encrypt(struct ct_trans *trans)
+{
+	CT_LOCK(&ct_state->ct_crypt_lock);
+	TAILQ_INSERT_TAIL(&ct_state->ct_crypt_queue, trans, tr_next);
+	ct_state->ct_crypt_qlen++;
+	ct_wakeup_encrypt();
+	CT_UNLOCK(&ct_state->ct_crypt_lock);
+}
+
+void
+ct_queue_csha(struct ct_trans *trans)
+{
+	CT_LOCK(&ct_state->ct_csha_lock);
+	TAILQ_INSERT_TAIL(&ct_state->ct_csha_queue, trans, tr_next);
+	ct_state->ct_csha_qlen++;
+	ct_wakeup_csha();
+	CT_UNLOCK(&ct_state->ct_csha_lock);
+}
+
+void
+ct_queue_write(struct ct_trans *trans)
+{
+	CT_LOCK(&ct_state->ct_write_lock);
+	TAILQ_INSERT_TAIL(&ct_state->ct_write_queue, trans, tr_next);
+	ct_state->ct_write_qlen++;
+	ct_wakeup_write();
+	CT_UNLOCK(&ct_state->ct_write_lock);
+}
+
+void
+ct_queue_queued(struct ct_trans *trans)
+{
+	CT_LOCK(&ct_state->ct_queued_lock);
+	TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
+	ct_state->ct_queued_qlen++;
+	CT_UNLOCK(&ct_state->ct_queued_lock);
+	/* XXX - mark socket write enabled */
+}
+
+void
+ct_queue_complete(struct ct_trans *trans)
+{
+	CT_LOCK(&ct_state->ct_complete_lock);
+	RB_INSERT(ct_trans_lookup, &ct_state->ct_complete, trans);
+	ct_state->ct_complete_rblen++;
+	ct_wakeup_complete();
+	CT_UNLOCK(&ct_state->ct_complete_lock);
+}
+
+
+void
 ct_queue_transfer(struct ct_trans *trans)
 {
 	CNDBG(CT_LOG_TRANS, "queuing transaction %" PRIu64 " %d",
@@ -129,91 +201,58 @@ ct_queue_transfer(struct ct_trans *trans)
 	case TR_S_EXISTS:
 		if (trans->hdr.c_flags & C_HDR_F_METADATA)
 			goto skip_sha;
-		ct_state->ct_sha_qlen++;
-		TAILQ_INSERT_TAIL(&ct_state->ct_sha_queue, trans, tr_next);
-		ct_wakeup_sha();
+		ct_queue_sha(trans);
 		break;
 	case TR_S_UNCOMPSHA_ED:
 skip_sha:	/* metadata skips shas */
 		/* try to compress trans body, if compression enabled */
 		if (ct_compress_enabled) {
-			/* XXX - locks */
-			ct_state->ct_comp_qlen++;
-			TAILQ_INSERT_TAIL(&ct_state->ct_comp_queue, trans,
-			  tr_next);
-
-			if (ct_state->ct_comp_state != CT_S_RUNNING) {
-				ct_wakeup_compress();
-			}
-			ct_wakeup_compress();
+			ct_queue_compress(trans);
 			break;
 		}
 		/* fallthru if compress not enabled */
 	case TR_S_COMPRESSED:
 		/* try to encrypt trans body, if encryption enabled */
 		if (ct_encrypt_enabled) {
-			/* XXX - locks */
-			ct_state->ct_crypt_qlen++;
-			TAILQ_INSERT_TAIL(&ct_state->ct_crypt_queue, trans,
-			  tr_next);
-
-			ct_wakeup_encrypt();
+			ct_queue_encrypt(trans);
 			break;
 		}
 		/* fallthru if compress not enabled */
 	case TR_S_COMPSHA_ED:
 	case TR_S_NEXISTS:
 		/* packet is compressed/crypted/SHAed as necessary, send */
-		/* XXX - locks */
 skip_csha:
-		ct_state->ct_write_qlen++;
-		TAILQ_INSERT_TAIL(&ct_state->ct_write_queue, trans, tr_next);
-
-		ct_wakeup_write();
+		ct_queue_write(trans);
 		break;
 	case TR_S_ENCRYPTED:
 		if (trans->hdr.c_flags & C_HDR_F_METADATA)
 			goto skip_csha;
 		/* after encrypting packet, create csha */
-		/* XXX - locks */
-		ct_state->ct_csha_qlen++;
-		TAILQ_INSERT_TAIL(&ct_state->ct_csha_queue, trans, tr_next);
-		ct_wakeup_csha();
+		ct_queue_csha(trans);
 		break;
 
 	case TR_S_FILE_START:
 	case TR_S_SPECIAL:
 	case TR_S_WMD_READY:
-		RB_INSERT(ct_trans_lookup, &ct_state->ct_complete, trans);
-		ct_state->ct_complete_rblen++;
-
-		ct_wakeup_complete();
+		ct_queue_complete(trans);
 		break;
-
 
 	/* extract path */
 	case TR_S_EX_SHA:
+		/* XXX - atomic increment */
 		ct_stats->st_chunks_tot++;
-		ct_state->ct_write_qlen++;
-		TAILQ_INSERT_TAIL(&ct_state->ct_write_queue, trans, tr_next);
-		ct_wakeup_write();
+		ct_queue_write(trans);
 		break;
 	case TR_S_EX_READ:
 		/* smash trans header with received header, flags, sz, op */
 		if (trans->hdr.c_flags & C_HDR_F_ENCRYPTED) {
-			ct_state->ct_crypt_qlen++;
-			TAILQ_INSERT_TAIL(&ct_state->ct_crypt_queue, trans,
-			    tr_next);
-			ct_wakeup_encrypt();
+			ct_queue_encrypt(trans);
 			break;
 		}
 		/* FALLTHRU */
 	case TR_S_EX_DECRYPTED:
 		if (trans->hdr.c_flags & C_HDR_F_COMPRESSED_MASK) {
-			ct_state->ct_comp_qlen++;
-			TAILQ_INSERT_TAIL(&ct_state->ct_comp_queue, trans,
-			    tr_next);
-			ct_wakeup_compress();
+			ct_queue_compress(trans);
 			break;
 		}
 		/* FALLTHRU */
@@ -226,19 +265,14 @@ skip_csha:
 	case TR_S_XML_CLOSE:
 	case TR_S_XML_CLOSED:
 	case TR_S_XML_CULL_REPLIED:
-		RB_INSERT(ct_trans_lookup, &ct_state->ct_complete, trans);
-		ct_state->ct_complete_rblen++;
-
-		ct_wakeup_complete();
+		ct_queue_complete(trans);
 		break;
 	case TR_S_XML_OPEN:
 	case TR_S_XML_LIST:
 	case TR_S_XML_CLOSING:
 	case TR_S_XML_DELETE:
 	case TR_S_XML_CULL_SEND:
-		ct_state->ct_write_qlen++;
-		TAILQ_INSERT_TAIL(&ct_state->ct_write_queue, trans, tr_next);
-		ct_wakeup_write();
+		ct_queue_write(trans);
 		break;
 	default:
 		CFATALX("state %d, not handled in ct_queue_transfer()",
@@ -430,7 +464,9 @@ ct_reconnect_internal(void)
 			CINFO("Reconnected");
 		ct_disconnected = 0;
 
+		CT_LOCK(&ct_state->ct_write_lock);
 		TAILQ_FOREACH(trans, &ct_state->ct_write_queue, tr_next) {
+			CT_UNLOCK(&ct_state->ct_write_lock);
 			if ((trans->hdr.c_flags & C_HDR_F_METADATA) == 0)
 				continue;
 
@@ -456,12 +492,12 @@ ct_reconnect_internal(void)
 					 * Don't try and close again,
 					 * complete it and stop worrying.
 					 */
+					CT_LOCK(&ct_state->ct_write_lock);
 					TAILQ_REMOVE(&ct_state->ct_write_queue,
 					    trans, tr_next);
 					ct_state->ct_write_qlen--;
-					RB_INSERT(ct_trans_lookup,
-					    &ct_state->ct_complete, trans);
-					ct_state->ct_complete_rblen++;
+					CT_UNLOCK(&ct_state->ct_write_lock);
+					ct_queue_complete(trans);
 					break;
 				}
 				/*
@@ -529,7 +565,7 @@ ct_reconnect(evutil_socket_t unused, short event, void *varg)
 		ct_wakeup_compress();
 		ct_wakeup_encrypt();
 		ct_wakeup_csha();
-		ct_wakeup_complete();
+// XXX - Remove		ct_wakeup_complete();
 		ct_wakeup_write();
 		ct_wakeup_complete();
 		ct_wakeup_file();
@@ -559,9 +595,7 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 			RB_REMOVE(ct_iotrans_lookup, &ct_state->ct_inflight,
 			    trans);
 			/* put on the head so write queue is still ordered. */
-			TAILQ_INSERT_HEAD(&ct_state->ct_write_queue, trans,
-			    tr_next);
-			ct_state->ct_write_qlen++;
+			ct_queue_write(trans);
 			ct_state->ct_inflight_rblen--;
 			idle = 0;
 		}
@@ -641,10 +675,11 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 		trans = (struct ct_trans *)hdr; /* cast to parent struct */
 		CNDBG(CT_LOG_NET, "moving trans %" PRIu64" back to write queue",
 		    trans->tr_trans_id);
+		CT_LOCK(&ct_state->ct_queued_lock);
 		TAILQ_REMOVE(&ct_state->ct_queued, trans, tr_next);
 		ct_state->ct_queued_qlen--;
-		ct_state->ct_write_qlen++;
-		TAILQ_INSERT_TAIL(&ct_state->ct_write_queue, trans, tr_next);
+		CT_UNLOCK(&ct_state->ct_queued_lock);
+		ct_queue_write(trans);
 		return;
 	}
 
@@ -654,7 +689,9 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 	case C_HDR_O_READ:
 	case C_HDR_O_XML:
 		trans = (struct ct_trans *)hdr; /* cast to parent struct */
+		CT_LOCK(&ct_state->ct_queued_lock);
 		TAILQ_REMOVE(&ct_state->ct_queued, trans, tr_next);
+		CT_UNLOCK(&ct_state->ct_queued_lock);
 		RB_INSERT(ct_iotrans_lookup, &ct_state->ct_inflight, trans);
 		ct_state->ct_queued_qlen--;
 		ct_state->ct_inflight_rblen++;
@@ -758,11 +795,12 @@ ct_compute_sha(void *vctx)
 	char			shat[SHA_DIGEST_STRING_LENGTH];
 	int			slot;
 
-
+	CT_LOCK(&ct_state->ct_sha_lock);
 	while (!TAILQ_EMPTY(&ct_state->ct_sha_queue)) {
 		trans = TAILQ_FIRST(&ct_state->ct_sha_queue);
 		TAILQ_REMOVE(&ct_state->ct_sha_queue, trans, tr_next);
 		ct_state->ct_sha_qlen--;
+		CT_UNLOCK(&ct_state->ct_sha_lock);
 		fnode = trans->tr_fl_node;
 
 		switch (trans->tr_state) {
@@ -780,6 +818,7 @@ ct_compute_sha(void *vctx)
 			ctdb_insert(trans);
 			trans->tr_state = TR_S_WMD_READY;
 			ct_queue_transfer(trans);
+			CT_LOCK(&ct_state->ct_sha_lock);
 			continue;
 		default:
 			CFATALX("unexpected transaction state %d",
@@ -810,7 +849,9 @@ ct_compute_sha(void *vctx)
 			trans->tr_state = TR_S_UNCOMPSHA_ED;
 		}
 		ct_queue_transfer(trans);
+		CT_LOCK(&ct_state->ct_sha_lock);
 	}
+	CT_UNLOCK(&ct_state->ct_sha_lock);
 }
 
 void
@@ -820,10 +861,12 @@ ct_compute_csha(void *vctx)
 	char			shat[SHA_DIGEST_STRING_LENGTH];
 	int			slot;
 
+	CT_LOCK(&ct_state->ct_csha_lock);
 	while (!TAILQ_EMPTY(&ct_state->ct_csha_queue)) {
 		trans = TAILQ_FIRST(&ct_state->ct_csha_queue);
 		TAILQ_REMOVE(&ct_state->ct_csha_queue, trans, tr_next);
 		ct_state->ct_csha_qlen--;
+		CT_UNLOCK(&ct_state->ct_csha_lock);
 
 		slot = trans->tr_dataslot;
 		ct_sha1(trans->tr_data[slot], trans->tr_csha,
@@ -838,7 +881,9 @@ ct_compute_csha(void *vctx)
 		}
 		trans->tr_state = TR_S_COMPSHA_ED;
 		ct_queue_transfer(trans);
+		CT_LOCK(&ct_state->ct_csha_lock);
 	}
+	CT_UNLOCK(&ct_state->ct_csha_lock);
 }
 
 void
@@ -996,6 +1041,7 @@ ct_process_completions(void *vctx)
 {
 	struct ct_trans *trans;
 
+	CT_LOCK(&ct_state->ct_complete_lock);
 	trans = RB_MIN(ct_trans_lookup, &ct_state->ct_complete);
 	if (trans)
 		CNDBG(CT_LOG_TRANS,
@@ -1005,6 +1051,7 @@ ct_process_completions(void *vctx)
 	while (trans != NULL && trans->tr_trans_id == ct_packet_id) {
 		RB_REMOVE(ct_trans_lookup, &ct_state->ct_complete, trans);
 		ct_state->ct_complete_rblen--;
+		CT_UNLOCK(&ct_state->ct_complete_lock);
 
 		CNDBG(CT_LOG_TRANS, "writing file trans %" PRIu64 " eof %d",
 		    trans->tr_trans_id, trans->tr_eof);
@@ -1023,8 +1070,10 @@ ct_process_completions(void *vctx)
 			ct_wakeup_file();
 
 
+		CT_LOCK(&ct_state->ct_complete_lock);
 		trans = RB_MIN(ct_trans_lookup, &ct_state->ct_complete);
 	}
+	CT_UNLOCK(&ct_state->ct_complete_lock);
 	if (trans != NULL && trans->tr_trans_id < ct_packet_id) {
 		CFATALX("old transaction found in completion queue %" PRIu64
 		    " %" PRIu64, trans->tr_trans_id, ct_packet_id);
@@ -1032,7 +1081,7 @@ ct_process_completions(void *vctx)
 }
 
 void
-ct_wakeup_write(void)
+ct_process_write(void *vctx)
 {
 	struct ct_trans		*trans;
 	struct ct_header	*hdr;
@@ -1048,11 +1097,13 @@ ct_wakeup_write(void)
 	}
 
 	CNDBG(CT_LOG_NET, "wakeup write");
+	CT_LOCK(&ct_state->ct_write_lock);
 	while (ct_disconnected == 0 &&
 	    !TAILQ_EMPTY(&ct_state->ct_write_queue)) {
 		trans = TAILQ_FIRST(&ct_state->ct_write_queue);
 		TAILQ_REMOVE(&ct_state->ct_write_queue, trans, tr_next);
 		ct_state->ct_write_qlen--;
+		CT_UNLOCK(&ct_state->ct_write_lock);
 
 		CNDBG(CT_LOG_NET, "wakeup write going");
 		hdr = &trans->hdr;
@@ -1117,8 +1168,7 @@ ct_wakeup_write(void)
 		    trans->tr_state, hdr->c_flags);
 
 		/* move transaction to pending RB tree */
-		TAILQ_INSERT_TAIL(&ct_state->ct_queued, trans, tr_next);
-		ct_state->ct_queued_qlen++;
+		ct_queue_queued(trans);
 
 		/* XXX there really isn't a better place to do this */
 		if (hdr->c_opcode == C_HDR_O_WRITE &&
@@ -1139,11 +1189,14 @@ ct_wakeup_write(void)
 			hdr->c_size += sizeof(*cmf);
 
 			ct_assl_writev_op(ct_assl_ctx, hdr, iov, 2);
+			CT_LOCK(&ct_state->ct_write_lock);
 			continue;
 		}
 
 		ct_assl_write_op(ct_assl_ctx, hdr, data);
+		CT_LOCK(&ct_state->ct_write_lock);
 	}
+	CT_UNLOCK(&ct_state->ct_write_lock);
 }
 
 void
@@ -1287,10 +1340,12 @@ ct_compute_compress(void *vctx)
 	int			len;
 	int			ncompmode;
 
+	CT_LOCK(&ct_state->ct_comp_lock);
 	while (!TAILQ_EMPTY(&ct_state->ct_comp_queue)) {
 		trans = TAILQ_FIRST(&ct_state->ct_comp_queue);
 		TAILQ_REMOVE(&ct_state->ct_comp_queue, trans, tr_next);
 		ct_state->ct_comp_qlen--;
+		CT_UNLOCK(&ct_state->ct_comp_lock);
 
 		switch(trans->tr_state) {
 		case TR_S_EX_DECRYPTED:
@@ -1371,7 +1426,9 @@ ct_compute_compress(void *vctx)
 		else
 			trans->tr_state = TR_S_EX_UNCOMPRESSED;
 		ct_queue_transfer(trans);
+		CT_LOCK(&ct_state->ct_comp_lock);
 	}
+	CT_UNLOCK(&ct_state->ct_comp_lock);
 }
 
 void
@@ -1388,10 +1445,12 @@ ct_compute_encrypt(void *vctx)
 	int			encr;
 	int			len;
 
-	while (!TAILQ_EMPTY(&ct_state->ct_crypt_queue)) {
+	CT_LOCK(&ct_state->ct_crypt_lock);
+	while (!TAILQ_EMPTY(&ct_state->ct_crypt_queue))	{
 		trans = TAILQ_FIRST(&ct_state->ct_crypt_queue);
 		TAILQ_REMOVE(&ct_state->ct_crypt_queue, trans, tr_next);
 		ct_state->ct_crypt_qlen--;
+		CT_UNLOCK(&ct_state->ct_crypt_lock);
 
 		switch(trans->tr_state) {
 		case TR_S_EX_READ:
@@ -1459,31 +1518,46 @@ ct_compute_encrypt(void *vctx)
 		else
 			trans->tr_state = TR_S_EX_DECRYPTED;
 		ct_queue_transfer(trans);
+		CT_LOCK(&ct_state->ct_crypt_lock);
 	}
+	CT_UNLOCK(&ct_state->ct_crypt_lock);
 }
 
 void
 ct_display_queues(void)
 {
-	/* XXX - looks at queues without locks */
-
 	if (ct_verbose > 1) {
+		CT_LOCK(&ct_state->ct_sha_lock);
+		CT_LOCK(&ct_state->ct_comp_lock);
+		CT_LOCK(&ct_state->ct_crypt_lock);
+		CT_LOCK(&ct_state->ct_csha_lock);
+		CT_LOCK(&ct_state->ct_write_lock);
+		CT_LOCK(&ct_state->ct_queued_lock);
+		CT_LOCK(&ct_state->ct_complete_lock);
 		fprintf(stderr, "Sha      queue len %d\n",
 		    ct_state->ct_sha_qlen);
+		CT_UNLOCK(&ct_state->ct_sha_lock);
 		fprintf(stderr, "Comp     queue len %d\n",
 		    ct_state->ct_comp_qlen);
+		CT_UNLOCK(&ct_state->ct_comp_lock);
 		fprintf(stderr, "Crypt    queue len %d\n",
 		    ct_state->ct_crypt_qlen);
+		CT_UNLOCK(&ct_state->ct_crypt_lock);
 		fprintf(stderr, "Csha     queue len %d\n",
 		    ct_state->ct_csha_qlen);
+		CT_UNLOCK(&ct_state->ct_csha_lock);
 		fprintf(stderr, "Write    queue len %d\n",
 		    ct_state->ct_write_qlen);
+		CT_UNLOCK(&ct_state->ct_write_lock);
 		fprintf(stderr, "CRqueued queue len %d\n",
 		    ct_state->ct_queued_qlen);
+		CT_UNLOCK(&ct_state->ct_queued_lock);
+		// XXX: Add locks for inflight queue throughout?
 		fprintf(stderr, "Inflight queue len %d\n",
 		    ct_state->ct_inflight_rblen);
 		fprintf(stderr, "Complete queue len %d\n",
 		    ct_state->ct_complete_rblen);
+		CT_UNLOCK(&ct_state->ct_complete_lock);
 		fprintf(stderr, "Free     queue len %d\n", c_trans_free);
 	}
 	ct_dump_stats(stderr);

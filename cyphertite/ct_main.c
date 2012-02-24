@@ -182,11 +182,20 @@ ct_init_eventloop(void)
 	CNDBG(CT_LOG_NET, "assl data: as bits %d, protocol [%s]",
 	    ct_assl_ctx->c->as_bits, ct_assl_ctx->c->as_protocol);
 
+	CT_LOCK_INIT(&ct_state->ct_sha_lock);
+	CT_LOCK_INIT(&ct_state->ct_comp_lock);
+	CT_LOCK_INIT(&ct_state->ct_crypt_lock);
+	CT_LOCK_INIT(&ct_state->ct_csha_lock);
+	CT_LOCK_INIT(&ct_state->ct_write_lock);
+	CT_LOCK_INIT(&ct_state->ct_queued_lock);
+	CT_LOCK_INIT(&ct_state->ct_complete_lock);
+
 	ct_setup_wakeup_file(ct_state, ct_nextop);
 	ct_setup_wakeup_sha(ct_state, ct_compute_sha);
 	ct_setup_wakeup_compress(ct_state, ct_compute_compress);
 	ct_setup_wakeup_csha(ct_state, ct_compute_csha);
 	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
+	ct_setup_wakeup_write(ct_state, ct_process_write);
 	ct_setup_wakeup_complete(ct_state, ct_process_completions);
 }
 
@@ -215,6 +224,14 @@ ct_cleanup_eventloop(void)
 	ct_ssl_cleanup();
 	ctdb_shutdown();
 	ct_cleanup_login_cache();
+	// XXX: ct_lock_cleanup();
+	CT_LOCK_RELEASE(&ct_state->ct_sha_lock);
+	CT_LOCK_RELEASE(&ct_state->ct_comp_lock);
+	CT_LOCK_RELEASE(&ct_state->ct_crypt_lock);
+	CT_LOCK_RELEASE(&ct_state->ct_csha_lock);
+	CT_LOCK_RELEASE(&ct_state->ct_write_lock);
+	CT_LOCK_RELEASE(&ct_state->ct_queued_lock);
+	CT_LOCK_RELEASE(&ct_state->ct_complete_lock);
 }
 
 void

@@ -17,6 +17,8 @@
 #ifndef CT_SOCKET_H
 #define CT_SOCKET_H
 
+#include <ct_threads.h>
+
 #include <event.h>
 
 #ifndef evutil_socket_t
@@ -83,6 +85,8 @@ struct ct_io_ctx {
 	int				io_user_flow_control;
 	int				io_write_io_enabled;
 
+	CT_LOCK_STORE(io_lock);
+
 	/* stats */
 	uint64_t			io_write_bytes;
 	uint64_t			io_write_count;
@@ -117,6 +121,8 @@ struct ct_assl_io_ctx {
 	int				io_o_written;
 
 	int				io_write_io_enabled;
+
+	CT_LOCK_STORE(io_lock);
 
 	/* stats */
 	uint64_t			io_write_bytes;

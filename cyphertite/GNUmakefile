@@ -44,6 +44,8 @@ endif
 CPPFLAGS += -DNEED_LIBCLENS
 INCFLAGS += -I../ctutil -I$(INCDIR)/clens -I$(LOCALBASE)/ssl/include
 CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(DEBUG)
+CFLAGS += $(CTHREAD)
+LDFLAGS+= $(LDTHREAD)
 LDFLAGS += -L$(LOCALBASE)/ssl/lib
 LDFLAGS += -L../ctutil/obj -L../ctutil -lctutil -lassl -lclog -levent -lexude
 LDFLAGS += -lshrink -lxmlsd -lexpat -lsqlite3 -llzma -llzo2 -lz -lclens -lbsd

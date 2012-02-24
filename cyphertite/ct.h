@@ -23,6 +23,7 @@
 
 #include <ctutil.h>
 #include <ct_socket.h>
+#include "ct_threads.h"
 
 #include <event.h>
 
@@ -81,6 +82,7 @@ void			ct_compute_compress(void *);
 void			ct_compute_encrypt(void *);
 void			ct_compute_csha(void *);
 void			ct_process_completions(void *);
+void			ct_process_write(void *);
 
 struct fnode;
 struct dnode;
@@ -342,31 +344,37 @@ struct ct_global_state{
 	int				ct_file_state;
 	int				ct_comp_state;
 	int				ct_crypt_state;
-	int				ct_write_state;
 	STR_PAD(0);
 	TAILQ_HEAD(, ct_trans)		ct_sha_queue;
 	int				ct_sha_qlen;
+	CT_LOCK_STORE(ct_sha_lock);
 	STR_PAD(1);
 	TAILQ_HEAD(, ct_trans)		ct_comp_queue;
 	int				ct_comp_qlen;
+	CT_LOCK_STORE(ct_comp_lock);
 	STR_PAD(2);
 	TAILQ_HEAD(, ct_trans)		ct_crypt_queue;
 	int				ct_crypt_qlen;
+	CT_LOCK_STORE(ct_crypt_lock);
 	STR_PAD(3);
 	TAILQ_HEAD(, ct_trans)		ct_csha_queue;
 	int				ct_csha_qlen;
+	CT_LOCK_STORE(ct_csha_lock);
 	STR_PAD(4);
 	TAILQ_HEAD(, ct_trans)		ct_write_queue;
 	int				ct_write_qlen;
+	CT_LOCK_STORE(ct_write_lock);
 	STR_PAD(5);
 	TAILQ_HEAD(, ct_trans)		ct_queued;
 	int				ct_queued_qlen;
+	CT_LOCK_STORE(ct_queued_lock);
 	STR_PAD(6);
 	struct ct_iotrans_lookup	ct_inflight;
 	int				ct_inflight_rblen;
 	STR_PAD(7);
 	struct ct_trans_lookup		ct_complete;
 	int				ct_complete_rblen;
+	CT_LOCK_STORE(ct_complete_lock);
 	TAILQ_HEAD(ct_ops, ct_op)	ct_operations;
 };
 extern struct ct_global_state		*ct_state;
@@ -392,7 +400,6 @@ typedef void (ct_func_cb)(void *);
 struct ct_ctx;
 
 void ct_setup_state(void);
-void ct_setup_wakeup(struct ct_ctx *, void *, ct_func_cb *);
 void ct_setup_wakeup_file(void *, ct_func_cb *);
 void ct_setup_wakeup_sha(void *, ct_func_cb *);
 void ct_setup_wakeup_compress(void *, ct_func_cb *);

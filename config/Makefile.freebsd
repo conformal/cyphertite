@@ -6,6 +6,9 @@ NO_OBJ=
 CFLAGS+= -fdiagnostics-show-option -fno-strict-aliasing
 CFLAGS+= -DNEED_LIBCLENS
 CFLAGS+= -I${INCDIR}/clens -I${LOCALBASE}/ssl/include
-LDFLAGS+= -L${LOCALBASE}/ssl/lib -L${LIBDIR}
+LDFLAGS+= -L${LOCALBASE}/ssl/lib
 LDADD+= -lclens
 LDADDSSL+= -Wl,-Bstatic -lssl -lcrypto -Wl,-Bdynamic
+
+CTHREAD=-pthread -DCT_ENABLE_THREADS -DCT_ENABLE_PTHREADS
+LDTHREAD=-pthread

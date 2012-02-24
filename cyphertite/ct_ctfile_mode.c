@@ -1055,7 +1055,7 @@ ctfile_extract_nextop(struct ct_op *op)
 		break;
 	case CT_A_JUSTDL:
 		{
-		extern char * ct_fb_filename; 
+		extern char * ct_fb_filename;
 		ct_fb_filename = op->op_local_fname; /* XXX ick */
 		ct_add_operation(ct_shutdown_op, NULL, NULL, NULL, NULL, NULL,
 		    NULL, 0, 0);
