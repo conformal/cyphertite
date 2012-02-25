@@ -56,10 +56,14 @@ BIN.SRCS += ct_aes_xts.c ct_crypto.c ct_match.c
 BIN.SRCS += ct_db.c ct_xdr.c ct_bw_lim.c ct_ctl.c ct_md_xdr.c
 BIN.SRCS += ct_config.c ct_md_traverse.c ct_fb.c ct_fb_ops.c
 BIN.MANPAGES = cyphertite.1 cyphertite.conf.5 cyphertitefb.1 cyphertitectl.1
+BIN.MLINKS  = cyphertite.1 ct.1
+BIN.MLINKS += cyphertitefb.1 ctfb.1
+BIN.MLINKS += cyphertitectl.1 ctctl.1
 BIN.OBJS = $(addprefix $(OBJPREFIX), $(BIN.SRCS:.c=.o))
 BIN.DEPS = $(addsuffix .depend, $(BIN.OBJS))
 BIN.LDFLAGS = $(LDFLAGS.EXTRA) $(LDFLAGS) $(LDADD)
 BIN.MDIRS = $(foreach page, $(BIN.MANPAGES), $(subst ., man, $(suffix $(page))))
+BIN.MLINKS := $(foreach page, $(BIN.MLINKS), $(subst ., man, $(suffix $(page)))/$(page))
 
 all: $(OBJPREFIX)$(BIN.NAME)
 
@@ -91,12 +95,32 @@ install:
 		$(INSTALL) -m 0444 $(page) $(addprefix $(DESTDIR)$(MANDIR)/, \
 		$(subst ., man, $(suffix $(page))))/; \
 	)
+	@set $(addprefix $(DESTDIR)$(MANDIR)/, $(BIN.MLINKS)); \
+	while : ; do \
+		case $$# in \
+			0) break;; \
+			1) echo "Warning: Unbalanced MLINK: $$1"; break;; \
+		esac; \
+		page=$$1; shift; link=$$1; shift; \
+		echo $(LN) $(LNFORCE) $$page $$link; \
+		$(LN) $(LNFORCE) $$page $$link; \
+	done
 
 uninstall:
 	$(RM) $(DESTDIR)$(BINDIR)/$(BIN.NAME)
 	$(foreach link, $(BIN.LINKS), \
 		$(RM) $(DESTDIR)$(BINDIR)/$(link); \
 	)
+	@set $(addprefix $(DESTDIR)$(MANDIR)/, $(BIN.MLINKS)); \
+	while : ; do \
+		case $$# in \
+			0) break;; \
+			1) echo "Warning: Unbalanced MLINK: $$1"; break;; \
+		esac; \
+		page=$$1; shift; link=$$1; shift; \
+		echo $(RM) $$link; \
+		$(RM) $$link; \
+	done
 	$(foreach page, $(BIN.MANPAGES), \
 		$(RM) $(addprefix $(DESTDIR)$(MANDIR)/, \
 		$(subst ., man, $(suffix $(page))))/$(page); \
