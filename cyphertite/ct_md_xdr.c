@@ -132,7 +132,7 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode)
 	uint64_t		reduction;
 	struct fnode		*fnode = &fnodestore;
 	struct ct_match		*match, *ex_match = NULL;
-	char			*ct_next_filename, *ct_filename_free = NULL;
+	char			*ct_next_filename;
 	char			*sign;
 	int			state;
 	int			doprint = 0;
@@ -145,23 +145,19 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode)
 
 	ct_verbose++;	/* by default print something. */
 
-next_file:
 	ct_next_filename = NULL;
-
+next_file:
 	ret = ct_xdr_parse_init(&xs_ctx, file);
 	if (ret)
 		CFATALX("failed to open %s", file);
 
-	if (ct_filename_free) {
-		free(ct_filename_free);
-		ct_filename_free = NULL;
-	}
+	if (ct_next_filename)
+		e_free(&ct_next_filename);
 
 	if (xs_ctx.xs_gh.cmg_prevlvl_filename) {
 		CNDBG(CT_LOG_CTFILE, "previous backup file %s\n",
 		    xs_ctx.xs_gh.cmg_prevlvl_filename);
-		ct_next_filename = xs_ctx.xs_gh.cmg_prevlvl_filename;
-		ct_filename_free = ct_next_filename;
+		ct_next_filename = e_strdup(xs_ctx.xs_gh.cmg_prevlvl_filename);
 	}
 	bzero(&fnodestore, sizeof(fnodestore));
 
@@ -202,7 +198,6 @@ next_file:
 					if (reduction != 0)
 						sign = "-";
 				}
-			
 			}
 			if (doprint && ct_verbose > 1)
 				printf(" sz: %" PRIu64 " shas: %" PRIu64
