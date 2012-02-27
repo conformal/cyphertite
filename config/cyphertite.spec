@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.0.0
+%define version		1.0.1
 %define release		1
 
 Name: 		%{name}
@@ -51,6 +51,17 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Mon Feb 27 2012 - davec 1.0.1-1
+- Normalize user names to match web accounts
+- Add support for latest version of libevent
+- Improve and cleanup man pages
+- Include cyphertitectl (ctctl) man page in packages
+- Implement build versioning on Linux to match support on BSD
+- Allow manpages to be accessed with their short names on Linux
+- Improve usage clarity
+- Improve error reporting when loading file certificates
+- Fixed an issue regarding listing contents of an incremental backup
+- Other minor bug fixes, misc code cleanup, and improvements
 * Mon Feb 13 2012 - drahn 1.0.0-1
 - Handle files truncated or growing during backup, best effort will be
   made to archive the files

@@ -3,6 +3,18 @@ User visible changes for cyphertite
   A high-security scalable solution for online backups
 ============================================================================
 
+Changes in 1.0.1 (Mon Feb 27 2012)
+  - Normalize user names to match web accounts
+  - Add support for latest version of libevent
+  - Improve and cleanup man pages
+  - Include cyphertitectl (ctctl) man page in packages
+  - Implement build versioning on Linux to match support on BSD
+  - Allow manpages to be accessed with their short names on Linux
+  - Improve usage clarity
+  - Improve error reporting when loading file certificates
+  - Fixed an issue regarding listing contents of an incremental backup
+  - Other minor bug fixes, misc code cleanup, and improvements
+
 Changes in 1.0.0 (Mon Feb 13 2012)
   - Handle files truncated or growing during backup, best effort will be
     made to archive the files

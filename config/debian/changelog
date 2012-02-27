@@ -1,3 +1,18 @@
+cyphertite (1.0.1-1) unstable; urgency=low
+
+  * Normalize user names to match web accounts
+  * Add support for latest version of libevent
+  * Improve and cleanup man pages
+  * Include cyphertitectl (ctctl) man page in packages
+  * Implement build versioning on Linux to match support on BSD
+  * Allow manpages to be accessed with their short names on Linux
+  * Improve usage clarity
+  * Improve error reporting when loading file certificates
+  * Fixed an issue regarding listing contents of an incremental backup
+  * Other minor bug fixes, misc code cleanup, and improvements
+
+ -- Conformal Systems <package-discuss@conformal.com>  Mon, 27 Feb 2012 16:55:42 -0600
+
 cyphertite (1.0.0-1) unstable; urgency=low
 
   * Handle files truncated or growing during backup, best effort will be
