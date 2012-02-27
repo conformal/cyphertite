@@ -885,7 +885,6 @@ ct_getloginbyuid(uid_t uid)
 	if (entry != NULL) {
 		return entry->lc_name;
 	}
-	printf("uid lookup failed %d\n", uid);
 
 	/* if the cache gets too big, dump all entries and refill. */
 	if (ct_login_cache_size > MAX_LC_CACHE_SIZE) {
