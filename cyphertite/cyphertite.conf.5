@@ -116,6 +116,18 @@ for a description of the different
 operation modes.
 .Pp
 .It Xo
+.Ic ctfile_expire_day = Ar days
+.Xc
+Specify the number of days after which remote
+.Ar ctfiles
+will be removed when running the cull command of the
+.Xr cyphertitectl 1
+utility.
+All unreferenced data as a result of removing those
+.Ar ctfiles
+will also be removed.
+.Pp
+.It Xo
 .Ic ctfile_remote_auto_differential =
 .Pq Ic 0 Ns \&| Ns Ic 1
 .Xc
