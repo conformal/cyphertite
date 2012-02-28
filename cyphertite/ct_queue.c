@@ -1113,10 +1113,6 @@ ct_process_write(void *vctx)
 			/* data = trans->tr_sha; - done above,allows fallthru */
 			hdr->c_opcode = C_HDR_O_EXISTS;
 			hdr->c_size = (sizeof trans->tr_sha);
-	#if 0
-			if (verify)
-				hdr->c_flags |= E_HDR_F_VERIFYDIGEST;
-	#endif
 			if (ct_encrypt_enabled) {
 				hdr->c_flags |= C_HDR_F_ENCRYPTED;
 			}
