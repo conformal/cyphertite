@@ -441,6 +441,7 @@ struct ct_global_state{
 	int				ct_complete_rblen;
 	CT_LOCK_STORE(ct_complete_lock);
 	TAILQ_HEAD(ct_ops, ct_op)	ct_operations;
+	struct ctdb_state		*ct_db_state;
 };
 extern struct ct_global_state		*ct_state;
 
@@ -497,13 +498,7 @@ int				ct_xml_file_open_polled(struct ct_assl_io_ctx *,
 #define MD_O_APPEND	2
 void				ct_xml_file_close(void);
 
-/* db external interface */
-void				ctdb_setup(const char *, int);
-void				ctdb_shutdown(void);
-int				ctdb_exists(struct ct_trans *);
-int				ctdb_insert(struct ct_trans *trans);
-#define CTDB_USE_SHA    (1)
-#define CTDB_USE_CSHA   (2)
+#include "ct_db.h"
 
 char				*ctfile_get_previous(const char *);
 

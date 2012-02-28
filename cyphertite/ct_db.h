@@ -14,18 +14,14 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* db functions */
-sqlite3			*ctdb_open(const char *, int, int *);
-sqlite3			*ctdb_reopendb(int);
-void			ctdb_cleanup(sqlite3 *);
-int			ctdb_lookup_sha(sqlite3 *, uint8_t *, uint8_t *,
-			    uint8_t *);
-int			ctdb_insert_sha(sqlite3 *, uint8_t *, uint8_t *,
-			    uint8_t *);
-int			ctdb_create(const char *, sqlite3 **, int, int);
-int			ctdb_query_db_mode(sqlite3 *, int, int *);
+/* localdb interface */
+struct ctdb_state;
 
-void			ctdb_setup(const char *, int);
-void			ctdb_shutdown(void);
-
-extern int		ctdb_genid;
+struct ctdb_state		*ctdb_setup(const char *, int);
+void				 ctdb_shutdown(struct ctdb_state *);
+int				 ctdb_exists(struct ctdb_state *,
+				     struct ct_trans *);
+int				 ctdb_insert(struct ctdb_state *,
+				     struct ct_trans *trans);
+int				 ctdb_get_genid(struct ctdb_state *);
+void				 ctdb_reopendb(struct ctdb_state *, int);

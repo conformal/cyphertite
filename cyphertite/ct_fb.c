@@ -432,7 +432,7 @@ ctfb_get_version(struct ct_fb_state *state, const char *path, int preferdir,
 	*postfix = '\0'; /* trim off version now we have it parsed out */
 
 search:
-	if ((entry = ctfb_follow_path(ctfb_cfs, path, NULL, 0)) == NULL) {
+	if ((entry = ctfb_follow_path(state, path, NULL, 0)) == NULL) {
 		if (noversion == 0)
 			*postfix = '.';
 		return (-1);

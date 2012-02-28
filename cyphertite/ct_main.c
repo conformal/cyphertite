@@ -170,11 +170,12 @@ ct_init(int foreground, int need_secrets, int only_metadata)
 void
 ct_init_eventloop(void)
 {
-	ctdb_setup(ct_localdb, ct_crypto_secrets != NULL);
-
 	assl_initialize();
 	ct_event_init();
 	ct_setup_state();
+
+	ct_state->ct_db_state = ctdb_setup(ct_localdb,
+	    ct_crypto_secrets != NULL);
 
 	gettimeofday(&ct_stats->st_time_start, NULL);
 	ct_assl_ctx = ct_ssl_connect(0);
@@ -226,7 +227,7 @@ ct_cleanup_eventloop(void)
 	ct_trans_cleanup();
 	ct_flnode_cleanup();
 	ct_ssl_cleanup();
-	ctdb_shutdown();
+	ctdb_shutdown(ct_state->ct_db_state);
 	ct_cleanup_login_cache();
 	// XXX: ct_lock_cleanup();
 	CT_LOCK_RELEASE(&ct_state->ct_sha_lock);

@@ -355,7 +355,8 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *asslctx)
 
 	xe = xmlsd_create(&xl, "ct_negotiate");
 	xe = xmlsd_add_element(&xl, xe, "clientdbgenid");
-	xmlsd_set_attr_int32(xe, "value", ctdb_genid);
+	xmlsd_set_attr_int32(xe, "value",
+	    ctdb_get_genid(ct_state->ct_db_state));
 
 	body = xmlsd_generate(&xl, malloc, &orig_size, 1);
 	hdr.c_size = payload_sz = orig_size;
@@ -456,9 +457,10 @@ ct_validate_xml_negotiate_xml(struct ct_header *hdr, char *xml_body)
 		}
 	}
 
-	if (attrval_i != -1 && attrval_i != ctdb_genid) {
+	if (attrval_i != -1 && attrval_i !=
+	    ctdb_get_genid(ct_state->ct_db_state)) {
 		CINFO("need to recreate localdb");
-		ctdb_reopendb(attrval_i);
+		ctdb_reopendb(ct_state->ct_db_state, attrval_i);
 	}
 
 
@@ -477,7 +479,8 @@ ct_shutdown_op(struct ct_op *unused)
 void
 ct_shutdown()
 {
-	ctdb_shutdown();
+	ctdb_shutdown(ct_state->ct_db_state);
+	ct_state->ct_db_state = NULL;
 	event_loopbreak();
 }
 

@@ -789,6 +789,7 @@ ct_body_free(void *vctx, void *body, struct ct_header *hdr)
 void
 ct_compute_sha(void *vctx)
 {
+	struct ct_global_state	*state = vctx;
 	struct ct_trans		*trans;
 	struct fnode		*fnode;
 	char			shat[SHA_DIGEST_STRING_LENGTH];
@@ -814,7 +815,7 @@ ct_compute_sha(void *vctx)
 				    "entering sha into db %" PRIu64 " %s",
 				    trans->tr_trans_id, shat);
 			}
-			ctdb_insert(trans);
+			ctdb_insert(state->ct_db_state, trans);
 			trans->tr_state = TR_S_WMD_READY;
 			ct_queue_transfer(trans);
 			CT_LOCK(&ct_state->ct_sha_lock);
@@ -841,7 +842,7 @@ ct_compute_sha(void *vctx)
 			    "block tr_id %" PRIu64 " sha %s sz %d",
 			    trans->tr_trans_id, shat, trans->tr_size[slot]);
 		}
-		if (ctdb_exists(trans)) {
+		if (ctdb_exists(state->ct_db_state, trans)) {
 			ct_stats->st_bytes_exists += trans->tr_chsize;
 			trans->tr_state = TR_S_WMD_READY;
 		} else {
