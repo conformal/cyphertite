@@ -1113,9 +1113,6 @@ ct_process_write(void *vctx)
 			/* data = trans->tr_sha; - done above,allows fallthru */
 			hdr->c_opcode = C_HDR_O_EXISTS;
 			hdr->c_size = (sizeof trans->tr_sha);
-			if (ct_encrypt_enabled) {
-				hdr->c_flags |= C_HDR_F_ENCRYPTED;
-			}
 			break;
 		case TR_S_EX_SHA:
 			hdr->c_opcode = C_HDR_O_READ;
@@ -1470,8 +1467,6 @@ ct_compute_encrypt(void *vctx)
 
 			newlen = ct_encrypt(key, keysz, iv, ivlen, src,
 			    len, dst, ct_alloc_block_size);
-			/* XXX - which one ? */
-			trans->hdr.c_flags |= C_HDR_F_ENCRYPTED;
 		} else {
 			newlen = ct_decrypt(key, keysz, iv, ivlen,
 			    src, len, dst, ct_alloc_block_size);
