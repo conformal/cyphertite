@@ -63,13 +63,19 @@ prompts for a new crypto password and writes the new one in the
 specified
 .Ar conffile .
 .It Cm cull
-removes meta data files older than
+removes
+.Ar ctfiles
+older than
 .Ar ctfile_expire_day
 in the specified
 .Ar conffile .
-Only meta data files that are
+Only
+.Ar ctfiles
+that are
 .Em not
-referenced by later meta data files are actually removed.
+referenced by later
+.Ar ctfiles
+are actually removed.
 .El
 .Sh SEE ALSO
 .Xr cyphertite 1 ,
