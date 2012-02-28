@@ -455,11 +455,11 @@ containing the directory
 Verbosely create an archive named
 .Pa pictures.ct ,
 of all files matching
-.Xr regex 3
+.Xr glob 7
 pattern
 .Pa *.jpg :
 .Pp
-.Dl $ cyphertite -rcvf pictures.ct *.jpg
+.Dl $ cyphertite -cvf pictures.ct *.jpg
 .Pp
 Perform a differential backup of an archive named
 .Pa htdocs-201104.ct .
