@@ -1042,7 +1042,11 @@ ct_process_completions(void *vctx)
 		}
 		ct_trans_free(trans);
 
-		/* XXX is this needed? */
+		/*
+		 * XXX this is needed while the ctfile download protocol
+		 * works as it does, we don't know the size of the file so
+		 * we keep reading until we run out of chunks
+		 */
 		if (ct_state->ct_file_state != CT_S_FINISHED)
 			ct_wakeup_file();
 
@@ -1277,7 +1281,7 @@ ct_handle_read_reply(struct ct_trans *trans, struct ct_header *hdr,
 			/* FAIL on metadata read is 'eof' */
 			if (ct_state->ct_file_state != CT_S_FINISHED) {
 				ct_set_file_state(CT_S_FINISHED);
-				trans->tr_state = TR_S_XML_CLOSE;
+				trans->tr_state = TR_S_EX_FILE_END;
 			} else {
 				/*
 				 * We had two ios in flight when we hit eof.

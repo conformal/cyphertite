@@ -393,6 +393,7 @@ struct ct_ctfile_list_args {
 struct ct_ctfileop_args {
 	char		*cca_localname;
 	char		*cca_remotename;
+	char		*cca_tdir;
 };
 
 struct ct_op	*ct_add_operation(ct_op_cb *, ct_op_cb *, void *);

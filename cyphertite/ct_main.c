@@ -302,7 +302,6 @@ ct_main(int argc, char **argv)
 	struct ct_archive_args		 caa;
 	struct ct_ctfileop_args 	 cca;
 	struct ct_ctfile_list_args	 ccla;
-	char				 tpath[PATH_MAX];
 	char				*ct_basisbackup = NULL;
 	char				*ctfile = NULL;
 	char				*ct_includefile = NULL;
@@ -544,17 +543,11 @@ ct_main(int argc, char **argv)
 		}
 	} else if (ct_metadata != 0) {
 		if (ct_action == CT_A_ARCHIVE || ct_action == CT_A_EXTRACT) {
-			if (ct_tdir) {
-				snprintf(tpath, sizeof tpath, "%s/%s",
-				    ct_tdir, ctfile);
-			} else {
-				strlcpy(tpath, ctfile, sizeof(tpath));
-			}
-			cca.cca_localname = tpath;
+			cca.cca_localname = ctfile;
 			cca.cca_remotename = NULL;
+			cca.cca_tdir = ct_tdir;
 			ct_add_operation(((ct_action == CT_A_ARCHIVE) ?
-			    ctfile_archive : ctfile_extract), ctfile_op_cleanup,
-			    &cca);
+			    ctfile_archive : ctfile_extract), ctfile_op_cleanup, &cca);
 		} else if (ct_action == CT_A_ERASE) {
 			ct_add_operation(ctfile_delete, NULL, ctfile);
 		} else if (ct_action == CT_A_LIST) {

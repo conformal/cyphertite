@@ -80,17 +80,18 @@ ctfile_op_cleanup(struct ct_op *op)
 }
 
 struct ctfile_archive_state {
-	 FILE		*cas_handle;
+	FILE		*cas_handle;
+	struct fnode	*cas_fnode;
 	off_t		 cas_size;
 	off_t		 cas_offset;
 	int		 cas_block_no;
 	int		 cas_open_sent;
 };
 
-struct fnode	ctfile_node;
 void
 ctfile_archive(struct ct_op *op)
 {
+	char				 tpath[PATH_MAX];
 	struct ct_ctfileop_args		*cca = op->op_args;
 	struct ctfile_archive_state	*cas = op->op_priv;
 	const char			*ctfile = cca->cca_localname;
@@ -104,13 +105,20 @@ ctfile_archive(struct ct_op *op)
 		cas = e_calloc(1, sizeof(*cas));
 		op->op_priv = cas;
 
+		if (cca->cca_tdir) {
+			snprintf(tpath, sizeof tpath, "%s/%s",
+			    ct_tdir, ctfile);
+		} else {
+			strlcpy(tpath, ctfile, sizeof(tpath));
+		}
 		CNDBG(CT_LOG_FILE, "opening ctfile for archive %s", ctfile);
-		if ((cas->cas_handle = fopen(ctfile, "rb")) == NULL)
+		if ((cas->cas_handle = fopen(tpath, "rb")) == NULL)
 			CFATAL("can't open %s for reading", ctfile);
 
 		if (fstat(fileno(cas->cas_handle), &sb) == -1)
 			CFATAL("can't stat backup file %s", ctfile);
 		cas->cas_size = sb.st_size;
+		cas->cas_fnode = e_calloc(1, sizeof(*cas->cas_fnode));
 
 		if (rname == NULL) {
 			rname = ctfile_cook_name(ctfile);
@@ -176,7 +184,7 @@ loop:
 
 	ct_stats->st_bytes_read += rlen;
 
-	ct_trans->tr_fl_node = &ctfile_node;
+	ct_trans->tr_fl_node = cas->cas_fnode;
 	ct_trans->tr_chsize = ct_trans->tr_size[0] = rlen;
 	ct_trans->tr_state = TR_S_READ;
 	ct_trans->tr_type = TR_T_WRITE_CHUNK;
@@ -231,6 +239,7 @@ loop:
 		 * will hit the state done case above
 		 */
 		cas->cas_offset = cas->cas_size;
+		ct_trans->tr_eof = 1;
 	} else {
 		cas->cas_offset += rlen;
 	}
@@ -401,12 +410,11 @@ ct_xml_file_close(void)
 	ct_queue_transfer(trans);
 }
 
-FILE	*ctfile_handle = NULL;
 struct ctfile_extract_state {
-	/* FILE		*ces_handle; */
+	struct fnode	*ces_fnode;
 	int		 ces_block_no;
 	int		 ces_open_sent;
-
+	int		 ces_is_open;
 };
 void
 ctfile_extract(struct ct_op *op)
@@ -422,17 +430,11 @@ ctfile_extract(struct ct_op *op)
 		ces = e_calloc(1, sizeof(*ces));
 		op->op_priv = ces;
 
-		/* XXX -chmod when done */
-		if (ctfile_handle == NULL) { /* may already be open */
-			if ((ctfile_handle = fopen(ctfile, "wb")) == NULL)
-				CFATALX("unable to open file %s", ctfile);
-		}
-
-
 		if (rname == NULL) {
 			rname = ctfile_cook_name(ctfile);
 			cca->cca_remotename = (char *)rname;
 		}
+		ct_file_extract_setup_dir(cca->cca_tdir);
 	} else if (ct_state->ct_file_state == CT_S_FINISHED) {
 		return;
 	} else if (ct_state->ct_file_state == CT_S_WAITING_SERVER) {
@@ -442,6 +444,7 @@ ctfile_extract(struct ct_op *op)
 
 	ct_set_file_state(CT_S_RUNNING);
 
+again:
 	trans = ct_trans_alloc();
 	if (trans == NULL) {
 		/* system busy, return */
@@ -455,9 +458,29 @@ ctfile_extract(struct ct_op *op)
 		/* xml thread will wake us up when it gets the open */
 		ct_set_file_state(CT_S_WAITING_SERVER);
 		return;
+	} else if (ces->ces_is_open == 0) {
+		ces->ces_is_open = 1;
+		extern struct dnode ct_ex_rootdir;
+		ces->ces_fnode = e_calloc(1, sizeof(*ces->ces_fnode));
+		ces->ces_fnode->fl_type = C_TY_REG;
+		ces->ces_fnode->fl_parent_dir = &ct_ex_rootdir;
+		ces->ces_fnode->fl_name = e_strdup(ctfile);
+		ces->ces_fnode->fl_mode = S_IRWXU;
+		ces->ces_fnode->fl_uid = getuid();
+		ces->ces_fnode->fl_gid = getgid();
+		ces->ces_fnode->fl_atime = time(NULL);
+		ces->ces_fnode->fl_mtime = time(NULL);
+
+		trans = ct_trans_realloc_local(trans);
+		trans->tr_fl_node = ces->ces_fnode;
+		trans->tr_state = TR_S_EX_FILE_START;
+		trans->tr_trans_id = ct_trans_id++;
+		trans->hdr.c_flags |= C_HDR_F_METADATA;
+		ct_queue_transfer(trans);
+		goto again;
 	}
 
-	trans->tr_fl_node = &ctfile_node;
+	trans->tr_fl_node = ces->ces_fnode;
 	trans->tr_state = TR_S_EX_SHA;
 	trans->tr_type = TR_T_READ_CHUNK;
 	trans->tr_trans_id = ct_trans_id++;
@@ -492,10 +515,15 @@ ctfile_extract(struct ct_op *op)
 void
 ct_complete_metadata(struct ct_trans *trans)
 {
-	ssize_t			wlen;
-	int			slot, done = 0;
+	int			slot, done = 0, release_fnode = 0;
 
 	switch(trans->tr_state) {
+	case TR_S_EX_FILE_START:
+		/* XXX can we recover from this? */
+		if (ct_file_extract_open(trans->tr_fl_node) != 0)
+			CFATALX("unable to open file %s",
+			    trans->tr_fl_node->fl_name);
+		break;
 	case TR_S_EX_READ:
 	case TR_S_EX_DECRYPTED:
 	case TR_S_EX_UNCOMPRESSED:
@@ -503,10 +531,8 @@ ct_complete_metadata(struct ct_trans *trans)
 			slot = trans->tr_dataslot;
 			CNDBG(CT_LOG_FILE, "writing packet sz %d",
 			    trans->tr_size[slot]);
-			wlen = fwrite(trans->tr_data[slot], sizeof(char),
-			    trans->tr_size[slot], ctfile_handle);
-			if (wlen != trans->tr_size[slot])
-				CWARN("unable to write to ctfile");
+			ct_file_extract_write(trans->tr_fl_node,
+			    trans->tr_data[slot], trans->tr_size[slot]);
 		} else {
 			ct_state->ct_file_state = CT_S_FINISHED;
 		}
@@ -529,18 +555,21 @@ ct_complete_metadata(struct ct_trans *trans)
 		ct_shutdown();
 		break;
 	case TR_S_WMD_READY:
+		if (trans->tr_eof != 0)
+			release_fnode = 1;
 	case TR_S_XML_OPEN:
 	case TR_S_XML_CLOSING:
 	case TR_S_XML_CLOSED:
 	case TR_S_XML_OPENED:
 	case TR_S_READ:
 		break;
+	case TR_S_EX_FILE_END:
+		ct_file_extract_close(trans->tr_fl_node);
+		ct_file_extract_cleanup_dir();
+		release_fnode = 1;
+		/* FALLTHROUGH */
 	case TR_S_XML_CLOSE:
 		CNDBG(CT_LOG_FILE, "eof reached, closing file");
-		if (ctfile_handle != NULL) {
-			fclose(ctfile_handle);
-			ctfile_handle = NULL;
-		}
 		ct_xml_file_close();
 		break;
 
@@ -551,6 +580,9 @@ ct_complete_metadata(struct ct_trans *trans)
 		CFATALX("unexpected tr state in %s %d", __func__,
 		    trans->tr_state);
 	}
+
+	if (release_fnode != 0)
+		ct_free_fnode(trans->tr_fl_node);
 }
 
 void
