@@ -212,7 +212,7 @@ skip_sha:	/* metadata skips shas */
 		/* fallthru if compress not enabled */
 	case TR_S_COMPRESSED:
 		/* try to encrypt trans body, if encryption enabled */
-		if (ct_encrypt_enabled) {
+		if (trans->hdr.c_flags & C_HDR_F_ENCRYPTED) {
 			ct_queue_encrypt(trans);
 			break;
 		}

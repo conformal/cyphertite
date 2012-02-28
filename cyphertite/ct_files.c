@@ -742,7 +742,7 @@ loop:
 	ct_trans->tr_type = TR_T_WRITE_CHUNK;
 	ct_trans->tr_trans_id = ct_trans_id++;
 	ct_trans->tr_eof = 0;
-	ct_trans->hdr.c_flags = 0;
+	ct_trans->hdr.c_flags = ct_encrypt_enabled ? C_HDR_F_ENCRYPTED : 0;
 	CNDBG(CT_LOG_FILE, "read %ld for block %" PRIu64, (long) rlen,
 	    ct_trans->tr_trans_id);
 
