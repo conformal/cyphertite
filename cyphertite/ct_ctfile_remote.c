@@ -454,6 +454,7 @@ ctfile_nextop_archive(char *basis, void *args)
 	 */
 	cca = e_calloc(1, sizeof(*cca));
 	cca->cca_localname = cachename;
+	cca->cca_encrypted = caa->caa_encrypted;
 	ct_add_operation(ctfile_archive, ctfile_nextop_archive_cleanup, cca);
 }
 

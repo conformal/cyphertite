@@ -376,6 +376,7 @@ struct ct_archive_args {
 	char			**caa_filelist;
 	char			**caa_excllist;
 	int			 caa_matchmode;
+	int			 caa_encrypted;
 };
 
 struct ct_extract_file_args {
@@ -394,6 +395,7 @@ struct ct_ctfileop_args {
 	char		*cca_localname;
 	char		*cca_remotename;
 	char		*cca_tdir;
+	int		 cca_encrypted; /* for archive only */
 };
 
 struct ct_op	*ct_add_operation(ct_op_cb *, ct_op_cb *, void *);

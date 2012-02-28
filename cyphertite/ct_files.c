@@ -564,7 +564,7 @@ ct_archive(struct ct_op *op)
 		/* XXX - if basisbackup should the type change ? */
 		if ((cap->cap_cws = ctfile_write_init(ctfile, CT_MD_REGULAR,
 		    basisbackup, nextlvl, cwd, filelist,
-		    ct_encrypt_enabled)) == NULL)
+		    caa->caa_encrypted)) == NULL)
 			CFATAL("can't create %s", ctfile);
 
 		if (basisbackup != NULL)
@@ -743,7 +743,7 @@ loop:
 	ct_trans->tr_type = TR_T_WRITE_CHUNK;
 	ct_trans->tr_trans_id = ct_trans_id++;
 	ct_trans->tr_eof = 0;
-	ct_trans->hdr.c_flags = ct_encrypt_enabled ? C_HDR_F_ENCRYPTED : 0;
+	ct_trans->hdr.c_flags = caa->caa_encrypted ? C_HDR_F_ENCRYPTED : 0;
 	CNDBG(CT_LOG_FILE, "read %ld for block %" PRIu64, (long) rlen,
 	    ct_trans->tr_trans_id);
 

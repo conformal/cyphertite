@@ -523,6 +523,8 @@ ct_main(int argc, char **argv)
 			caa.caa_includefile = ct_includefile;
 			caa.caa_tdir = ct_tdir;
 			caa.caa_tag = ctfile;
+			/* we want to encrypt as long as we have keys */
+			caa.caa_encrypted = (ct_crypto_secrets != NULL);
 			if (ct_auto_differential)
 				/*
 				 * Need to work out basis filename and
@@ -546,6 +548,8 @@ ct_main(int argc, char **argv)
 			cca.cca_localname = ctfile;
 			cca.cca_remotename = NULL;
 			cca.cca_tdir = ct_tdir;
+			/* only matters for archive */
+			cca.cca_encrypted = (ct_crypto_secrets != NULL);
 			ct_add_operation(((ct_action == CT_A_ARCHIVE) ?
 			    ctfile_archive : ctfile_extract), ctfile_op_cleanup, &cca);
 		} else if (ct_action == CT_A_ERASE) {

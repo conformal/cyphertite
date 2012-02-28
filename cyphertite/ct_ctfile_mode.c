@@ -191,7 +191,7 @@ loop:
 	ct_trans->tr_trans_id = ct_trans_id++;
 	ct_trans->tr_eof = 0;
 	ct_trans->hdr.c_flags = C_HDR_F_METADATA;
-	ct_trans->hdr.c_flags |= ct_encrypt_enabled ? C_HDR_F_ENCRYPTED : 0;
+	ct_trans->hdr.c_flags |= cca->cca_encrypted ? C_HDR_F_ENCRYPTED : 0;
 	ct_trans->hdr.c_ex_status = 2; /* we handle new metadata protocol */
 	ct_trans->tr_ctfile_chunkno = cas->cas_block_no;
 	ct_trans->tr_ctfile_name = rname;
