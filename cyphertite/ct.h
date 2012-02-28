@@ -504,7 +504,6 @@ int				ctdb_insert(struct ct_trans *trans);
 #define CTDB_USE_SHA    (1)
 #define CTDB_USE_CSHA   (2)
 
-int				ct_s_to_e_type(int);
 char				*ctfile_get_previous(const char *);
 
 struct dedup_digest {
