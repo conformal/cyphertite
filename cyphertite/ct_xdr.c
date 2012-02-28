@@ -589,7 +589,7 @@ static int	 ctfile_write_header_entry(struct ctfile_write_state *, char *,
  */
 struct ctfile_write_state *
 ctfile_write_init(const char *ctfile, int type, const char *basis, int lvl,
-    char *cwd, char **filelist)
+    char *cwd, char **filelist, int encrypted)
 {
 	struct ctfile_write_state	*ctx;
 	char				**fptr;
@@ -616,7 +616,7 @@ ctfile_write_init(const char *ctfile, int type, const char *basis, int lvl,
 	gh.cmg_created = time(NULL);
 	gh.cmg_type = type;
 	gh.cmg_flags = 0;
-	if (ct_encrypt_enabled)
+	if (encrypted)
 		gh.cmg_flags |= CT_MD_CRYPTO;
 	if (ct_multilevel_allfiles)
 		gh.cmg_flags |= CT_MD_MLB_ALLFILES;

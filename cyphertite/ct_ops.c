@@ -299,7 +299,6 @@ ct_extract_setup(struct ct_extract_head *extract_head,
 		CFATALX("extract failure: unable to open metadata file '%s'\n",
 		    file);
 
-	ct_encrypt_enabled = (ctx->xs_gh.cmg_flags & CT_MD_CRYPTO);
 	ct_multilevel_allfiles = (ctx->xs_gh.cmg_flags &
 	    CT_MD_MLB_ALLFILES);
 
@@ -335,8 +334,6 @@ ct_extract_setup_queue(struct ct_extract_head *extract_head,
 	if (ctfile_parse_init(ctx, file))
 		CFATALX("extract failure: unable to open differential archive"
 		    "'%s'\n", file);
-
-	ct_encrypt_enabled = (ctx->xs_gh.cmg_flags & CT_MD_CRYPTO);
 
 	if (ctx->xs_gh.cmg_prevlvl_filename) {
 		printf("next [%s]\n", ctx->xs_gh.cmg_prevlvl_filename);
@@ -378,7 +375,6 @@ ct_extract_open_next(struct ct_extract_head *extract_head,
 
 		if (ctfile_parse_init(ctx, next->filename))
 			CFATALX("failed to open %s", next->filename);
-		ct_encrypt_enabled = (ctx->xs_gh.cmg_flags & CT_MD_CRYPTO);
 
 		if (next->filename)
 			e_free(&next->filename);
@@ -689,8 +685,6 @@ ct_extract_file(struct ct_op *op)
 			CFATALX("can't open metadata file %s",
 			    cefa->cefa_ctfile);
 		ct_file_extract_setup_dir(NULL);
-		ct_encrypt_enabled =
-		    (ex_priv->xdr_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO);
 		ct_multilevel_allfiles = (ex_priv->xdr_ctx.xs_gh.cmg_flags &
 		    CT_MD_MLB_ALLFILES);
 	} else if (ct_state->ct_file_state == CT_S_FINISHED) {

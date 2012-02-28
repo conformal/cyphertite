@@ -563,7 +563,8 @@ ct_archive(struct ct_op *op)
 		/* XXX - deal with stdin */
 		/* XXX - if basisbackup should the type change ? */
 		if ((cap->cap_cws = ctfile_write_init(ctfile, CT_MD_REGULAR,
-		    basisbackup, nextlvl, cwd, filelist)) == NULL)
+		    basisbackup, nextlvl, cwd, filelist,
+		    ct_encrypt_enabled)) == NULL)
 			CFATAL("can't create %s", ctfile);
 
 		if (basisbackup != NULL)
