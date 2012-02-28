@@ -914,10 +914,9 @@ ctfile_write_close(struct ctfile_write_state *ctx)
 	hdr.cmh_beacon = CT_HDR_EOF;
 	if (ct_xdr_header(&ctx->cws_xdr, &hdr, ctx->cws_version) == FALSE)
 		CWARNX("Failed to write archive footer");
-	
+
 	ctfile_close(ctx->cws_f, &ctx->cws_xdr);
 
-	CWARNX("close called");
 	e_free(&ctx);
 }
 
