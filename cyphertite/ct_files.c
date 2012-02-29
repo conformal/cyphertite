@@ -564,7 +564,7 @@ ct_archive(struct ct_op *op)
 		/* XXX - if basisbackup should the type change ? */
 		if ((cap->cap_cws = ctfile_write_init(ctfile, CT_MD_REGULAR,
 		    basisbackup, nextlvl, cwd, filelist,
-		    caa->caa_encrypted)) == NULL)
+		    caa->caa_encrypted, ct_multilevel_allfiles)) == NULL)
 			CFATAL("can't create %s", ctfile);
 
 		if (basisbackup != NULL)
