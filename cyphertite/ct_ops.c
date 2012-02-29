@@ -304,7 +304,6 @@ ct_extract_setup(struct ct_extract_head *extract_head,
 		    file);
 
 	*is_allfiles = (ctx->xs_gh.cmg_flags & CT_MD_MLB_ALLFILES);
-	ct_multilevel_allfiles = *is_allfiles;
 
 	if (ctx->xs_gh.cmg_prevlvl_filename) {
 		nfile = e_malloc(sizeof(*nfile));
@@ -692,8 +691,6 @@ ct_extract_file(struct ct_op *op)
 			CFATALX("can't open metadata file %s",
 			    cefa->cefa_ctfile);
 		ct_file_extract_setup_dir(NULL);
-		ct_multilevel_allfiles = (ex_priv->xdr_ctx.xs_gh.cmg_flags &
-		    CT_MD_MLB_ALLFILES);
 	} else if (ct_state->ct_file_state == CT_S_FINISHED) {
 		return;
 	}

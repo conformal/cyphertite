@@ -376,6 +376,7 @@ struct ct_archive_args {
 	char			**caa_excllist;
 	int			 caa_matchmode;
 	int			 caa_encrypted;
+	int			 caa_allfiles;
 };
 
 struct ct_extract_file_args {

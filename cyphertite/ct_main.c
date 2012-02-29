@@ -525,6 +525,7 @@ ct_main(int argc, char **argv)
 			caa.caa_tag = ctfile;
 			/* we want to encrypt as long as we have keys */
 			caa.caa_encrypted = (ct_crypto_secrets != NULL);
+			caa.caa_allfiles = ct_multilevel_allfiles;
 			if (ct_auto_differential)
 				/*
 				 * Need to work out basis filename and

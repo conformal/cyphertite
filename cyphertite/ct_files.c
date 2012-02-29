@@ -563,7 +563,7 @@ ct_archive(struct ct_op *op)
 		/* XXX - if basisbackup should the type change ? */
 		if ((cap->cap_cws = ctfile_write_init(ctfile, CT_MD_REGULAR,
 		    basisbackup, nextlvl, cwd, filelist,
-		    caa->caa_encrypted, ct_multilevel_allfiles)) == NULL)
+		    caa->caa_encrypted, caa->caa_allfiles)) == NULL)
 			CFATAL("can't create %s", ctfile);
 
 		if (basisbackup != NULL)
@@ -707,9 +707,9 @@ loop:
 		/*
 		 * Allfiles backups needs to still record skipped files.
 		 * Non allfiles backups don't need to do anything with them
+		 * so we can dump them here.
 		 */
-		if (cap->cap_curnode->fl_skip_file &&
-		    ct_multilevel_allfiles == 0) {
+		if (cap->cap_curnode->fl_skip_file && caa->caa_allfiles == 0) {
 			ct_free_fnode(cap->cap_curnode);
 			ct_trans_free(ct_trans);
 			goto next_file;
