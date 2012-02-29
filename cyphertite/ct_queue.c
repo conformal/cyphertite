@@ -899,6 +899,7 @@ ct_complete_normal(struct ct_trans *trans)
 		if (trans->tr_ctfile) {
 			ctfile_write_close(trans->tr_ctfile);
 		}
+		ct_dnode_cleanup();
 		/* do we have more operations queued up? */
 		if (ct_op_complete() == 0)
 			return;

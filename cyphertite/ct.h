@@ -113,32 +113,6 @@ struct fnode {
 	int			fl_skip_file;
 };
 
-struct flist {
-	TAILQ_ENTRY(flist)	fl_list;
-	RB_ENTRY(flist)		fl_inode_entry;
-	struct dnode		*fl_parent_dir;
-	struct flist		*fl_hlnode;
-	char			*fl_fname;
-	struct fnode		*fl_node;
-	dev_t			fl_dev;
-	ino_t			fl_ino;
-#define C_FF_FORCEDIR	0x1
-#define C_FF_CLOSEDIR	0x2
-#define C_FF_WASDIR	0x4
-	int			fl_flags;
-};
-
-struct dnode * gen_finddir(int64_t idx);
-char *gen_fname(struct flist *);
-
-int fl_inode_sort(struct flist *, struct flist *);
-
-RB_HEAD(fl_tree, flist);
-
-RB_PROTOTYPE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
-
-TAILQ_HEAD(flist_head, flist);
-
 struct dnode {
 	RB_ENTRY(dnode)		 d_rb_name;
 	RB_ENTRY(dnode)		 d_rb_num;
@@ -154,6 +128,7 @@ struct dnode {
 	int                      d_mtime;       /* last modification time */
 };
 
+struct dnode * gen_finddir(int64_t idx);
 int	ct_dname_cmp(struct dnode *, struct dnode *);
 RB_HEAD(d_name_tree, dnode);
 RB_PROTOTYPE(d_name_tree, dnode, ds_rb, ct_dname_cmp);
@@ -162,11 +137,8 @@ int	ct_dnum_cmp(struct dnode *, struct dnode *);
 RB_HEAD(d_num_tree, dnode);
 RB_PROTOTYPE(d_num_tree, dnode, ds_rb, ct_dnum_cmp);
 
-struct fnode *ct_populate_fnode_from_flist(struct flist *);
-
 extern struct d_num_tree	ct_dnum_head;
 extern struct d_name_tree	ct_dname_head;
-extern struct flist_head	fl_list_head;
 
 /* FILE STATUS */
 
@@ -255,7 +227,6 @@ struct ct_trans		*ct_trans_alloc(void);
 struct ct_trans		*ct_trans_realloc_local(struct ct_trans *);
 void			ct_trans_free(struct ct_trans *trans);
 void			ct_trans_cleanup(void);
-void			ct_flnode_cleanup(void);
 void			ct_dnum_cleanup(void);
 void			ct_dnode_cleanup(void);
 void			ct_free_fnode(struct fnode *);

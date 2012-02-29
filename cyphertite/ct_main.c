@@ -225,7 +225,6 @@ void
 ct_cleanup_eventloop(void)
 {
 	ct_trans_cleanup();
-	ct_flnode_cleanup();
 	ct_ssl_cleanup();
 	ctdb_shutdown(ct_state->ct_db_state);
 	ct_cleanup_login_cache();

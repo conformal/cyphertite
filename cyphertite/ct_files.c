@@ -36,13 +36,39 @@
 
 #include "ct.h"
 
+/*
+ * flist is a structure that keeps track of the files that still need to be
+ * accessed. Turned into a fnode by populate_fnode_from_flist() when it is
+ * time to process the file fully.
+ */
+struct flist {
+	TAILQ_ENTRY(flist)	fl_list;
+	RB_ENTRY(flist)		fl_inode_entry;
+	struct dnode		*fl_parent_dir;
+	struct flist		*fl_hlnode;
+	char			*fl_fname;
+	struct fnode		*fl_node;
+	dev_t			fl_dev;
+	ino_t			fl_ino;
+#define C_FF_FORCEDIR	0x1
+#define C_FF_CLOSEDIR	0x2
+#define C_FF_WASDIR	0x4
+	int			fl_flags;
+};
+RB_HEAD(fl_tree, flist);
+TAILQ_HEAD(flist_head, flist);
+
+int		 fl_inode_sort(struct flist *, struct flist *);
+RB_PROTOTYPE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
+
+char		*gen_fname(struct flist *);
+struct fnode	*ct_populate_fnode_from_flist(struct flist *);
+
 
 extern int		ct_follow_symlinks;
-struct flist_head	fl_list_head = TAILQ_HEAD_INITIALIZER(fl_list_head);
 
-struct fnode		*ct_populate_fnode_from_flist(struct flist *);
 char			*ct_name_to_safename(char *);
-void			 ct_traverse(char **);
+void			 ct_traverse(char **, struct flist_head *);
 
 int                      ct_dname_cmp(struct dnode *, struct dnode *);
 int                      ct_dnum_cmp(struct dnode *, struct dnode *);
@@ -65,20 +91,18 @@ ct_dnum_cmp(struct dnode *d1, struct dnode *d2)
 	return (d1->d_num < d2->d_num ? -1 : d1->d_num > d2->d_num);
 }
 
-void
-ct_flnode_cleanup(void)
+static void
+ct_flnode_cleanup(struct flist_head *head)
 {
 	struct flist *flnode;
 
-	while (!TAILQ_EMPTY(&fl_list_head)) {
-		flnode = TAILQ_FIRST(&fl_list_head);
-		TAILQ_REMOVE(&fl_list_head, flnode, fl_list);
+	while (!TAILQ_EMPTY(head)) {
+		flnode = TAILQ_FIRST(head);
+		TAILQ_REMOVE(head, flnode, fl_list);
 		if (flnode->fl_fname)
 			e_free(&flnode->fl_fname);
 		e_free(&flnode);
 	}
-
-	ct_dnode_cleanup();
 }
 
 void
@@ -123,13 +147,12 @@ ct_free_fnode(struct fnode *fnode)
 }
 
 char *eat_double_dots(char *, char *);
-int backup_prefix(char *);
-int ct_sched_backup_file(struct stat *, char *, int, int);
+int backup_prefix(char *, struct flist_head *, struct fl_tree *);
+int ct_sched_backup_file(struct stat *, char *, int, int, struct flist_head *,
+    struct fl_tree *);
 int s_to_e_type(int);
 
 int ct_extract_fd = -1;
-
-struct fl_tree		fl_rb_head = RB_INITIALIZER(&fl_rb_head);
 
 RB_GENERATE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 
@@ -208,13 +231,13 @@ gen_finddir(int64_t idx)
 
 
 struct fnode *
-ct_get_next_fnode(struct flist **flist, struct ct_match *include,
-    struct ct_match *exclude)
+ct_get_next_fnode(struct flist_head *head, struct flist **flist,
+    struct ct_match *include, struct ct_match *exclude)
 {
 	struct fnode	*fnode;
 again:
 	if (*flist == NULL)
-		*flist = TAILQ_FIRST(&fl_list_head);
+		*flist = TAILQ_FIRST(head);
 	else
 		*flist = TAILQ_NEXT(*flist, fl_list);
 	if (*flist == NULL)
@@ -389,7 +412,7 @@ ct_cleanup_root_dir(void)
 
 int
 ct_sched_backup_file(struct stat *sb, char *filename, int forcedir,
-    int closedir)
+    int closedir, struct flist_head *flist, struct fl_tree *ino_tree)
 {
 	struct flist		*flnode;
 	const char		*safe;
@@ -473,7 +496,7 @@ ct_sched_backup_file(struct stat *sb, char *filename, int forcedir,
 
 	flnode->fl_hlnode = NULL;
 	/* deal with hardlink */
-	flnode_exists = RB_INSERT(fl_tree, &fl_rb_head, flnode);
+	flnode_exists = RB_INSERT(fl_tree, ino_tree, flnode);
 	if (flnode_exists != NULL) {
 		flnode->fl_hlnode = flnode_exists;
 		CNDBG(CT_LOG_CTFILE, "found %s as hardlink of %s", safe,
@@ -485,12 +508,13 @@ ct_sched_backup_file(struct stat *sb, char *filename, int forcedir,
 	ct_stats->st_files_scanned++;
 
 insert:
-	TAILQ_INSERT_TAIL(&fl_list_head, flnode, fl_list);
+	TAILQ_INSERT_TAIL(flist, flnode, fl_list);
 
 	return 0;
 }
 
 struct ct_archive_priv {
+	struct flist_head		 cap_flist;
 	struct ctfile_write_state	*cap_cws;
 	struct ct_match			*cap_include;
 	struct ct_match			*cap_exclude;
@@ -525,6 +549,7 @@ ct_archive(struct ct_op *op)
 
 		cap = e_calloc(1, sizeof(*cap));
 		cap->cap_fd = -1;
+		TAILQ_INIT(&cap->cap_flist);
 		op->op_priv = cap;
 		if (caa->caa_includefile)
 			cap->cap_include =
@@ -545,15 +570,16 @@ ct_archive(struct ct_op *op)
 		ct_setup_root_dir(ct_tdir);
 		if (ct_tdir && chdir(ct_tdir) != 0)
 			CFATALX("can't chdir to %s", ct_tdir);
-		ct_traverse(filelist);
+		ct_traverse(filelist, &cap->cap_flist);
 		/*
 		 * Get the first file we must operate on.
 		 * Do this before we open the ctfile for writing so
 		 * if all are excluded we don't then have to unlink it.
 		 */
 		cap->cap_curlist = NULL;
-		if ((cap->cap_curnode = ct_get_next_fnode(&cap->cap_curlist,
-		    cap->cap_include, cap->cap_exclude)) == NULL)
+		if ((cap->cap_curnode = ct_get_next_fnode(&cap->cap_flist,
+		    &cap->cap_curlist, cap->cap_include,
+		    cap->cap_exclude)) == NULL)
 			CFATALX("all files specified excluded or nonexistant");
 
 		if (ct_tdir && chdir(cwd) != 0)
@@ -795,8 +821,9 @@ next_file:
 	/* XXX should node be removed from list at this time? */
 	if (cap->cap_curnode->fl_state == CT_FILE_FINISHED) {
 skip:
-		if ((cap->cap_curnode = ct_get_next_fnode(&cap->cap_curlist,
-		    cap->cap_include, cap->cap_exclude)) == NULL) {
+		if ((cap->cap_curnode = ct_get_next_fnode(&cap->cap_flist,
+		    &cap->cap_curlist, cap->cap_include,
+		    cap->cap_exclude)) == NULL) {
 			CNDBG(CT_LOG_FILE, "no more files");
 		} else {
 			CNDBG(CT_LOG_FILE, "going to next file %s",
@@ -819,30 +846,38 @@ done:
 		ct_set_file_state(CT_S_WAITING_TRANS);
 		return;
 	}
-	if (cap->cap_include)
-		ct_match_unwind(cap->cap_include);
-	if (cap->cap_exclude)
-		ct_match_unwind(cap->cap_exclude);
-	ct_cleanup_root_dir();
 	ct_trans->tr_ctfile = cap->cap_cws;;
 	ct_trans->tr_fl_node = NULL;
 	ct_trans->tr_state = TR_S_DONE;
 	ct_trans->tr_eof = 0;
 	ct_trans->tr_trans_id = ct_trans_id++;
+
+	/* We're done, cleanup local state. */
+	if (cap->cap_include)
+		ct_match_unwind(cap->cap_include);
+	if (cap->cap_exclude)
+		ct_match_unwind(cap->cap_exclude);
+	ct_flnode_cleanup(&cap->cap_flist);
+	ct_cleanup_root_dir();
+	/* cws is cleaned up by the completion handler */
+	e_free(&cap);
+
 	ct_queue_transfer(ct_trans);
 }
 
 void
-ct_traverse(char **paths)
+ct_traverse(char **paths, struct flist_head *files)
 {
 	FTS			*ftsp;
 	FTSENT			*fe;
+	struct fl_tree		 ino_tree;
 	char			 clean[PATH_MAX];
 	int			 fts_options;
 	int			 cnt;
 	int			 forcedir;
 	extern int		 ct_root_symlink;
 
+	RB_INIT(&ino_tree);
 	fts_options = FTS_NOCHDIR;
 	if (ct_follow_symlinks)
 		fts_options |= FTS_LOGICAL;
@@ -897,7 +932,7 @@ ct_traverse(char **paths)
 			/* XXX technically this should apply to files too */
 			if (ct_root_symlink && fe->fts_info == FTS_D)
 				forcedir = 1;
-			if (backup_prefix(clean))
+			if (backup_prefix(clean, files, &ino_tree))
 				CFATAL("backup_prefix failed");
 		}
 
@@ -905,7 +940,7 @@ ct_traverse(char **paths)
 		/* backup all other files */
 sched:
 		if (ct_sched_backup_file(fe->fts_statp, clean, forcedir,
-		    fe->fts_info == FTS_DP ? 1 : 0))
+		    fe->fts_info == FTS_DP ? 1 : 0, files, &ino_tree))
 			CFATAL("backup_file failed: %s", clean);
 
 	}
@@ -1008,7 +1043,7 @@ done:
 }
 
 int
-backup_prefix(char *root)
+backup_prefix(char *root, struct flist_head *flist, struct fl_tree *ino_tree)
 {
 	char			dir[PATH_MAX], rbuf[PATH_MAX], pfx[PATH_MAX];
 	char			*cp, *p;
@@ -1041,7 +1076,7 @@ backup_prefix(char *root)
 			return (1);
 		}
 
-		if (ct_sched_backup_file(&sb, dir, 1, 0))
+		if (ct_sched_backup_file(&sb, dir, 1, 0, flist, ino_tree))
 			return (1);
 	}
 
