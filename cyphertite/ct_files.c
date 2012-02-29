@@ -515,7 +515,6 @@ ct_archive(struct ct_op *op)
 	char			cwd[PATH_MAX];
 	int			new_file = 0;
 	int			error;
-	int			skip_file;
 	int			nextlvl = 0;
 
 	CNDBG(CT_LOG_TRANS, "processing");
@@ -658,7 +657,6 @@ loop:
 			goto next_file;
 		}
 
-		skip_file = 0;
 		error = fstat(cap->cap_fd, &sb);
 		if (error) {
 			CWARN("archive: file %s stat error",
@@ -668,8 +666,7 @@ loop:
 				if (ct_verbose > 1)
 					CINFO("skipping file based on mtime %s",
 					    cap->cap_curnode->fl_sname);
-				skip_file = 1;
-				cap->cap_curnode->fl_skip_file = skip_file;
+				cap->cap_curnode->fl_skip_file = 1;
 			}
 		}
 		/*
@@ -680,8 +677,7 @@ loop:
 		if (!S_ISREG(sb.st_mode)) {
 			CWARNX("%s is no longer a regular file, skipping",
 			    cap->cap_curnode->fl_sname);
-			skip_file = 1;
-			cap->cap_curnode->fl_skip_file = skip_file;
+			cap->cap_curnode->fl_skip_file = 1;
 		}
 		cap->cap_curnode->fl_dev = sb.st_dev;
 		cap->cap_curnode->fl_rdev = sb.st_rdev;
@@ -698,7 +694,8 @@ loop:
 		ct_trans->tr_state = TR_S_FILE_START;
 		ct_trans->tr_type = TR_T_WRITE_HEADER;
 		ct_trans->tr_trans_id = ct_trans_id++;
-		if (cap->cap_curnode->fl_size == 0 || skip_file) {
+		if (cap->cap_curnode->fl_size == 0 ||
+		    cap->cap_curnode->fl_skip_file) {
 			close(cap->cap_fd);
 			cap->cap_fd = -1;
 			ct_trans->tr_eof = 1;
@@ -706,8 +703,21 @@ loop:
 		} else {
 			ct_trans->tr_eof = 0;
 		}
+
+		/*
+		 * Allfiles backups needs to still record skipped files.
+		 * Non allfiles backups don't need to do anything with them
+		 */
+		if (cap->cap_curnode->fl_skip_file &&
+		    ct_multilevel_allfiles == 0) {
+			ct_free_fnode(cap->cap_curnode);
+			ct_trans_free(ct_trans);
+			goto next_file;
+		}
+
 		ct_queue_transfer(ct_trans);
-		if (cap->cap_curnode->fl_size == 0 || skip_file) {
+		if (cap->cap_curnode->fl_size == 0 ||
+		    cap->cap_curnode->fl_skip_file) {
 			goto next_file;
 		}
 		goto loop;

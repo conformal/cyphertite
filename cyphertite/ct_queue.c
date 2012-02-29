@@ -913,12 +913,6 @@ ct_complete_normal(struct ct_trans *trans)
 		release_fnode = 1;
 		break;
 	case TR_S_FILE_START:
-		if ((ct_multilevel_allfiles == 0) &&
-		    fnode->fl_skip_file) {
-			release_fnode = 1;
-			break;
-		}
-
 		if (ctfile_write_file_start(trans->tr_ctfile, fnode))
 			CWARNX("header write failed");
 
