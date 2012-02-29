@@ -990,7 +990,6 @@ again:
 			CWARN("couldn't set mtime on new secrets file");
 		e_free(&crypto_secrets);
 	}
-	ct_encrypt_enabled = 1;
 	/* Free remote name */
 	if (op->op_remote_fname)
 		e_free(&op->op_remote_fname);

@@ -741,6 +741,5 @@ ct_create_or_unlock_secrets(const char *secrets, const char *password)
 	    sizeof(ct_crypto_key), ct_iv, sizeof (ct_iv)))
 		return (1);
 
-	ct_encrypt_enabled = 1;
 	return (0);
 }

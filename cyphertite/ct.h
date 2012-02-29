@@ -46,7 +46,6 @@
 extern int		cflags;
 extern int		ct_debug;
 extern int		ct_compress_enabled;
-extern int		ct_encrypt_enabled;
 extern int		ct_multilevel_allfiles;
 extern char		*ct_tdir;
 extern int		ct_attr;

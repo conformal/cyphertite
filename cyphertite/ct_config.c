@@ -55,7 +55,6 @@ char			*ctfile_mode_str;
 char			*ctfile_cachedir;
 int			ctfile_mode = CT_MDMODE_LOCAL;
 int			ct_compress_enabled;
-int			ct_encrypt_enabled;
 int			ct_multilevel_allfiles;
 int			ct_auto_differential;
 long long		ctfile_max_cachesize = LLONG_MAX; /* unbounded */
