@@ -64,18 +64,18 @@ RB_PROTOTYPE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 RB_GENERATE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 
 /* Directory traversal and transformation of generated data */
-void			 ct_traverse(char **, struct flist_head *);
-int			 ct_sched_backup_file(struct stat *, char *, int, int,
+static void		 ct_traverse(char **, struct flist_head *);
+static int		 ct_sched_backup_file(struct stat *, char *, int, int,
 			     struct flist_head *, struct fl_tree *);
-struct fnode		*ct_populate_fnode_from_flist(struct flist *);
-char			*ct_name_to_safename(char *);
+static struct fnode	*ct_populate_fnode_from_flist(struct flist *);
+static char		*ct_name_to_safename(char *);
 
 /* Helper functions for the above */
-char			*eat_double_dots(char *, char *);
-int			 backup_prefix(char *, struct flist_head *,
+static char		*eat_double_dots(char *, char *);
+static int		 backup_prefix(char *, struct flist_head *,
 			     struct fl_tree *);
-char			*gen_fname(struct flist *);
-int			 s_to_e_type(int);
+static char		*gen_fname(struct flist *);
+static int		 s_to_e_type(int);
 
 
 int                      ct_dname_cmp(struct dnode *, struct dnode *);
@@ -173,7 +173,7 @@ fl_inode_sort(struct flist *f1, struct flist *f2)
 	return (0);
 }
 
-char *
+static char *
 ct_name_to_safename(char *filename)
 {
 	char		*safe;
@@ -197,7 +197,7 @@ ct_name_to_safename(char *filename)
 	return safe;
 }
 
-char *
+static char *
 gen_fname(struct flist *flnode)
 {
 	char *name;
@@ -272,7 +272,7 @@ again:
 	return (fnode);
 }
 
-struct fnode *
+static struct fnode *
 ct_populate_fnode_from_flist(struct flist *flnode)
 {
 	struct fnode		*fnode;
@@ -414,7 +414,7 @@ ct_cleanup_root_dir(void)
 	ct_rootdir.d_fd = -1;
 }
 
-int
+static int
 ct_sched_backup_file(struct stat *sb, char *filename, int forcedir,
     int closedir, struct flist_head *flist, struct fl_tree *ino_tree)
 {
@@ -869,7 +869,7 @@ done:
 	ct_queue_transfer(ct_trans);
 }
 
-void
+static void
 ct_traverse(char **paths, struct flist_head *files)
 {
 	FTS			*ftsp;
@@ -961,7 +961,7 @@ sched:
 		CINFO("Done! Initiating backup...");
 }
 
-char *
+static char *
 eat_double_dots(char *path, char *resolved)
 {
 	char	**tab = NULL, *buf = NULL, *rv = NULL, *cp, **ntab;
@@ -1046,7 +1046,7 @@ done:
 	return (rv);
 }
 
-int
+static int
 backup_prefix(char *root, struct flist_head *flist, struct fl_tree *ino_tree)
 {
 	char			dir[PATH_MAX], rbuf[PATH_MAX], pfx[PATH_MAX];
@@ -1087,7 +1087,7 @@ backup_prefix(char *root, struct flist_head *flist, struct fl_tree *ino_tree)
 	return (0);
 }
 
-int
+static int
 s_to_e_type(int mode)
 {
 	int rv = C_TY_INVALID;
