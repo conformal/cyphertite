@@ -79,19 +79,16 @@ static int		 s_to_e_type(int);
 
 
 int                      ct_dname_cmp(struct dnode *, struct dnode *);
-int                      ct_dnum_cmp(struct dnode *, struct dnode *);
 
 
 extern int		 ct_follow_symlinks;
 int			 ct_extract_fd = -1;
 
 
+/* Directory tree by name */
 struct d_name_tree ct_dname_head = RB_INITIALIZER(&ct_dname_head);
-struct d_num_tree ct_dnum_head = RB_INITIALIZER(&ct_dnum_head);
 
-/* Directory trees by number and by name */
 RB_GENERATE(d_name_tree, dnode, d_rb_name, ct_dname_cmp);
-RB_GENERATE(d_num_tree, dnode, d_rb_num, ct_dnum_cmp);
 
 int
 ct_dname_cmp(struct dnode *d1, struct dnode *d2)
@@ -99,11 +96,6 @@ ct_dname_cmp(struct dnode *d1, struct dnode *d2)
 	return strcmp(d2->d_name, d1->d_name);
 }
 
-int
-ct_dnum_cmp(struct dnode *d1, struct dnode *d2)
-{
-	return (d1->d_num < d2->d_num ? -1 : d1->d_num > d2->d_num);
-}
 
 static void
 ct_flnode_cleanup(struct flist_head *head)
@@ -120,24 +112,10 @@ ct_flnode_cleanup(struct flist_head *head)
 }
 
 void
-ct_dnum_cleanup(void)
-{
-	struct dnode *dnode;
-
-	/*
-	 * d_num_tree is just a slave of d_name_tree, empty it but
-	 * don't free the nodes
-	 */
-	while ((dnode = RB_ROOT(&ct_dnum_head)) != NULL)
-		RB_REMOVE(d_num_tree, &ct_dnum_head, dnode);
-}
-
-void
 ct_dnode_cleanup(void)
 {
 	struct dnode *dnode;
 
-	ct_dnum_cleanup();
 	while ((dnode = RB_ROOT(&ct_dname_head)) != NULL) {
 		RB_REMOVE(d_name_tree, &ct_dname_head, dnode);
 		e_free(&dnode->d_name);
@@ -223,16 +201,6 @@ gen_sname(struct flist *flnode)
 
 	return sname;
 }
-
-struct dnode *
-gen_finddir(int64_t idx)
-{
-	struct dnode dsearch;
-
-	dsearch.d_num = idx;
-	return RB_FIND(d_num_tree, &ct_dnum_head, &dsearch);
-}
-
 
 struct fnode *
 ct_get_next_fnode(struct flist_head *head, struct flist **flist,

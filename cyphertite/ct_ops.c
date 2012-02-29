@@ -25,30 +25,29 @@
 
 #include "ct.h"
 
-int	ct_populate_fnode(struct fnode *, struct ctfile_header *,
-	    struct ctfile_header *, int *, int);
+int	ct_populate_fnode(struct ctfile_parse_state *, struct fnode *, 
+	    int *, int);
 
-int64_t		 ct_ex_dirnum = 0;
 const uint8_t	 zerosha[SHA_DIGEST_LENGTH];
 
 /*
  * Helper functions
  */
 int
-ct_populate_fnode(struct fnode *fnode, struct ctfile_header *hdr,
-    struct ctfile_header *hdrlnk, int *state, int allfiles)
+ct_populate_fnode(struct ctfile_parse_state *ctx, struct fnode *fnode,
+    int *state, int allfiles)
 {
 	struct dnode		*dnode, *tdnode;
 	char			*name;
 	extern struct dnode	 ct_ex_rootdir;
 
-	if (C_ISLINK(hdr->cmh_type)) {
+	if (C_ISLINK(ctx->xs_hdr.cmh_type)) {
 		/* hardlink/symlink */
-		fnode->fl_hlname = e_strdup(hdrlnk->cmh_filename);
-		fnode->fl_hardlink = !C_ISLINK(hdrlnk->cmh_type);
+		fnode->fl_hlname = e_strdup(ctx->xs_lnkhdr.cmh_filename);
+		fnode->fl_hardlink = !C_ISLINK(ctx->xs_lnkhdr.cmh_type);
 		*state = TR_S_EX_SPECIAL;
 
-	} else if (!C_ISREG(hdr->cmh_type)) {
+	} else if (!C_ISREG(ctx->xs_hdr.cmh_type)) {
 		/* special file/dir */
 		*state = TR_S_EX_SPECIAL;
 	} else {
@@ -57,48 +56,48 @@ ct_populate_fnode(struct fnode *fnode, struct ctfile_header *hdr,
 	}
 
 	/* ino not preserved? */
-	fnode->fl_rdev = hdr->cmh_rdev;
-	fnode->fl_uid = hdr->cmh_uid;
-	fnode->fl_gid = hdr->cmh_gid;
-	fnode->fl_mode = hdr->cmh_mode;
-	fnode->fl_mtime = hdr->cmh_mtime;
-	fnode->fl_atime = hdr->cmh_atime;
-	fnode->fl_type = hdr->cmh_type;
+	fnode->fl_rdev = ctx->xs_hdr.cmh_rdev;
+	fnode->fl_uid = ctx->xs_hdr.cmh_uid;
+	fnode->fl_gid = ctx->xs_hdr.cmh_gid;
+	fnode->fl_mode = ctx->xs_hdr.cmh_mode;
+	fnode->fl_mtime = ctx->xs_hdr.cmh_mtime;
+	fnode->fl_atime = ctx->xs_hdr.cmh_atime;
+	fnode->fl_type = ctx->xs_hdr.cmh_type;
 
 	/* Default to parent being the ``root''. */
 	fnode->fl_parent_dir = &ct_ex_rootdir;
-	name = hdr->cmh_filename;
+	name = ctx->xs_hdr.cmh_filename;
 	/* fnode->fl_parent_dir default to NULL */
-	if (hdr->cmh_parent_dir == -2) {
+	if (ctx->xs_hdr.cmh_parent_dir == -2) {
 		/* rooted directory */
 		e_asprintf(&fnode->fl_sname, "%s%s", ct_strip_slash ? "" : "/",
-		    hdr->cmh_filename);
+		    ctx->xs_hdr.cmh_filename);
 		name = fnode->fl_sname;
-	} else if (hdr->cmh_parent_dir != -1) {
-		fnode->fl_parent_dir = gen_finddir(hdr->cmh_parent_dir);
+	} else if (ctx->xs_hdr.cmh_parent_dir != -1) {
+		fnode->fl_parent_dir = ctfile_parse_finddir(ctx,
+		    ctx->xs_hdr.cmh_parent_dir);
 		if (fnode->fl_parent_dir == NULL)
 			CFATALX("can't find parent dir %" PRId64 " for %s",
-			    hdr->cmh_parent_dir, hdr->cmh_filename);
+			    ctx->xs_hdr.cmh_parent_dir, ctx->xs_hdr.cmh_filename);
 		e_asprintf(&fnode->fl_sname, "%s/%s",
-		    fnode->fl_parent_dir->d_name, hdr->cmh_filename);
+		    fnode->fl_parent_dir->d_name, ctx->xs_hdr.cmh_filename);
 		CNDBG(CT_LOG_CTFILE,
 		    "parent_dir %p %" PRId64, fnode->fl_parent_dir,
-		    hdr->cmh_parent_dir);
+		    ctx->xs_hdr.cmh_parent_dir);
 	} else
-		fnode->fl_sname = e_strdup(hdr->cmh_filename);
+		fnode->fl_sname = e_strdup(ctx->xs_hdr.cmh_filename);
 
 	/* name needed for openat() */
 	fnode->fl_name = e_strdup(name);
 
 	CNDBG(CT_LOG_CTFILE,
-	    "name %s from %s %" PRId64, fnode->fl_sname, hdr->cmh_filename,
-	    hdr->cmh_parent_dir);
+	    "name %s from %s %" PRId64, fnode->fl_sname, ctx->xs_hdr.cmh_filename,
+	    ctx->xs_hdr.cmh_parent_dir);
 
-	if (C_ISDIR(hdr->cmh_type)) {
+	if (C_ISDIR(ctx->xs_hdr.cmh_type)) {
 		dnode = e_calloc(1,sizeof (*dnode));
 		dnode->d_name = e_strdup(fnode->fl_sname);
 		dnode->d_sname = e_strdup(name);
-		dnode->d_num = ct_ex_dirnum++;
 		dnode->d_fd = -1;
 		dnode->d_parent = fnode->fl_parent_dir;
 		dnode->d_mode = fnode->fl_mode;
@@ -118,16 +117,11 @@ ct_populate_fnode(struct fnode *fnode, struct ctfile_header *hdr,
 				tdnode->d_uid = dnode->d_uid;
 				tdnode->d_gid = dnode->d_gid;
 			}
-			/*
-			 * d_num is only used on inital file tree generation
-			 * so updating an older dnode when we are already
-			 * processing the next file is perfectly ok.
-			 */
-			 tdnode->d_num = dnode->d_num;
 			 e_free(&dnode);
 			 dnode = tdnode;
 		}
-		RB_INSERT(d_num_tree, &ct_dnum_head, dnode);
+		/* XXX check duplicates? */
+		ctfile_parse_insertdir(ctx, dnode);
 		CNDBG(CT_LOG_CTFILE, "inserting %s as %" PRId64,
 		    dnode->d_name, dnode->d_num );
 	}
@@ -207,8 +201,7 @@ next_file:
 		ret = ctfile_parse(&xs_ctx);
 		switch (ret) {
 		case XS_RET_FILE:
-			ct_populate_fnode(fnode, &xs_ctx.xs_hdr,
-			    &xs_ctx.xs_lnkhdr, &state,
+			ct_populate_fnode(&xs_ctx, fnode, &state,
 			    xs_ctx.xs_gh.cmg_flags & CT_MD_MLB_ALLFILES);
 			doprint = !ct_match(match, fnode->fl_sname);
 			if (doprint && ex_match != NULL &&
@@ -480,9 +473,8 @@ ct_extract(struct ct_op *op)
 			trans->tr_fl_node = ex_priv->fl_ex_node = fnode =
 			    e_calloc(1, sizeof(*fnode));
 
-			ct_populate_fnode(fnode, &ex_priv->xdr_ctx.xs_hdr,
-			    &ex_priv->xdr_ctx.xs_lnkhdr, &trans->tr_state,
-			    ex_priv->allfiles);
+			ct_populate_fnode(&ex_priv->xdr_ctx, fnode,
+			    &trans->tr_state, ex_priv->allfiles);
 
 			ex_priv->doextract = !ct_match(ex_priv->inc_match,
 			    fnode->fl_sname);
@@ -580,8 +572,6 @@ skip:
 			break;
 		case XS_RET_EOF:
 			CNDBG(CT_LOG_CTFILE, "Hit end of ctfile");
-			ct_dnum_cleanup();
-			ct_ex_dirnum = 0;
 			ctfile_parse_close(&ex_priv->xdr_ctx);
 			/* if rb tree and rb is empty, goto end state */
 			if ((ex_priv->haverb &&
@@ -706,8 +696,6 @@ ct_extract_file(struct ct_op *op)
 
 		if (ex_priv->done) {
 			CNDBG(CT_LOG_CTFILE, "Hit end of ctfile");
-			ct_dnum_cleanup();
-			ct_ex_dirnum = 0;
 			ctfile_parse_close(&ex_priv->xdr_ctx);
 			e_free(&ex_priv);
 			trans->tr_state = TR_S_DONE;
@@ -732,9 +720,7 @@ ct_extract_file(struct ct_op *op)
 			/* Make it local directory, it won't be set up right. */
 			ex_priv->xdr_ctx.xs_hdr.cmh_parent_dir = -1;
 			/* Allfiles doesn't matter, only processing one file. */
-			ct_populate_fnode(trans->tr_fl_node,
-			    &ex_priv->xdr_ctx.xs_hdr,
-			    &ex_priv->xdr_ctx.xs_lnkhdr,
+			ct_populate_fnode(&ex_priv->xdr_ctx, trans->tr_fl_node,
 			    &trans->tr_state, 0);
 
 			/* XXX Check filename matches what we expect */

@@ -128,16 +128,10 @@ struct dnode {
 	int                      d_mtime;       /* last modification time */
 };
 
-struct dnode * gen_finddir(int64_t idx);
 int	ct_dname_cmp(struct dnode *, struct dnode *);
 RB_HEAD(d_name_tree, dnode);
 RB_PROTOTYPE(d_name_tree, dnode, ds_rb, ct_dname_cmp);
 
-int	ct_dnum_cmp(struct dnode *, struct dnode *);
-RB_HEAD(d_num_tree, dnode);
-RB_PROTOTYPE(d_num_tree, dnode, ds_rb, ct_dnum_cmp);
-
-extern struct d_num_tree	ct_dnum_head;
 extern struct d_name_tree	ct_dname_head;
 
 /* FILE STATUS */
@@ -227,7 +221,6 @@ struct ct_trans		*ct_trans_alloc(void);
 struct ct_trans		*ct_trans_realloc_local(struct ct_trans *);
 void			ct_trans_free(struct ct_trans *trans);
 void			ct_trans_cleanup(void);
-void			ct_dnum_cleanup(void);
 void			ct_dnode_cleanup(void);
 void			ct_free_fnode(struct fnode *);
 void			ct_ssl_cleanup(void);
@@ -670,6 +663,7 @@ void			ct_cleanup_login_cache(void);
 #include <rpc/types.h>
 #include <rpc/xdr.h>
 /* parser for cyphertite ctfile archives */
+RB_HEAD(d_num_tree, dnode);
 struct ctfile_parse_state {
 	FILE			*xs_f;
 	const char		*xs_filename;
@@ -678,6 +672,8 @@ struct ctfile_parse_state {
 	struct ctfile_header	 xs_hdr;
 	struct ctfile_header	 xs_lnkhdr;
 	struct ctfile_trailer	 xs_trl;
+	struct d_num_tree	 xs_dnum_head;
+	int			 xs_dnum;
 	int			 xs_state;
 	int			 xs_sha_cnt;
 	size_t			 xs_sha_sz;
@@ -703,6 +699,8 @@ int ctfile_parse(struct ctfile_parse_state *);
 int ctfile_parse_seek(struct ctfile_parse_state *);
 void ctfile_parse_close(struct ctfile_parse_state *);
 off_t ctfile_parse_tell(struct ctfile_parse_state *);
+struct dnode *ctfile_parse_finddir(struct ctfile_parse_state *, int);
+struct dnode *ctfile_parse_insertdir(struct ctfile_parse_state *, struct dnode *);
 
 struct ctfile_write_state;
 struct ctfile_write_state	

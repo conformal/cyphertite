@@ -368,6 +368,8 @@ ctfile_parse_init_at(struct ctfile_parse_state *ctx, const char *file,
 		return 2;
 
 	ctx->xs_filename  = e_strdup(file);
+	ctx->xs_dnum = 0;
+	RB_INIT(&ctx->xs_dnum_head);
 
 	if (offset != 0 && fseek(ctx->xs_f, offset, SEEK_SET) == -1) {
 		CWARN("failed to seek in file %s", file);
@@ -510,6 +512,29 @@ fail:
 	return XS_RET_FAIL;
 }
 
+static inline int
+ct_dnum_cmp(struct dnode *d1, struct dnode *d2)
+{
+	return (d1->d_num < d2->d_num ? -1 : d1->d_num > d2->d_num);
+}
+RB_PROTOTYPE_STATIC(d_num_tree, dnode, ds_rb, ct_dnum_cmp);
+RB_GENERATE_STATIC(d_num_tree, dnode, d_rb_num, ct_dnum_cmp);
+
+struct dnode *ctfile_parse_finddir(struct ctfile_parse_state *ctx, int num)
+{
+	struct dnode dsearch;
+
+	dsearch.d_num = num;
+	return RB_FIND(d_num_tree, &ctx->xs_dnum_head, &dsearch);
+}
+
+struct dnode *ctfile_parse_insertdir(struct ctfile_parse_state *ctx,
+    struct dnode *dnode)
+{
+	dnode->d_num = ctx->xs_dnum++;
+	return RB_INSERT(d_num_tree, &ctx->xs_dnum_head, dnode);
+}
+
 /*
  * If in SHA state, it is valid to tell the reader to seek to the end
  * of the shas and read the file trailer
@@ -561,10 +586,20 @@ ctfile_parse_tell(struct ctfile_parse_state *ctx)
 void
 ctfile_parse_close(struct ctfile_parse_state *ctx)
 {
+	struct dnode *dnode;
 
 	ctfile_cleanup_gheader(&ctx->xs_gh);
 	if (ctx->xs_filename != NULL)
 		e_free(&ctx->xs_filename);
+	ctx->xs_dnum = 0;
+
+	/*
+	 * The directory number tree is provided as a convenience for looking
+	 * up parents. Remove any entries from the tree, but do not free them
+	 * the onus for that is on the caller.
+	 */
+	while ((dnode = RB_ROOT(&ctx->xs_dnum_head)) != NULL)
+		RB_REMOVE(d_num_tree, &ctx->xs_dnum_head, dnode);
 
 	ctfile_close(ctx->xs_f, &ctx->xs_xdr);
 }

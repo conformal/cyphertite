@@ -73,7 +73,6 @@ struct ct_fb_entry *
 ct_add_tree(struct ct_fb_entry *head, struct ctfile_parse_state *xdr_ctx,
     struct ct_fb_ctfile *ctfile, off_t fileoffset, int allfiles)
 {
-	extern int64_t			 ct_ex_dirnum;
 	struct ctfile_header		*hdr = &xdr_ctx->xs_hdr;
 	struct ctfile_header		*hdrlnk= &xdr_ctx->xs_lnkhdr;
 	struct dnode 			*dnode;
@@ -87,7 +86,8 @@ ct_add_tree(struct ct_fb_entry *head, struct ctfile_parse_state *xdr_ctx,
 
 	/* First find parent directory if any */
 	if (hdr->cmh_parent_dir != -1) {
-		if ((dnode = gen_finddir(hdr->cmh_parent_dir)) == NULL)
+		if ((dnode = ctfile_parse_finddir(xdr_ctx,
+		    hdr->cmh_parent_dir)) == NULL)
 			CFATALX("can't find dir %" PRId64 ,
 			    hdr->cmh_parent_dir);
 		fb_dnode = (struct ct_fb_dnode *)dnode;
@@ -185,12 +185,11 @@ ct_add_tree(struct ct_fb_entry *head, struct ctfile_parse_state *xdr_ctx,
 	if (C_ISDIR(hdr->cmh_type)) {
 		fb_dnode = e_calloc(1,sizeof (*fb_dnode));
 		fb_dnode->dnode.d_name = e_strdup(entry->cfb_name);
-		fb_dnode->dnode.d_num = ct_ex_dirnum++;
 		fb_dnode->dir = entry;
 		CNDBG(CT_LOG_VERTREE, "inserting %s as %" PRId64,
 		    fb_dnode->dnode.d_name, fb_dnode->dnode.d_num );
-		dnode = RB_INSERT(d_num_tree, &ct_dnum_head, &fb_dnode->dnode);
-		if (dnode != NULL)
+		if ((dnode = ctfile_parse_insertdir(xdr_ctx,
+		    &fb_dnode->dnode)) != NULL)
 			CFATALX("duplicate dentry");
 	} else if (C_ISREG(hdr->cmh_type)) {
 		/*
