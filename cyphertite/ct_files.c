@@ -58,24 +58,38 @@ struct flist {
 RB_HEAD(fl_tree, flist);
 TAILQ_HEAD(flist_head, flist);
 
-int		 fl_inode_sort(struct flist *, struct flist *);
+/* tree for hardlink calculations */
+int		 	 fl_inode_sort(struct flist *, struct flist *);
 RB_PROTOTYPE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
+RB_GENERATE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 
-char		*gen_fname(struct flist *);
-struct fnode	*ct_populate_fnode_from_flist(struct flist *);
-
-
-extern int		ct_follow_symlinks;
-
-char			*ct_name_to_safename(char *);
+/* Directory traversal and transformation of generated data */
 void			 ct_traverse(char **, struct flist_head *);
+int			 ct_sched_backup_file(struct stat *, char *, int, int,
+			     struct flist_head *, struct fl_tree *);
+struct fnode		*ct_populate_fnode_from_flist(struct flist *);
+char			*ct_name_to_safename(char *);
+
+/* Helper functions for the above */
+char			*eat_double_dots(char *, char *);
+int			 backup_prefix(char *, struct flist_head *,
+			     struct fl_tree *);
+char			*gen_fname(struct flist *);
+int			 s_to_e_type(int);
+
 
 int                      ct_dname_cmp(struct dnode *, struct dnode *);
 int                      ct_dnum_cmp(struct dnode *, struct dnode *);
 
+
+extern int		 ct_follow_symlinks;
+int			 ct_extract_fd = -1;
+
+
 struct d_name_tree ct_dname_head = RB_INITIALIZER(&ct_dname_head);
 struct d_num_tree ct_dnum_head = RB_INITIALIZER(&ct_dnum_head);
 
+/* Directory trees by number and by name */
 RB_GENERATE(d_name_tree, dnode, d_rb_name, ct_dname_cmp);
 RB_GENERATE(d_num_tree, dnode, d_rb_num, ct_dnum_cmp);
 
@@ -145,16 +159,6 @@ ct_free_fnode(struct fnode *fnode)
 	e_free(&fnode);
 
 }
-
-char *eat_double_dots(char *, char *);
-int backup_prefix(char *, struct flist_head *, struct fl_tree *);
-int ct_sched_backup_file(struct stat *, char *, int, int, struct flist_head *,
-    struct fl_tree *);
-int s_to_e_type(int);
-
-int ct_extract_fd = -1;
-
-RB_GENERATE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 
 int
 fl_inode_sort(struct flist *f1, struct flist *f2)
