@@ -38,7 +38,6 @@ int
 ct_populate_fnode(struct fnode *fnode, struct ctfile_header *hdr,
     struct ctfile_header *hdrlnk, int *state, int allfiles)
 {
-	struct flist		 flistnode;
 	struct dnode		*dnode, *tdnode;
 	char			*name;
 	extern struct dnode	 ct_ex_rootdir;
@@ -72,20 +71,19 @@ ct_populate_fnode(struct fnode *fnode, struct ctfile_header *hdr,
 	/* fnode->fl_parent_dir default to NULL */
 	if (hdr->cmh_parent_dir == -2) {
 		/* rooted directory */
-		flistnode.fl_fname = hdr->cmh_filename;
-		e_asprintf(&fnode->fl_sname , "%s%s",
-		    ct_strip_slash ? "" : "/", flistnode.fl_fname);
+		e_asprintf(&fnode->fl_sname, "%s%s", ct_strip_slash ? "" : "/",
+		    hdr->cmh_filename);
 		name = fnode->fl_sname;
 	} else if (hdr->cmh_parent_dir != -1) {
-		flistnode.fl_fname = hdr->cmh_filename;
-
-		fnode->fl_parent_dir = flistnode.fl_parent_dir =
-		    gen_finddir(hdr->cmh_parent_dir);
+		fnode->fl_parent_dir = gen_finddir(hdr->cmh_parent_dir);
+		if (fnode->fl_parent_dir == NULL)
+			CFATALX("can't find parent dir %" PRId64 " for %s",
+			    hdr->cmh_parent_dir, hdr->cmh_filename);
+		e_asprintf(&fnode->fl_sname, "%s/%s",
+		    fnode->fl_parent_dir->d_name, hdr->cmh_filename);
 		CNDBG(CT_LOG_CTFILE,
-		    "parent_dir %p %" PRId64, flistnode.fl_parent_dir,
+		    "parent_dir %p %" PRId64, fnode->fl_parent_dir,
 		    hdr->cmh_parent_dir);
-
-		fnode->fl_sname = gen_fname(&flistnode);
 	} else
 		fnode->fl_sname = e_strdup(hdr->cmh_filename);
 
