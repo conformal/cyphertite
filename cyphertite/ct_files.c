@@ -752,7 +752,8 @@ ct_traverse(char **paths, char **exclude, int match_mode)
 			continue;
 		}
 		if (exclude_match && !ct_match(exclude_match, clean)) {
-			CINFO("failing %s: in exclude list", clean);
+			CNDBG(CT_LOG_FILE, "failing %s: in exclude list",
+			    clean);
 			ecnt++;
 			continue;
 		}
