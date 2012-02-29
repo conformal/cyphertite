@@ -422,7 +422,9 @@ the ctctl(1) command:
 .Pp
 .Dl $ ctctl cull
 .Pp
-This will use the configuration setting ctfile_expire_day and automatically
+This will use the configuration setting
+.Ar ctfile_cull_keep_days
+and automatically
 delete any ctfile archives that are older than the specified age which are
 not referenced by more recent incremental backups.
 .Pp

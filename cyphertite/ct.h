@@ -62,7 +62,7 @@ extern char		*__progname;
 extern char		*ct_includefile;
 extern char		*ct_crypto_password;
 extern char		*ct_configfile;
-extern int		ct_ctfile_expire_day;
+extern int		ct_ctfile_keep_days;
 extern int		ctfile_mode;
 extern char		*ctfile_cachedir;
 extern long long	ctfile_max_cachesize;

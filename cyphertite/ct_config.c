@@ -62,7 +62,7 @@ int			ct_auto_differential;
 long long		ctfile_max_cachesize = LLONG_MAX; /* unbounded */
 int			ct_max_differentials;
 int			ct_secrets_upload = 0;
-int			ct_ctfile_expire_day = 0;
+int			ct_ctfile_keep_days = 0;
 
 struct ct_settings	settings[] = {
 	{ "queue_depth", CT_S_INT, &ct_max_trans, NULL, NULL, NULL },
@@ -82,7 +82,7 @@ struct ct_settings	settings[] = {
 	{ "polltype", CT_S_STR, NULL, &ct_polltype, NULL, NULL },
 	{ "upload_crypto_secrets" , CT_S_INT, &ct_secrets_upload,
 	    NULL, NULL, NULL },
-	{ "ctfile_expire_day" , CT_S_INT, &ct_ctfile_expire_day,
+	{ "ctfile_cull_keep_days" , CT_S_INT, &ct_ctfile_keep_days,
 	    NULL, NULL, NULL },
 	{ "ctfile_mode", CT_S_STR, NULL, &ctfile_mode_str, NULL, NULL },
 	{ "ctfile_cachedir", CT_S_DIR, NULL, &ctfile_cachedir, NULL, NULL },
@@ -102,6 +102,8 @@ struct ct_settings	settings[] = {
 	{ "md_remote_auto_differential" , CT_S_INT, &ct_auto_differential,
 	    NULL, NULL, NULL },
 	{ "md_max_differentials" , CT_S_INT, &ct_max_differentials,
+	    NULL, NULL, NULL },
+	{ "ctfile_expire_day" , CT_S_INT, &ct_ctfile_keep_days,
 	    NULL, NULL, NULL },
 	{ NULL, 0, NULL, NULL, NULL,  NULL }
 };

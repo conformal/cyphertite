@@ -1671,11 +1671,12 @@ ct_cull_collect_ctfiles(struct ct_op *op)
 	time_t			now;
 	int			keep_files = 0;
 
-	if (ct_ctfile_expire_day == 0)
-		CFATALX("cull: ctfile_expire_day must be specified in config");
+	if (ct_ctfile_keep_days == 0)
+		CFATALX("cull: ctfile_cull_keep_days must be specified in "
+		    "config");
 
 	now = time(NULL);
-	now -= (24 * 60 * 60 * ct_ctfile_expire_day);
+	now -= (24 * 60 * 60 * ct_ctfile_keep_days);
 	if (strftime(buf, TIMEDATA_LEN, "%Y%m%d-%H%M%S",
 	    localtime(&now)) == 0)
 		CFATALX("can't format time");
