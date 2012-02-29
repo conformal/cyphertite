@@ -1478,7 +1478,8 @@ open:
 	ct_file_extract_opento(newdirlist[i], newdir);
 
 	ct_ex_prevdir = newdir;
-	e_free(&ct_ex_prevdir_list);
+	if (ct_ex_prevdir_list != NULL)
+		e_free(&ct_ex_prevdir_list);
 	ct_ex_prevdir_list = newdirlist;
 }
 
