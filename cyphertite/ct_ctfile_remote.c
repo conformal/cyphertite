@@ -219,7 +219,7 @@ ctfile_find_for_extract_complete(struct ct_op *op)
 	struct ct_ctfile_list_args		*ccla = list_fakeop->op_args;
 	struct ctfile_list_tree			 result;
 	struct ctfile_list_file			*tmp;
-	char	 				*best, *cachename = NULL;
+	char	 				*best = NULL;
 
 	RB_INIT(&result);
 	ctfile_list_complete(ccla->ccla_matchmode, ccla->ccla_search,
@@ -264,20 +264,20 @@ ctfile_find_for_extract_complete(struct ct_op *op)
 	 * those operations too. If we have it, we still need to check
 	 * that all others in the chain exist, however.
 	 */
-	cachename = ctfile_get_cachename(best);
 	if (!ctfile_in_cache(best)) {
-		ccffa->ccffa_base.cca_localname = cachename;
-		ccffa->ccffa_base.cca_remotename = best;
+		ccffa->ccffa_base.cca_localname = best;
+		ccffa->ccffa_base.cca_tdir = ctfile_cachedir;
+		ccffa->ccffa_base.cca_remotename = e_strdup(best);
 		ct_add_operation(ctfile_extract, ctfile_extract_nextop,
 		    ccffa);
 	} else {
-		e_free(&best);
 do_operation:
 		/*
 		 * No download needed, fake the next operation callback
 		 * to see if we need anymore.
 		 */
-		ccffa->ccffa_base.cca_localname = cachename;
+		ccffa->ccffa_base.cca_localname = best;
+		ccffa->ccffa_base.cca_tdir = ctfile_cachedir;
 		op->op_args = ccffa;
 		ctfile_extract_nextop(op);
 	}
@@ -293,6 +293,7 @@ ctfile_extract_nextop(struct ct_op *op)
 {
 	struct ct_ctfile_find_fileop_args	*ccffa = op->op_args;
 	struct ct_ctfileop_args			*cca;
+	char					*cachename;
 
 	/*
 	 * If this is an operation that needs the full differential chain
@@ -310,6 +311,7 @@ ctfile_extract_nextop(struct ct_op *op)
 		if (ccffa->ccffa_base.cca_remotename)
 			cca->cca_remotename =
 			    e_strdup(ccffa->ccffa_base.cca_remotename);
+		cca->cca_tdir = ccffa->ccffa_base.cca_tdir;
 		op->op_args = cca;
 		ctfile_download_next(op);
 	}
@@ -320,8 +322,15 @@ ctfile_extract_nextop(struct ct_op *op)
 	 * to the operation list. Ownership of the allocated pointer
 	 * passes to the child.
 	 */
-	ccffa->ccffa_nextop(ccffa->ccffa_base.cca_localname,
-	    ccffa->ccffa_nextop_args);
+	if (ccffa->ccffa_base.cca_localname != NULL) {
+		cachename =
+		    ctfile_get_cachename(ccffa->ccffa_base.cca_localname);
+	} else {
+		cachename = NULL;
+	}
+	ccffa->ccffa_nextop(cachename, ccffa->ccffa_nextop_args);
+	if (ccffa->ccffa_base.cca_localname)
+		e_free(&ccffa->ccffa_base.cca_localname);
 	if (ccffa->ccffa_base.cca_remotename)
 		e_free(&ccffa->ccffa_base.cca_remotename);
 	e_free(&ccffa);
@@ -338,36 +347,37 @@ ctfile_download_next(struct ct_op *op)
 	const char		*ctfile = cca->cca_localname;
 	const char		*rfile = cca->cca_remotename;
 	char			*prevfile;
-	char			*cachename;
 	char			*cookedname;
+	char			*cachename;
 
 again:
 	CNDBG(CT_LOG_CTFILE, "ctfile %s", ctfile);
 
+	cachename = ctfile_get_cachename(ctfile);
 	/* this will provide us the path that we need to use */
-	prevfile = ctfile_get_previous(ctfile);
+	prevfile = ctfile_get_previous(cachename);
+	e_free(&cachename);
 	if (prevfile == NULL)
 		goto out;
 
 	if (prevfile[0] != '\0') {
 		cookedname = ctfile_cook_name(prevfile);
-		cachename = ctfile_get_cachename(cookedname);
-		CNDBG(CT_LOG_CTFILE, "prev file %s cachename %s", prevfile,
-		    cachename);
-		if (!ctfile_in_cache(cachename)) {
-			e_free(&cachename);
+		CNDBG(CT_LOG_CTFILE, "prev file %s cookedname %s", prevfile,
+		    cookedname);
+		if (!ctfile_in_cache(cookedname)) {
 			nextcca = e_calloc(1, sizeof(*nextcca));
-			nextcca->cca_localname = prevfile;
-			nextcca->cca_remotename = cookedname;
+			nextcca->cca_localname = cookedname;
+			nextcca->cca_remotename = e_strdup(cookedname);
+			nextcca->cca_tdir = ctfile_cachedir;
 			ct_add_operation_after(op, ctfile_extract,
 			    ctfile_download_next, nextcca);
 		} else {
+			CWARNX("don't need to get %s", cookedname);
 			if (ctfile)
 				e_free(&ctfile);
 			if (rfile)
 				e_free(&rfile);
 			e_free(&cookedname);
-			e_free(&cachename);
 			ctfile = prevfile;
 			goto again;
 		}
