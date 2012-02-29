@@ -26,7 +26,7 @@
 #include "ct.h"
 
 int	ct_populate_fnode(struct fnode *, struct ctfile_header *,
-	    struct ctfile_header *, int *);
+	    struct ctfile_header *, int *, int);
 
 int64_t		 ct_ex_dirnum = 0;
 const uint8_t	 zerosha[SHA_DIGEST_LENGTH];
@@ -36,7 +36,7 @@ const uint8_t	 zerosha[SHA_DIGEST_LENGTH];
  */
 int
 ct_populate_fnode(struct fnode *fnode, struct ctfile_header *hdr,
-    struct ctfile_header *hdrlnk, int *state)
+    struct ctfile_header *hdrlnk, int *state, int allfiles)
 {
 	struct flist		 flistnode;
 	struct dnode		*dnode, *tdnode;
@@ -112,7 +112,7 @@ ct_populate_fnode(struct fnode *fnode, struct ctfile_header *hdr,
 		/* Insert into the name tree first to check for duplicates. */
 		if ((tdnode = RB_INSERT(d_name_tree, &ct_dname_head, dnode))
 		    != NULL) {
-			if (ct_multilevel_allfiles == 0) {
+			if (allfiles == 0) {
 				/* update stat data */
 				tdnode->d_mode = dnode->d_mode;
 				tdnode->d_atime = dnode->d_atime;
@@ -210,7 +210,8 @@ next_file:
 		switch (ret) {
 		case XS_RET_FILE:
 			ct_populate_fnode(fnode, &xs_ctx.xs_hdr,
-			    &xs_ctx.xs_lnkhdr, &state);
+			    &xs_ctx.xs_lnkhdr, &state,
+			    xs_ctx.xs_gh.cmg_flags & CT_MD_MLB_ALLFILES);
 			doprint = !ct_match(match, fnode->fl_sname);
 			if (doprint && ex_match != NULL &&
 			    !ct_match(ex_match, fnode->fl_sname))
@@ -288,9 +289,12 @@ next_file:
 /*
  * Code for extract.
  */
+static void	ct_extract_setup_queue(struct ct_extract_head *,
+	    struct ctfile_parse_state *, const char *, int);
+
 void
 ct_extract_setup(struct ct_extract_head *extract_head,
-    struct ctfile_parse_state *ctx, const char *file)
+    struct ctfile_parse_state *ctx, const char *file, int *is_allfiles)
 {
 	struct ct_extract_stack	*nfile;
 	char			*prevlvl;
@@ -299,8 +303,8 @@ ct_extract_setup(struct ct_extract_head *extract_head,
 		CFATALX("extract failure: unable to open metadata file '%s'\n",
 		    file);
 
-	ct_multilevel_allfiles = (ctx->xs_gh.cmg_flags &
-	    CT_MD_MLB_ALLFILES);
+	*is_allfiles = (ctx->xs_gh.cmg_flags & CT_MD_MLB_ALLFILES);
+	ct_multilevel_allfiles = *is_allfiles;
 
 	if (ctx->xs_gh.cmg_prevlvl_filename) {
 		nfile = e_malloc(sizeof(*nfile));
@@ -310,11 +314,12 @@ ct_extract_setup(struct ct_extract_head *extract_head,
 		prevlvl = e_strdup(ctx->xs_gh.cmg_prevlvl_filename);
 
 		ctfile_parse_close(ctx);
-		ct_extract_setup_queue(extract_head, ctx, prevlvl);
+		ct_extract_setup_queue(extract_head, ctx, prevlvl,
+		    *is_allfiles);
 
 		e_free(&prevlvl);
 
-		if (ct_multilevel_allfiles) {
+		if (*is_allfiles) {
 			ctfile_parse_close(ctx);
 			/* reopen first file */
 			ct_extract_open_next(extract_head, ctx);
@@ -324,9 +329,9 @@ ct_extract_setup(struct ct_extract_head *extract_head,
 	ct_set_file_state(CT_S_WAITING_TRANS);
 }
 
-void
+static void
 ct_extract_setup_queue(struct ct_extract_head *extract_head,
-    struct ctfile_parse_state *ctx, const char *file)
+    struct ctfile_parse_state *ctx, const char *file, int is_allfiles)
 {
 	char			*prevlvl;
 	struct ct_extract_stack	*nfile;
@@ -341,7 +346,7 @@ ct_extract_setup_queue(struct ct_extract_head *extract_head,
 		nfile = e_malloc(sizeof(*nfile));
 		nfile->filename = e_strdup(file);
 
-		if (ct_multilevel_allfiles)
+		if (is_allfiles)
 			TAILQ_INSERT_TAIL(extract_head, nfile, next);
 		else
 			TAILQ_INSERT_HEAD(extract_head, nfile, next);
@@ -349,21 +354,21 @@ ct_extract_setup_queue(struct ct_extract_head *extract_head,
 		prevlvl = e_strdup(ctx->xs_gh.cmg_prevlvl_filename);
 		ctfile_parse_close(ctx);
 
-		ct_extract_setup_queue(extract_head, ctx, prevlvl);
+		ct_extract_setup_queue(extract_head, ctx, prevlvl, is_allfiles);
 		e_free(&prevlvl);
 
-	} else {
-		if (ct_multilevel_allfiles) {
-			nfile = e_malloc(sizeof(*nfile));
-			nfile->filename = e_strdup(file);
-			TAILQ_INSERT_TAIL(extract_head, nfile, next);
-		}
+	} else if (is_allfiles) {
+		/*
+		 * Allfiles we work backwards down the chain, without it
+		 * we work at the end and go backwards. Since this is the last
+		 * entry we only need it for allfiles mode.
+		 */
+		nfile = e_malloc(sizeof(*nfile));
+		nfile->filename = e_strdup(file);
+		TAILQ_INSERT_TAIL(extract_head, nfile, next);
 	}
 }
-
-void
-ct_extract_open_next(struct ct_extract_head *extract_head,
-    struct ctfile_parse_state *ctx)
+void ct_extract_open_next(struct ct_extract_head *extract_head, struct ctfile_parse_state *ctx)
 {
 	struct ct_extract_stack *next;
 
@@ -407,6 +412,7 @@ struct ct_extract_priv {
 	int				 doextract;
 	int				 fillrb;
 	int				 haverb;
+	int				 allfiles;
 };
 
 void
@@ -436,10 +442,10 @@ ct_extract(struct ct_op *op)
 			op->op_priv = ex_priv;
 		}
 		ct_extract_setup(&ex_priv->extract_head,
-		    &ex_priv->xdr_ctx, ctfile);
+		    &ex_priv->xdr_ctx, ctfile, &ex_priv->allfiles);
 		ct_file_extract_setup_dir(cea->cea_tdir);
 		/* create rb tree head, prepare to start inserting */
-		if (ct_multilevel_allfiles) {
+		if (ex_priv->allfiles) {
 			char *nothing = NULL;
 			ex_priv->rb_match =
 			    ct_match_compile(CT_MATCH_RB, &nothing);
@@ -465,7 +471,7 @@ ct_extract(struct ct_op *op)
 		case XS_RET_FILE:
 			if (ex_priv->fillrb == 0 &&
 			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas == -1) {
-				if (ct_multilevel_allfiles == 0)
+				if (ex_priv->allfiles == 0)
 					CINFO("file %s has negative shas "
 					    "and backup is not allfiles",
 					    ex_priv->xdr_ctx.xs_hdr.cmh_filename);
@@ -478,7 +484,8 @@ ct_extract(struct ct_op *op)
 			    e_calloc(1, sizeof(*fnode));
 
 			ct_populate_fnode(fnode, &ex_priv->xdr_ctx.xs_hdr,
-			    &ex_priv->xdr_ctx.xs_lnkhdr, &trans->tr_state);
+			    &ex_priv->xdr_ctx.xs_lnkhdr, &trans->tr_state,
+			    ex_priv->allfiles);
 
 			ex_priv->doextract = !ct_match(ex_priv->inc_match,
 			    fnode->fl_sname);
@@ -729,10 +736,11 @@ ct_extract_file(struct ct_op *op)
 
 			/* Make it local directory, it won't be set up right. */
 			ex_priv->xdr_ctx.xs_hdr.cmh_parent_dir = -1;
+			/* Allfiles doesn't matter, only processing one file. */
 			ct_populate_fnode(trans->tr_fl_node,
 			    &ex_priv->xdr_ctx.xs_hdr,
 			    &ex_priv->xdr_ctx.xs_lnkhdr,
-			    &trans->tr_state);
+			    &trans->tr_state, 0);
 
 			/* XXX Check filename matches what we expect */
 			e_free(&trans->tr_fl_node->fl_sname);

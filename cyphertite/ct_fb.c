@@ -49,7 +49,7 @@ struct ct_fb_state	*ctfb_cfs;
 __dead void		 ctfb_usage(void);
 struct ct_fb_entry	*ct_add_tree(struct ct_fb_entry *,
 			     struct ctfile_parse_state *, struct ct_fb_ctfile *,
-			     off_t);
+			     off_t, int);
 struct ct_fb_entry	*ctfb_follow_path(struct ct_fb_state *, const char *,
 			     char *, size_t);
 int			 glob_ctfile(const char *, int,
@@ -71,7 +71,7 @@ RB_GENERATE_STATIC(ct_fb_entries, ct_fb_entry, cfb_entry, ct_cmp_entry);
  */
 struct ct_fb_entry *
 ct_add_tree(struct ct_fb_entry *head, struct ctfile_parse_state *xdr_ctx,
-    struct ct_fb_ctfile *ctfile, off_t fileoffset)
+    struct ct_fb_ctfile *ctfile, off_t fileoffset, int allfiles)
 {
 	extern int64_t			 ct_ex_dirnum;
 	struct ctfile_header		*hdr = &xdr_ctx->xs_hdr;
@@ -122,7 +122,7 @@ ct_add_tree(struct ct_fb_entry *head, struct ctfile_parse_state *xdr_ctx,
 	 * then check version tags -> head/tail if mtime and type match, we're
 	 * good else prepare version key.
 	 */
-	if (ct_multilevel_allfiles) {
+	if (allfiles) {
 		lastkey = TAILQ_FIRST(&entry->cfb_versions);
 	} else {
 		lastkey = TAILQ_LAST(&entry->cfb_versions, ct_fb_vers);
@@ -169,7 +169,7 @@ ct_add_tree(struct ct_fb_entry *head, struct ctfile_parse_state *xdr_ctx,
 			file = (struct ct_fb_file *)key;
 			file->cfb_nr_shas = -1;
 		}
-		if (ct_multilevel_allfiles) {
+		if (allfiles) {
 			TAILQ_INSERT_HEAD(&entry->cfb_versions, key, cfb_link);
 		} else {
 			TAILQ_INSERT_TAIL(&entry->cfb_versions, key, cfb_link);
@@ -235,11 +235,12 @@ ct_build_tree(const char *filename, struct ct_fb_entry *head)
 	struct ct_fb_key		*root_version;
 	off_t				 offset;
 	int				 ret;
+	int				 allfiles;
 
 	CNDBG(CT_LOG_FILE, "entry");
 
 	TAILQ_INIT(&extract_head);
-	ct_extract_setup(&extract_head, &xdr_ctx, filename);
+	ct_extract_setup(&extract_head, &xdr_ctx, filename, &allfiles);
 
 	TAILQ_INIT(&head->cfb_versions);
 	RB_INIT(&head->cfb_children);
@@ -267,7 +268,7 @@ nextfile:
 		switch(ret) {
 		case XS_RET_FILE:
 			(void)ct_add_tree(head, &xdr_ctx,
-			    ctfile, offset);
+			    ctfile, offset, allfiles);
 			break;
 		case XS_RET_FILE_END:
 			break;

@@ -755,10 +755,8 @@ struct ct_extract_stack   {
 	char		*filename;
 };
 void	ct_extract_setup(struct ct_extract_head *, struct ctfile_parse_state *,
-	    const char *);
+	    const char *, int *);
 void	ct_extract_setup_dir(const char *);
-void	ct_extract_setup_queue(struct ct_extract_head *,
-	    struct ctfile_parse_state *, const char *);
 void	ct_extract_open_next(struct ct_extract_head *,
 	    struct ctfile_parse_state *);
 void	ct_extract_cleanup_queue(struct ct_extract_head *);
