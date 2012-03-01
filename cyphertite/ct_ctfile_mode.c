@@ -1176,7 +1176,7 @@ void	ct_secrets_unlock(struct ct_op *);
 void
 ct_check_crypto_secrets_nextop(struct ct_op *op)
 {
-	extern char		*ct_crypto_password;
+	extern char		*ct_crypto_passphrase;
 	char			*current_secrets = op->op_local_fname;
 	char			*t, *remote_name = NULL;
 	char			 *dirp, dir[PATH_MAX], tmp[PATH_MAX];
@@ -1222,7 +1222,7 @@ check_local:
 		if (remote_name)
 			e_free(&remote_name);
 		if (ct_create_or_unlock_secrets(current_secrets,
-		    ct_crypto_password))
+		    ct_crypto_passphrase))
 			CFATALX("can't unlock secrets file");
 	} else if (mtime < local_mtime) {
 		/* XXX verify local file before upload? */
@@ -1255,7 +1255,7 @@ check_local:
 void
 ct_secrets_unlock(struct ct_op *op)
 {
-	extern char		*ct_crypto_password;
+	extern char		*ct_crypto_passphrase;
 	char			*crypto_secrets = op->op_local_fname;
 	char			*old_secrets = op->op_basis;
 	char			 tmp[PATH_MAX], *t;
@@ -1277,11 +1277,11 @@ again:
 		}
 		/* XXX should we *ever* hit this case? */
 		fprintf(stderr, "No crypto secrets file. Creating\n");
-		if (ct_create_secrets(ct_crypto_password, ct_crypto_secrets,
+		if (ct_create_secrets(ct_crypto_passphrase, ct_crypto_secrets,
 		    NULL, NULL))
 			CFATALX("can't create secrets");
 	}
-	if (ct_unlock_secrets(ct_crypto_password, crypto_secrets,
+	if (ct_unlock_secrets(ct_crypto_passphrase, crypto_secrets,
 	    ct_crypto_key, sizeof (ct_crypto_key), ct_iv, sizeof ct_iv)) {
 		if (old_secrets != NULL) {
 			/* unlink tmp file */

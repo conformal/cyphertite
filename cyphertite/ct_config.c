@@ -48,7 +48,7 @@ char			*ct_ca_cert;
 char			*ct_cert;
 char			*ct_key;
 char			*ct_crypto_secrets;
-char			*ct_crypto_password;
+char			*ct_crypto_passphrase;
 char			*ct_compression_type;
 char			*ct_polltype;
 char			*ctfile_mode_str;
@@ -76,7 +76,7 @@ struct ct_settings	settings[] = {
 	{ "cert", CT_S_DIR, NULL, &ct_cert, NULL, NULL },
 	{ "key", CT_S_DIR, NULL, &ct_key, NULL, NULL },
 	{ "crypto_secrets", CT_S_DIR, NULL, &ct_crypto_secrets, NULL, NULL },
-	{ "crypto_password", CT_S_STR, NULL, &ct_crypto_password, NULL, NULL }, /* name may NOT be modified */
+	{ "crypto_passphrase", CT_S_STR, NULL, &ct_crypto_passphrase, NULL, NULL }, /* name may NOT be modified */
 	{ "session_compression", CT_S_STR, NULL, &ct_compression_type, NULL,
 	    NULL },
 	{ "polltype", CT_S_STR, NULL, &ct_polltype, NULL, NULL },
@@ -105,6 +105,7 @@ struct ct_settings	settings[] = {
 	    NULL, NULL, NULL },
 	{ "ctfile_expire_day" , CT_S_INT, &ct_ctfile_keep_days,
 	    NULL, NULL, NULL },
+	{ "crypto_password", CT_S_STR, NULL, &ct_crypto_passphrase, NULL, NULL },
 	{ NULL, 0, NULL, NULL, NULL,  NULL }
 };
 
@@ -233,7 +234,7 @@ ct_create_config(void)
 	char			*conf_buf = NULL;
 	char			*conf = NULL, *dir = NULL;
 	char			*user = NULL, *password = NULL;
-	char			*crypto_password = NULL;
+	char			*crypto_passphrase = NULL;
 	char			*mode = NULL, *cachedir = NULL;
 	int			ctfile_remote_diff = 0;
 	int			rv, fd;
@@ -332,8 +333,8 @@ ct_create_config(void)
 				CFATALX("can't base64 encode "
 				    "crypto passphrase");
 
-			crypto_password = strdup(b64d);
-			if (crypto_password == NULL)
+			crypto_passphrase = strdup(b64d);
+			if (crypto_passphrase == NULL)
 				CFATALX("strdup");
 		}
 		else {
@@ -342,8 +343,8 @@ ct_create_config(void)
 				CFATALX("password");
 
 			if (strlen(answer)) {
-				crypto_password = strdup(answer);
-				if (crypto_password == NULL)
+				crypto_passphrase = strdup(answer);
+				if (crypto_passphrase == NULL)
 					CFATALX("strdup");
 			}
 		}
@@ -391,10 +392,10 @@ ct_create_config(void)
 		fprintf(f, "password\t\t\t= %s\n", password);
 	else
 		fprintf(f, "#password\t\t\t=\n");
-	if (crypto_password)
-		fprintf(f, "crypto_password\t\t\t= %s\n", crypto_password);
+	if (crypto_passphrase)
+		fprintf(f, "crypto_passphrase\t\t= %s\n", crypto_passphrase);
 	else
-		fprintf(f, "#crypto_password\t\t=\n");
+		fprintf(f, "#crypto_passphrase\t\t=\n");
 
 	fprintf(f, "cache_db\t\t\t= %s/ct_db\n", dir);
 	fprintf(f, "session_compression\t\t= lzo\n");
@@ -426,9 +427,9 @@ ct_create_config(void)
 		bzero(password, strlen(password));
 		free(password);
 	}
-	if (crypto_password) {
-		bzero(crypto_password, strlen(crypto_password));
-		free(crypto_password);
+	if (crypto_passphrase) {
+		bzero(crypto_passphrase, strlen(crypto_passphrase));
+		free(crypto_passphrase);
 	}
 	if (mode)
 		free(mode);

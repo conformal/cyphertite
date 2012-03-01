@@ -157,7 +157,7 @@ ct_init(int foreground, int need_secrets, int only_metadata)
 		if (ct_crypto_secrets) {
 			if (ct_secrets_upload == 0 &&
 			    ct_create_or_unlock_secrets(ct_crypto_secrets,
-				ct_crypto_password))
+				ct_crypto_passphrase))
 				CFATALX("can't unlock secrets");
 		}
 	}
