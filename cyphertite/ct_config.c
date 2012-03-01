@@ -403,7 +403,7 @@ ct_create_config(void)
 	fprintf(f, "cert\t\t\t\t= %s/ct_certs/ct_%s.crt\n", dir, user);
 	fprintf(f, "key\t\t\t\t= %s/ct_certs/private/ct_%s.key\n", dir, user);
 
-	fprintf(f, "ctfile_mode\t\t\t\t= %s\n", mode);
+	fprintf(f, "ctfile_mode\t\t\t= %s\n", mode);
 	if (strcmp(mode, "remote") == 0) {
 		fprintf(f, "ctfile_cachedir\t\t\t= %s\n", cachedir);
 		fprintf(f, "ctfile_remote_auto_differential\t= %d\n",
