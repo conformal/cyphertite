@@ -494,10 +494,10 @@ into directory
 was written by
 .An Conformal Systems, LLC. Aq info@conformal.com .
 .Sh CAVEATS
-Before executing the first backup on a system, run
-.Nm
-with no parameters to allow cyphertite to prompt for the
-information needed to setup the account as follows:
+Before executing the first backup on a system, run ``
+.Xr cyphertitectl 1
+config generate''
+to interactively generate an account configuration as follows:
 .Dl $ cyphertite
 .Dl cyphertite config file not found. Create one? [yes]:
 .Dl Target conf file [/root/.cyphertite/cyphertite.conf]:

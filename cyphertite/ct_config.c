@@ -242,12 +242,6 @@ ct_create_config(void)
 	FILE			*f = NULL;
 
 	/* help user create config file */
-	snprintf(prompt, sizeof prompt,
-	    "%s config file not found. Create one? [yes]: ", __progname);
-	if (ct_get_answer(prompt, "yes", "no", "yes", answer,
-	    sizeof answer, 0) != 1)
-		CFATALX("%s requires a config file", __progname);
-
 	conf_buf = ct_user_config();
 	snprintf(prompt, sizeof prompt,
 	    "Target conf file [%s]: ", conf_buf);

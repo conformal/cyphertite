@@ -439,13 +439,9 @@ ct_main(int argc, char **argv)
 
 	/* Generate config file if one doesn't exist and there are no params. */
 	if (ct_load_config(settings)) {
-		if ((argc + optind) == 1) {
-			ct_create_config();
-			return (0);
-		} else
-			CFATALX("config file not found.  Use the -F option to "
-			    "specify its path or run %s with no parameters "
-			    "to generate one.", __progname);
+		CFATALX("config file not found.  Use the -F option to "
+		    "specify its path or run \"cyphertitectl config generate\""
+		    "to generate one.");
 	}
 
 	/* ct -A or ct -a force allfiles on and off and cancel each other */

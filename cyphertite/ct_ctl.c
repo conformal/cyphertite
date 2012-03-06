@@ -44,6 +44,8 @@ void cpasswd(struct ct_cli_cmd *, int , char **);
 void secrets_download(struct ct_cli_cmd *, int, char **);
 void secrets_upload(struct ct_cli_cmd *, int, char **);
 void secrets_generate(struct ct_cli_cmd *, int, char **);
+void config_generate(struct ct_cli_cmd *, int, char **);
+
 void
 cpasswd(struct ct_cli_cmd *c, int argc, char **argv)
 {
@@ -176,9 +178,15 @@ struct ct_cli_cmd	cmd_secrets[] = {
 	{ NULL, NULL, 0, NULL, NULL, 0}
 };
 
+struct ct_cli_cmd	cmd_config[] = {
+	{ "generate", NULL, 0, "", config_generate },
+	{ NULL, NULL, 0, NULL, NULL, 0}
+};
+
 struct ct_cli_cmd	cmd_list[] = {
 	{ "cull", NULL, 0, "", cull },
 	{ "secrets", cmd_secrets, CLI_CMD_SUBCOMMAND, "<action> ...", NULL },
+	{ "config", cmd_config, CLI_CMD_SUBCOMMAND, "<action> ...", NULL },
 	{ NULL, NULL, 0, NULL, NULL }
 };
 
@@ -236,15 +244,15 @@ ctctl_main(int argc, char *argv[])
 	if (configfile)
 		ct_configfile = e_strdup(configfile);
 
-	/* load config */
-	if (ct_load_config(settings))
+	/* load config XXX ick... unless we're generating one. */
+	if (!(argc == 2 && strcmp(argv[0], "config") == 0 && strcmp(argv[1],
+	    "generate") == 0) && ct_load_config(settings))
 		CFATALX("config file not found.  Use the -F option to "
-		    "specify its path.");
+		    "specify its path or run \"%s config generate\" to create "
+		    "one.", __progname);
 
 	if ((cc = ct_cli_validate(cmd_list, &argc, &argv)) == NULL)
 		ct_cli_usage(cmd_list, NULL);
-
-	ct_prompt_for_login_password();
 
 	ct_cli_execute(cc, &argc, &argv);
 
@@ -259,6 +267,8 @@ cull(struct ct_cli_cmd *c, int argc, char **argv)
 	int	ret;
 
 	/* XXX */
+
+	ct_prompt_for_login_password();
 
 	need_secrets = 1;
 
@@ -303,4 +313,10 @@ secrets_generate(struct ct_cli_cmd *c, int argc, char **argv)
 
 	if (ct_secrets_upload != 0)
 		ct_upload_secrets_file();
+}
+
+void
+config_generate(struct ct_cli_cmd *c, int argc, char **argv)
+{
+	ct_create_config();
 }
