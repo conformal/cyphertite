@@ -466,7 +466,7 @@ again:
 		ces->ces_fnode->fl_type = C_TY_REG;
 		ces->ces_fnode->fl_parent_dir = &ct_ex_rootdir;
 		ces->ces_fnode->fl_name = e_strdup(ctfile);
-		ces->ces_fnode->fl_mode = S_IRWXU;
+		ces->ces_fnode->fl_mode = S_IRUSR | S_IWUSR;
 		ces->ces_fnode->fl_uid = getuid();
 		ces->ces_fnode->fl_gid = getgid();
 		ces->ces_fnode->fl_atime = time(NULL);
