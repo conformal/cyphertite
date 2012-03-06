@@ -364,6 +364,8 @@ struct ct_ctfileop_args {
 struct ct_op	*ct_add_operation(ct_op_cb *, ct_op_cb *, void *);
 struct ct_op	*ct_add_operation_after(struct ct_op *, ct_op_cb *, ct_op_cb *,
 		    void *);
+void		 ct_do_operation(ct_op_cb *, ct_op_cb *,
+		     void *, int, int);
 void		 ct_nextop(void *);
 int		 ct_op_complete(void);
 ct_op_cb	 ct_shutdown_op;
@@ -631,6 +633,8 @@ typedef void	(ctfile_find_callback)(char *, void *);
 void			 ctfile_find_for_operation(char *,
 			     ctfile_find_callback *, void *, int, int);
 		
+void		 ct_upload_secrets_file(void);
+void		 ct_download_secrets_file(void);
 
 ctfile_find_callback	 ctfile_nextop_extract;
 ctfile_find_callback	 ctfile_nextop_list;

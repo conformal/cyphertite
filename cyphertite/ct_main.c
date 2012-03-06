@@ -130,6 +130,8 @@ show_version(void)
 void
 ct_init(int foreground, int need_secrets, int only_metadata)
 {
+	struct stat	sb;
+
 	/* Run with restricted umask as we create numerous sensitive files. */
 	umask(S_IRWXG|S_IRWXO);
 
@@ -156,9 +158,15 @@ ct_init(int foreground, int need_secrets, int only_metadata)
 	}
 
 	if (need_secrets != 0 && ct_crypto_secrets != NULL) {
-		if (ct_create_or_unlock_secrets(ct_crypto_secrets,
-		    ct_crypto_passphrase))
-			CFATALX("can't unlock secrets");
+		if (stat(ct_crypto_secrets, &sb) == -1) {
+			CFATALX("No crypto secrets file, please run"
+			    "ctctl secrets generate or ctctl secrets download");
+		}
+		/* we got crypto */
+		if (ct_unlock_secrets(ct_crypto_passphrase, ct_crypto_secrets,
+		    ct_crypto_key, sizeof(ct_crypto_key), ct_iv,
+		    sizeof (ct_iv)))
+			CFATALX("can't unlock secrets file");
 	}
 
 	ct_init_eventloop();

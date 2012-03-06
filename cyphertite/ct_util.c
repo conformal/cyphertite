@@ -29,6 +29,7 @@
 #include <grp.h>
 #include <pwd.h>
 #include <ctype.h>
+#include <errno.h>
 
 #include <clog.h>
 #include <assl.h>
@@ -87,6 +88,23 @@ ct_add_operation_after(struct ct_op *after, ct_op_cb *start, ct_op_cb *complete,
 	TAILQ_INSERT_AFTER(&ct_state->ct_operations, after, op, op_link);
 
 	return (op);
+}
+
+/* Do a complete ct operation from start to finish */
+void
+ct_do_operation(ct_op_cb *start, ct_op_cb *complete, void *args,
+    int need_secrets, int only_metadata)
+{
+	int		 ret;
+
+	ct_prompt_for_login_password();
+
+	ct_init(1, need_secrets, only_metadata);
+	ct_add_operation(start, complete, args);
+	ct_wakeup_file();
+	if ((ret = ct_event_dispatch()) != 0)
+		CWARN("event_dispatch returned failure");
+	ct_cleanup();
 }
 
 void

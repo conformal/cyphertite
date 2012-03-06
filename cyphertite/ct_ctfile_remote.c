@@ -609,3 +609,33 @@ ct_check_secrets_upload(struct ct_op *op)
 	ct_add_operation_after(op, ctfile_archive, NULL, cca);
 
 }
+
+void
+ct_download_secrets_file(void)
+{
+	struct ct_ctfileop_args	 cca;
+
+	CWARNX("Downloading secrets file from server...");
+
+	cca.cca_localname = ct_crypto_secrets;
+	cca.cca_remotename = "crypto.secrets";
+	cca.cca_tdir = NULL;
+	cca.cca_encrypted = 0;
+
+	ct_do_operation(ctfile_extract, NULL, &cca, 0, 1);
+}
+
+void
+ct_upload_secrets_file(void)
+{
+	struct ct_ctfileop_args	 cca;
+
+	CWARNX("Uploading secrets file to server...");
+
+	cca.cca_localname = ct_crypto_secrets;
+	cca.cca_remotename = "crypto.secrets";
+	cca.cca_tdir = NULL;
+	cca.cca_encrypted = 0;
+
+	ct_do_operation(ctfile_list_start, ct_check_secrets_upload, &cca, 0, 1);
+}

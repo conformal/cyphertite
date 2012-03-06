@@ -43,7 +43,7 @@ void cull(struct ct_cli_cmd *, int , char **);
 void cpasswd(struct ct_cli_cmd *, int , char **);
 void secrets_download(struct ct_cli_cmd *, int, char **);
 void secrets_upload(struct ct_cli_cmd *, int, char **);
-
+void secrets_generate(struct ct_cli_cmd *, int, char **);
 void
 cpasswd(struct ct_cli_cmd *c, int argc, char **argv)
 {
@@ -172,6 +172,7 @@ struct ct_cli_cmd	cmd_secrets[] = {
 	{ "upload", NULL, 0, "", secrets_upload },
 	{ "download", NULL, 0, "", secrets_download },
 	{ "passwd", NULL, 0, "", cpasswd},
+	{ "generate", NULL, 0, "", secrets_generate },
 	{ NULL, NULL, 0, NULL, NULL, 0}
 };
 
@@ -278,41 +279,28 @@ cull(struct ct_cli_cmd *c, int argc, char **argv)
 void
 secrets_upload(struct ct_cli_cmd *c, int argc, char **argv)
 {
-	struct ct_ctfileop_args	 cca;
-	int		ret;
-
-	cca.cca_localname = ct_crypto_secrets;
-	cca.cca_remotename = "crypto.secrets";
-	cca.cca_tdir = NULL;
-	cca.cca_encrypted = 0;
-
-	ct_init(1, 0, 1);
-	ct_add_operation(ctfile_list_start, ct_check_secrets_upload, &cca);
-	ct_wakeup_file();
-	if ((ret = ct_event_dispatch()) != 0)
-		CWARN("event_dispatch returned, %d %s", errno,
-		    strerror(errno));
-	ct_cleanup();
-	e_check_memory();
+	ct_upload_secrets_file();
 }
 
 void
 secrets_download(struct ct_cli_cmd *c, int argc, char **argv)
 {
-	struct ct_ctfileop_args	 cca;
-	int			 ret;
+	ct_download_secrets_file();
+}
 
-	cca.cca_localname = ct_crypto_secrets;
-	cca.cca_remotename = "crypto.secrets";
-	cca.cca_tdir = NULL;
-	cca.cca_encrypted = 0;
+void
+secrets_generate(struct ct_cli_cmd *c, int argc, char **argv)
+{
+	struct stat	sb;
 
-	ct_init(1, 0, 1);
-	ct_add_operation(ctfile_extract, NULL, &cca);
-	ct_wakeup_file();
-	if ((ret = ct_event_dispatch()) != 0)
-		CWARN("event_dispatch returned, %d %s", errno,
-		    strerror(errno));
-	ct_cleanup();
-	e_check_memory();
+	if (stat(ct_crypto_secrets, &sb) != -1)
+		CFATALX("A crypto secrets file already exists!\n"
+		    "Please check if it is valid before deleting.");
+	CWARNX("Generating crypto secrets file");
+	if (ct_create_secrets(ct_crypto_passphrase, ct_crypto_secrets,
+	    NULL, NULL))
+		CFATALX("can't create secrets");
+
+	if (ct_secrets_upload != 0)
+		ct_upload_secrets_file();
 }

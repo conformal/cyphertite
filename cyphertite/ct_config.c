@@ -324,16 +324,12 @@ ct_create_config(void)
 		rv = ct_get_answer(prompt, "yes", "no", "no", answer,
 		    sizeof answer, 0);
 		if (rv == 1) {
-			extern void secrets_download(struct ct_cli_cmd *, int,
-			    char **); /* XXX */
 			if (user != NULL)
 				ct_username = e_strdup(user);
 			if (password != NULL)
 				ct_password = e_strdup(password);
 			ct_crypto_secrets = secrets_file;
-			ct_prompt_for_login_password();
-			/* Download file now */
-			secrets_download(NULL, 0, NULL);
+			ct_download_secrets_file();
 			have_file = 1;
 		}
 	}
@@ -363,30 +359,38 @@ ct_create_config(void)
 
 			crypto_passphrase = e_strdup(b64d);
 		}
-		else {
-get_pass:
-			if (ct_prompt_password("crypto passphrase: ", answer,
-			    sizeof answer, answer2, sizeof answer2))
-				CFATALX("password");
-
-			if (strlen(answer))
-				crypto_passphrase = e_strdup(answer);
-			if (have_file) {
-				/* Check passphrase works for the file */
-				if (ct_unlock_secrets(crypto_passphrase,
-				    secrets_file, ct_crypto_key,
-				    sizeof(ct_crypto_key),
-				    ct_iv, sizeof (ct_iv))) {
-					CWARNX("password incorrect, try again");
-					e_free(&crypto_passphrase);
-					goto get_pass;
-				}
-			}
-		}
-
-		bzero(answer, sizeof answer);
-		bzero(answer2, sizeof answer2);
 	}
+get_pass:
+	if (crypto_passphrase == NULL) {
+		if (ct_prompt_password("crypto passphrase: ", answer,
+		    sizeof answer, answer2, sizeof answer2))
+			CFATALX("password");
+
+		if (strlen(answer))
+			crypto_passphrase = e_strdup(answer);
+	}
+	if (have_file) {
+		/* Check passphrase works for the file */
+		if (ct_unlock_secrets(crypto_passphrase,
+		    secrets_file, ct_crypto_key,
+		    sizeof(ct_crypto_key),
+		    ct_iv, sizeof (ct_iv))) {
+			CWARNX("password incorrect, try again");
+			e_free(&crypto_passphrase);
+			goto get_pass;
+		}
+	} else {
+		/* XXX */
+		ct_crypto_secrets = secrets_file;
+		ct_crypto_passphrase = crypto_passphrase;
+		ct_secrets_upload = upload_secrets;
+		extern void secrets_generate(struct ct_cli_cmd *,
+		    int, char **);
+		secrets_generate(NULL, 0, NULL);
+	}
+
+	bzero(answer, sizeof answer);
+	bzero(answer2, sizeof answer2);
 
 	snprintf(prompt, sizeof prompt,
 	    "Choose a ctfile operation mode (remote/local) [remote]: ");
