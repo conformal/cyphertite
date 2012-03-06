@@ -155,13 +155,10 @@ ct_init(int foreground, int need_secrets, int only_metadata)
 			CFATALX("remote mode needs a cache directory set");
 	}
 
-	if (need_secrets != 0) {
-		if (ct_crypto_secrets) {
-			if (ct_secrets_upload == 0 &&
-			    ct_create_or_unlock_secrets(ct_crypto_secrets,
-				ct_crypto_passphrase))
-				CFATALX("can't unlock secrets");
-		}
+	if (need_secrets != 0 && ct_crypto_secrets != NULL) {
+		if (ct_create_or_unlock_secrets(ct_crypto_secrets,
+		    ct_crypto_passphrase))
+			CFATALX("can't unlock secrets");
 	}
 
 	ct_init_eventloop();
@@ -200,25 +197,6 @@ ct_init_eventloop(void)
 	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
 	ct_setup_wakeup_write(ct_state, ct_process_write);
 	ct_setup_wakeup_complete(ct_state, ct_process_completions);
-}
-
-void
-ct_update_secrets(void)
-{
-#if 0
-	if (ct_secrets_upload > 0) {
-		CNDBG(CT_LOG_CRYPTO, "doing list for crypto secrets");
-		ct_add_operation(ctfile_list_start,
-		    ct_check_crypto_secrets_nextop, ct_crypto_secrets,
-		    NULL, secrets_file_pattern, NULL, NULL,
-		    CT_MATCH_REGEX, 0);
-	} else {
-		ct_add_operation(ctfile_list_start,
-		    ctfile_trigger_delete, NULL, NULL,
-		    secrets_file_pattern, NULL, NULL,
-		    CT_MATCH_REGEX, 0);
-	}
-#endif
 }
 
 void
@@ -498,8 +476,10 @@ ct_main(int argc, char **argv)
 	    ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0));
 
 	ct_init(foreground, need_secrets, ct_metadata);
-	if (need_secrets != 0)
-		ct_update_secrets();
+	if (ct_crypto_passphrase != NULL && ct_secrets_upload != 0) {
+		ct_add_operation(ctfile_list_start, ct_check_secrets_exists,
+		    ct_crypto_secrets);
+	}
 
 	if (ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
 		switch (ct_action) {

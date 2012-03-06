@@ -490,3 +490,122 @@ ctfile_nextop_justdl(char *ctfile, void *args)
 	/* done, jump out of the loop */
 	ct_add_operation(ct_shutdown_op, NULL, NULL);
 }
+
+void	ct_compare_secrets(struct ct_op *);
+void
+ct_check_secrets_exists(struct ct_op *op)
+{
+	struct ctfile_list_tree	 results;
+	struct ctfile_list_file	*file = NULL;
+	struct ct_ctfileop_args	*cca;
+	char			*filelist[2];
+
+	RB_INIT(&results);
+	filelist[0] = "crypto.secrets";
+	filelist[1] = NULL;
+	ctfile_list_complete(CT_MATCH_GLOB, filelist, NULL, &results);
+
+	if (RB_MIN(ctfile_list_tree, &results) == NULL)
+		CFATALX("upload_crypto_secrets set but not secrets file on"
+		    "server, please use cyphertitectl secrets_upload");
+
+	while ((file = RB_ROOT(&results)) != NULL) {
+		RB_REMOVE(ctfile_list_tree, &results, file);
+		e_free(&file);
+	}
+
+	cca = e_calloc(1, sizeof(*cca));
+	/* XXX temporary name? */
+	cca->cca_localname = "cyphertite-server.secrets";
+	cca->cca_remotename = "crypto.secrets";
+	cca->cca_tdir = ctfile_cachedir;
+	cca->cca_encrypted = 0; /* ignored */
+	ct_add_operation_after(op, ctfile_extract, ct_compare_secrets, cca);
+	/* start download of secrets with finish file being the comparison */
+
+}
+
+void
+ct_compare_secrets(struct ct_op *op)
+{
+	struct ct_ctfileop_args		*cca = op->op_args;
+	FILE				*f, *tf;
+	char		 		 temp_path[PATH_MAX];
+	struct stat	 		 sb, tsb;
+	char				 buf[1024], tbuf[1024];
+	size_t				 sz, rsz;
+
+	/* cachedir is '/' terminated */
+	strlcpy(temp_path, ctfile_cachedir, sizeof(temp_path));
+	strlcat(temp_path, "cyphertite-server.secrets", sizeof(temp_path));
+	if (stat(ct_crypto_secrets, &sb) != 0)
+		CFATAL("can't stat secrets file at \"%s\"", ct_crypto_secrets);
+	if (stat(temp_path, &tsb) != 0) 
+		CFATAL("can't stat temporary secrets file");
+
+	/* Compare size first */
+	if (tsb.st_size != sb.st_size)
+		CFATALX("size doesn't match for server secrets file "
+		    "(%" PRId64 " vs %" PRId64 "), please confirm that local "
+		    "secrets file is the correct one", tsb.st_size, sb.st_size);
+
+	if ((f = fopen(ct_crypto_secrets, "r")) == NULL)
+		CFATAL("can't open secrets file");
+	if ((tf = fopen(temp_path, "r")) == NULL)
+		CFATAL("can't open temporary secrets file");
+	/* read then throw away */
+	unlink(temp_path);
+	while (sb.st_size > 0) {
+		sz = sb.st_size;
+		if (sz > 1024)
+			sz = 1024;
+		sb.st_size -= sz;
+		CNDBG(CT_LOG_FILE, "sz = %zu remaining = %" PRId64,
+		    sz, sb.st_size);
+		if ((rsz = fread(buf, 1, sz, f)) != sz)
+			CFATALX("short read on secrets file (%zu %zu)",
+			    sz, rsz);
+		if ((rsz = fread(tbuf, 1, sz, tf)) != sz)
+			CFATALX("short read on temporary secrets file "
+			    "(%zu %zu)", sz, rsz);
+
+		if (memcmp(buf, tbuf, sz) != 0)
+			CFATALX("secrets file on server differs from local"
+			    " please check which is correct and rectify");
+	}
+	fclose(f);
+	fclose(tf);
+	e_free(&cca);
+}
+
+void
+ct_check_secrets_upload(struct ct_op *op)
+{
+	struct ct_ctfileop_args	*cca = op->op_args;
+	struct ctfile_list_tree	 results;
+	struct ctfile_list_file	*file = NULL;
+	char			*filelist[2];
+	char			 answer[1024];
+
+	RB_INIT(&results);
+	filelist[0] = cca->cca_remotename;
+	filelist[1] = NULL;
+	ctfile_list_complete(CT_MATCH_GLOB, filelist, NULL, &results);
+
+	/* Check to see if we already have a secrets file on the server */
+	if (RB_MIN(ctfile_list_tree, &results) != NULL) {
+		if (ct_get_answer("There is already a crypto secrets file on "
+		    "the server, would you like to replace it? [no]: ",
+		    "yes", "no", "no", answer, sizeof answer, 0) != 1)
+			CFATALX("not uploading secrets file");
+		op = ct_add_operation_after(op, ctfile_delete, NULL,
+		    cca->cca_remotename);
+	}
+	while ((file = RB_ROOT(&results)) != NULL) {
+		RB_REMOVE(ctfile_list_tree, &results, file);
+		e_free(&file);
+	}
+
+	ct_add_operation_after(op, ctfile_archive, NULL, cca);
+
+}

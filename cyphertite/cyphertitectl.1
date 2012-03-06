@@ -57,7 +57,7 @@ as the config file.
 .El
 .Pp
 The commands are as follows:
-.Bl -tag -width "cpasswd"
+.Bl -tag -width "secrets download"
 .It Cm cpasswd
 prompts for a new crypto passphrase and writes the new one in the
 specified
@@ -76,6 +76,10 @@ that are
 referenced by later
 .Ar ctfiles
 are actually removed.
+.It Cm secrets upload
+upload the current encrypted crypto secrets file to the server.
+.It Cm secrets download
+download the crypto secrets file on the server to the local machine.
 .El
 .Sh SEE ALSO
 .Xr cyphertite 1 ,

@@ -295,10 +295,10 @@ void			ctfile_list_start(struct ct_op *);
 void			ctfile_list_print(struct ct_op *);
 void			ctfile_list_complete(int, char **, char **,
 			    struct ctfile_list_tree *);
+void			ct_check_secrets_exists(struct ct_op *);
+void			ct_check_secrets_upload(struct ct_op *);
 void			ctfile_delete(struct ct_op *);
-void			ctfile_trigger_delete(struct ct_op *);
 int			ctfile_verify_name(char *);
-void			ct_check_crypto_secrets_nextop(struct ct_op *);
 void			ct_free_remotename(struct ct_op *);
 
 /* CT context state */

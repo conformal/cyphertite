@@ -41,6 +41,8 @@
 
 void cull(struct ct_cli_cmd *, int , char **);
 void cpasswd(struct ct_cli_cmd *, int , char **);
+void secrets_download(struct ct_cli_cmd *, int, char **);
+void secrets_upload(struct ct_cli_cmd *, int, char **);
 
 void
 cpasswd(struct ct_cli_cmd *c, int argc, char **argv)
@@ -171,9 +173,15 @@ struct ct_cli_cmd	cmd_cpasswd[] = {
 	{ NULL, NULL, 0, NULL, NULL, 0}
 };
 
+struct ct_cli_cmd	cmd_secrets[] = {
+	{ "upload", NULL, 0, "", secrets_upload },
+	{ "download", NULL, 0, "", secrets_download },
+};
+
 struct ct_cli_cmd	cmd_list[] = {
 	{ "cpasswd", NULL, 1, "<change>", cpasswd },
 	{ "cull", NULL, 0, "", cull },
+	{ "secrets", cmd_secrets, CLI_CMD_SUBCOMMAND, "<action> ...", NULL },
 	{ NULL, NULL, 0, NULL, NULL }
 };
 
@@ -267,6 +275,48 @@ cull(struct ct_cli_cmd *c, int argc, char **argv)
 		CWARNX("event_dispatch returned, %d %s", errno,
 		    strerror(errno));
 
+	ct_cleanup();
+	e_check_memory();
+}
+
+void
+secrets_upload(struct ct_cli_cmd *c, int argc, char **argv)
+{
+	struct ct_ctfileop_args	 cca;
+	int		ret;
+
+	cca.cca_localname = ct_crypto_secrets;
+	cca.cca_remotename = "crypto.secrets";
+	cca.cca_tdir = NULL;
+	cca.cca_encrypted = 0;
+
+	ct_init(1, 0, 1);
+	ct_add_operation(ctfile_list_start, ct_check_secrets_upload, &cca);
+	ct_wakeup_file();
+	if ((ret = ct_event_dispatch()) != 0)
+		CWARN("event_dispatch returned, %d %s", errno,
+		    strerror(errno));
+	ct_cleanup();
+	e_check_memory();
+}
+
+void
+secrets_download(struct ct_cli_cmd *c, int argc, char **argv)
+{
+	struct ct_ctfileop_args	 cca;
+	int			 ret;
+
+	cca.cca_localname = ct_crypto_secrets;
+	cca.cca_remotename = "crypto.secrets";
+	cca.cca_tdir = NULL;
+	cca.cca_encrypted = 0;
+
+	ct_init(1, 0, 1);
+	ct_add_operation(ctfile_extract, NULL, &cca);
+	ct_wakeup_file();
+	if ((ret = ct_event_dispatch()) != 0)
+		CWARN("event_dispatch returned, %d %s", errno,
+		    strerror(errno));
 	ct_cleanup();
 	e_check_memory();
 }

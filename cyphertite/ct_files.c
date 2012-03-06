@@ -1213,8 +1213,12 @@ ct_file_extract_close(struct fnode *fnode)
 			CFATAL("utimes failed");
 	}
 	if (renameat(fnode->fl_parent_dir->d_fd, fnode->fl_fname,
-	    fnode->fl_parent_dir->d_fd, fnode->fl_name) != 0)
+	    fnode->fl_parent_dir->d_fd, fnode->fl_name) != 0) {
+		CWARNX("%d %s %d %s (%s)",  fnode->fl_parent_dir->d_fd,
+		    fnode->fl_fname, fnode->fl_parent_dir->d_fd,
+		    fnode->fl_name, fnode->fl_parent_dir->d_name);
 		CFATAL("rename to %s failed", fnode->fl_sname);
+	}
 
 	close(ct_extract_fd);
 	ct_extract_fd = -1;
