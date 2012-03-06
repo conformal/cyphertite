@@ -326,7 +326,6 @@ ct_create_config(void)
 	    sizeof answer, 0) == 1)
 		save_password = 1;
 
-	/* XXX check for local secrets file */
 	if (ct_have_remote_secrets_file()) {
 		strlcpy(prompt, "Your account already has a crypto secrets file"
 		    " associated with it. Download existing file to the "
