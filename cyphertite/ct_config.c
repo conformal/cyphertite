@@ -266,8 +266,7 @@ ct_create_config(void)
 		CFATAL("unable to open file %s", conf);
 
 	while (user == NULL) {
-		snprintf(prompt, sizeof prompt,
-		    "%s login username: ", __progname);
+		strlcpy(prompt, "login username: ", sizeof(prompt));
 		if (ct_get_answer(prompt,
 		    NULL, NULL, NULL, answer, sizeof answer, 0)) {
 			printf("must supply username\n");
@@ -289,9 +288,8 @@ ct_create_config(void)
 	e_asprintf(&ct_ca_cert, "%s/ct_certs/ct_ca.crt", dir);
 	e_asprintf(&ct_key, "%s/ct_certs/private/ct_%s.key", dir, user);
 
-	snprintf(prompt, sizeof prompt,
-	    "Save %s login password to configuration file? [yes]: ",
-	    __progname);
+	strlcpy(prompt, "Save login password to configuration file? [yes]: ",
+	    sizeof(prompt));
 	rv = ct_get_answer(prompt, "yes", "no", "yes", answer,
 	    sizeof answer, 0);
 
@@ -306,15 +304,15 @@ ct_create_config(void)
 		bzero(answer2, sizeof answer2);
 	}
 
-	snprintf(prompt, sizeof prompt,
-	    "Upload %s crypto secrets file to server? [yes]: ",
-	    __progname);
+	strlcpy(prompt, "Upload crypto secrets file to server? [yes]: ",
+	    sizeof(prompt));
 	rv = ct_get_answer(prompt, "yes", "no", "yes", answer,
 	    sizeof answer, 0);
 	if (rv == 1) {
 		upload_secrets = 1;
-		snprintf(prompt, sizeof prompt,
-		    "Download existing crypto secrets file from server? [no]: ");
+		strlcpy(prompt,
+		    "Download existing crypto secrets file from server? [no]: ",
+		    sizeof(prompt));
 		rv = ct_get_answer(prompt, "yes", "no", "no", answer,
 		    sizeof answer, 0);
 		if (rv == 1) {
@@ -329,17 +327,17 @@ ct_create_config(void)
 	}
 
 
-	snprintf(prompt, sizeof prompt,
-	    "Save %s crypto passphrase to configuration file? [yes]: ",
-	    __progname);
+	strlcpy(prompt, "Save crypto passphrase to configuration file? [yes]: ",
+	    sizeof(prompt));
 	rv = ct_get_answer(prompt, "yes", "no", "yes", answer,
 	    sizeof answer, 0);
 
 	if (rv == 1) {
 		if (have_file)
 			goto get_pass;
-		snprintf(prompt, sizeof prompt,
-		    "Automatically generate crypto passphrase? [yes]: ");
+		strlcpy(prompt,
+		    "Automatically generate crypto passphrase? [yes]: ",
+		    sizeof(prompt));
 		rv = ct_get_answer(prompt, "yes", "no", "yes", answer,
 		    sizeof answer, 0);
 
@@ -386,8 +384,9 @@ get_pass:
 	bzero(answer, sizeof answer);
 	bzero(answer2, sizeof answer2);
 
-	snprintf(prompt, sizeof prompt,
-	    "Choose a ctfile operation mode (remote/local) [remote]: ");
+	strlcpy(prompt,
+	    "Choose a ctfile operation mode (remote/local) [remote]: ",
+	    sizeof(prompt));
 	rv = ct_get_answer(prompt, "remote", "local", "remote", answer,
 	    sizeof answer, 0);
 	mode = e_strdup(answer);
@@ -401,8 +400,8 @@ get_pass:
 			e_free(&cachedir);
 		cachedir = e_strdup(answer);
 
-		snprintf(prompt, sizeof prompt,
-		    "Use automatic remote differentials? [no]: ");
+		strlcpy(prompt, "Use automatic remote differentials? [no]: ",
+		    sizeof(prompt));
 		rv = ct_get_answer(prompt, "yes", "no", "no", answer,
 		    sizeof answer, 0);
 		if (rv == 1)
