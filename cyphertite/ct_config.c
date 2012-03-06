@@ -295,6 +295,20 @@ ct_create_config(void)
 	e_asprintf(&ct_ca_cert, "%s/ct_certs/ct_ca.crt", dir);
 	e_asprintf(&ct_key, "%s/ct_certs/private/ct_%s.key", dir, ct_username);
 
+	if (stat(ct_cert , &sb) != 0)
+		CFATALX("certificate file %s not found, please ensure you "
+		    "have extracted the certificate bundle to your "
+		    "configuration directory", ct_cert);
+
+	if (stat(ct_ca_cert , &sb) != 0)
+		CFATALX("ca certificate file %s not found, please ensure you "
+		    "have extracted the certificate bundle to your "
+		    "configuration directory", ct_ca_cert);
+	if (stat(ct_key, &sb) != 0)
+		CFATALX("certificate key file %s not found, please ensure you "
+		    "have extracted the certificate bundle to your "
+		    "configuration directory", ct_key);
+
 	while (ct_password == NULL) {
 		if (ct_prompt_password("login password: ", answer,
 		    sizeof answer, answer2, sizeof answer2))
