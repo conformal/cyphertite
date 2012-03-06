@@ -42,6 +42,7 @@ void	ctfile_extract_nextop(struct ct_op *);
 void	ctfile_download_next(struct ct_op *);
 void	ctfile_nextop_extract_cleanup(struct ct_op *);
 void	ctfile_nextop_archive_cleanup(struct ct_op *);
+int	ct_file_on_server(char *filename);
 
 void
 ctfile_mode_setup(const char *mode)
@@ -493,26 +494,13 @@ ctfile_nextop_justdl(char *ctfile, void *args)
 
 void	ct_compare_secrets(struct ct_op *);
 void
-ct_check_secrets_exists(struct ct_op *op)
+ct_check_secrets_extract(struct ct_op *op)
 {
-	struct ctfile_list_tree	 results;
-	struct ctfile_list_file	*file = NULL;
 	struct ct_ctfileop_args	*cca;
-	char			*filelist[2];
 
-	RB_INIT(&results);
-	filelist[0] = "crypto.secrets";
-	filelist[1] = NULL;
-	ctfile_list_complete(CT_MATCH_GLOB, filelist, NULL, &results);
-
-	if (RB_MIN(ctfile_list_tree, &results) == NULL)
+	if (!ct_file_on_server("crypto.secrets"))
 		CFATALX("upload_crypto_secrets set but not secrets file on"
 		    "server, please use cyphertitectl secrets_upload");
-
-	while ((file = RB_ROOT(&results)) != NULL) {
-		RB_REMOVE(ctfile_list_tree, &results, file);
-		e_free(&file);
-	}
 
 	cca = e_calloc(1, sizeof(*cca));
 	/* XXX temporary name? */
@@ -582,18 +570,11 @@ void
 ct_check_secrets_upload(struct ct_op *op)
 {
 	struct ct_ctfileop_args	*cca = op->op_args;
-	struct ctfile_list_tree	 results;
-	struct ctfile_list_file	*file = NULL;
-	char			*filelist[2];
 	char			 answer[1024];
 
-	RB_INIT(&results);
-	filelist[0] = cca->cca_remotename;
-	filelist[1] = NULL;
-	ctfile_list_complete(CT_MATCH_GLOB, filelist, NULL, &results);
 
 	/* Check to see if we already have a secrets file on the server */
-	if (RB_MIN(ctfile_list_tree, &results) != NULL) {
+	if (ct_file_on_server(cca->cca_remotename)) {
 		if (ct_get_answer("There is already a crypto secrets file on "
 		    "the server, would you like to replace it? [no]: ",
 		    "yes", "no", "no", answer, sizeof answer, 0) != 1)
@@ -601,15 +582,57 @@ ct_check_secrets_upload(struct ct_op *op)
 		op = ct_add_operation_after(op, ctfile_delete, NULL,
 		    cca->cca_remotename);
 	}
-	while ((file = RB_ROOT(&results)) != NULL) {
-		RB_REMOVE(ctfile_list_tree, &results, file);
-		e_free(&file);
-	}
 
 	ct_add_operation_after(op, ctfile_archive, NULL, cca);
 
 }
 
+/*
+ * return boolean whether or not the last ctfile_list contained
+ * filename.
+ */
+int
+ct_file_on_server(char *filename)
+{
+	struct ctfile_list_tree	 results;
+	struct ctfile_list_file	*file = NULL;
+	char			*filelist[2];
+	int			 exists = 0;
+
+	RB_INIT(&results);
+	filelist[0] = filename;
+	filelist[1] = NULL;
+	ctfile_list_complete(CT_MATCH_GLOB, filelist, NULL, &results);
+
+	/* Check to see if we already have a secrets file on the server */
+	if (RB_MIN(ctfile_list_tree, &results) != NULL) {
+		exists = 1;
+	}
+	while ((file = RB_ROOT(&results)) != NULL) {
+		RB_REMOVE(ctfile_list_tree, &results, file);
+		e_free(&file);
+	}
+
+	return (exists);
+}
+
+void
+ct_secrets_exists(struct ct_op *op)
+{
+	int *exists = op->op_args;
+
+	*exists = ct_file_on_server("crypto.secrets");
+}
+
+int
+ct_have_remote_secrets_file(void)
+{
+	int have;
+
+	ct_do_operation(ctfile_list_start, ct_secrets_exists, &have, 0, 1);
+
+	return (have);
+}
 void
 ct_download_secrets_file(void)
 {

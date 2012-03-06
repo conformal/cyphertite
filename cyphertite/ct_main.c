@@ -481,7 +481,7 @@ ct_main(int argc, char **argv)
 
 	ct_init(foreground, need_secrets, ct_metadata);
 	if (ct_crypto_passphrase != NULL && ct_secrets_upload != 0) {
-		ct_add_operation(ctfile_list_start, ct_check_secrets_exists,
+		ct_add_operation(ctfile_list_start, ct_check_secrets_extract,
 		    ct_crypto_secrets);
 	}
 

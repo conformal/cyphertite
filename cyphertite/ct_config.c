@@ -233,8 +233,9 @@ ct_create_config(void)
 	char			*conf = NULL, *dir = NULL;
 	char			*mode = NULL;
 	int			rv, fd;
-	int			have_file = 0;
+	int			have_file = 0, save_password = 0;
 	FILE			*f = NULL;
+	struct stat		sb;
 
 	/*
 	 * config should not have been loaded by this point, but enforce
@@ -285,6 +286,7 @@ ct_create_config(void)
 		ct_normalize_username(ct_username);
 	}
 
+
 	conf_buf = e_strdup(conf);
 	dir = dirname(conf_buf);
 	e_asprintf(&ctfile_cachedir, "%s/ct_cachedir", dir);
@@ -293,12 +295,7 @@ ct_create_config(void)
 	e_asprintf(&ct_ca_cert, "%s/ct_certs/ct_ca.crt", dir);
 	e_asprintf(&ct_key, "%s/ct_certs/private/ct_%s.key", dir, ct_username);
 
-	strlcpy(prompt, "Save login password to configuration file? [yes]: ",
-	    sizeof(prompt));
-	rv = ct_get_answer(prompt, "yes", "no", "yes", answer,
-	    sizeof answer, 0);
-
-	if (rv == 1) {
+	while (ct_password == NULL) {
 		if (ct_prompt_password("login password: ", answer,
 		    sizeof answer, answer2, sizeof answer2))
 			CFATALX("password");
@@ -309,25 +306,46 @@ ct_create_config(void)
 		bzero(answer2, sizeof answer2);
 	}
 
-	ct_secrets_upload = 0;
-	strlcpy(prompt, "Upload crypto secrets file to server? [yes]: ",
+	strlcpy(prompt, "Save login password to configuration file? [yes]: ",
 	    sizeof(prompt));
-	rv = ct_get_answer(prompt, "yes", "no", "yes", answer,
-	    sizeof answer, 0);
-	if (rv == 1) {
-		ct_secrets_upload = 1;
-		strlcpy(prompt,
-		    "Download existing crypto secrets file from server? [no]: ",
-		    sizeof(prompt));
-		rv = ct_get_answer(prompt, "yes", "no", "no", answer,
+	if (ct_get_answer(prompt, "yes", "no", "yes", answer,
+	    sizeof answer, 0) == 1)
+		save_password = 1;
+
+	/* XXX check for local secrets file */
+	if (ct_have_remote_secrets_file()) {
+		strlcpy(prompt, "Your account already has a crypto secrets file"
+		    " associated with it. Download existing file to the "
+		    "local machine? [yes]: ", sizeof(prompt));
+		rv = ct_get_answer(prompt, "yes", "no", "yes", answer,
 		    sizeof answer, 0);
 		if (rv == 1) {
+			ct_secrets_upload = 1;
 			ct_download_secrets_file();
 			have_file = 1;
+			goto crypto_passphrase;
 		}
+		/* XXX delete remote secrets if not? */
 	}
+	if (stat(ct_crypto_secrets, &sb) == 0) {
+		strlcpy(prompt, "Found an existing crypto secrets file. Use "
+		    "this one? [yes]: ", sizeof(prompt));
+		if (ct_get_answer(prompt, "yes", "no", "yes", answer,
+		    sizeof answer, 0) == 1) {
+			have_file = 1;
+		} else {
+			CWARNX("deleting existing secrets file");
+			unlink(ct_crypto_secrets);
+		}
+			
+	}
+	strlcpy(prompt, "Upload crypto secrets file to server? [yes]: ",
+	    sizeof(prompt));
+	if ((ct_get_answer(prompt, "yes", "no", "yes", answer,
+	    sizeof answer, 0)) == 1)
+		ct_secrets_upload = 1;
 
-
+crypto_passphrase:
 	strlcpy(prompt, "Save crypto passphrase to configuration file? [yes]: ",
 	    sizeof(prompt));
 	rv = ct_get_answer(prompt, "yes", "no", "yes", answer,
@@ -364,6 +382,7 @@ get_pass:
 	}
 	if (have_file) {
 		/* Check passphrase works for the file */
+		CWARNX("checking local secrets file is valid");
 		if (ct_unlock_secrets(ct_crypto_passphrase,
 		    ct_crypto_secrets, ct_crypto_key,
 		    sizeof(ct_crypto_key),

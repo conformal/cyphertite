@@ -295,7 +295,7 @@ void			ctfile_list_start(struct ct_op *);
 void			ctfile_list_print(struct ct_op *);
 void			ctfile_list_complete(int, char **, char **,
 			    struct ctfile_list_tree *);
-void			ct_check_secrets_exists(struct ct_op *);
+void			ct_check_secrets_extract(struct ct_op *);
 void			ct_check_secrets_upload(struct ct_op *);
 void			ctfile_delete(struct ct_op *);
 int			ctfile_verify_name(char *);
@@ -635,6 +635,7 @@ void			 ctfile_find_for_operation(char *,
 		
 void		 ct_upload_secrets_file(void);
 void		 ct_download_secrets_file(void);
+int		 ct_have_remote_secrets_file(void);
 
 ctfile_find_callback	 ctfile_nextop_extract;
 ctfile_find_callback	 ctfile_nextop_list;
