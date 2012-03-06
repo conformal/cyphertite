@@ -253,20 +253,15 @@ ct_create_config(void)
 	if (conf_buf != NULL)
 		e_free(&conf_buf);
 	conf = e_strdup(answer);
-	if (conf == NULL)
-		CFATALX("conf");
 
 	/*
 	 * Make path and create conf file early so permission failures are
 	 * are caught before the user fills out all of the information.
 	 */
-	conf_buf = strdup(conf);
-	if (conf_buf == NULL)
-		CFATALX("strdup conf");
+	conf_buf = e_strdup(conf);
 	if (ct_make_full_path(conf_buf, 0700))
 		CFATAL("unable to create directory %s", conf_buf);
-	if (conf_buf != NULL)
-		free(conf_buf);
+	e_free(&conf_buf);
 
 	if ((fd = open(conf, O_RDWR | O_CREAT, 0400)) == -1)
 		CFATAL("unable to open file for writing %s", conf);
@@ -285,9 +280,7 @@ ct_create_config(void)
 			printf("invalid username length\n");
 			continue;
 		}
-		user = strdup(answer);
-		if (user == NULL)
-			CFATALX("strdup");
+		user = e_strdup(answer);
 		ct_normalize_username(user);
 	}
 
@@ -302,11 +295,8 @@ ct_create_config(void)
 		    sizeof answer, answer2, sizeof answer2))
 			CFATALX("password");
 
-		if (strlen(answer)) {
-			password = strdup(answer);
-			if (password == NULL)
-				CFATALX("strdup");
-		}
+		if (strlen(answer))
+			password = e_strdup(answer);
 		bzero(answer, sizeof answer);
 		bzero(answer2, sizeof answer2);
 	}
@@ -331,40 +321,30 @@ ct_create_config(void)
 				CFATALX("can't base64 encode "
 				    "crypto passphrase");
 
-			crypto_passphrase = strdup(b64d);
-			if (crypto_passphrase == NULL)
-				CFATALX("strdup");
+			crypto_passphrase = e_strdup(b64d);
 		}
 		else {
 			if (ct_prompt_password("crypto passphrase: ", answer,
 			    sizeof answer, answer2, sizeof answer2))
 				CFATALX("password");
 
-			if (strlen(answer)) {
-				crypto_passphrase = strdup(answer);
-				if (crypto_passphrase == NULL)
-					CFATALX("strdup");
-			}
+			if (strlen(answer))
+				crypto_passphrase = e_strdup(answer);
 		}
 
 		bzero(answer, sizeof answer);
 		bzero(answer2, sizeof answer2);
 	}
 
-	conf_buf = strdup(conf);
-	if (conf_buf == NULL)
-		CFATALX("strdup");
+	conf_buf = e_strdup(conf);
 	dir = dirname(conf_buf);
-	if (asprintf(&cachedir, "%s/ct_cachedir", dir) == -1)
-		CFATALX("default cachedir");
+	e_asprintf(&cachedir, "%s/ct_cachedir", dir);
 
 	snprintf(prompt, sizeof prompt,
 	    "Choose a ctfile operation mode (remote/local) [remote]: ");
 	rv = ct_get_answer(prompt, "remote", "local", "remote", answer,
 	    sizeof answer, 0);
-	mode = strdup(answer);
-	if (mode == NULL)
-		CFATALX("mode");
+	mode = e_strdup(answer);
 
 	if (rv == 1) {
 		snprintf(prompt, sizeof prompt,
@@ -372,10 +352,8 @@ ct_create_config(void)
 		ct_get_answer(prompt, NULL, NULL, cachedir, answer,
 		    sizeof answer, 0);
 		if (cachedir != NULL)
-			free(cachedir);
-		cachedir = strdup(answer);
-		if (cachedir == NULL)
-			CFATALX("cachedir");
+			e_free(&cachedir);
+		cachedir = e_strdup(answer);
 
 		snprintf(prompt, sizeof prompt,
 		    "Use automatic remote differentials? [no]: ");
@@ -418,21 +396,21 @@ ct_create_config(void)
 	printf("Configuration file created.\n");
 
 	if (conf_buf)
-		free(conf_buf);
+		e_free(&conf_buf);
 	if (user)
-		free(user);
+		e_free(&user);
 	if (password) {
 		bzero(password, strlen(password));
-		free(password);
+		e_free(&password);
 	}
 	if (crypto_passphrase) {
 		bzero(crypto_passphrase, strlen(crypto_passphrase));
-		free(crypto_passphrase);
+		e_free(&crypto_passphrase);
 	}
 	if (mode)
-		free(mode);
+		e_free(&mode);
 	if (cachedir)
-		free(cachedir);
+		e_free(&cachedir);
 	if (f)
 		fclose(f);
 }
