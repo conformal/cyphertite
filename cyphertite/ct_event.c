@@ -122,7 +122,7 @@ ct_setup_wakeup_compress(void *vctx, ct_func_cb *func_cb)
 #ifdef CT_ENABLE_THREADS
 	ct_setup_wakeup_cv(&ct_ctx_compress, vctx, func_cb);
 #else
-	ct_setup_wakeup_pipe(&ct_ctx_sha, vctx, func_cb);
+	ct_setup_wakeup_pipe(&ct_ctx_compress, vctx, func_cb);
 #endif
 }
 
@@ -132,7 +132,7 @@ ct_setup_wakeup_csha(void *vctx, ct_func_cb *func_cb)
 #ifdef CT_ENABLE_THREADS
 	ct_setup_wakeup_cv(&ct_ctx_csha, vctx, func_cb);
 #else
-	ct_setup_wakeup_pipe(&ct_ctx_sha, vctx, func_cb);
+	ct_setup_wakeup_pipe(&ct_ctx_csha, vctx, func_cb);
 #endif
 }
 
@@ -142,7 +142,7 @@ ct_setup_wakeup_encrypt(void *vctx, ct_func_cb *func_cb)
 #ifdef CT_ENABLE_THREADS
 	ct_setup_wakeup_cv(&ct_ctx_encrypt, vctx, func_cb);
 #else
-	ct_setup_wakeup_pipe(&ct_ctx_sha, vctx, func_cb);
+	ct_setup_wakeup_pipe(&ct_ctx_encrypt, vctx, func_cb);
 #endif
 }
 
