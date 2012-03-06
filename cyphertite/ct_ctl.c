@@ -168,18 +168,14 @@ cpasswd(struct ct_cli_cmd *c, int argc, char **argv)
 	free(crypto_passphrase);
 }
 
-struct ct_cli_cmd	cmd_cpasswd[] = {
-	{ "change", NULL, 0, "", cpasswd, 0 },
-	{ NULL, NULL, 0, NULL, NULL, 0}
-};
-
 struct ct_cli_cmd	cmd_secrets[] = {
 	{ "upload", NULL, 0, "", secrets_upload },
 	{ "download", NULL, 0, "", secrets_download },
+	{ "passwd", NULL, 0, "", cpasswd},
+	{ NULL, NULL, 0, NULL, NULL, 0}
 };
 
 struct ct_cli_cmd	cmd_list[] = {
-	{ "cpasswd", NULL, 1, "<change>", cpasswd },
 	{ "cull", NULL, 0, "", cull },
 	{ "secrets", cmd_secrets, CLI_CMD_SUBCOMMAND, "<action> ...", NULL },
 	{ NULL, NULL, 0, NULL, NULL }

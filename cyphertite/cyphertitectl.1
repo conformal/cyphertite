@@ -58,10 +58,6 @@ as the config file.
 .Pp
 The commands are as follows:
 .Bl -tag -width "secrets download"
-.It Cm cpasswd
-prompts for a new crypto passphrase and writes the new one in the
-specified
-.Ar conffile .
 .It Cm cull
 removes
 .Ar ctfiles
@@ -80,6 +76,10 @@ are actually removed.
 upload the current encrypted crypto secrets file to the server.
 .It Cm secrets download
 download the crypto secrets file on the server to the local machine.
+.It cm secrets passwd
+prompts for a new crypto passphrase and writes the new one in the
+specified
+.Ar conffile .
 .El
 .Sh SEE ALSO
 .Xr cyphertite 1 ,
