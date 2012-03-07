@@ -47,6 +47,7 @@ bool_t          ct_xdr_stdin(XDR *, struct ctfile_stdin *);
 bool_t          ct_xdr_gheader(XDR *, struct ctfile_gheader *, int);
 
 static FILE	*ctfile_open(const char *, struct ctfile_gheader *, XDR *);
+static FILE	*ctfile_open_f(FILE *, struct ctfile_gheader *, XDR *);
 static void	 ctfile_close(FILE *, XDR *);
 static void	 ctfile_cleanup_gheader(struct ctfile_gheader *);
 
@@ -180,8 +181,11 @@ ct_xdr_gheader(XDR *xdrs, struct ctfile_gheader *objp,
 		if (!xdr_int(xdrs, &objp->cmg_num_paths))
 			return (FALSE);
 		if (direction == XDR_DECODE) {
-			objp->cmg_paths = e_calloc(objp->cmg_num_paths,
-			    sizeof(*objp->cmg_paths));
+			if (objp->cmg_num_paths != 0)
+				objp->cmg_paths = e_calloc(objp->cmg_num_paths,
+				    sizeof(*objp->cmg_paths));
+			else
+				objp->cmg_paths = NULL;
 		}
 		for (i = 0; i < objp->cmg_num_paths; i++) {
 			if (!xdr_string(xdrs, &objp->cmg_paths[i], PATH_MAX))
@@ -201,23 +205,38 @@ ctfile_close(FILE *file, XDR *xdr)
 	fclose(file);
 }
 
+/*
+ * Open filename as a ctfile, returning the xdr pointer and the global header.
+ */
 FILE *
 ctfile_open(const char *filename, struct ctfile_gheader *gh, XDR *xdr)
 {
 	FILE			*f;
-	time_t			ltime;
-
-	/* open file */
 	f = fopen(filename, "rb");
 	if (f == NULL)
 		return (NULL);
+
+	return (ctfile_open_f(f, gh, xdr));
+}
+
+/*
+ * Open stream f as a ctfile, returning the xdr pointer and the global header.
+ *
+ * Upon failure the file will be *closed*.
+ */
+FILE *
+ctfile_open_f(FILE *f, struct ctfile_gheader *gh, XDR *xdr)
+{
+	time_t			ltime;
 
 	xdrstdio_create(xdr, f, XDR_DECODE);
 
 	bzero(gh, sizeof *gh);
 
-	if (ct_xdr_gheader(xdr, gh, XDR_DECODE) == FALSE)
-		CFATALX("e_xdr_gheader failed");
+	if (ct_xdr_gheader(xdr, gh, XDR_DECODE) == FALSE) {
+		CWARNX("e_xdr_gheader failed");
+		goto destroy;
+	}
 
 	/* don't bother with empty strings for prevlevel */
 	if (gh->cmg_prevlvl_filename &&
@@ -233,16 +252,26 @@ ctfile_open(const char *filename, struct ctfile_gheader *gh, XDR *xdr)
 		    gh->cmg_version, gh->cmg_cur_lvl, gh->cmg_chunk_size,
 		    ctime(&ltime));
 
-	if (gh->cmg_beacon != CT_MD_BEACON)
-		CFATALX("Not a cyphertite file");
+	if (gh->cmg_beacon != CT_MD_BEACON) {
+		CWARNX("Not a cyphertite file");
+		goto cleanup;
+	}
 	if (gh->cmg_version > CT_MD_VERSION) {
-		CFATALX("Invalid version %d, expected %d", gh->cmg_version,
+		CWARNX("Invalid version %d, expected %d", gh->cmg_version,
 		    CT_MD_VERSION);
+		goto cleanup;
 	}
 
 	ct_max_block_size = gh->cmg_chunk_size;
 
 	return (f);
+
+cleanup:
+	ctfile_cleanup_gheader(gh);
+destroy:
+	xdr_destroy(xdr);
+	fclose(f);
+	return (NULL);
 }
 
 /*
@@ -357,6 +386,21 @@ ctfile_get_previous(const char *path)
 	}
 
 	return ret;
+}
+
+int
+ctfile_parse_init_f(struct ctfile_parse_state *ctx, FILE *f)
+{
+	if ((ctx->xs_f = ctfile_open_f(f,  &ctx->xs_gh, &ctx->xs_xdr)) == NULL)
+		return 2;
+
+	ctx->xs_filename  = NULL;
+	ctx->xs_dnum = 0;
+	RB_INIT(&ctx->xs_dnum_head);
+
+	ctx->xs_sha_sz = 0;
+	ctx->xs_state = XS_STATE_FILE;
+	return 0;
 }
 
 int

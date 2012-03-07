@@ -699,6 +699,7 @@ struct ctfile_parse_state {
 };
 
 int ctfile_parse_init_at(struct ctfile_parse_state *, const char *, off_t);
+int ctfile_parse_init_f(struct ctfile_parse_state *, FILE *);
 #define ctfile_parse_init(ctx, file) ctfile_parse_init_at(ctx, file, 0)
 int ctfile_parse(struct ctfile_parse_state *);
 int ctfile_parse_seek(struct ctfile_parse_state *);

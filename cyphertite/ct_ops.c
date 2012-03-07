@@ -358,7 +358,9 @@ ct_extract_setup_queue(struct ct_extract_head *extract_head,
 		TAILQ_INSERT_TAIL(extract_head, nfile, next);
 	}
 }
-void ct_extract_open_next(struct ct_extract_head *extract_head, struct ctfile_parse_state *ctx)
+
+void
+ct_extract_open_next(struct ct_extract_head *extract_head, struct ctfile_parse_state *ctx)
 {
 	struct ct_extract_stack *next;
 

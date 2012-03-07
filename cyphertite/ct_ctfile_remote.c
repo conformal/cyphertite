@@ -572,7 +572,6 @@ ct_check_secrets_upload(struct ct_op *op)
 	struct ct_ctfileop_args	*cca = op->op_args;
 	char			 answer[1024];
 
-
 	/* Check to see if we already have a secrets file on the server */
 	if (ct_file_on_server(cca->cca_remotename)) {
 		if (ct_get_answer("There is already a crypto secrets file on "
