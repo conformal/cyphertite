@@ -39,7 +39,7 @@ ct_populate_fnode(struct ctfile_parse_state *ctx, struct fnode *fnode,
 {
 	struct dnode		*dnode, *tdnode;
 	char			*name;
-	extern struct dnode	 ct_ex_rootdir;
+	extern struct dnode	 ct_rootdir;
 
 	if (C_ISLINK(ctx->xs_hdr.cmh_type)) {
 		/* hardlink/symlink */
@@ -65,7 +65,7 @@ ct_populate_fnode(struct ctfile_parse_state *ctx, struct fnode *fnode,
 	fnode->fl_type = ctx->xs_hdr.cmh_type;
 
 	/* Default to parent being the ``root''. */
-	fnode->fl_parent_dir = &ct_ex_rootdir;
+	fnode->fl_parent_dir = &ct_rootdir;
 	name = ctx->xs_hdr.cmh_filename;
 	/* fnode->fl_parent_dir default to NULL */
 	if (ctx->xs_hdr.cmh_parent_dir == -2) {

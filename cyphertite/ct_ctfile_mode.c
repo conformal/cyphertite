@@ -480,11 +480,12 @@ again:
 		return;
 	} else if (ces->ces_is_open == 0) {
 		ces->ces_is_open = 1;
-		extern struct dnode ct_ex_rootdir;
+		extern struct dnode ct_rootdir;
 		ces->ces_fnode = e_calloc(1, sizeof(*ces->ces_fnode));
 		ces->ces_fnode->fl_type = C_TY_REG;
-		ces->ces_fnode->fl_parent_dir = &ct_ex_rootdir;
+		ces->ces_fnode->fl_parent_dir = &ct_rootdir;
 		ces->ces_fnode->fl_name = e_strdup(ctfile);
+		ces->ces_fnode->fl_sname = e_strdup(ctfile);
 		ces->ces_fnode->fl_mode = S_IRUSR | S_IWUSR;
 		ces->ces_fnode->fl_uid = getuid();
 		ces->ces_fnode->fl_gid = getgid();
