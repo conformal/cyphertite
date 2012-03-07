@@ -115,24 +115,28 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 		if (ioctx->io_max_transfer != 0 &&
 		    wlen > ioctx->io_max_transfer)
 			wlen = ioctx->io_max_transfer;
-
-		len = assl_write(c, body + ioctx->io_o_off, wlen);
-		s_errno = errno;
+		if (wlen == 0) {
+			len = 0;
+			s_errno = 0;
+		} else {
+			len = assl_write(c, body + ioctx->io_o_off, wlen);
+			s_errno = errno;
+		}
 		CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" wlen1 %d len %ld",
 		    (int64_t)c_pid, wlen, (long) len);
 
 		if (len == 0 && wlen != 0) {
 			/* lost socket */
+			ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
+			    NULL, NULL, 0);
 			goto done;
 		} else if (len == -1) {
 			errno = s_errno;
 			if (errno == EFAULT) {
-				CWARN("opcode %d sz %d resid %d p %p wrote -1 ",
-				   hdr->c_opcode, hdr->c_size, wlen,
-				   body + ioctx->io_o_off);
-				abort();
-			}
-			if (errno != EINTR && errno != EAGAIN &&
+				CABORTX("opcode %d sz %d resid %d p %p "
+				    "wrote -1 ", hdr->c_opcode, hdr->c_size,
+				    wlen, body + ioctx->io_o_off);
+			} else if (errno != EINTR && errno != EAGAIN &&
 			    errno != ECONNRESET && errno != EPIPE)
 				CWARN("wrote -1 ");
 			return;
@@ -199,7 +203,7 @@ ct_event_assl_read(evutil_socket_t fd, short events, void *arg)
 	struct ct_header	*hdr;
 	uint8_t			*body;
 	ssize_t			len;
-	int			rlen;
+	int			rlen, s_errno;
 
 	c = ioctx->c;
 	hdr = ioctx->io_i_hdr;
@@ -228,8 +232,7 @@ ct_event_assl_read(evutil_socket_t fd, short events, void *arg)
 		} else if (len == -1) {
 			if (errno != EINTR && errno != EAGAIN &&
 			    errno != ECONNRESET && errno != EPIPE)
-				CWARN("read -1 %d, errno %s", errno,
-				    strerror(errno));
+				CWARN("read -1 ");
 			return; /* no data? */
 		}
 		ioctx->io_read_count++;
@@ -255,20 +258,27 @@ ct_event_assl_read(evutil_socket_t fd, short events, void *arg)
 		/* fall thru */
 	case 2: /* reading body */
 		rlen = hdr->c_size - ioctx->io_i_off;
-		len = assl_read(c,  body + ioctx->io_i_off, rlen);
+		if (rlen == 0) {
+			len = 0;
+			s_errno = 0;
+		} else {
+			len = assl_read(c,  body + ioctx->io_i_off, rlen);
+			s_errno = errno;
+		}
+
 		CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" op %d, body sz %d "
 		    "read %ld, rlen %d off %d", (int64_t)c_pid, hdr->c_opcode,
 		    hdr->c_size, (long) len, rlen, ioctx->io_i_off);
 
 		if (len == 0 && rlen != 0) {
-			ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
 			/* lost socket */
+			ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
 			return;
 		} else if (len == -1) {
+			errno = s_errno;
 			if (errno != EINTR && errno != EAGAIN &&
 			    errno != ECONNRESET && errno != EPIPE)
-				CWARN("read -1 %d, errno %s", errno,
-				    strerror(errno));
+				CWARN("read -1 ");
 			return; /* no data? */
 		}
 
@@ -374,23 +384,28 @@ write_next_iov:
 		CNDBG(CTUTIL_LOG_SOCKET, "writing body state %d sz %d count %d",
 		    ioctx->io_o_state, body_len, iob->iovcnt);
 		wlen = body_len - ioctx->io_o_off;
-		len = write(fd, body + ioctx->io_o_off, wlen);
-		s_errno = errno;
+		if (wlen == 0) {
+			len = 0;
+			s_errno = 0;
+		} else {
+			len = write(fd, body + ioctx->io_o_off, wlen);
+			s_errno = errno;
+		}
 		CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" wlen1 %d len %ld",
 		    (int64_t)c_pid, wlen, (long) len);
 
 		if (len == 0 && wlen != 0) {
 			/* lost socket */
+			ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
+			    NULL, NULL, 0);
 			goto done;
 		} else if (len == -1) {
 			errno = s_errno;
 			if (errno == EFAULT) {
-				CWARN("opcode %d sz %d resid %d p %p wrote -1 ",
-				   hdr->c_opcode, hdr->c_size, wlen,
-				   body + ioctx->io_o_off);
-				abort();
-			}
-			if (errno != EINTR && errno != EAGAIN &&
+				CABORTX("opcode %d sz %d resid %d p %p "
+				    "wrote -1 ", hdr->c_opcode, hdr->c_size,
+				    wlen, body + ioctx->io_o_off);
+			} else if (errno != EINTR && errno != EAGAIN &&
 			    errno != ECONNRESET && errno != EPIPE)
 				CWARN("wrote -1 ");
 			return;
@@ -455,7 +470,7 @@ ct_event_io_read(evutil_socket_t fd, short events, void *arg)
 	struct ct_header	*hdr;
 	uint8_t			*body;
 	ssize_t			len;
-	int			rlen;
+	int			rlen, s_errno;
 
 	hdr = ioctx->io_i_hdr;
 	body = ioctx->io_i_data;
@@ -483,8 +498,7 @@ ct_event_io_read(evutil_socket_t fd, short events, void *arg)
 		} else if (len == -1) {
 			if (errno != EINTR && errno != EAGAIN &&
 			    errno != ECONNRESET && errno != EPIPE)
-				CWARN("read -1 %d, errno %s", errno,
-				    strerror(errno));
+				CWARN("read -1 ");
 			return; /* no data? */
 		}
 		ioctx->io_read_count++;
@@ -508,20 +522,26 @@ ct_event_io_read(evutil_socket_t fd, short events, void *arg)
 		/* fall thru */
 	case 2: /* reading body */
 		rlen = hdr->c_size - ioctx->io_i_off;
-		len = read(fd, body + ioctx->io_i_off, rlen);
+		if (rlen == 0) {
+			len = 0;
+			s_errno = 0;
+		} else {
+			len = read(fd, body + ioctx->io_i_off, rlen);
+			s_errno = errno;
+		}
 		CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" op %d, body sz %d "
 		    "read %ld, rlen %d off %d", (int64_t)c_pid, hdr->c_opcode,
 		    hdr->c_size, (long) len, rlen, ioctx->io_i_off);
 
 		if (len == 0 && rlen != 0) {
-			ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
 			/* lost socket */
+			ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
 			return;
 		} else if (len == -1) {
+			errno = s_errno;
 			if (errno != EINTR && errno != EAGAIN &&
 			    errno != ECONNRESET && errno != EPIPE)
-				CWARN("read -1 %d, errno %s", errno,
-				    strerror(errno));
+				CWARN("read -1 ");
 			return; /* no data? */
 		}
 
