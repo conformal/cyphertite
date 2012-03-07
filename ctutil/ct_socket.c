@@ -41,7 +41,7 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 {
 	struct assl_context	*c;
 	struct ct_assl_io_ctx	*ioctx = arg;
-	struct ct_header		*hdr;
+	struct ct_header	*hdr;
 	uint8_t			*body;
 	struct ct_io_queue	*iob;
 	ssize_t			len;
@@ -72,6 +72,7 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 	case 1: /* writing header */
 		wlen = sizeof(*hdr) - ioctx->io_o_off;
 		len = assl_write(c, (uint8_t *)hdr + ioctx->io_o_off, wlen);
+		s_errno = errno;
 		CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" wlen %d len %ld",
 		    (int64_t)c_pid, wlen, (long) len);
 		if (len == 0) {
@@ -80,6 +81,7 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 			    NULL, NULL, 0);
 			return;
 		} else if (len == -1) {
+			errno = s_errno;
 			if (errno != EINTR && errno != EAGAIN &&
 			    errno != ECONNRESET && errno != EPIPE)
 				CWARN("wrote -1 ");
@@ -115,6 +117,7 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 		if (ioctx->io_max_transfer != 0 &&
 		    wlen > ioctx->io_max_transfer)
 			wlen = ioctx->io_max_transfer;
+
 		if (wlen == 0) {
 			len = 0;
 			s_errno = 0;
@@ -133,7 +136,7 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 		} else if (len == -1) {
 			errno = s_errno;
 			if (errno == EFAULT) {
-				CABORTX("opcode %d sz %d resid %d p %p "
+				CABORT("opcode %d sz %d resid %d p %p "
 				    "wrote -1 ", hdr->c_opcode, hdr->c_size,
 				    wlen, body + ioctx->io_o_off);
 			} else if (errno != EINTR && errno != EAGAIN &&
@@ -203,7 +206,8 @@ ct_event_assl_read(evutil_socket_t fd, short events, void *arg)
 	struct ct_header	*hdr;
 	uint8_t			*body;
 	ssize_t			len;
-	int			rlen, s_errno;
+	int			rlen;
+	int			s_errno;
 
 	c = ioctx->c;
 	hdr = ioctx->io_i_hdr;
@@ -265,7 +269,6 @@ ct_event_assl_read(evutil_socket_t fd, short events, void *arg)
 			len = assl_read(c,  body + ioctx->io_i_off, rlen);
 			s_errno = errno;
 		}
-
 		CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" op %d, body sz %d "
 		    "read %ld, rlen %d off %d", (int64_t)c_pid, hdr->c_opcode,
 		    hdr->c_size, (long) len, rlen, ioctx->io_i_off);
@@ -343,6 +346,7 @@ ct_event_io_write(evutil_socket_t fd, short events, void *arg)
 	case 1: /* writing header */
 		wlen = sizeof(*hdr) - ioctx->io_o_off;
 		len = write(fd, (uint8_t *)hdr + ioctx->io_o_off, wlen);
+		s_errno = errno;
 		CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" wlen %d len %ld",
 		    (int64_t)c_pid, wlen, (long) len);
 
@@ -352,6 +356,7 @@ ct_event_io_write(evutil_socket_t fd, short events, void *arg)
 			    NULL, NULL, 0);
 			return;
 		} else if (len == -1) {
+			errno = s_errno;
 			if (errno != EINTR && errno != EAGAIN &&
 			    errno != ECONNRESET && errno != EPIPE)
 				CWARN("wrote -1 ");
@@ -402,7 +407,7 @@ write_next_iov:
 		} else if (len == -1) {
 			errno = s_errno;
 			if (errno == EFAULT) {
-				CABORTX("opcode %d sz %d resid %d p %p "
+				CABORT("opcode %d sz %d resid %d p %p "
 				    "wrote -1 ", hdr->c_opcode, hdr->c_size,
 				    wlen, body + ioctx->io_o_off);
 			} else if (errno != EINTR && errno != EAGAIN &&
@@ -470,7 +475,8 @@ ct_event_io_read(evutil_socket_t fd, short events, void *arg)
 	struct ct_header	*hdr;
 	uint8_t			*body;
 	ssize_t			len;
-	int			rlen, s_errno;
+	int			rlen;
+	int			s_errno;
 
 	hdr = ioctx->io_i_hdr;
 	body = ioctx->io_i_data;
