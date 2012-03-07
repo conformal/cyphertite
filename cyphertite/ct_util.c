@@ -197,8 +197,11 @@ ct_ssl_connect(int nonfatal)
 void
 ct_ssl_cleanup(void)
 {
-	ct_assl_disconnect(ct_assl_ctx);
-	e_free(&ct_ssl_ctx);
+	if (ct_ssl_ctx != NULL) {
+		ct_assl_disconnect(ct_assl_ctx);
+		e_free(&ct_ssl_ctx);
+		ct_ssl_ctx = NULL;
+	}
 }
 
 struct ct_io_queue *
