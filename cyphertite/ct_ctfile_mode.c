@@ -1145,6 +1145,7 @@ ct_cull_fetch_all_ctfiles(struct ct_op *op)
 			cca = e_calloc(1, sizeof(*cca));
 			cca->cca_localname = cachename;
 			cca->cca_remotename = e_strdup(file->mlf_name);
+			cca->cca_ctfile = 1;
 			ct_add_operation_after(op, ctfile_extract,
 			    ct_cull_extract_cleanup, cca);
 		} else {

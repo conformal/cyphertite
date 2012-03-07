@@ -359,6 +359,7 @@ struct ct_ctfileop_args {
 	char		*cca_remotename;
 	char		*cca_tdir;
 	int		 cca_encrypted; /* for archive only */
+	int		 cca_ctfile; /* is ctfile or other data */
 };
 
 struct ct_op	*ct_add_operation(ct_op_cb *, ct_op_cb *, void *);

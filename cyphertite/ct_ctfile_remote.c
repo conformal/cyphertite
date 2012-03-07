@@ -269,6 +269,7 @@ ctfile_find_for_extract_complete(struct ct_op *op)
 		ccffa->ccffa_base.cca_localname = best;
 		ccffa->ccffa_base.cca_tdir = ctfile_cachedir;
 		ccffa->ccffa_base.cca_remotename = e_strdup(best);
+		ccffa->ccffa_base.cca_ctfile = 1;
 		ct_add_operation(ctfile_extract, ctfile_extract_nextop,
 		    ccffa);
 	} else {
@@ -279,6 +280,7 @@ do_operation:
 		 */
 		ccffa->ccffa_base.cca_localname = best;
 		ccffa->ccffa_base.cca_tdir = ctfile_cachedir;
+		ccffa->ccffa_base.cca_ctfile = 1;
 		op->op_args = ccffa;
 		ctfile_extract_nextop(op);
 	}
@@ -313,6 +315,7 @@ ctfile_extract_nextop(struct ct_op *op)
 			cca->cca_remotename =
 			    e_strdup(ccffa->ccffa_base.cca_remotename);
 		cca->cca_tdir = ccffa->ccffa_base.cca_tdir;
+		cca->cca_ctfile = ccffa->ccffa_base.cca_ctfile;
 		op->op_args = cca;
 		ctfile_download_next(op);
 	}
@@ -370,6 +373,7 @@ again:
 			nextcca->cca_localname = cookedname;
 			nextcca->cca_remotename = e_strdup(cookedname);
 			nextcca->cca_tdir = ctfile_cachedir;
+			nextcca->cca_ctfile = 1;
 			ct_add_operation_after(op, ctfile_extract,
 			    ctfile_download_next, nextcca);
 		} else {
@@ -466,6 +470,7 @@ ctfile_nextop_archive(char *basis, void *args)
 	cca = e_calloc(1, sizeof(*cca));
 	cca->cca_localname = cachename;
 	cca->cca_encrypted = caa->caa_encrypted;
+	cca->cca_ctfile = 1;
 	ct_add_operation(ctfile_archive, ctfile_nextop_archive_cleanup, cca);
 }
 
@@ -508,6 +513,7 @@ ct_check_secrets_extract(struct ct_op *op)
 	cca->cca_remotename = "crypto.secrets";
 	cca->cca_tdir = ctfile_cachedir;
 	cca->cca_encrypted = 0; /* ignored */
+	cca->cca_ctfile = 0;
 	ct_add_operation_after(op, ctfile_extract, ct_compare_secrets, cca);
 	/* start download of secrets with finish file being the comparison */
 
@@ -643,6 +649,7 @@ ct_download_secrets_file(void)
 	cca.cca_remotename = "crypto.secrets";
 	cca.cca_tdir = NULL;
 	cca.cca_encrypted = 0;
+	cca.cca_ctfile = 0;
 
 	ct_do_operation(ctfile_extract, NULL, &cca, 0, 1);
 }
@@ -658,6 +665,7 @@ ct_upload_secrets_file(void)
 	cca.cca_remotename = "crypto.secrets";
 	cca.cca_tdir = NULL;
 	cca.cca_encrypted = 0;
+	cca.cca_ctfile = 0;
 
 	ct_do_operation(ctfile_list_start, ct_check_secrets_upload, &cca, 0, 1);
 }

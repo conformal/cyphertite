@@ -532,6 +532,7 @@ ct_main(int argc, char **argv)
 			cca.cca_localname = ctfile;
 			cca.cca_remotename = NULL;
 			cca.cca_tdir = ct_tdir;
+			cca.cca_ctfile = 1;
 			/* only matters for archive */
 			cca.cca_encrypted = (ct_crypto_secrets != NULL);
 			ct_add_operation(((ct_action == CT_A_ARCHIVE) ?
