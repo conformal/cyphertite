@@ -114,6 +114,24 @@ ctfile_archive(struct ct_op *op)
 		CNDBG(CT_LOG_FILE, "opening ctfile for archive %s", ctfile);
 		if ((cas->cas_handle = fopen(tpath, "rb")) == NULL)
 			CFATAL("can't open %s for reading", ctfile);
+		if (cca->cca_ctfile) {
+			struct ctfile_parse_state	 xs_ctx;
+			int				 ret;
+			if (ctfile_parse_init_f(&xs_ctx, cas->cas_handle))
+				CFATALX("%s is not a valid ctfile, can't "
+				    "open", tpath);
+			while ((ret = ctfile_parse(&xs_ctx)) != XS_RET_EOF) {
+				if (ret == XS_RET_SHA)  {
+					if (ctfile_parse_seek(&xs_ctx))
+						CFATALX("seek failed");
+				} else if (ret == XS_RET_FAIL) {
+					CFATALX("%s is not a valid ctfile, EOF"
+					    " not found", tpath);
+				}
+
+			}
+			ctfile_parse_close(&xs_ctx);
+		}
 
 		if (fstat(fileno(cas->cas_handle), &sb) == -1)
 			CFATAL("can't stat backup file %s", ctfile);
