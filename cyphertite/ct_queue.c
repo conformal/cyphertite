@@ -576,35 +576,42 @@ ct_reconnect(evutil_socket_t unused, short event, void *varg)
 }
 
 void
+ct_handle_disconnect(void)
+{
+	struct ct_trans		*trans = NULL;
+	int			 idle = 1;
+
+	ct_disconnected = 1;
+	ct_ssl_cleanup();
+	while(!RB_EMPTY(&ct_state->ct_inflight)) {
+		trans = RB_MAX(ct_iotrans_lookup,
+		    &ct_state->ct_inflight);
+		CNDBG(CT_LOG_NET,
+		    "moving trans %" PRIu64 " back to queued",
+		    trans->tr_trans_id);
+		RB_REMOVE(ct_iotrans_lookup, &ct_state->ct_inflight,
+		    trans);
+		/* put on the head so write queue is still ordered. */
+		ct_queue_write(trans);
+		ct_state->ct_inflight_rblen--;
+		idle = 0;
+	}
+	if (idle) {
+		ct_reconnect_pending = 1;
+	} else {
+		ct_set_reconnect_timeout(ct_reconnect, NULL,
+		    ct_reconnect_timeout);
+	}
+}
+
+void
 ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 {
 	struct ct_trans		ltrans, *trans = NULL;
 	int			lookup_body = 0;
-	int			idle = 1;
 
 	if (hdr == NULL) {
-		ct_disconnected = 1;
-		ct_ssl_cleanup();
-		while(!RB_EMPTY(&ct_state->ct_inflight)) {
-			trans = RB_MAX(ct_iotrans_lookup,
-			    &ct_state->ct_inflight);
-			CNDBG(CT_LOG_NET,
-			    "moving trans %" PRIu64 " back to queued",
-			    trans->tr_trans_id);
-			RB_REMOVE(ct_iotrans_lookup, &ct_state->ct_inflight,
-			    trans);
-			/* put on the head so write queue is still ordered. */
-			ct_queue_write(trans);
-			ct_state->ct_inflight_rblen--;
-			idle = 0;
-		}
-		if (idle) {
-			ct_reconnect_pending = 1;
-		} else {
-			ct_set_reconnect_timeout(ct_reconnect, NULL,
-			    ct_reconnect_timeout);
-		}
-
+		ct_handle_disconnect();
 		return;
 	}
 	ltrans.hdr.c_tag = hdr->c_tag;
@@ -658,6 +665,11 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 {
 	/* the header is first in the structure for this reason */
 	struct ct_trans *trans = (struct ct_trans *)hdr;
+
+	if (hdr == NULL) {
+		ct_handle_disconnect();
+		return;
+	}
 
 	if (cnt != 0 && (hdr->c_opcode != C_HDR_O_WRITE ||
 	    (hdr->c_flags & C_HDR_F_METADATA) == 0))
