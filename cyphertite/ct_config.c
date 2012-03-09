@@ -267,7 +267,7 @@ ct_create_config(void)
 		CFATAL("unable to create directory %s", conf_buf);
 	e_free(&conf_buf);
 
-	if ((fd = open(conf, O_RDWR | O_CREAT, 0400)) == -1)
+	if ((fd = open(conf, O_RDWR | O_CREAT, 0600)) == -1)
 		CFATAL("unable to open file for writing %s", conf);
 	if ((f = fdopen(fd, "r+")) == NULL)
 		CFATAL("unable to open file %s", conf);
