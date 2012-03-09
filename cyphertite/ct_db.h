@@ -15,8 +15,8 @@
  */
 
 /* db functions */
-sqlite3			*ctdb_open(const char *, int crypt, int *);
-sqlite3			*ctdb_reopendb(int genid);
+sqlite3			*ctdb_open(const char *, int, int *);
+sqlite3			*ctdb_reopendb(int);
 void			ctdb_cleanup(sqlite3 *);
 int			ctdb_lookup_sha(sqlite3 *, uint8_t *, uint8_t *,
 			    uint8_t *);

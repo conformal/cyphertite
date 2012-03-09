@@ -83,7 +83,7 @@ struct ct_fb_state {
 
 int		ctfb_main(int, char *[]);
 void		ct_fb_print_entry(char *, struct ct_fb_key *, int);
-int		ctfb_lstat(const char *path, struct stat *sb);
+int		ctfb_lstat(const char *, struct stat *);
 
 typedef void    (ctfb_cmd)(int, const char **);
 __dead void	ctfb_usage(void);
