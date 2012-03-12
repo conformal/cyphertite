@@ -214,6 +214,9 @@ ct_settings_add(struct ct_settings *settings, char *var, char *val)
 		if (strcmp(var, cs->cs_name))
 			continue;
 
+		if (cs->cs_secure == 0)
+			CNDBG(CTUTIL_LOG_CONFIG, "settings_add: %s=%s\n",var ,val);
+
 		if (cs->cs_s) {
 			if (cs->cs_s->csp_set(cs, val))
 				CFATALX("invalid value for %s: %s", var, val);
@@ -308,7 +311,6 @@ ct_config_parse(struct ct_settings *settings, const char *filename)
 			i--;
 		val[++i] = '\0';
 
-		CNDBG(CTUTIL_LOG_CONFIG, "config_parse: %s=%s\n",var ,val);
 		if (ct_settings_add(settings, var, val))
 			CFATALX("invalid conf file entry: %s=%s", var, val);
 

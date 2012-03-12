@@ -70,12 +70,13 @@ struct ct_settings	settings[] = {
 	{ "hostport", CT_S_STR, NULL, &ct_hostport, NULL, NULL },
 	{ "cache_db", CT_S_DIR, NULL, &ct_localdb, NULL, NULL },
 	{ "username", CT_S_STR, NULL, &ct_username, NULL, NULL },
-	{ "password", CT_S_STR, NULL, &ct_password, NULL, NULL },
+	{ "password", CT_S_STR, NULL, &ct_password, NULL, NULL, NULL, 1 },
 	{ "ca_cert", CT_S_DIR, NULL, &ct_ca_cert, NULL, NULL },
 	{ "cert", CT_S_DIR, NULL, &ct_cert, NULL, NULL },
 	{ "key", CT_S_DIR, NULL, &ct_key, NULL, NULL },
 	{ "crypto_secrets", CT_S_DIR, NULL, &ct_crypto_secrets, NULL, NULL },
-	{ "crypto_passphrase", CT_S_STR, NULL, &ct_crypto_passphrase, NULL, NULL }, /* name may NOT be modified */
+	{ "crypto_passphrase", CT_S_STR, NULL, &ct_crypto_passphrase, NULL,
+	   NULL, NULL, 1}, /* name may NOT be modified */
 	{ "session_compression", CT_S_STR, NULL, &ct_compression_type, NULL,
 	    NULL },
 	{ "polltype", CT_S_STR, NULL, &ct_polltype, NULL, NULL },

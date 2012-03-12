@@ -49,6 +49,7 @@ struct ct_settings {
 	double			*cs_fval;
 	long long		*cs_szval;
 	struct ct_special	*cs_s;
+	int			cs_secure;
 };
 
 struct ct_header {
