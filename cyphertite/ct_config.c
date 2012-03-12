@@ -180,7 +180,7 @@ ct_get_answer(char *prompt, char *a1, char *a2, char *default_val,
 
 int
 ct_prompt_password(char *prompt, char *answer, size_t answer_len,
-    char *answer2, size_t answer2_len)
+    char *answer2, size_t answer2_len, int confirm)
 {
 	int			i;
 
@@ -201,6 +201,11 @@ ct_prompt_password(char *prompt, char *answer, size_t answer_len,
 			i++;
 			break;
 		case 1:
+			if (!confirm) {
+				i++;
+				break;
+			}
+
 			if (ct_get_answer("confirm: ",
 			    NULL, NULL, NULL, answer2, answer2_len, 1))
 				CFATALX("password");
@@ -312,7 +317,7 @@ ct_create_config(void)
 
 	while (ct_password == NULL) {
 		if (ct_prompt_password("login password: ", answer,
-		    sizeof answer, answer2, sizeof answer2))
+		    sizeof answer, answer2, sizeof answer2, 1))
 			CFATALX("password");
 
 		if (strlen(answer))
@@ -389,7 +394,7 @@ crypto_passphrase:
 get_pass:
 	if (ct_crypto_passphrase == NULL) {
 		if (ct_prompt_password("crypto passphrase: ", answer,
-		    sizeof answer, answer2, sizeof answer2))
+		    sizeof answer, answer2, sizeof answer2, 1))
 			CFATALX("crypto password");
 
 		if (strlen(answer))

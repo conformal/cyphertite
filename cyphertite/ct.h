@@ -657,7 +657,7 @@ char			*ctfile_get_cachename(const char *);
 int			ct_get_answer(char *, char *, char *, char *, char *,
 			    size_t, int);
 int			ct_prompt_password(char *, char *, size_t, char *,
-			    size_t);
+			    size_t, int);
 
 /* init/cleanup */
 void			ct_init(int, int, int);
