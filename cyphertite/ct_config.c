@@ -31,6 +31,7 @@
 #include <limits.h>
 #include <readpassphrase.h>
 
+#include <assl.h>
 #include <clog.h>
 #include <exude.h>
 
@@ -255,10 +256,8 @@ ct_create_config(void)
 
 	/* help user create config file */
 	conf_buf = ct_user_config();
-	snprintf(prompt, sizeof prompt,
-	    "Target conf file [%s]: ", conf_buf);
-	ct_get_answer(prompt, NULL, NULL, conf_buf, answer,
-	    sizeof answer, 0);
+	snprintf(prompt, sizeof prompt, "Target conf file [%s]: ", conf_buf);
+	ct_get_answer(prompt, NULL, NULL, conf_buf, answer, sizeof answer, 0);
 	if (conf_buf != NULL)
 		e_free(&conf_buf);
 	conf = e_strdup(answer);
@@ -279,8 +278,8 @@ ct_create_config(void)
 
 	while (ct_username == NULL) {
 		strlcpy(prompt, "login username: ", sizeof(prompt));
-		if (ct_get_answer(prompt,
-		    NULL, NULL, NULL, answer, sizeof answer, 0)) {
+		if (ct_get_answer(prompt, NULL, NULL, NULL, answer,
+		    sizeof answer, 0)) {
 			printf("must supply username\n");
 			continue;
 		}
@@ -317,7 +316,7 @@ ct_create_config(void)
 
 	while (ct_password == NULL) {
 		if (ct_prompt_password("login password: ", answer,
-		    sizeof answer, answer2, sizeof answer2, 1))
+		    sizeof answer, answer2, sizeof answer2, 0))
 			CFATALX("password");
 
 		if (strlen(answer))
@@ -326,6 +325,19 @@ ct_create_config(void)
 		bzero(answer2, sizeof answer2);
 	}
 
+	/* Verify username and password are correct before continuing. */
+	assl_initialize();
+	ct_event_init();
+	ct_assl_ctx = ct_ssl_connect(0);
+	if (ct_assl_negotiate_poll(ct_assl_ctx)) {
+		CFATALX("unable to connect to server");
+	}
+	/*
+	 * XXX: It would make more sense to leave the connection open here, but
+	 * there are some corner cases that need to be handled if so.
+	 */
+	ct_ssl_cleanup();
+
 	strlcpy(prompt, "Save login password to configuration file? [yes]: ",
 	    sizeof(prompt));
 	if (ct_get_answer(prompt, "yes", "no", "yes", answer,
@@ -333,9 +345,9 @@ ct_create_config(void)
 		save_password = 1;
 
 	if (ct_have_remote_secrets_file()) {
-		strlcpy(prompt, "Your account already has a crypto secrets file"
-		    " associated with it. Download existing file to the "
-		    "local machine? [yes]: ", sizeof(prompt));
+		strlcpy(prompt, "Your account already has a crypto secrets "
+		    "file associated with it.  Download it to the local "
+		    "machine? [yes]: ", sizeof(prompt));
 		rv = ct_get_answer(prompt, "yes", "no", "yes", answer,
 		    sizeof answer, 0);
 		if (rv == 1) {
@@ -346,61 +358,60 @@ ct_create_config(void)
 		}
 		/* XXX delete remote secrets if not? */
 	}
+
+	/* No remote secrets file (or user didn't want to use it). */
 	if (stat(ct_crypto_secrets, &sb) == 0) {
 		strlcpy(prompt, "Found an existing crypto secrets file. Use "
 		    "this one? [yes]: ", sizeof(prompt));
 		if (ct_get_answer(prompt, "yes", "no", "yes", answer,
 		    sizeof answer, 0) == 1) {
 			have_file = 1;
+			goto crypto_passphrase;
 		} else {
 			CWARNX("deleting existing secrets file");
 			unlink(ct_crypto_secrets);
 		}
-
 	}
-	strlcpy(prompt, "Upload crypto secrets file to server? [yes]: ",
-	    sizeof(prompt));
-	if ((ct_get_answer(prompt, "yes", "no", "yes", answer,
-	    sizeof answer, 0)) == 1)
-		ct_secrets_upload = 1;
 
-crypto_passphrase:
-	strlcpy(prompt, "Save crypto passphrase to configuration file? [yes]: ",
+	/* No remote or local secrets file (or user didn't want to use them). */
+	strlcpy(prompt, "Automatically generate crypto passphrase? [yes]: ",
 	    sizeof(prompt));
 	rv = ct_get_answer(prompt, "yes", "no", "yes", answer,
 	    sizeof answer, 0);
-
 	if (rv == 1) {
+		arc4random_buf(answer2, sizeof answer2);
+		ct_sha512((uint8_t *)answer2, ad, sizeof answer2);
+		if (ct_base64_encode(CT_B64_ENCODE, ad,
+		    sizeof ad, (uint8_t *)b64d, sizeof b64d))
+			CFATALX("can't base64 encode crypto passphrase");
+
+		ct_crypto_passphrase = e_strdup(b64d);
 		save_crypto_passphrase = 1;
-		if (have_file)
-			goto get_pass;
-		strlcpy(prompt,
-		    "Automatically generate crypto passphrase? [yes]: ",
-		    sizeof(prompt));
-		rv = ct_get_answer(prompt, "yes", "no", "yes", answer,
-		    sizeof answer, 0);
-
-		if (rv == 1) {
-			arc4random_buf(answer2, sizeof answer2);
-			ct_sha512((uint8_t *)answer2, ad, sizeof answer2);
-			if (ct_base64_encode(CT_B64_ENCODE, ad,
-			    sizeof ad, (uint8_t *)b64d, sizeof b64d))
-				CFATALX("can't base64 encode "
-				    "crypto passphrase");
-
-			ct_crypto_passphrase = e_strdup(b64d);
-		}
-	}
-get_pass:
-	if (ct_crypto_passphrase == NULL) {
+	} else {
 		if (ct_prompt_password("crypto passphrase: ", answer,
 		    sizeof answer, answer2, sizeof answer2, 1))
+			CFATALX("crypto passphrase");
+
+		if (strlen(answer))
+			ct_crypto_passphrase = e_strdup(answer);
+
+		bzero(answer, sizeof answer);
+		bzero(answer2, sizeof answer2);
+	}
+	secrets_generate(NULL, 0, NULL);
+
+crypto_passphrase:
+	while (have_file && ct_crypto_passphrase == NULL) {
+		if (ct_prompt_password("crypto passphrase: ", answer,
+		    sizeof answer, answer2, sizeof answer2, 0))
 			CFATALX("crypto password");
 
 		if (strlen(answer))
 			ct_crypto_passphrase = e_strdup(answer);
-	}
-	if (have_file) {
+
+		bzero(answer, sizeof answer);
+		bzero(answer2, sizeof answer2);
+
 		/* Check passphrase works for the file */
 		CWARNX("checking local secrets file is valid");
 		if (ct_unlock_secrets(ct_crypto_passphrase,
@@ -408,17 +419,32 @@ get_pass:
 		    sizeof(ct_crypto_key),
 		    ct_iv, sizeof (ct_iv))) {
 			CWARNX("password incorrect, try again");
+			bzero(ct_crypto_passphrase,
+			    sizeof ct_crypto_passphrase);
 			e_free(&ct_crypto_passphrase);
-			goto get_pass;
 		}
-	} else {
-		extern void secrets_generate(struct ct_cli_cmd *,
-		    int, char **); /* XXX */
-		secrets_generate(NULL, 0, NULL);
 	}
 
-	bzero(answer, sizeof answer);
-	bzero(answer2, sizeof answer2);
+	/* Prompt to save crytpo passphrase in config if not set. */
+	if (!save_crypto_passphrase) {
+		strlcpy(prompt,
+		    "Save crypto passphrase to configuration file? [yes]: ",
+		    sizeof(prompt));
+		rv = ct_get_answer(prompt, "yes", "no", "yes", answer,
+		    sizeof answer, 0);
+		if (rv == 1)
+			save_crypto_passphrase = 1;
+	}
+
+
+	/* Prompt to store secrets file on server if not set. */
+	if (!ct_secrets_upload) {
+		strlcpy(prompt, "Store crypto secrets file on server? [yes]: ",
+		    sizeof(prompt));
+		if ((ct_get_answer(prompt, "yes", "no", "yes", answer,
+		    sizeof answer, 0)) == 1)
+			ct_secrets_upload = 1;
+	}
 
 	strlcpy(prompt,
 	    "Choose a ctfile operation mode (remote/local) [remote]: ",
@@ -428,14 +454,6 @@ get_pass:
 	mode = e_strdup(answer);
 
 	if (rv == 1) {
-		snprintf(prompt, sizeof prompt,
-		    "Target ctfile cache directory [%s]: ", ctfile_cachedir);
-		ct_get_answer(prompt, NULL, NULL, ctfile_cachedir, answer,
-		    sizeof answer, 0);
-		if (ctfile_cachedir != NULL)
-			e_free(&ctfile_cachedir);
-		ctfile_cachedir = e_strdup(answer);
-
 		strlcpy(prompt, "Use automatic remote differentials? [no]: ",
 		    sizeof(prompt));
 		rv = ct_get_answer(prompt, "yes", "no", "no", answer,
@@ -444,34 +462,34 @@ get_pass:
 			ct_auto_differential = 1;
 	}
 
-	fprintf(f, "username\t\t\t= %s\n", ct_username);
-	if (save_password)
-		fprintf(f, "password\t\t\t= %s\n", ct_password);
+	fprintf(f, "username\t\t\t\t= %s\n", ct_username);
+	if (save_password && ct_password)
+		fprintf(f, "password\t\t\t\t= %s\n", ct_password);
 	else
-		fprintf(f, "#password\t\t\t=\n");
-	if (save_crypto_passphrase)
-		fprintf(f, "crypto_passphrase\t\t= %s\n", ct_crypto_passphrase);
+		fprintf(f, "#password\t\t\t\t=\n");
+	if (save_crypto_passphrase && ct_crypto_passphrase)
+		fprintf(f, "crypto_passphrase\t\t\t= %s\n", ct_crypto_passphrase);
 	else
-		fprintf(f, "#crypto_passphrase\t\t=\n");
+		fprintf(f, "#crypto_passphrase\t\t\t=\n");
 
-	fprintf(f, "cache_db\t\t\t= %s/ct_db\n", dir);
-	fprintf(f, "session_compression\t\t= lzo\n");
-	fprintf(f, "crypto_secrets\t\t\t= %s\n", ct_crypto_secrets);
-	fprintf(f, "ca_cert\t\t\t\t= %s\n", ct_ca_cert);
-	fprintf(f, "cert\t\t\t\t= %s\n", ct_cert);
-	fprintf(f, "key\t\t\t\t= %s\n", ct_key);
+	fprintf(f, "cache_db\t\t\t\t= %s/ct_db\n", dir);
+	fprintf(f, "session_compression\t\t\t= lzo\n");
+	fprintf(f, "crypto_secrets\t\t\t\t= %s\n", ct_crypto_secrets);
+	fprintf(f, "ca_cert\t\t\t\t\t= %s\n", ct_ca_cert);
+	fprintf(f, "cert\t\t\t\t\t= %s\n", ct_cert);
+	fprintf(f, "key\t\t\t\t\t= %s\n", ct_key);
 
-	fprintf(f, "ctfile_mode\t\t\t= %s\n", mode);
+	fprintf(f, "ctfile_mode\t\t\t\t= %s\n", mode);
 	if (strcmp(mode, "remote") == 0) {
-		fprintf(f, "ctfile_cachedir\t\t\t= %s\n", ctfile_cachedir);
-		fprintf(f, "ctfile_remote_auto_differential\t= %d\n",
+		fprintf(f, "ctfile_cachedir\t\t\t\t= %s\n", ctfile_cachedir);
+		fprintf(f, "ctfile_remote_auto_differential\t\t= %d\n",
 		    ct_auto_differential);
 	} else {
 		fprintf(f, "#ctfile_cachedir\t\t\t= %s\n", ctfile_cachedir);
 		fprintf(f, "#ctfile_remote_auto_differential\t= %d\n",
 		    ct_auto_differential);
 	}
-	fprintf(f, "upload_crypto_secrets\t\t= %d\n", ct_secrets_upload);
+	fprintf(f, "upload_crypto_secrets\t\t\t= %d\n", ct_secrets_upload);
 
 	printf("Configuration file created.\n");
 

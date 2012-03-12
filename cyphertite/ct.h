@@ -569,6 +569,9 @@ char *ct_system_config(void);
 char *ct_user_config(void);
 char *ct_user_config_old(void);
 
+/* ct_ctl.c */
+void			secrets_generate(struct ct_cli_cmd *, int, char **);
+
 /* print file data nicely */
 void			ct_pr_fmt_file(struct fnode *fnode);
 
