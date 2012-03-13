@@ -56,7 +56,7 @@ ct_list_op(struct ct_global_state *state, struct ct_op *op)
 	}
 	trans->tr_state = TR_S_DONE;
 	trans->tr_trans_id = ct_trans_id++;
-	ct_queue_transfer(trans);
+	ct_queue_transfer(state, trans);
 	ct_set_file_state(state, CT_S_FINISHED);
 }
 
@@ -410,7 +410,7 @@ skip:
 			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas);
 
 			trans->tr_trans_id = ct_trans_id++;
-			ct_queue_transfer(trans);
+			ct_queue_transfer(state, trans);
 			break;
 		case XS_RET_SHA:
 			if (ex_priv->doextract == 0 ||
@@ -454,7 +454,7 @@ skip:
 			trans->tr_state = TR_S_EX_SHA;
 			trans->tr_dataslot = 0;
 			trans->tr_trans_id = ct_trans_id++;
-			ct_queue_transfer(trans);
+			ct_queue_transfer(state, trans);
 			break;
 		case XS_RET_FILE_END:
 			trans = ct_trans_realloc_local(trans);
@@ -471,7 +471,7 @@ skip:
 			trans->tr_fl_node->fl_size =
 			    ex_priv->xdr_ctx.xs_trl.cmt_orig_size;
 			trans->tr_trans_id = ct_trans_id++;
-			ct_queue_transfer(trans);
+			ct_queue_transfer(state, trans);
 			break;
 		case XS_RET_EOF:
 			CNDBG(CT_LOG_CTFILE, "Hit end of ctfile");
@@ -540,7 +540,7 @@ we_re_done_here:
 				 * transaction. However, since we are done
 				 * it doesn't really matter either way.
 				 */
-				ct_queue_transfer(trans);
+				ct_queue_transfer(state, trans);
 				CNDBG(CT_LOG_TRANS, "extract finished");
 				ct_set_file_state(state, CT_S_FINISHED);
 			}
@@ -606,7 +606,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			ctfile_parse_close(&ex_priv->xdr_ctx);
 			e_free(&ex_priv);
 			trans->tr_state = TR_S_DONE;
-			ct_queue_transfer(trans);
+			ct_queue_transfer(state, trans);
 			CNDBG(CT_LOG_TRANS, "extract finished");
 			ct_set_file_state(state, CT_S_FINISHED);
 			e_free(&ex_priv);
@@ -684,7 +684,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 		default:
 			CFATALX("%s: invalid state %d", __func__, ret);
 		}
-		ct_queue_transfer(trans);
+		ct_queue_transfer(state, trans);
 	}
 }
 

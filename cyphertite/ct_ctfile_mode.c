@@ -177,7 +177,7 @@ loop:
 
 	if (cas->cas_open_sent == 0) {
 		cas->cas_open_sent = 1;
-		ct_xml_file_open(ct_trans, rname, MD_O_WRITE, 0);
+		ct_xml_file_open(state, ct_trans, rname, MD_O_WRITE, 0);
 		/* xml thread will wake us up when it gets the open */
 		ct_set_file_state(state, CT_S_WAITING_SERVER);
 		return;
@@ -198,7 +198,7 @@ loop:
 		ct_stats->st_bytes_tot += cas->cas_size;
 		e_free(&cas);
 		op->op_priv = NULL;
-		ct_queue_transfer(ct_trans);
+		ct_queue_transfer(state, ct_trans);
 		return;
 	}
 	/* perform read */
@@ -276,13 +276,13 @@ loop:
 	} else {
 		cas->cas_offset += rlen;
 	}
-	ct_queue_transfer(ct_trans);
+	ct_queue_transfer(state, ct_trans);
 	goto loop;
 }
 
 void
-ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
-    uint32_t chunkno)
+ct_xml_file_open(struct ct_global_state *state, struct ct_trans *trans,
+    const char *file, int mode, uint32_t chunkno)
 {
 	struct xmlsd_element_list	 xl;
 	struct xmlsd_element		*xe;
@@ -321,7 +321,7 @@ ct_xml_file_open(struct ct_trans *trans, const char *file, int mode,
 	trans->tr_size[2] = sz;
 
 	CNDBG(CT_LOG_XML, "open trans %"PRIu64, trans->tr_trans_id);
-	ct_queue_transfer(trans);
+	ct_queue_transfer(state, trans);
 
 }
 
@@ -440,7 +440,7 @@ ct_xml_file_close(struct ct_global_state *state)
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = sz;
 
-	ct_queue_transfer(trans);
+	ct_queue_transfer(state, trans);
 }
 
 struct ctfile_extract_state {
@@ -490,7 +490,7 @@ again:
 		return;
 	}
 	if (ces->ces_open_sent == 0) {
-		ct_xml_file_open(trans, rname, MD_O_READ, 0);
+		ct_xml_file_open(state, trans, rname, MD_O_READ, 0);
 		ces->ces_open_sent = 1;
 		/* xml thread will wake us up when it gets the open */
 		ct_set_file_state(state, CT_S_WAITING_SERVER);
@@ -514,7 +514,7 @@ again:
 		trans->tr_state = TR_S_EX_FILE_START;
 		trans->tr_trans_id = ct_trans_id++;
 		trans->hdr.c_flags |= C_HDR_F_METADATA;
-		ct_queue_transfer(trans);
+		ct_queue_transfer(state, trans);
 		goto again;
 	}
 
@@ -547,7 +547,7 @@ again:
 
 	ces->ces_block_no++; /* next chunk on next pass */
 
-	ct_queue_transfer(trans);
+	ct_queue_transfer(state, trans);
 }
 
 void
@@ -650,7 +650,7 @@ ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = sz;
 
-	ct_queue_transfer(trans);
+	ct_queue_transfer(state, trans);
 }
 
 void
@@ -722,7 +722,7 @@ ctfile_delete(struct ct_global_state *state, struct ct_op *op)
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = sz;
 
-	ct_queue_transfer(trans);
+	ct_queue_transfer(state, trans);
 }
 
 void
@@ -861,7 +861,7 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 		CABORTX("unexpected XML returned [%s]", (char *)vbody);
 	}
 
-	ct_queue_transfer(trans);
+	ct_queue_transfer(state, trans);
 	ct_body_free(NULL, vbody, hdr);
 	ct_header_free(NULL, hdr);
 	xmlsd_unwind(&xl);
@@ -1038,7 +1038,7 @@ ct_cull_setup(struct ct_global_state *state, struct ct_op *op)
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = sz;
 
-	ct_queue_transfer(trans);
+	ct_queue_transfer(state, trans);
 }
 
 int sent_complete;
@@ -1080,7 +1080,7 @@ ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 	trans->tr_size[2] = sz;
 	ct_set_file_state(state, CT_S_FINISHED);
 
-	ct_queue_transfer(trans);
+	ct_queue_transfer(state, trans);
 }
 
 
@@ -1144,7 +1144,7 @@ ct_cull_send_shas(struct ct_global_state *state, struct ct_op *op)
 	CNDBG(CT_LOG_SHA, "sending shas [%s]", (char *)trans->tr_data[2]);
 	CNDBG(CT_LOG_SHA, "sending shas len %lu", (unsigned long) sz);
 	sha_payload_sz += sz;
-	ct_queue_transfer(trans);
+	ct_queue_transfer(state, trans);
 
 	if (shacnt == 0 || node == NULL) {
 		ct_set_file_state(state, CT_S_FINISHED);

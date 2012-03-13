@@ -685,7 +685,7 @@ loop:
 		ct_trans->tr_type = TR_T_SPECIAL;
 		ct_trans->tr_trans_id = ct_trans_id++;
 		ct_trans->tr_eof = 0;
-		ct_queue_transfer(ct_trans);
+		ct_queue_transfer(state, ct_trans);
 		goto next_file;
 	}
 
@@ -767,7 +767,7 @@ loop:
 
 		/* must not allocate trans_id if not skipped */
 		ct_trans->tr_trans_id = ct_trans_id++;
-		ct_queue_transfer(ct_trans);
+		ct_queue_transfer(state, ct_trans);
 		if (cap->cap_curnode->fl_size == 0 ||
 		    cap->cap_curnode->fl_skip_file) {
 			goto next_file;
@@ -839,7 +839,7 @@ loop:
 	} else {
 		cap->cap_curnode->fl_offset += rlen;
 	}
-	ct_queue_transfer(ct_trans);
+	ct_queue_transfer(state, ct_trans);
 
 	/* if file finished, update curnode to next node in list */
 	/* XXX is there other file metadata that needs to be saved?  */
@@ -888,7 +888,7 @@ done:
 	/* cws is cleaned up by the completion handler */
 	e_free(&cap);
 
-	ct_queue_transfer(ct_trans);
+	ct_queue_transfer(state, ct_trans);
 }
 
 static void
