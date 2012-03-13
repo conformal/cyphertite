@@ -462,13 +462,13 @@ int ct_reconnect_pending;
 int ct_reconnect_timeout = CT_RECONNECT_DEFAULT_TIMEOUT;
 
 int
-ct_reconnect_internal(void)
+ct_reconnect_internal(struct ct_global_state *state)
 {
 	struct ct_trans		*trans;
 
-	ct_assl_ctx = ct_ssl_connect(ct_state, 1);
+	ct_assl_ctx = ct_ssl_connect(state, 1);
 	if (ct_assl_ctx) {
-		if (ct_assl_negotiate_poll(ct_state, ct_assl_ctx)) {
+		if (ct_assl_negotiate_poll(state, ct_assl_ctx)) {
 			CFATALX("negotiate failed");
 		}
 
@@ -476,9 +476,9 @@ ct_reconnect_internal(void)
 			CINFO("Reconnected");
 		ct_disconnected = 0;
 
-		CT_LOCK(&ct_state->ct_write_lock);
-		TAILQ_FOREACH(trans, &ct_state->ct_write_queue, tr_next) {
-			CT_UNLOCK(&ct_state->ct_write_lock);
+		CT_LOCK(&state->ct_write_lock);
+		TAILQ_FOREACH(trans, &state->ct_write_queue, tr_next) {
+			CT_UNLOCK(&state->ct_write_lock);
 			if ((trans->hdr.c_flags & C_HDR_F_METADATA) == 0)
 				continue;
 
@@ -504,12 +504,12 @@ ct_reconnect_internal(void)
 					 * Don't try and close again,
 					 * complete it and stop worrying.
 					 */
-					CT_LOCK(&ct_state->ct_write_lock);
-					TAILQ_REMOVE(&ct_state->ct_write_queue,
+					CT_LOCK(&state->ct_write_lock);
+					TAILQ_REMOVE(&state->ct_write_queue,
 					    trans, tr_next);
-					ct_state->ct_write_qlen--;
-					CT_UNLOCK(&ct_state->ct_write_lock);
-					ct_queue_complete(ct_state, trans);
+					state->ct_write_qlen--;
+					CT_UNLOCK(&state->ct_write_lock);
+					ct_queue_complete(state, trans);
 					break;
 				}
 				/*
@@ -570,7 +570,9 @@ ct_reconnect_internal(void)
 void
 ct_reconnect(evutil_socket_t unused, short event, void *varg)
 {
-	if (ct_reconnect_internal() == 0) {
+	struct ct_global_state *state = varg;
+
+	if (ct_reconnect_internal(state) == 0) {
 		ct_reconnect_timeout = CT_RECONNECT_DEFAULT_TIMEOUT;
 		/* XXX - wakeup everyone */
 		ct_wakeup_sha();
@@ -582,7 +584,7 @@ ct_reconnect(evutil_socket_t unused, short event, void *varg)
 		ct_wakeup_complete();
 		ct_wakeup_file();
 	} else {
-		ct_set_reconnect_timeout(ct_reconnect, NULL,
+		ct_set_reconnect_timeout(ct_reconnect, state,
 		     ct_reconnect_timeout);
 	}
 
@@ -612,7 +614,7 @@ ct_handle_disconnect(struct ct_global_state *state)
 	if (idle) {
 		ct_reconnect_pending = 1;
 	} else {
-		ct_set_reconnect_timeout(ct_reconnect, NULL,
+		ct_set_reconnect_timeout(ct_reconnect, state,
 		    ct_reconnect_timeout);
 	}
 }
@@ -1097,7 +1099,7 @@ ct_process_write(void *vctx)
 
 	/* did we idle out? */
 	if (ct_reconnect_pending) {
-		if (ct_reconnect_internal() != 0)
+		if (ct_reconnect_internal(state) != 0)
 			ct_set_reconnect_timeout(ct_reconnect, NULL,
 			     ct_reconnect_timeout);
 		ct_reconnect_pending = 0;

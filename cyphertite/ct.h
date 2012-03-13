@@ -621,7 +621,7 @@ struct ct_stat {
 void			ct_dump_stats(FILE *);
 struct ct_assl_io_ctx	*ct_ssl_connect(struct ct_global_state *, int);
 void			ct_reconnect(evutil_socket_t, short, void *);
-int			ct_reconnect_internal(void);
+int			ct_reconnect_internal(struct ct_global_state *);
 void			ct_load_certs(struct assl_context *);
 int			ct_assl_negotiate_poll(struct ct_global_state *,
 			    struct ct_assl_io_ctx *);
