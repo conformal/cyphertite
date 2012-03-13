@@ -438,7 +438,7 @@ get_pass:
 	}
 
 	fprintf(f, "username\t\t\t= %s\n", ct_username);
-	if (ct_password)
+	if (save_password)
 		fprintf(f, "password\t\t\t= %s\n", ct_password);
 	else
 		fprintf(f, "#password\t\t\t=\n");
