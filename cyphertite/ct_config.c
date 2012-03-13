@@ -323,6 +323,7 @@ ct_download_decode_and_save_certs(const char *username, const char *password)
 void
 ct_create_config(void)
 {
+	struct ct_global_state	*state;
 	char			prompt[1024];
 	char			answer[1024], answer2[1024];
 	uint8_t			ad[SHA512_DIGEST_LENGTH];
@@ -436,10 +437,11 @@ ct_create_config(void)
 	}
 
 	/* Verify username and password are correct before continuing. */
+	state = ct_setup_state();
 	assl_initialize();
 	ct_event_init();
-	ct_assl_ctx = ct_ssl_connect(0);
-	if (ct_assl_negotiate_poll(ct_state, ct_assl_ctx)) {
+	ct_assl_ctx = ct_ssl_connect(state, 0);
+	if (ct_assl_negotiate_poll(state, ct_assl_ctx)) {
 		CFATALX("unable to connect to server");
 	}
 	/*

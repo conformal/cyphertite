@@ -188,7 +188,7 @@ ct_init_eventloop(void)
 	    ct_crypto_secrets != NULL);
 
 	gettimeofday(&ct_stats->st_time_start, NULL);
-	ct_assl_ctx = ct_ssl_connect(0);
+	ct_assl_ctx = ct_ssl_connect(state, 0);
 	if (ct_assl_negotiate_poll(state, ct_assl_ctx))
 		CFATALX("negotiate failed");
 

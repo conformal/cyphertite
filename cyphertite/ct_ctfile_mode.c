@@ -862,8 +862,8 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 	}
 
 	ct_queue_transfer(state, trans);
-	ct_body_free(NULL, vbody, hdr);
-	ct_header_free(NULL, hdr);
+	ct_body_free(state, vbody, hdr);
+	ct_header_free(state, hdr);
 	xmlsd_unwind(&xl);
 }
 

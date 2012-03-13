@@ -466,7 +466,7 @@ ct_reconnect_internal(void)
 {
 	struct ct_trans		*trans;
 
-	ct_assl_ctx = ct_ssl_connect(1);
+	ct_assl_ctx = ct_ssl_connect(ct_state, 1);
 	if (ct_assl_ctx) {
 		if (ct_assl_negotiate_poll(ct_state, ct_assl_ctx)) {
 			CFATALX("negotiate failed");
@@ -743,6 +743,7 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 void *
 ct_body_alloc(void *vctx, struct ct_header *hdr)
 {
+	struct ct_global_state	*state = vctx;
 	uint8_t			*body;
 	struct ct_trans		ltrans, *trans = NULL;
 	int			slot;
@@ -765,7 +766,7 @@ ct_body_alloc(void *vctx, struct ct_header *hdr)
 	}
 	if (lookup_body) {
 		ltrans.hdr.c_tag = hdr->c_tag;
-		trans = RB_FIND(ct_iotrans_lookup, &ct_state->ct_inflight,
+		trans = RB_FIND(ct_iotrans_lookup, &state->ct_inflight,
 		    &ltrans);
 
 		if (trans == NULL)
@@ -793,6 +794,7 @@ ct_body_alloc_xml(size_t sz)
 
 	hdr.c_opcode = C_HDR_O_XML;
 	hdr.c_size = sz;
+	/* don't need state here because we're not using shm */
 	return (ct_body_alloc(NULL, &hdr));
 }
 
