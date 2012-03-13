@@ -436,7 +436,7 @@ void ct_wakeup_uncompress(void);
 void ct_wakeup_filewrite(void);
 void ct_wakeup_complete(void);
 
-void ct_display_queues(void);
+void ct_display_queues(struct ct_global_state *);
 void ct_display_assl_stats(FILE *);
 
 typedef void (ct_func_cb)(void *);

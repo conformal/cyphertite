@@ -242,7 +242,7 @@ ct_wakeup_write()
 void
 ct_info_sig(int fd, short event, void *vctx)
 {
-	ct_display_queues();
+	ct_display_queues(ct_state);
 }
 
 void

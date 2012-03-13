@@ -1522,40 +1522,40 @@ ct_compute_encrypt(void *vctx)
 }
 
 void
-ct_display_queues(void)
+ct_display_queues(struct ct_global_state *state)
 {
 	if (ct_verbose > 1) {
-		CT_LOCK(&ct_state->ct_sha_lock);
-		CT_LOCK(&ct_state->ct_comp_lock);
-		CT_LOCK(&ct_state->ct_crypt_lock);
-		CT_LOCK(&ct_state->ct_csha_lock);
-		CT_LOCK(&ct_state->ct_write_lock);
-		CT_LOCK(&ct_state->ct_queued_lock);
-		CT_LOCK(&ct_state->ct_complete_lock);
+		CT_LOCK(&state->ct_sha_lock);
+		CT_LOCK(&state->ct_comp_lock);
+		CT_LOCK(&state->ct_crypt_lock);
+		CT_LOCK(&state->ct_csha_lock);
+		CT_LOCK(&state->ct_write_lock);
+		CT_LOCK(&state->ct_queued_lock);
+		CT_LOCK(&state->ct_complete_lock);
 		fprintf(stderr, "Sha      queue len %d\n",
-		    ct_state->ct_sha_qlen);
-		CT_UNLOCK(&ct_state->ct_sha_lock);
+		    state->ct_sha_qlen);
+		CT_UNLOCK(&state->ct_sha_lock);
 		fprintf(stderr, "Comp     queue len %d\n",
-		    ct_state->ct_comp_qlen);
-		CT_UNLOCK(&ct_state->ct_comp_lock);
+		    state->ct_comp_qlen);
+		CT_UNLOCK(&state->ct_comp_lock);
 		fprintf(stderr, "Crypt    queue len %d\n",
-		    ct_state->ct_crypt_qlen);
-		CT_UNLOCK(&ct_state->ct_crypt_lock);
+		    state->ct_crypt_qlen);
+		CT_UNLOCK(&state->ct_crypt_lock);
 		fprintf(stderr, "Csha     queue len %d\n",
-		    ct_state->ct_csha_qlen);
-		CT_UNLOCK(&ct_state->ct_csha_lock);
+		    state->ct_csha_qlen);
+		CT_UNLOCK(&state->ct_csha_lock);
 		fprintf(stderr, "Write    queue len %d\n",
-		    ct_state->ct_write_qlen);
-		CT_UNLOCK(&ct_state->ct_write_lock);
+		    state->ct_write_qlen);
+		CT_UNLOCK(&state->ct_write_lock);
 		fprintf(stderr, "CRqueued queue len %d\n",
-		    ct_state->ct_queued_qlen);
-		CT_UNLOCK(&ct_state->ct_queued_lock);
+		    state->ct_queued_qlen);
+		CT_UNLOCK(&state->ct_queued_lock);
 		// XXX: Add locks for inflight queue throughout?
 		fprintf(stderr, "Inflight queue len %d\n",
-		    ct_state->ct_inflight_rblen);
+		    state->ct_inflight_rblen);
 		fprintf(stderr, "Complete queue len %d\n",
-		    ct_state->ct_complete_rblen);
-		CT_UNLOCK(&ct_state->ct_complete_lock);
+		    state->ct_complete_rblen);
+		CT_UNLOCK(&state->ct_complete_lock);
 		fprintf(stderr, "Free     queue len %d\n", c_trans_free);
 	}
 	ct_dump_stats(stderr);
