@@ -464,7 +464,7 @@ int ct_reconnect_timeout = CT_RECONNECT_DEFAULT_TIMEOUT;
 int
 ct_reconnect_internal(struct ct_global_state *state)
 {
-	struct ct_trans		*trans;
+	struct ct_trans		*trans, *ttrans;
 
 	ct_assl_ctx = ct_ssl_connect(state, 1);
 	if (ct_assl_ctx) {
@@ -477,7 +477,8 @@ ct_reconnect_internal(struct ct_global_state *state)
 		ct_disconnected = 0;
 
 		CT_LOCK(&state->ct_write_lock);
-		TAILQ_FOREACH(trans, &state->ct_write_queue, tr_next) {
+		TAILQ_FOREACH_SAFE(trans, &state->ct_write_queue, tr_next,
+		    ttrans) {
 			CT_UNLOCK(&state->ct_write_lock);
 			if ((trans->hdr.c_flags & C_HDR_F_METADATA) == 0)
 				continue;
