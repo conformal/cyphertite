@@ -72,7 +72,6 @@ TAILQ_HEAD(,ct_trans)ct_trans_free_head =
 int ct_numalloc = 0;
 int ct_alloc_block_size;
 int ct_cur_compress_mode = 0;
-uint64_t	ct_packet_id = 0;
 
 int c_tr_tag = 0;
 int c_trans_free = 0;
@@ -89,6 +88,9 @@ ct_setup_state(void)
 	state = ct_state = &ct_int_state;
 
 	ct_stats = &ct_int_stats;
+
+	state->ct_trans_id = 0;
+	state->ct_packet_id = 0;
 
 	state->ct_file_state = CT_S_STARTING;
 	state->ct_comp_state = CT_S_WAITING_TRANS;
@@ -544,7 +546,7 @@ ct_reconnect_internal(struct ct_global_state *state)
 				 * queue being full and how much we have in
 				 * the queue after us and just do this polled.
 				 */
-				if (ct_xml_file_open_polled(ct_assl_ctx,
+				if (ct_xml_file_open_polled(state, ct_assl_ctx,
 				    trans->tr_ctfile_name, MD_O_APPEND,
 				    trans->tr_ctfile_chunkno))
 					CFATALX("can't reopen metadata file");
@@ -557,7 +559,7 @@ ct_reconnect_internal(struct ct_global_state *state)
 				 * the right open at chunkno
 				 * For how this works see above.
 				 */
-				if (ct_xml_file_open_polled(ct_assl_ctx,
+				if (ct_xml_file_open_polled(state, ct_assl_ctx,
 				    trans->tr_ctfile_name, MD_O_READ,
 				    trans->tr_ctfile_chunkno))
 					CFATALX("can't reopen metadata file");
@@ -1062,9 +1064,9 @@ ct_process_completions(void *vctx)
 	if (trans)
 		CNDBG(CT_LOG_TRANS,
 		    "completing trans %" PRIu64 " pkt id: %" PRIu64"",
-		    trans->tr_trans_id, ct_packet_id);
+		    trans->tr_trans_id, state->ct_packet_id);
 
-	while (trans != NULL && trans->tr_trans_id == ct_packet_id) {
+	while (trans != NULL && trans->tr_trans_id == state->ct_packet_id) {
 		RB_REMOVE(ct_trans_lookup, &state->ct_complete, trans);
 		state->ct_complete_rblen--;
 		CT_UNLOCK(&state->ct_complete_lock);
@@ -1072,7 +1074,7 @@ ct_process_completions(void *vctx)
 		CNDBG(CT_LOG_TRANS, "writing file trans %" PRIu64 " eof %d",
 		    trans->tr_trans_id, trans->tr_eof);
 
-		ct_packet_id++;
+		state->ct_packet_id++;
 
 		if (trans->hdr.c_flags & C_HDR_F_METADATA) {
 			ct_complete_metadata(state, trans);
@@ -1093,9 +1095,9 @@ ct_process_completions(void *vctx)
 		trans = RB_MIN(ct_trans_lookup, &state->ct_complete);
 	}
 	CT_UNLOCK(&state->ct_complete_lock);
-	if (trans != NULL && trans->tr_trans_id < ct_packet_id) {
+	if (trans != NULL && trans->tr_trans_id < state->ct_packet_id) {
 		CFATALX("old transaction found in completion queue %" PRIu64
-		    " %" PRIu64, trans->tr_trans_id, ct_packet_id);
+		    " %" PRIu64, trans->tr_trans_id, state->ct_packet_id);
 	}
 }
 

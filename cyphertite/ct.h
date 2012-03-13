@@ -383,6 +383,7 @@ ct_op_cb	 ct_free_remotename;
 struct ct_global_state {
 	/* PADs? */
 	int				ct_trans_id; /* next transaction id */
+	uint64_t			ct_packet_id; /* next complete id */
 	int				ct_sha_state;
 	int				ct_csha_state;
 	int				ct_file_state;
@@ -463,7 +464,6 @@ void ct_setup_wakeup_write(void *, ct_func_cb *);
 void ct_setup_wakeup_complete(void *, ct_func_cb *);
 void ct_set_reconnect_timeout(void (*)(evutil_socket_t, short, void*), void *,
     int);
-extern int ct_reconnect_pending;
 
 msgdeliver_ty			ct_handle_msg;
 msgcomplete_ty			ct_write_done;
@@ -481,7 +481,9 @@ void				ct_handle_xml_reply(struct ct_global_state *,
 void				ct_xml_file_open(struct ct_global_state *,
 				    struct ct_trans *, const char *,
 				    int, uint32_t);
-int				ct_xml_file_open_polled(struct ct_assl_io_ctx *,
+int				ct_xml_file_open_polled(
+				    struct ct_global_state *,
+				    struct ct_assl_io_ctx *,
 				    const char *, int, uint32_t);
 #define MD_O_READ	0
 #define MD_O_WRITE	1

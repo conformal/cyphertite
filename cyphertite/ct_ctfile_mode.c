@@ -323,11 +323,11 @@ ct_xml_file_open(struct ct_global_state *state, struct ct_trans *trans,
 }
 
 int
-ct_xml_file_open_polled(struct ct_assl_io_ctx *asslctx,
-    const char *file, int mode, uint32_t chunkno)
+ct_xml_file_open_polled(struct ct_global_state *state,
+    struct ct_assl_io_ctx *asslctx, const char *file, int mode,
+    uint32_t chunkno)
 {
 #define ASSL_TIMEOUT 20
-	extern uint64_t		 ct_packet_id;
 	struct ct_header	 hdr;
 
 	struct xmlsd_element_list xl;
@@ -365,7 +365,7 @@ ct_xml_file_open_polled(struct ct_assl_io_ctx *asslctx,
 	hdr.c_opcode = C_HDR_O_XML;
 	hdr.c_flags = C_HDR_F_METADATA;
 	/* use previous packet id so it'll fit with the state machine */
-	hdr.c_tag = ct_packet_id - 1;
+	hdr.c_tag = state->ct_packet_id - 1;
 	hdr.c_size = sz;
 
 	ct_wire_header(&hdr);
