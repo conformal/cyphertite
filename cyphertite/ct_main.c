@@ -500,6 +500,7 @@ ct_main(int argc, char **argv)
 			    &cea, 1, 0);
 			break;
 		case CT_A_ARCHIVE:
+			ct_normalize_filelist(argv);
 			caa.caa_filelist = argv;
 			caa.caa_excllist = excludelist;
 			caa.caa_matchmode = ct_match_mode;
@@ -554,6 +555,7 @@ ct_main(int argc, char **argv)
 		/* list is handled above */
 		if (ct_action == CT_A_ARCHIVE) {
 			caa.caa_local_ctfile = ctfile;
+			ct_normalize_filelist(argv);
 			caa.caa_filelist = argv;
 			caa.caa_excllist = excludelist;
 			caa.caa_matchmode = ct_match_mode;

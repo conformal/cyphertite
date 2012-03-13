@@ -938,3 +938,33 @@ ct_normalize_username(char *username)
 	for (; *username != '\0'; username++)
 		*username = tolower(*username);
 }
+
+/* Trim trailing '/' */
+char *
+ct_normalize_path(char *path)
+{
+	char	*cp;
+
+	cp = path + strlen(path) - 1;
+	while (cp >= path && (*cp == '/')) {
+		cp--;
+	}
+
+	if (cp >= path) {
+		*(cp + 1) = '\0';
+	}
+
+	return path;
+}
+
+void
+ct_normalize_filelist(char **filelist)
+{
+	char	**fptr;
+
+	fptr = filelist;
+	while (*fptr != NULL) {
+		*fptr = ct_normalize_path(*fptr);
+		fptr++;
+	}
+}

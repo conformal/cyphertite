@@ -190,6 +190,9 @@ ct_xdr_gheader(XDR *xdrs, struct ctfile_gheader *objp,
 		for (i = 0; i < objp->cmg_num_paths; i++) {
 			if (!xdr_string(xdrs, &objp->cmg_paths[i], PATH_MAX))
 				return (FALSE);
+			if (direction == XDR_DECODE)
+				objp->cmg_paths[i] =
+				    ct_normalize_path(objp->cmg_paths[i]);
 		}
 	}
 	return (TRUE);

@@ -247,8 +247,10 @@ extern char		*ct_polltype;
 extern int		 ct_secrets_upload;
 extern int		 ct_auto_differential;
 
-void			ct_prompt_for_login_password(void);
-void			ct_normalize_username(char *);
+void			 ct_prompt_for_login_password(void);
+void			 ct_normalize_username(char *);
+char			*ct_normalize_path(char *);
+void			 ct_normalize_filelist(char **);
 
 /* what are we doing? */
 extern int		ct_action;
