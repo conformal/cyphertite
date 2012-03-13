@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.0.1
+%define version		1.0.2
 %define release		1
 
 Name: 		%{name}
@@ -51,6 +51,10 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Tue Mar 13 2012 - drahn 1.0.2-1
+- Consistently use ctfile instead of md (metadata) file
+- Documentation cleanup
+- Other internal cleanup and bug fixes
 * Mon Feb 27 2012 - davec 1.0.1-1
 - Normalize user names to match web accounts
 - Add support for latest version of libevent

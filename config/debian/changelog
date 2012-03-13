@@ -1,3 +1,11 @@
+cyphertite (1.0.2-1) unstable; urgency=low
+
+  * Consistently use ctfile instead of md (metadata) file
+  * Documentation cleanup
+  * Other internal cleanup and bug fixes
+
+ -- Conformal Systems <package-discuss@conformal.com>  Tue, 13 Mar 2012 14:06:24 -0500
+
 cyphertite (1.0.1-1) unstable; urgency=low
 
   * Normalize user names to match web accounts
