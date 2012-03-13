@@ -379,7 +379,7 @@ ct_op_cb	 ct_check_secrets_upload;
 ct_op_cb	 ctfile_delete;
 ct_op_cb	 ct_free_remotename;
 
-struct ct_global_state{
+struct ct_global_state {
 	/* PADs? */
 	int				ct_sha_state;
 	int				ct_csha_state;
@@ -419,6 +419,12 @@ struct ct_global_state{
 	CT_LOCK_STORE(ct_complete_lock);
 	TAILQ_HEAD(ct_ops, ct_op)	ct_operations;
 	struct ctdb_state		*ct_db_state;
+
+	/* Reconnect state */
+	int				ct_disconnected;
+	int				ct_reconnect_pending;
+#define CT_RECONNECT_DEFAULT_TIMEOUT	30
+	int				ct_reconnect_timeout;
 };
 extern struct ct_global_state		*ct_state;
 

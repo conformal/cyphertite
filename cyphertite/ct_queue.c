@@ -74,8 +74,6 @@ int ct_alloc_block_size;
 int ct_cur_compress_mode = 0;
 uint64_t	ct_packet_id = 0;
 
-int ct_disconnected = 0;
-
 int c_tr_tag = 0;
 int c_trans_free = 0;
 
@@ -115,6 +113,10 @@ ct_setup_state(void)
 	state->ct_write_qlen = 0;
 	state->ct_inflight_rblen = 0;
 	state->ct_complete_rblen = 0;
+
+	state->ct_disconnected = 0;
+	state->ct_reconnect_pending = 0;
+	state->ct_reconnect_timeout = CT_RECONNECT_DEFAULT_TIMEOUT;
 
 	return (state);
 }
@@ -457,10 +459,6 @@ ct_trans_cleanup(void)
 	CNDBG(CT_LOG_TRANS, "freed %d transactions", count);
 }
 
-#define CT_RECONNECT_DEFAULT_TIMEOUT	30
-int ct_reconnect_pending;
-int ct_reconnect_timeout = CT_RECONNECT_DEFAULT_TIMEOUT;
-
 int
 ct_reconnect_internal(struct ct_global_state *state)
 {
@@ -472,9 +470,9 @@ ct_reconnect_internal(struct ct_global_state *state)
 			CFATALX("negotiate failed");
 		}
 
-		if (ct_disconnected > 2)
+		if (state->ct_disconnected > 2)
 			CINFO("Reconnected");
-		ct_disconnected = 0;
+		state->ct_disconnected = 0;
 
 		CT_LOCK(&state->ct_write_lock);
 		TAILQ_FOREACH_SAFE(trans, &state->ct_write_queue, tr_next,
@@ -555,15 +553,15 @@ ct_reconnect_internal(struct ct_global_state *state)
 			}
 		}
 	} else {
-		if (ct_disconnected == 2)
+		if (state->ct_disconnected == 2)
 			CWARNX("Lost connection to server will attempt "
 			    "to reconnect");
-		if (ct_disconnected == 10) {
+		if (state->ct_disconnected == 10) {
 			CWARNX("Unable to contact server, continuing to retry "
 			    "connection");
-			ct_reconnect_timeout *= 2;
+			state->ct_reconnect_timeout *= 2;
 		}
-		ct_disconnected++;
+		state->ct_disconnected++;
 	}
 	return (ct_assl_ctx == NULL);
 }
@@ -574,7 +572,7 @@ ct_reconnect(evutil_socket_t unused, short event, void *varg)
 	struct ct_global_state *state = varg;
 
 	if (ct_reconnect_internal(state) == 0) {
-		ct_reconnect_timeout = CT_RECONNECT_DEFAULT_TIMEOUT;
+		state->ct_reconnect_timeout = CT_RECONNECT_DEFAULT_TIMEOUT;
 		/* XXX - wakeup everyone */
 		ct_wakeup_sha();
 		ct_wakeup_compress();
@@ -586,7 +584,7 @@ ct_reconnect(evutil_socket_t unused, short event, void *varg)
 		ct_wakeup_file();
 	} else {
 		ct_set_reconnect_timeout(ct_reconnect, state,
-		     ct_reconnect_timeout);
+		     state->ct_reconnect_timeout);
 	}
 
 }
@@ -597,7 +595,7 @@ ct_handle_disconnect(struct ct_global_state *state)
 	struct ct_trans		*trans = NULL;
 	int			 idle = 1;
 
-	ct_disconnected = 1;
+	state->ct_disconnected = 1;
 	ct_ssl_cleanup();
 	while(!RB_EMPTY(&state->ct_inflight)) {
 		trans = RB_MAX(ct_iotrans_lookup,
@@ -613,10 +611,10 @@ ct_handle_disconnect(struct ct_global_state *state)
 		idle = 0;
 	}
 	if (idle) {
-		ct_reconnect_pending = 1;
+		state->ct_reconnect_pending = 1;
 	} else {
 		ct_set_reconnect_timeout(ct_reconnect, state,
-		    ct_reconnect_timeout);
+		    state->ct_reconnect_timeout);
 	}
 }
 
@@ -696,7 +694,7 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 	CNDBG(CT_LOG_NET, "write done, trans %" PRIu64 " op %u",
 	    trans->tr_trans_id, hdr->c_opcode);
 
-	if (ct_disconnected) {
+	if (state->ct_disconnected) {
 		/*
 		 * this transaction is already in the inflight rb tree
 		 * move back to to write_queue
@@ -1099,16 +1097,16 @@ ct_process_write(void *vctx)
 	int			slot;
 
 	/* did we idle out? */
-	if (ct_reconnect_pending) {
+	if (state->ct_reconnect_pending) {
 		if (ct_reconnect_internal(state) != 0)
 			ct_set_reconnect_timeout(ct_reconnect, NULL,
-			     ct_reconnect_timeout);
-		ct_reconnect_pending = 0;
+			     state->ct_reconnect_timeout);
+		state->ct_reconnect_pending = 0;
 	}
 
 	CNDBG(CT_LOG_NET, "wakeup write");
 	CT_LOCK(&state->ct_write_lock);
-	while (ct_disconnected == 0 &&
+	while (state->ct_disconnected == 0 &&
 	    !TAILQ_EMPTY(&state->ct_write_queue)) {
 		trans = TAILQ_FIRST(&state->ct_write_queue);
 		TAILQ_REMOVE(&state->ct_write_queue, trans, tr_next);
