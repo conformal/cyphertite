@@ -128,7 +128,7 @@ ct_set_file_state(struct ct_global_state *state, int newstate)
 int
 ct_get_file_state(struct ct_global_state *state)
 {
-	return (ct_state->ct_file_state);
+	return (state->ct_file_state);
 }
 
 void
@@ -433,7 +433,7 @@ ct_trans_free(struct ct_trans *trans)
 	}
 
 	/* XXX - should this wait for a low threshold? */
-	if (ct_state->ct_file_state == CT_S_WAITING_TRANS) {
+	if (ct_get_file_state(ct_state) == CT_S_WAITING_TRANS) {
 		CNDBG(CT_LOG_TRANS, "send wakeup");
 		ct_wakeup_file();
 	}
@@ -1071,9 +1071,8 @@ ct_process_completions(void *vctx)
 		 * works as it does, we don't know the size of the file so
 		 * we keep reading until we run out of chunks
 		 */
-		if (state->ct_file_state != CT_S_FINISHED)
+		if (ct_get_file_state(state) != CT_S_FINISHED)
 			ct_wakeup_file();
-
 
 		CT_LOCK(&state->ct_complete_lock);
 		trans = RB_MIN(ct_trans_lookup, &state->ct_complete);
@@ -1297,7 +1296,7 @@ ct_handle_read_reply(struct ct_global_state *state, struct ct_trans *trans,
 		CNDBG(CT_LOG_NET, "c_flags on reply %x", hdr->c_flags);
 		if (hdr->c_flags & C_HDR_F_METADATA) {
 			/* FAIL on metadata read is 'eof' */
-			if (state->ct_file_state != CT_S_FINISHED) {
+			if (ct_get_file_state(state) != CT_S_FINISHED) {
 				ct_set_file_state(state, CT_S_FINISHED);
 				trans->tr_state = TR_S_EX_FILE_END;
 			} else {

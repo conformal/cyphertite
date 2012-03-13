@@ -571,7 +571,8 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 	int			nextlvl = 0;
 
 	CNDBG(CT_LOG_TRANS, "processing");
-	if (state->ct_file_state == CT_S_STARTING) {
+	switch (ct_get_file_state(state)) {
+	case CT_S_STARTING:
 		if (*filelist == NULL) {
 			CFATALX("no files specified");
 		}
@@ -623,9 +624,12 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 
 		if (basisbackup != NULL)
 			e_free(&basisbackup);
-	} else if (state->ct_file_state == CT_S_FINISHED)
+		break;
+	case CT_S_FINISHED:
 		return;
-
+	default:
+		break;
+	}
 	ct_set_file_state(state, CT_S_RUNNING);
 
 	if (cap->cap_curnode == NULL)

@@ -110,7 +110,8 @@ ctfile_archive(struct ct_global_state *state, struct ct_op *op)
 	ssize_t				 rsz, rlen;
 	int				 error;
 
-	if (state->ct_file_state == CT_S_STARTING) {
+	switch (ct_get_file_state(state)) {
+	case CT_S_STARTING:
 		cas = e_calloc(1, sizeof(*cas));
 		op->op_priv = cas;
 
@@ -152,12 +153,15 @@ ctfile_archive(struct ct_global_state *state, struct ct_op *op)
 			rname = ctfile_cook_name(ctfile);
 			cca->cca_remotename = (char *)rname;
 		}
-	} else if (state->ct_file_state == CT_S_FINISHED) {
+		break;
+	case CT_S_FINISHED:
 		/* We're done here */
 		return;
-	} else if (state->ct_file_state == CT_S_WAITING_SERVER) {
+	case CT_S_WAITING_SERVER:
 		CNDBG(CT_LOG_FILE, "waiting on remote open");
 		return;
+	default:
+		break;
 	}
 
 	CNDBG(CT_LOG_FILE, "entered for block %d", cas->cas_block_no);
@@ -456,7 +460,8 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 	struct ct_trans			*trans;
 	struct ct_header		*hdr;
 
-	if (state->ct_file_state == CT_S_STARTING) {
+	switch (ct_get_file_state(state)) {
+	case CT_S_STARTING:
 		ces = e_calloc(1, sizeof(*ces));
 		op->op_priv = ces;
 
@@ -465,13 +470,15 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 			cca->cca_remotename = (char *)rname;
 		}
 		ct_file_extract_setup_dir(cca->cca_tdir);
-	} else if (state->ct_file_state == CT_S_FINISHED) {
-		return;
-	} else if (state->ct_file_state == CT_S_WAITING_SERVER) {
+		break;
+	case CT_S_WAITING_SERVER:
 		CNDBG(CT_LOG_FILE, "waiting on remote open");
+		/* FALLTHROUGH */
+	case CT_S_FINISHED:
 		return;
+	default:
+		break;
 	}
-
 	ct_set_file_state(state, CT_S_RUNNING);
 
 again:
@@ -565,7 +572,7 @@ ct_complete_metadata(struct ct_global_state *state, struct ct_trans *trans)
 			ct_file_extract_write(trans->tr_fl_node,
 			    trans->tr_data[slot], trans->tr_size[slot]);
 		} else {
-			state->ct_file_state = CT_S_FINISHED;
+			ct_set_file_state(state, CT_S_FINISHED);
 		}
 		break;
 

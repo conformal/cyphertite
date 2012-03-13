@@ -318,7 +318,8 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 	char			shat[SHA_DIGEST_STRING_LENGTH];
 
 	CNDBG(CT_LOG_TRANS, "entry");
-	if (state->ct_file_state == CT_S_STARTING) {
+	switch (ct_get_file_state(state)) {
+	case CT_S_STARTING:
 		if (ex_priv == NULL) {
 			ex_priv = e_calloc(1, sizeof(*ex_priv));
 			TAILQ_INIT(&ex_priv->extract_head);
@@ -340,8 +341,11 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			    ct_match_compile(CT_MATCH_RB, &nothing);
 			ex_priv->fillrb = 1;
 		}
-	} else if (state->ct_file_state == CT_S_FINISHED) {
+		break;
+	case CT_S_FINISHED:
 		return;
+	default:
+		break;
 	}
 
 	ct_set_file_state(state, CT_S_RUNNING);
@@ -569,7 +573,8 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 	char				 shat[SHA_DIGEST_STRING_LENGTH];
 
 	CNDBG(CT_LOG_TRANS, "entry");
-	if (state->ct_file_state == CT_S_STARTING) {
+	switch (ct_get_file_state(state)) {
+	case CT_S_STARTING:
 		CNDBG(CT_LOG_TRANS, "starting");
 		ex_priv = e_calloc(1, sizeof(*ex_priv));
 		/* open file and seek to beginning of file */
@@ -578,8 +583,11 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			CFATALX("can't open metadata file %s",
 			    cefa->cefa_ctfile);
 		ct_file_extract_setup_dir(NULL);
-	} else if (state->ct_file_state == CT_S_FINISHED) {
+		break;
+	case CT_S_FINISHED:
 		return;
+	default:
+		break;
 	}
 
 	ct_set_file_state(state, CT_S_RUNNING);
