@@ -719,8 +719,8 @@ ctfile_delete(struct ct_op *op)
 }
 
 void
-ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
-    void *vbody)
+ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
+    struct ct_header *hdr, void *vbody)
 {
 	struct xmlsd_element_list xl;
 	struct xmlsd_attribute *xa;

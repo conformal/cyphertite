@@ -462,7 +462,8 @@ ct_body_free_func		ct_body_free;
 
 void				*ct_body_alloc_xml(size_t);
 
-void				ct_handle_xml_reply(struct ct_trans *trans,
+void				ct_handle_xml_reply(struct ct_global_state *,
+				    struct ct_trans *trans,
 				    struct ct_header *hdr, void *vbody);
 void				ct_xml_file_open(struct ct_trans *,
 				    const char *, int, uint32_t);
