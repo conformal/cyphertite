@@ -541,7 +541,7 @@ ct_compare_secrets(struct ct_op *op)
 	if (tsb.st_size != sb.st_size)
 		CFATALX("size doesn't match for server secrets file "
 		    "(%" PRId64 " vs %" PRId64 "), please confirm that local "
-		    "secrets file is the correct one", tsb.st_size, sb.st_size);
+		    "secrets file is the correct one", (int64_t)tsb.st_size, (int64_t)sb.st_size);
 
 	if ((f = fopen(ct_crypto_secrets, "r")) == NULL)
 		CFATAL("can't open secrets file");
@@ -555,7 +555,7 @@ ct_compare_secrets(struct ct_op *op)
 			sz = 1024;
 		sb.st_size -= sz;
 		CNDBG(CT_LOG_FILE, "sz = %zu remaining = %" PRId64,
-		    sz, sb.st_size);
+		    sz, (int64_t)sb.st_size);
 		if ((rsz = fread(buf, 1, sz, f)) != sz)
 			CFATALX("short read on secrets file (%zu %zu)",
 			    sz, rsz);
