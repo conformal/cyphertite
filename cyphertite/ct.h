@@ -767,3 +767,8 @@ ct_op_cb	ct_extract_file_cleanup;
 #define	CT_LOG_VERTREE	(0x800)
 
 uint64_t ct_get_debugmask(char *);
+
+/* FreeBSD 7 doesn't have openat() */
+#if defined(__FreeBSD__) &&  __FreeBSD_version < 800000 
+#define CT_NO_OPENAT
+#endif
