@@ -47,7 +47,7 @@ ct_list_op(struct ct_global_state *state, struct ct_op *op)
 	 * state machine for async operations and there should be none
 	 * others allocated it doesn't really matter.
 	 */
-	trans = ct_trans_alloc();
+	trans = ct_trans_alloc(state);
 	if (trans == NULL) {
 		/* system busy, return (should never happen) */
 		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
@@ -350,7 +350,7 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 
 	ct_set_file_state(state, CT_S_RUNNING);
 	while (1) {
-		trans = ct_trans_alloc();
+		trans = ct_trans_alloc(state);
 		if (trans == NULL) {
 			/* system busy, return */
 			CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
@@ -372,7 +372,7 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 				goto skip; /* skip ze file for now */
 			}
 
-			trans = ct_trans_realloc_local(trans);
+			trans = ct_trans_realloc_local(state, trans);
 			trans->tr_fl_node = ex_priv->fl_ex_node = fnode =
 			    e_calloc(1, sizeof(*fnode));
 
@@ -401,7 +401,7 @@ skipfree:
 				ct_free_fnode(fnode);
 skip:
 				fnode = NULL;
-				ct_trans_free(trans);
+				ct_trans_free(state, trans);
 				continue;
 			}
 
@@ -417,7 +417,7 @@ skip:
 			    trans->tr_fl_node->fl_skip_file != 0) {
 				if (ctfile_parse_seek(&ex_priv->xdr_ctx))
 					CFATALX("can't seek past shas");
-				ct_trans_free(trans);
+				ct_trans_free(state, trans);
 				continue;
 			}
 
@@ -427,7 +427,7 @@ skip:
 				    trans->tr_fl_node->fl_sname);
 				if (ctfile_parse_seek(&ex_priv->xdr_ctx))
 					CFATALX("can't seek past shas");
-				ct_trans_free(trans);
+				ct_trans_free(state, trans);
 				continue;
 			}
 
@@ -457,12 +457,12 @@ skip:
 			ct_queue_transfer(state, trans);
 			break;
 		case XS_RET_FILE_END:
-			trans = ct_trans_realloc_local(trans);
+			trans = ct_trans_realloc_local(state, trans);
 			trans->tr_fl_node = ex_priv->fl_ex_node; /* reload */
 
 			if (ex_priv->doextract == 0 ||
 			    trans->tr_fl_node->fl_skip_file != 0) {
-				ct_trans_free(trans);
+				ct_trans_free(state, trans);
 				continue;
 			}
 			bcopy(ex_priv->xdr_ctx.xs_trl.cmt_sha, trans->tr_sha,
@@ -508,7 +508,7 @@ skip:
 					ex_priv->haverb = 1;
 					ex_priv->fillrb = 0;
 				}
-				ct_trans_free(trans);
+				ct_trans_free(state, trans);
 				/* reinits ex_priv->xdr_ctx */
 				ct_extract_open_next(&ex_priv->extract_head,
 				    &ex_priv->xdr_ctx);
@@ -592,7 +592,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 
 	ct_set_file_state(state, CT_S_RUNNING);
 	while (1) {
-		if ((trans = ct_trans_alloc()) == NULL) {
+		if ((trans = ct_trans_alloc(state)) == NULL) {
 			CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
 			ct_set_file_state(state, CT_S_WAITING_TRANS);
 			return;
@@ -619,7 +619,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			if (ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas == -1)
 				CFATALX("can't extract file with -1 shas");
 
-			trans = ct_trans_realloc_local(trans);
+			trans = ct_trans_realloc_local(state, trans);
 			trans->tr_trans_id = ltrans_id;
 			trans->tr_fl_node = ex_priv->fl_ex_node =
 			    e_calloc(1, sizeof(*trans->tr_fl_node));
@@ -665,7 +665,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			trans->tr_dataslot = 0;
 			break;
 		case XS_RET_FILE_END:
-			trans = ct_trans_realloc_local(trans);
+			trans = ct_trans_realloc_local(state, trans);
 			trans->tr_fl_node = ex_priv->fl_ex_node; /* reload */
 			trans->tr_trans_id = ltrans_id;
 

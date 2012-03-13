@@ -96,7 +96,7 @@ ct_setup_state(void)
 	state->ct_comp_state = CT_S_WAITING_TRANS;
 	state->ct_crypt_state = CT_S_WAITING_TRANS;
 	/* XXX: We need this? */
-	/* ct_state->ct_write_state = CT_S_WAITING_TRANS; */
+	/* state->ct_write_state = CT_S_WAITING_TRANS; */
 
 	TAILQ_INIT(&state->ct_sha_queue);
 	TAILQ_INIT(&state->ct_comp_queue);
@@ -317,7 +317,7 @@ skip_csha:
 #define CT_MAX_LOCAL_TRANSACTIONS	(100)
 static int ct_num_local_transactions;
 static struct ct_trans *
-ct_trans_alloc_local(void)
+ct_trans_alloc_local(struct ct_global_state *state)
 {
 
 	struct ct_trans *trans;
@@ -349,7 +349,7 @@ ct_trans_alloc_local(void)
  * No fields saved, just the right to do some work.
  */
 struct ct_trans *
-ct_trans_realloc_local(struct ct_trans *trans)
+ct_trans_realloc_local(struct ct_global_state *state, struct ct_trans *trans)
 {
 	struct ct_trans		*tmp;
 
@@ -358,16 +358,16 @@ ct_trans_realloc_local(struct ct_trans *trans)
 	 * the non local trans, we'll eventually starve those too and
 	 * wait for some to finish.
 	 */
-	if ((tmp = ct_trans_alloc_local()) == NULL)
+	if ((tmp = ct_trans_alloc_local(state)) == NULL)
 		return (trans);
 
-	ct_trans_free(trans);
+	ct_trans_free(state, trans);
 
 	return (tmp);
 }
 
 struct ct_trans *
-ct_trans_alloc(void)
+ct_trans_alloc(struct ct_global_state *state)
 {
 	struct ct_trans *trans;
 	void *tr_data[2];
@@ -414,7 +414,7 @@ ct_trans_alloc(void)
 }
 
 void
-ct_trans_free(struct ct_trans *trans)
+ct_trans_free(struct ct_global_state *state, struct ct_trans *trans)
 {
 	/* This should come from preallocated shared memory freelist */
 	if (trans->tr_local) {
@@ -433,7 +433,7 @@ ct_trans_free(struct ct_trans *trans)
 	}
 
 	/* XXX - should this wait for a low threshold? */
-	if (ct_get_file_state(ct_state) == CT_S_WAITING_TRANS) {
+	if (ct_get_file_state(state) == CT_S_WAITING_TRANS) {
 		CNDBG(CT_LOG_TRANS, "send wakeup");
 		ct_wakeup_file();
 	}
@@ -1066,7 +1066,7 @@ ct_process_completions(void *vctx)
 		} else {
 			ct_complete_normal(state, trans);
 		}
-		ct_trans_free(trans);
+		ct_trans_free(state, trans);
 
 		/*
 		 * XXX this is needed while the ctfile download protocol

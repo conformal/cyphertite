@@ -640,7 +640,7 @@ loop:
 	new_file = (cap->cap_curnode->fl_state == CT_FILE_START);
 
 	/* allocate transaction */
-	ct_trans = ct_trans_alloc();
+	ct_trans = ct_trans_alloc(state);
 	if (ct_trans == NULL) {
 		/* system busy, return */
 		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
@@ -653,7 +653,7 @@ loop:
 	 * to the server. don't waste slots.
 	 */
 	if (!C_ISREG(cap->cap_curnode->fl_type) || new_file)
-		ct_trans = ct_trans_realloc_local(ct_trans);
+		ct_trans = ct_trans_realloc_local(state, ct_trans);
 
 	/* handle special files */
 	if (!C_ISREG(cap->cap_curnode->fl_type)) {
@@ -672,7 +672,7 @@ loop:
 					    " based on mtime %s",
 					    cap->cap_curnode->fl_sname);
 					ct_free_fnode(cap->cap_curnode);
-					ct_trans_free(ct_trans);
+					ct_trans_free(state, ct_trans);
 					goto skip;
 				}
 			}
@@ -703,7 +703,7 @@ loop:
 		    ct_follow_symlinks)) == -1) {
 			CWARN("archive: unable to open file '%s'",
 			    cap->cap_curnode->fl_sname);
-			ct_trans_free(ct_trans);
+			ct_trans_free(state, ct_trans);
 			cap->cap_curnode->fl_state = CT_FILE_FINISHED;
 			goto next_file;
 		}
@@ -761,7 +761,7 @@ loop:
 		 */
 		if (cap->cap_curnode->fl_skip_file && caa->caa_allfiles == 0) {
 			ct_free_fnode(cap->cap_curnode);
-			ct_trans_free(ct_trans);
+			ct_trans_free(state, ct_trans);
 			goto skip;
 		}
 
@@ -865,7 +865,7 @@ done:
 	/* done with backup */
 	ct_set_file_state(state, CT_S_FINISHED);
 
-	ct_trans = ct_trans_alloc();
+	ct_trans = ct_trans_alloc(state);
 	if (ct_trans == NULL) {
 		/* system busy, return */
 		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");

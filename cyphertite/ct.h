@@ -222,9 +222,11 @@ struct ct_trans {
 	const char		*tr_ctfile_name;
 };
 
-struct ct_trans		*ct_trans_alloc(void);
-struct ct_trans		*ct_trans_realloc_local(struct ct_trans *);
-void			ct_trans_free(struct ct_trans *trans);
+struct ct_trans		*ct_trans_alloc(struct ct_global_state *);
+struct ct_trans		*ct_trans_realloc_local(struct ct_global_state *,
+			    struct ct_trans *);
+void			ct_trans_free(struct ct_global_state *,
+			    struct ct_trans *);
 void			ct_trans_cleanup(void);
 void			ct_dnode_cleanup(void);
 void			ct_free_fnode(struct fnode *);

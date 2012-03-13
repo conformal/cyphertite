@@ -167,7 +167,7 @@ ctfile_archive(struct ct_global_state *state, struct ct_op *op)
 	CNDBG(CT_LOG_FILE, "entered for block %d", cas->cas_block_no);
 	ct_set_file_state(state, CT_S_RUNNING);
 loop:
-	ct_trans = ct_trans_alloc();
+	ct_trans = ct_trans_alloc(state);
 	if (ct_trans == NULL) {
 		/* system busy, return */
 		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
@@ -417,7 +417,7 @@ ct_xml_file_close(struct ct_global_state *state)
 	struct ct_trans			*trans;
 	size_t				 sz;
 
-	trans = ct_trans_alloc();
+	trans = ct_trans_alloc(state);
 	if (trans == NULL) {
 		/* system busy, return  XXX this would be pretty bad. */
 		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
@@ -482,7 +482,7 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 	ct_set_file_state(state, CT_S_RUNNING);
 
 again:
-	trans = ct_trans_alloc();
+	trans = ct_trans_alloc(state);
 	if (trans == NULL) {
 		/* system busy, return */
 		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
@@ -509,7 +509,7 @@ again:
 		ces->ces_fnode->fl_atime = time(NULL);
 		ces->ces_fnode->fl_mtime = time(NULL);
 
-		trans = ct_trans_realloc_local(trans);
+		trans = ct_trans_realloc_local(state, trans);
 		trans->tr_fl_node = ces->ces_fnode;
 		trans->tr_state = TR_S_EX_FILE_START;
 		trans->tr_trans_id = ct_trans_id++;
@@ -633,7 +633,7 @@ ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 
 	ct_set_file_state(state, CT_S_FINISHED);
 
-	trans = ct_trans_alloc();
+	trans = ct_trans_alloc(state);
 
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_state = TR_S_XML_LIST;
@@ -711,7 +711,7 @@ ctfile_delete(struct ct_global_state *state, struct ct_op *op)
 
 	e_free(&rname);
 
-	trans = ct_trans_alloc();
+	trans = ct_trans_alloc(state);
 	trans->tr_trans_id = ct_trans_id++;
 	trans->tr_state = TR_S_XML_DELETE;
 
@@ -1015,7 +1015,7 @@ ct_cull_setup(struct ct_global_state *state, struct ct_op *op)
 	CNDBG(CT_LOG_TRANS, "cull_setup");
 	ct_set_file_state(state, CT_S_RUNNING);
 
-	trans = ct_trans_alloc();
+	trans = ct_trans_alloc(state);
 
 	if (trans == NULL) {
 		ct_set_file_state(state, CT_S_WAITING_TRANS);
@@ -1056,7 +1056,7 @@ ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 	sent_complete = 1;
 
 	CNDBG(CT_LOG_TRANS, "send cull_complete");
-	trans = ct_trans_alloc();
+	trans = ct_trans_alloc(state);
 
 	if (trans == NULL) {
 		ct_set_file_state(state, CT_S_WAITING_TRANS);
@@ -1103,7 +1103,7 @@ ct_cull_send_shas(struct ct_global_state *state, struct ct_op *op)
 	}
 	ct_set_file_state(state, CT_S_RUNNING);
 
-	trans = ct_trans_alloc();
+	trans = ct_trans_alloc(state);
 
 	if (trans == NULL) {
 		ct_set_file_state(state, CT_S_WAITING_TRANS);
