@@ -478,9 +478,8 @@ ct_reconnect_internal(struct ct_global_state *state)
 {
 	struct ct_trans		*trans, *ttrans;
 
-	ct_assl_ctx = ct_ssl_connect(state, 1);
-	if (ct_assl_ctx) {
-		if (ct_assl_negotiate_poll(state, ct_assl_ctx)) {
+	if ((state->ct_assl_ctx = ct_ssl_connect(state, 1)) != NULL) {
+		if (ct_assl_negotiate_poll(state)) {
 			CFATALX("negotiate failed");
 		}
 
@@ -546,7 +545,7 @@ ct_reconnect_internal(struct ct_global_state *state)
 				 * queue being full and how much we have in
 				 * the queue after us and just do this polled.
 				 */
-				if (ct_xml_file_open_polled(state, ct_assl_ctx,
+				if (ct_xml_file_open_polled(state,
 				    trans->tr_ctfile_name, MD_O_APPEND,
 				    trans->tr_ctfile_chunkno))
 					CFATALX("can't reopen metadata file");
@@ -559,7 +558,7 @@ ct_reconnect_internal(struct ct_global_state *state)
 				 * the right open at chunkno
 				 * For how this works see above.
 				 */
-				if (ct_xml_file_open_polled(state, ct_assl_ctx,
+				if (ct_xml_file_open_polled(state,
 				    trans->tr_ctfile_name, MD_O_READ,
 				    trans->tr_ctfile_chunkno))
 					CFATALX("can't reopen metadata file");
@@ -577,7 +576,7 @@ ct_reconnect_internal(struct ct_global_state *state)
 		}
 		state->ct_disconnected++;
 	}
-	return (ct_assl_ctx == NULL);
+	return (state->ct_assl_ctx == NULL);
 }
 
 void
@@ -610,7 +609,9 @@ ct_handle_disconnect(struct ct_global_state *state)
 	int			 idle = 1;
 
 	state->ct_disconnected = 1;
-	ct_ssl_cleanup();
+	ct_ssl_cleanup(state->ct_assl_ctx);
+	state->ct_assl_ctx = NULL;
+
 	while(!RB_EMPTY(&state->ct_inflight)) {
 		trans = RB_MAX(ct_iotrans_lookup,
 		    &state->ct_inflight);
@@ -949,7 +950,7 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 		if (ct_op_complete(state) == 0)
 			return;
 		if (ct_verbose_ratios)
-			ct_dump_stats(stdout);
+			ct_dump_stats(state, stdout);
 		ct_shutdown(state);
 		break;
 	case TR_S_SPECIAL:
@@ -1203,12 +1204,12 @@ ct_process_write(void *vctx)
 
 			hdr->c_size += sizeof(*cmf);
 
-			ct_assl_writev_op(ct_assl_ctx, hdr, iov, 2);
+			ct_assl_writev_op(state->ct_assl_ctx, hdr, iov, 2);
 			CT_LOCK(&state->ct_write_lock);
 			continue;
 		}
 
-		ct_assl_write_op(ct_assl_ctx, hdr, data);
+		ct_assl_write_op(state->ct_assl_ctx, hdr, data);
 		CT_LOCK(&state->ct_write_lock);
 	}
 	CT_UNLOCK(&state->ct_write_lock);
@@ -1575,5 +1576,5 @@ ct_display_queues(struct ct_global_state *state)
 		CT_UNLOCK(&state->ct_complete_lock);
 		fprintf(stderr, "Free     queue len %d\n", c_trans_free);
 	}
-	ct_dump_stats(stderr);
+	ct_dump_stats(state, stderr);
 }

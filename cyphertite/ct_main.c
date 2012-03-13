@@ -188,12 +188,13 @@ ct_init_eventloop(void)
 	    ct_crypto_secrets != NULL);
 
 	gettimeofday(&ct_stats->st_time_start, NULL);
-	ct_assl_ctx = ct_ssl_connect(state, 0);
-	if (ct_assl_negotiate_poll(state, ct_assl_ctx))
+	state->ct_assl_ctx = ct_ssl_connect(state, 0);
+	if (ct_assl_negotiate_poll(state))
 		CFATALX("negotiate failed");
 
 	CNDBG(CT_LOG_NET, "assl data: as bits %d, protocol [%s]",
-	    ct_assl_ctx->c->as_bits, ct_assl_ctx->c->as_protocol);
+	    state->ct_assl_ctx->c->as_bits,
+	    state->ct_assl_ctx->c->as_protocol);
 
 	CT_LOCK_INIT(&state->ct_sha_lock);
 	CT_LOCK_INIT(&state->ct_comp_lock);
@@ -218,7 +219,10 @@ void
 ct_cleanup_eventloop(struct ct_global_state *state)
 {
 	ct_trans_cleanup();
-	ct_ssl_cleanup();
+	if (state->ct_assl_ctx) {
+		ct_ssl_cleanup(state->ct_assl_ctx);
+		state->ct_assl_ctx = NULL;
+	}
 	ctdb_shutdown(state->ct_db_state);
 	ct_cleanup_login_cache();
 	// XXX: ct_lock_cleanup();

@@ -45,10 +45,7 @@
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 #endif
 
-/* assl pipe */
-struct ct_assl_io_ctx	*ct_assl_ctx;
 int			 ct_skip_xml_negotiate;
-
 struct ct_io_queue	*ct_ioctx_alloc(void);
 void			ct_ioctx_free(struct ct_io_queue *);
 void			ct_print_scaled_stat(FILE *, const char *, int64_t,
@@ -160,15 +157,13 @@ ct_load_certs(struct assl_context *c)
 		    ct_configfile);
 }
 
-
-struct ct_assl_io_ctx    *ct_ssl_ctx;
-
 struct ct_assl_io_ctx *
 ct_ssl_connect(struct ct_global_state *state, int nonfatal)
 {
-	struct assl_context *c;
+	struct ct_assl_io_ctx	*ctx;
+	struct assl_context	*c;
 
-	ct_ssl_ctx = e_calloc(1, sizeof (*ct_ssl_ctx));
+	ctx = e_calloc(1, sizeof (*ctx));
 
 	c = assl_alloc_context(ASSL_M_TLSV1_CLIENT, 0);
 	if (c == NULL)
@@ -176,33 +171,33 @@ ct_ssl_connect(struct ct_global_state *state, int nonfatal)
 
 	ct_load_certs(c);
 
-	ct_assl_io_ctx_init(ct_ssl_ctx, c, ct_handle_msg, ct_write_done,
+	ct_assl_io_ctx_init(ctx, c, ct_handle_msg, ct_write_done,
 	    state, ct_header_alloc, ct_header_free, ct_body_alloc,
 	    ct_body_free, ct_ioctx_alloc, ct_ioctx_free);
 
 	if (assl_event_connect(c, ct_host, ct_hostport,
 		ASSL_F_NONBLOCK|ASSL_F_KEEPALIVE|ASSL_F_THROUGHPUT,
-	    ct_evt_base, ct_event_assl_read, ct_event_assl_write, ct_ssl_ctx)) {
+	    ct_evt_base, ct_event_assl_read, ct_event_assl_write, ctx)) {
 		if (nonfatal) {
 			/* XXX */
-			ct_assl_disconnect(ct_ssl_ctx);
-			e_free(&ct_ssl_ctx);
+			ct_assl_disconnect(ctx);
+			e_free(&ctx);
+			ctx = NULL;
 		} else
 			assl_fatalx("server connect failed");
 	}
-	if (ct_io_bw_limit && ct_ssl_ctx != NULL)
-		ct_ssl_init_bw_lim(ct_ssl_ctx);
+	if (ct_io_bw_limit && ctx != NULL)
+		ct_ssl_init_bw_lim(ctx);
 
-	return ct_ssl_ctx;
+	return ctx;
 }
 
 void
-ct_ssl_cleanup(void)
+ct_ssl_cleanup(struct ct_assl_io_ctx *ctx)
 {
-	if (ct_ssl_ctx != NULL) {
-		ct_assl_disconnect(ct_assl_ctx);
-		e_free(&ct_ssl_ctx);
-		ct_ssl_ctx = NULL;
+	if (ctx != NULL) {
+		ct_assl_disconnect(ctx);
+		e_free(&ctx);
 	}
 }
 
@@ -237,8 +232,7 @@ ct_header_free(void *vctx, struct ct_header *hdr)
 
 #define ASSL_TIMEOUT 20
 int
-ct_assl_negotiate_poll(struct ct_global_state *state,
-    struct ct_assl_io_ctx *asslctx)
+ct_assl_negotiate_poll(struct ct_global_state *state)
 {
 	struct xmlsd_element		*xe;
 	struct xmlsd_element_list	 xl;
@@ -267,18 +261,20 @@ ct_assl_negotiate_poll(struct ct_global_state *state,
 	buf[6] = (ct_max_block_size >> 16) & 0xff;
 	buf[7] = (ct_max_block_size >> 24) & 0xff;
 	ct_wire_header(&hdr);
-	if (ct_assl_io_write_poll(asslctx, &hdr, sizeof hdr, ASSL_TIMEOUT)
-	    != sizeof hdr) {
+	if (ct_assl_io_write_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
+	    ASSL_TIMEOUT) != sizeof hdr) {
 		CWARNX("could not write header");
 		goto done;
 	}
-	if (ct_assl_io_write_poll(asslctx, buf, 8,  ASSL_TIMEOUT) != 8) {
+	if (ct_assl_io_write_poll(state->ct_assl_ctx, buf, 8,
+	    ASSL_TIMEOUT) != 8) {
 		CWARNX("could not write body");
 		goto done;
 	}
 
 	/* get server reply */
-	sz = ct_assl_io_read_poll(asslctx, &hdr, sizeof hdr, ASSL_TIMEOUT);
+	sz = ct_assl_io_read_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
+	    ASSL_TIMEOUT);
 	if (sz != sizeof hdr) {
 		CWARNX("invalid header size %ld", (long) sz);
 		goto done;
@@ -288,8 +284,8 @@ ct_assl_negotiate_poll(struct ct_global_state *state,
 	if (hdr.c_version == C_HDR_VERSION &&
 	    hdr.c_opcode == C_HDR_O_NEG_REPLY) {
 		if (hdr.c_size == 8) {
-			if (ct_assl_io_read_poll(asslctx, buf, hdr.c_size,
-			    ASSL_TIMEOUT) != hdr.c_size) {
+			if (ct_assl_io_read_poll(state->ct_assl_ctx, buf,
+			    hdr.c_size, ASSL_TIMEOUT) != hdr.c_size) {
 				CWARNX("couldn't read neg parameters");
 				goto done;
 			}
@@ -336,19 +332,20 @@ ct_assl_negotiate_poll(struct ct_global_state *state,
 	hdr.c_flags = ct_compress_enabled;
 
 	ct_wire_header(&hdr);
-	if (ct_assl_io_write_poll(asslctx, &hdr, sizeof hdr, ASSL_TIMEOUT)
-	    != sizeof hdr) {
+	if (ct_assl_io_write_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
+	    ASSL_TIMEOUT) != sizeof hdr) {
 		CWARNX("could not write header");
 		goto done;
 	}
-	if (ct_assl_io_write_poll(asslctx, body, payload_sz,  ASSL_TIMEOUT)
-	    != payload_sz) {
+	if (ct_assl_io_write_poll(state->ct_assl_ctx, body, payload_sz,
+	    ASSL_TIMEOUT) != payload_sz) {
 		CWARNX("could not write body");
 		goto done;
 	}
 
 	/* get server reply */
-	sz = ct_assl_io_read_poll(asslctx, &hdr, sizeof hdr, ASSL_TIMEOUT);
+	sz = ct_assl_io_read_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
+	    ASSL_TIMEOUT);
 	if (sz != sizeof hdr) {
 		CWARNX("invalid header size %ld", (long) sz);
 		goto done;
@@ -383,12 +380,13 @@ ct_assl_negotiate_poll(struct ct_global_state *state,
 	hdr.c_size = payload_sz = orig_size;
 
 	ct_wire_header(&hdr);
-	if (ct_assl_io_write_poll(ct_assl_ctx, &hdr, sizeof hdr, ASSL_TIMEOUT)
-	    != sizeof hdr) {
+	if (ct_assl_io_write_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
+	    ASSL_TIMEOUT) != sizeof hdr) {
 		CWARNX("could not write header");
 		goto done;
 	}
-	if (ct_assl_io_write_poll(ct_assl_ctx, body, payload_sz,  ASSL_TIMEOUT)
+	if (ct_assl_io_write_poll(state->ct_assl_ctx, body, payload_sz,
+	    ASSL_TIMEOUT)
 	    != payload_sz) {
 		CWARNX("could not write body");
 		goto done;
@@ -396,7 +394,8 @@ ct_assl_negotiate_poll(struct ct_global_state *state,
 	e_free(&body);
 
 	/* get server reply */
-	sz = ct_assl_io_read_poll(ct_assl_ctx, &hdr, sizeof hdr, ASSL_TIMEOUT);
+	sz = ct_assl_io_read_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
+	    ASSL_TIMEOUT);
 	if (sz != sizeof hdr) {
 		CWARNX("invalid header size %" PRId64, (int64_t)sz);
 		goto done;
@@ -408,7 +407,8 @@ ct_assl_negotiate_poll(struct ct_global_state *state,
 	}
 	/* get server reply body */
 	body = e_calloc(1, hdr.c_size);
-	sz = ct_assl_io_read_poll(ct_assl_ctx, body, hdr.c_size, ASSL_TIMEOUT);
+	sz = ct_assl_io_read_poll(state->ct_assl_ctx, body, hdr.c_size,
+	    ASSL_TIMEOUT);
 	if (sz != hdr.c_size) {
 		CWARNX("invalid xml body size %"PRId64" %d", (int64_t)sz,
 		    hdr.c_size);
@@ -550,7 +550,7 @@ ct_print_scaled_stat(FILE *outfh, const char *label, int64_t val,
 }
 
 void
-ct_dump_stats(FILE *outfh)
+ct_dump_stats(struct ct_global_state *state, FILE *outfh)
 {
 	struct timeval time_end, scan_delta, time_delta;
 	int64_t sec;
@@ -639,30 +639,32 @@ ct_dump_stats(FILE *outfh)
 		if (ct_action == CT_A_ARCHIVE)
 			print_time_scaled(outfh, "Scan Time\t\t\t    ",
 			    &scan_delta);
-		ct_display_assl_stats(outfh);
+		ct_display_assl_stats(state, outfh);
 	}
 }
 
 void
-ct_display_assl_stats(FILE *outfh)
+ct_display_assl_stats(struct ct_global_state *state, FILE *outfh)
 {
-	if (ct_assl_ctx == NULL)
+	if (state->ct_assl_ctx == NULL)
 		return;
 
 	fprintf(outfh, "ssl bytes written %" PRIu64 "\n",
-	    ct_assl_ctx->io_write_bytes);
+	    state->ct_assl_ctx->io_write_bytes);
 	fprintf(outfh, "ssl writes        %" PRIu64 "\n",
-	    ct_assl_ctx->io_write_count);
+	    state->ct_assl_ctx->io_write_count);
 	fprintf(outfh, "avg write len     %" PRIu64 "\n",
-	    ct_assl_ctx->io_write_count == 0 ?  (int64_t)0 :
-	    ct_assl_ctx->io_write_bytes / ct_assl_ctx->io_write_count);
+	    state->ct_assl_ctx->io_write_count == 0 ?  (int64_t)0 :
+	    state->ct_assl_ctx->io_write_bytes /
+	    state->ct_assl_ctx->io_write_count);
 	fprintf(outfh, "ssl bytes read    %" PRIu64 "\n",
-	    ct_assl_ctx->io_read_bytes);
+	    state->ct_assl_ctx->io_read_bytes);
 	fprintf(outfh, "ssl reads         %" PRIu64 "\n",
-	    ct_assl_ctx->io_read_count);
+	    state->ct_assl_ctx->io_read_count);
 	fprintf(outfh, "avg read len      %" PRIu64 "\n",
-	    ct_assl_ctx->io_read_count == 0 ?  (int64_t)0 :
-	    ct_assl_ctx->io_read_bytes / ct_assl_ctx->io_read_count);
+	    state->ct_assl_ctx->io_read_count == 0 ?  (int64_t)0 :
+	    state->ct_assl_ctx->io_read_bytes /
+	    state->ct_assl_ctx->io_read_count);
 }
 
 void

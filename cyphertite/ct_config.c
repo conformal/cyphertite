@@ -440,15 +440,16 @@ ct_create_config(void)
 	state = ct_setup_state();
 	assl_initialize();
 	ct_event_init();
-	ct_assl_ctx = ct_ssl_connect(state, 0);
-	if (ct_assl_negotiate_poll(state, ct_assl_ctx)) {
+	state->ct_assl_ctx = ct_ssl_connect(state, 0);
+	if (ct_assl_negotiate_poll(state)) {
 		CFATALX("unable to connect to server");
 	}
 	/*
 	 * XXX: It would make more sense to leave the connection open here, but
 	 * there are some corner cases that need to be handled if so.
 	 */
-	ct_ssl_cleanup();
+	ct_ssl_cleanup(state->ct_assl_ctx);
+	state->ct_assl_ctx = NULL;
 
 	if (expert_mode) {
 		strlcpy(prompt,

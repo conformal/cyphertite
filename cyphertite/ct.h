@@ -229,7 +229,6 @@ void			ct_trans_free(struct ct_global_state *,
 void			ct_trans_cleanup(void);
 void			ct_dnode_cleanup(void);
 void			ct_free_fnode(struct fnode *);
-void			ct_ssl_cleanup(void);
 
 void			ct_queue_first(struct ct_global_state *,
 			    struct ct_trans *);
@@ -268,9 +267,6 @@ extern int		ct_action;
 #define CT_A_EXTRACT	(3)
 #define CT_A_ERASE	(4)
 #define CT_A_JUSTDL	(5)	/* fake option for ctfb */
-
-/* assl */
-extern struct ct_assl_io_ctx	*ct_assl_ctx;
 
 struct ct_op;
 
@@ -382,6 +378,7 @@ ct_op_cb	 ct_free_remotename;
 
 struct ct_global_state {
 	/* PADs? */
+	struct ct_assl_io_ctx		*ct_assl_ctx; /* Connection state */
 	int				ct_trans_id; /* next transaction id */
 	uint64_t			ct_packet_id; /* next complete id */
 	int				ct_sha_state;
@@ -448,7 +445,7 @@ void ct_wakeup_filewrite(void);
 void ct_wakeup_complete(void);
 
 void ct_display_queues(struct ct_global_state *);
-void ct_display_assl_stats(FILE *);
+void ct_display_assl_stats(struct ct_global_state *, FILE *);
 
 typedef void (ct_func_cb)(void *);
 
@@ -483,7 +480,6 @@ void				ct_xml_file_open(struct ct_global_state *,
 				    int, uint32_t);
 int				ct_xml_file_open_polled(
 				    struct ct_global_state *,
-				    struct ct_assl_io_ctx *,
 				    const char *, int, uint32_t);
 #define MD_O_READ	0
 #define MD_O_WRITE	1
@@ -628,13 +624,13 @@ struct ct_stat {
 	uint64_t		st_files_completed;
 } ;
 
-void			ct_dump_stats(FILE *);
+void			ct_dump_stats(struct ct_global_state *, FILE *);
 struct ct_assl_io_ctx	*ct_ssl_connect(struct ct_global_state *, int);
+void			ct_ssl_cleanup(struct ct_assl_io_ctx *);
 void			ct_reconnect(evutil_socket_t, short, void *);
 int			ct_reconnect_internal(struct ct_global_state *);
 void			ct_load_certs(struct assl_context *);
-int			ct_assl_negotiate_poll(struct ct_global_state *,
-			    struct ct_assl_io_ctx *);
+int			ct_assl_negotiate_poll(struct ct_global_state *);
 
 /* match functionality */
 #define CT_MATCH_INVALID	(0)
