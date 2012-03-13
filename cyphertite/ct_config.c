@@ -234,6 +234,7 @@ ct_create_config(void)
 	char			*mode = NULL;
 	int			rv, fd;
 	int			have_file = 0, save_password = 0;
+	int			save_crypto_passphrase = 0;
 	FILE			*f = NULL;
 	struct stat		sb;
 
@@ -365,6 +366,7 @@ crypto_passphrase:
 	    sizeof answer, 0);
 
 	if (rv == 1) {
+		save_crypto_passphrase = 1;
 		if (have_file)
 			goto get_pass;
 		strlcpy(prompt,
@@ -442,7 +444,7 @@ get_pass:
 		fprintf(f, "password\t\t\t= %s\n", ct_password);
 	else
 		fprintf(f, "#password\t\t\t=\n");
-	if (ct_crypto_passphrase)
+	if (save_crypto_passphrase)
 		fprintf(f, "crypto_passphrase\t\t= %s\n", ct_crypto_passphrase);
 	else
 		fprintf(f, "#crypto_passphrase\t\t=\n");
