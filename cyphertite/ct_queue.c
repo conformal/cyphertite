@@ -73,7 +73,6 @@ int ct_numalloc = 0;
 int ct_alloc_block_size;
 int ct_cur_compress_mode = 0;
 
-int c_tr_tag = 0;
 int c_trans_free = 0;
 
 struct ct_global_state *ct_state = &ct_int_state;
@@ -91,6 +90,7 @@ ct_setup_state(void)
 
 	state->ct_trans_id = 0;
 	state->ct_packet_id = 0;
+	state->ct_tr_tag = 0;
 
 	state->ct_file_state = CT_S_STARTING;
 	state->ct_comp_state = CT_S_WAITING_TRANS;
@@ -421,8 +421,8 @@ ct_trans_alloc(struct ct_global_state *state)
 		trans->tr_data[1] = (uint8_t *)trans + sizeof(*trans)
 		    + ct_alloc_block_size;
 
-		trans->hdr.c_tag = c_tr_tag++;
-		if (c_tr_tag >= 0x10000)
+		trans->hdr.c_tag = state->ct_tr_tag++;
+		if (state->ct_tr_tag >= 0x10000)
 			CFATALX("too many transactions allocated");
 	}
 

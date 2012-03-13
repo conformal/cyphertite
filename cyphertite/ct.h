@@ -381,6 +381,7 @@ struct ct_global_state {
 	struct ct_assl_io_ctx		*ct_assl_ctx; /* Connection state */
 	int				ct_trans_id; /* next transaction id */
 	uint64_t			ct_packet_id; /* next complete id */
+	int				ct_tr_tag; /* next packet tag */
 	int				ct_sha_state;
 	int				ct_csha_state;
 	int				ct_file_state;
