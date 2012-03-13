@@ -1683,7 +1683,7 @@ ct_stat(struct fnode *fnode, struct stat *sb, int follow_symlinks)
 		return (lstat(path, sb));
 #else
 	return (fstatat(fnode->fl_parent_dir->d_fd,
-	    fnode->fl_fname, &sb, follow_symlinks ? 0 :
+	    fnode->fl_fname, sb, follow_symlinks ? 0 :
 	    AT_SYMLINK_NOFOLLOW));
 #endif
 }
