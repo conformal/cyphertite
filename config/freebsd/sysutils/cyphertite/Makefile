@@ -1,4 +1,4 @@
-# New ports collection makefile for:    clens
+# New ports collection makefile for:    cyphertite
 # Date created:         March 5, 2012
 # Whom:                 Dale Rahn <drahn@conformal.com>
 #
