@@ -67,7 +67,7 @@ printtime(time_t ftime)
 
 
 void
-ctfile_list_print(struct ct_op *op)
+ctfile_list_print(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfile_list_args	*ccla = op->op_args;
 	struct ctfile_list_tree		 results;

@@ -34,7 +34,7 @@ const uint8_t	 zerosha[SHA_DIGEST_LENGTH];
  * MD content listing code.
  */
 void
-ct_list_op(struct ct_op *op)
+ct_list_op(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_extract_args	*cea = op->op_args;
 	struct ct_trans		*trans;
@@ -51,13 +51,13 @@ ct_list_op(struct ct_op *op)
 	if (trans == NULL) {
 		/* system busy, return (should never happen) */
 		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
-		ct_set_file_state(CT_S_WAITING_TRANS);
+		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
 	trans->tr_state = TR_S_DONE;
 	trans->tr_trans_id = ct_trans_id++;
 	ct_queue_transfer(trans);
-	ct_set_file_state(CT_S_FINISHED);
+	ct_set_file_state(state, CT_S_FINISHED);
 }
 
 int
@@ -215,8 +215,6 @@ ct_extract_setup(struct ct_extract_head *extract_head,
 			ct_extract_open_next(extract_head, ctx);
 		}
 	}
-
-	ct_set_file_state(CT_S_WAITING_TRANS);
 }
 
 static void
@@ -307,7 +305,7 @@ struct ct_extract_priv {
 };
 
 void
-ct_extract(struct ct_op *op)
+ct_extract(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_extract_args	*cea = op->op_args;
 	const char		*ctfile = cea->cea_local_ctfile;
@@ -320,7 +318,7 @@ ct_extract(struct ct_op *op)
 	char			shat[SHA_DIGEST_STRING_LENGTH];
 
 	CNDBG(CT_LOG_TRANS, "entry");
-	if (ct_state->ct_file_state == CT_S_STARTING) {
+	if (state->ct_file_state == CT_S_STARTING) {
 		if (ex_priv == NULL) {
 			ex_priv = e_calloc(1, sizeof(*ex_priv));
 			TAILQ_INIT(&ex_priv->extract_head);
@@ -342,17 +340,17 @@ ct_extract(struct ct_op *op)
 			    ct_match_compile(CT_MATCH_RB, &nothing);
 			ex_priv->fillrb = 1;
 		}
-	} else if (ct_state->ct_file_state == CT_S_FINISHED) {
+	} else if (state->ct_file_state == CT_S_FINISHED) {
 		return;
 	}
 
-	ct_set_file_state(CT_S_RUNNING);
+	ct_set_file_state(state, CT_S_RUNNING);
 	while (1) {
 		trans = ct_trans_alloc();
 		if (trans == NULL) {
 			/* system busy, return */
 			CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
-			ct_set_file_state(CT_S_WAITING_TRANS);
+			ct_set_file_state(state, CT_S_WAITING_TRANS);
 			return;
 		}
 		/* Correct unless new file or EOF. Will fix in those cases  */
@@ -540,7 +538,7 @@ we_re_done_here:
 				 */
 				ct_queue_transfer(trans);
 				CNDBG(CT_LOG_TRANS, "extract finished");
-				ct_set_file_state(CT_S_FINISHED);
+				ct_set_file_state(state, CT_S_FINISHED);
 			}
 			return;
 			break;
@@ -560,7 +558,7 @@ struct ct_file_extract_priv {
  * Extract an individual file that has been passed into the op by op_priv.
  */
 void
-ct_extract_file(struct ct_op *op)
+ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_extract_file_args	*cefa = op->op_args;
 	struct ct_file_extract_priv	*ex_priv = op->op_priv;
@@ -571,7 +569,7 @@ ct_extract_file(struct ct_op *op)
 	char				 shat[SHA_DIGEST_STRING_LENGTH];
 
 	CNDBG(CT_LOG_TRANS, "entry");
-	if (ct_state->ct_file_state == CT_S_STARTING) {
+	if (state->ct_file_state == CT_S_STARTING) {
 		CNDBG(CT_LOG_TRANS, "starting");
 		ex_priv = e_calloc(1, sizeof(*ex_priv));
 		/* open file and seek to beginning of file */
@@ -580,15 +578,15 @@ ct_extract_file(struct ct_op *op)
 			CFATALX("can't open metadata file %s",
 			    cefa->cefa_ctfile);
 		ct_file_extract_setup_dir(NULL);
-	} else if (ct_state->ct_file_state == CT_S_FINISHED) {
+	} else if (state->ct_file_state == CT_S_FINISHED) {
 		return;
 	}
 
-	ct_set_file_state(CT_S_RUNNING);
+	ct_set_file_state(state, CT_S_RUNNING);
 	while (1) {
 		if ((trans = ct_trans_alloc()) == NULL) {
 			CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
-			ct_set_file_state(CT_S_WAITING_TRANS);
+			ct_set_file_state(state, CT_S_WAITING_TRANS);
 			return;
 		}
 		/* unless start of file this is right */
@@ -602,7 +600,7 @@ ct_extract_file(struct ct_op *op)
 			trans->tr_state = TR_S_DONE;
 			ct_queue_transfer(trans);
 			CNDBG(CT_LOG_TRANS, "extract finished");
-			ct_set_file_state(CT_S_FINISHED);
+			ct_set_file_state(state, CT_S_FINISHED);
 			e_free(&ex_priv);
 			return;
 		}
@@ -683,7 +681,7 @@ ct_extract_file(struct ct_op *op)
 }
 
 void
-ct_extract_file_cleanup(struct ct_op *op)
+ct_extract_file_cleanup(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_extract_file_args	*cefa = op->op_args;
 

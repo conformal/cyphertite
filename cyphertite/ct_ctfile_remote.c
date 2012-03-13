@@ -36,12 +36,12 @@
 
 #include "ct.h"
 
-void	ctfile_find_for_extract(struct ct_op *);
-void	ctfile_find_for_extract_complete(struct ct_op *);
-void	ctfile_extract_nextop(struct ct_op *);
-void	ctfile_download_next(struct ct_op *);
-void	ctfile_nextop_extract_cleanup(struct ct_op *);
-void	ctfile_nextop_archive_cleanup(struct ct_op *);
+ct_op_cb	ctfile_find_for_extract;
+ct_op_cb	ctfile_find_for_extract_complete;
+ct_op_cb	ctfile_extract_nextop;
+ct_op_cb	ctfile_download_next;
+ct_op_cb	ctfile_nextop_extract_cleanup;
+ct_op_cb	ctfile_nextop_archive_cleanup;
 int	ct_file_on_server(char *filename);
 
 void
@@ -149,8 +149,9 @@ struct ct_ctfile_find_fileop_args {
 };
 
 void
-ctfile_find_for_operation(char *tag, ctfile_find_callback *nextop,
-    void *nextop_args, int download_chain, int empty_ok)
+ctfile_find_for_operation(struct ct_global_state *state, char *tag,
+    ctfile_find_callback *nextop, void *nextop_args, int download_chain,
+    int empty_ok)
 {
 	struct ct_ctfile_find_args  *ccfa;
 	ccfa = e_calloc(1, sizeof(*ccfa));
@@ -160,7 +161,7 @@ ctfile_find_for_operation(char *tag, ctfile_find_callback *nextop,
 	ccfa->ccfa_download_chain = download_chain;
 	ccfa->ccfa_empty_ok = empty_ok;
 
-	ct_add_operation(ctfile_find_for_extract,
+	ct_add_operation(state, ctfile_find_for_extract,
 	    ctfile_find_for_extract_complete, ccfa);
 }
 /*
@@ -169,7 +170,7 @@ ctfile_find_for_operation(char *tag, ctfile_find_callback *nextop,
  * YYYYMMDD-HHMMSS-<strnvis(mname)>
  */
 void
-ctfile_find_for_extract(struct ct_op *op)
+ctfile_find_for_extract(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfile_find_args	*ccfa = op->op_args;
 	const char			*ctfile = ccfa->ccfa_tag;
@@ -203,7 +204,7 @@ ctfile_find_for_extract(struct ct_op *op)
 	CNDBG(CT_LOG_CTFILE, "looking for %s", ccla->ccla_search[0]);
 
 	op->op_priv = list_fakeop;
-	ctfile_list_start(list_fakeop);
+	ctfile_list_start(state, list_fakeop);
 }
 
 /*
@@ -212,7 +213,8 @@ ctfile_find_for_extract(struct ct_op *op)
  * Select the best filename for download, and download it if missing.
  */
 void
-ctfile_find_for_extract_complete(struct ct_op *op)
+ctfile_find_for_extract_complete(struct ct_global_state *state,
+    struct ct_op *op)
 {
 	struct ct_ctfile_find_args		*ccfa = op->op_args;
 	struct ct_ctfile_find_fileop_args	*ccffa;
@@ -270,7 +272,7 @@ ctfile_find_for_extract_complete(struct ct_op *op)
 		ccffa->ccffa_base.cca_tdir = ctfile_cachedir;
 		ccffa->ccffa_base.cca_remotename = e_strdup(best);
 		ccffa->ccffa_base.cca_ctfile = 1;
-		ct_add_operation(ctfile_extract, ctfile_extract_nextop,
+		ct_add_operation(state, ctfile_extract, ctfile_extract_nextop,
 		    ccffa);
 	} else {
 do_operation:
@@ -282,7 +284,7 @@ do_operation:
 		ccffa->ccffa_base.cca_tdir = ctfile_cachedir;
 		ccffa->ccffa_base.cca_ctfile = 1;
 		op->op_args = ccffa;
-		ctfile_extract_nextop(op);
+		ctfile_extract_nextop(state, op);
 	}
 	e_free(&ccfa);
 }
@@ -292,7 +294,7 @@ do_operation:
  * that everything has been set up for it.
  */
 void
-ctfile_extract_nextop(struct ct_op *op)
+ctfile_extract_nextop(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfile_find_fileop_args	*ccffa = op->op_args;
 	struct ct_ctfileop_args			*cca;
@@ -317,7 +319,7 @@ ctfile_extract_nextop(struct ct_op *op)
 		cca->cca_tdir = ccffa->ccffa_base.cca_tdir;
 		cca->cca_ctfile = ccffa->ccffa_base.cca_ctfile;
 		op->op_args = cca;
-		ctfile_download_next(op);
+		ctfile_download_next(state, op);
 	}
 
 	/*
@@ -332,7 +334,7 @@ ctfile_extract_nextop(struct ct_op *op)
 	} else {
 		cachename = NULL;
 	}
-	ccffa->ccffa_nextop(cachename, ccffa->ccffa_nextop_args);
+	ccffa->ccffa_nextop(state, cachename, ccffa->ccffa_nextop_args);
 	if (ccffa->ccffa_base.cca_localname)
 		e_free(&ccffa->ccffa_base.cca_localname);
 	if (ccffa->ccffa_base.cca_remotename)
@@ -345,7 +347,7 @@ ctfile_extract_nextop(struct ct_op *op)
  * (called repeatedly until all are fetched).
  */
 void
-ctfile_download_next(struct ct_op *op)
+ctfile_download_next(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfileop_args	*cca = op->op_args, *nextcca;
 	const char		*ctfile = cca->cca_localname;
@@ -374,7 +376,7 @@ again:
 			nextcca->cca_remotename = e_strdup(cookedname);
 			nextcca->cca_tdir = ctfile_cachedir;
 			nextcca->cca_ctfile = 1;
-			ct_add_operation_after(op, ctfile_extract,
+			ct_add_operation_after(state, op, ctfile_extract,
 			    ctfile_download_next, nextcca);
 		} else {
 			if (ctfile)
@@ -397,25 +399,25 @@ out:
 }
 
 void
-ctfile_nextop_extract(char *ctfile, void *args)
+ctfile_nextop_extract(struct ct_global_state *state, char *ctfile, void *args)
 {
 	struct ct_extract_args	*cea = args;
 
 	cea->cea_local_ctfile = ctfile;
-	ct_add_operation(ct_extract, ctfile_nextop_extract_cleanup, cea);
+	ct_add_operation(state, ct_extract, ctfile_nextop_extract_cleanup, cea);
 }
 
 void
-ctfile_nextop_list(char *ctfile, void *args)
+ctfile_nextop_list(struct ct_global_state *state, char *ctfile, void *args)
 {
 	struct ct_extract_args	*cea = args;
 
 	cea->cea_local_ctfile = ctfile;
-	ct_add_operation(ct_list_op, ctfile_nextop_extract_cleanup, cea);
+	ct_add_operation(state, ct_list_op, ctfile_nextop_extract_cleanup, cea);
 }
 
 void
-ctfile_nextop_extract_cleanup(struct ct_op *op)
+ctfile_nextop_extract_cleanup(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_extract_args	*cea = op->op_args;
 
@@ -424,7 +426,7 @@ ctfile_nextop_extract_cleanup(struct ct_op *op)
 }
 
 void
-ctfile_nextop_archive(char *basis, void *args)
+ctfile_nextop_archive(struct ct_global_state *state, char *basis, void *args)
 {
 	struct ct_archive_args	*caa = args;
 	struct ct_ctfileop_args	*cca;
@@ -461,7 +463,7 @@ ctfile_nextop_archive(char *basis, void *args)
 	e_free(&fullname);
 
 	caa->caa_local_ctfile = cachename;
-	ct_add_operation(ct_archive, NULL, caa);
+	ct_add_operation(state, ct_archive, NULL, caa);
 	/*
 	 * set up an additional operation to upload the newly created
 	 * ctfile after the archive is completed.
@@ -470,11 +472,12 @@ ctfile_nextop_archive(char *basis, void *args)
 	cca->cca_localname = cachename;
 	cca->cca_encrypted = caa->caa_encrypted;
 	cca->cca_ctfile = 1;
-	ct_add_operation(ctfile_archive, ctfile_nextop_archive_cleanup, cca);
+	ct_add_operation(state, ctfile_archive, ctfile_nextop_archive_cleanup,
+	    cca);
 }
 
 void
-ctfile_nextop_archive_cleanup(struct ct_op *op)
+ctfile_nextop_archive_cleanup(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfileop_args	*cca = op->op_args;
 
@@ -486,19 +489,19 @@ ctfile_nextop_archive_cleanup(struct ct_op *op)
 }
 
 void
-ctfile_nextop_justdl(char *ctfile, void *args)
+ctfile_nextop_justdl(struct ct_global_state *state, char *ctfile, void *args)
 {
 	char		**filename = args;
 
 	*filename = ctfile;
 
 	/* done, jump out of the loop */
-	ct_add_operation(ct_shutdown_op, NULL, NULL);
+	ct_add_operation(state, ct_shutdown_op, NULL, NULL);
 }
 
-void	ct_compare_secrets(struct ct_op *);
+ct_op_cb	ct_compare_secrets;
 void
-ct_check_secrets_extract(struct ct_op *op)
+ct_check_secrets_extract(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfileop_args	*cca;
 
@@ -514,13 +517,14 @@ ct_check_secrets_extract(struct ct_op *op)
 	cca->cca_tdir = ctfile_cachedir;
 	cca->cca_encrypted = 0; /* ignored */
 	cca->cca_ctfile = 0;
-	ct_add_operation_after(op, ctfile_extract, ct_compare_secrets, cca);
+	ct_add_operation_after(state, op, ctfile_extract, ct_compare_secrets,
+	    cca);
 	/* start download of secrets with finish file being the comparison */
 
 }
 
 void
-ct_compare_secrets(struct ct_op *op)
+ct_compare_secrets(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfileop_args		*cca = op->op_args;
 	FILE				*f, *tf;
@@ -575,7 +579,7 @@ ct_compare_secrets(struct ct_op *op)
 }
 
 void
-ct_check_secrets_upload(struct ct_op *op)
+ct_check_secrets_upload(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfileop_args	*cca = op->op_args;
 	char			 answer[1024];
@@ -586,11 +590,11 @@ ct_check_secrets_upload(struct ct_op *op)
 		    "the server, would you like to replace it? [no]: ",
 		    "yes", "no", "no", answer, sizeof answer, 0) != 1)
 			CFATALX("not uploading secrets file");
-		op = ct_add_operation_after(op, ctfile_delete, NULL,
+		op = ct_add_operation_after(state, op, ctfile_delete, NULL,
 		    cca->cca_remotename);
 	}
 
-	ct_add_operation_after(op, ctfile_archive, NULL, cca);
+	ct_add_operation_after(state, op, ctfile_archive, NULL, cca);
 
 }
 
@@ -624,7 +628,7 @@ ct_file_on_server(char *filename)
 }
 
 void
-ct_secrets_exists(struct ct_op *op)
+ct_secrets_exists(struct ct_global_state *state, struct ct_op *op)
 {
 	int *exists = op->op_args;
 
@@ -636,7 +640,8 @@ ct_have_remote_secrets_file(void)
 {
 	int have;
 
-	ct_do_operation(ctfile_list_start, ct_secrets_exists, &have, 0, 1);
+	ct_do_operation(ctfile_list_start, ct_secrets_exists,
+	    &have, 0, 1);
 
 	return (have);
 }
@@ -679,5 +684,6 @@ ct_upload_secrets_file(void)
 	cca.cca_encrypted = 0;
 	cca.cca_ctfile = 0;
 
-	ct_do_operation(ctfile_list_start, ct_check_secrets_upload, &cca, 0, 1);
+	ct_do_operation(ctfile_list_start, ct_check_secrets_upload,
+	    &cca, 0, 1);
 }

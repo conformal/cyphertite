@@ -254,6 +254,7 @@ prompt(EditLine *unused)
 int
 ctfb_main(int argc, char *argv[])
 {
+	struct ct_global_state	*state;
 	struct ct_fb_state	 cfs;
 	struct ctfb_cmd		*cmd;
 	const char		**l_argv;
@@ -326,19 +327,19 @@ ctfb_main(int argc, char *argv[])
 	ct_prompt_for_login_password();
 
 	/* We may have to download files later, always set up */
-	ct_init(1, 1, 0);
+	state = ct_init(1, 1, 0);
 
 	/* if we're in remote mode, try and grab the appropriate files */
 	if (ctfile_mode == CT_MDMODE_REMOTE) {
-		ctfile_find_for_operation(ctfile, ctfile_nextop_justdl,
-		    &ct_fb_filename, 1, 0);
+		ctfile_find_for_operation(state, ctfile,
+		    ctfile_nextop_justdl, &ct_fb_filename, 1, 0);
 		ct_wakeup_file();
 		if ((ret = ct_event_dispatch()) != 0) {
 			CWARNX("event loop returned error %d, exiting", ret);
 			return (ret);
 
 		}
-		ct_cleanup_eventloop();
+		ct_cleanup_eventloop(state);
 	} else {
 		ct_fb_filename = e_strdup(ctfile);
 	}

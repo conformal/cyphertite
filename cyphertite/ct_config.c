@@ -439,7 +439,7 @@ ct_create_config(void)
 	assl_initialize();
 	ct_event_init();
 	ct_assl_ctx = ct_ssl_connect(0);
-	if (ct_assl_negotiate_poll(ct_assl_ctx)) {
+	if (ct_assl_negotiate_poll(ct_state, ct_assl_ctx)) {
 		CFATALX("unable to connect to server");
 	}
 	/*

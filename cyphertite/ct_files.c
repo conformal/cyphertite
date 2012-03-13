@@ -554,7 +554,7 @@ struct ct_archive_priv {
 };
 
 void
-ct_archive(struct ct_op *op)
+ct_archive(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_archive_args	*caa = op->op_args;
 	const char		*ctfile = caa->caa_local_ctfile;
@@ -571,7 +571,7 @@ ct_archive(struct ct_op *op)
 	int			nextlvl = 0;
 
 	CNDBG(CT_LOG_TRANS, "processing");
-	if (ct_state->ct_file_state == CT_S_STARTING) {
+	if (state->ct_file_state == CT_S_STARTING) {
 		if (*filelist == NULL) {
 			CFATALX("no files specified");
 		}
@@ -623,10 +623,10 @@ ct_archive(struct ct_op *op)
 
 		if (basisbackup != NULL)
 			e_free(&basisbackup);
-	} else if (ct_state->ct_file_state == CT_S_FINISHED)
+	} else if (state->ct_file_state == CT_S_FINISHED)
 		return;
 
-	ct_set_file_state(CT_S_RUNNING);
+	ct_set_file_state(state, CT_S_RUNNING);
 
 	if (cap->cap_curnode == NULL)
 		goto done;
@@ -640,7 +640,7 @@ loop:
 	if (ct_trans == NULL) {
 		/* system busy, return */
 		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
-		ct_set_file_state(CT_S_WAITING_TRANS);
+		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
 
@@ -859,13 +859,13 @@ skip:
 done:
 	CNDBG(CT_LOG_FILE, "last file read");
 	/* done with backup */
-	ct_set_file_state(CT_S_FINISHED);
+	ct_set_file_state(state, CT_S_FINISHED);
 
 	ct_trans = ct_trans_alloc();
 	if (ct_trans == NULL) {
 		/* system busy, return */
 		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
-		ct_set_file_state(CT_S_WAITING_TRANS);
+		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
 	ct_trans->tr_ctfile = cap->cap_cws;

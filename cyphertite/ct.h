@@ -71,7 +71,9 @@ extern unsigned char		ct_crypto_key[CT_KEY_LEN];
 
 extern struct ct_settings	settings[];
 
-void			ct_shutdown(void);
+struct ct_global_state;
+
+void			ct_shutdown(struct ct_global_state *state);
 void			ct_process_input(void *);
 void			ct_process_file(void *);
 void			ct_compute_sha(void *);
@@ -143,7 +145,9 @@ extern struct d_name_tree	ct_dname_head;
 #define CT_S_WAITING_TRANS	(3)
 #define CT_S_FINISHED		(4)
 
-void				ct_set_file_state(int);
+void				ct_set_file_state(struct ct_global_state *,
+				    int);
+int				ct_get_file_state(struct ct_global_state *);
 
 /* Transaction  */
 
@@ -286,23 +290,10 @@ struct ctfile_list_file {
 	int					mlf_keep;
 };
 
-
-void			ct_archive(struct ct_op *);
-void			ct_extract(struct ct_op *);
-void			ct_list_op(struct ct_op *);
 int			ct_list(const char *, char **, char **, int);
-void			ctfile_archive(struct ct_op *);
-void			ctfile_extract(struct ct_op *);
-void			ctfile_op_cleanup(struct ct_op *);
-void			ctfile_list_start(struct ct_op *);
-void			ctfile_list_print(struct ct_op *);
 void			ctfile_list_complete(int, char **, char **,
 			    struct ctfile_list_tree *);
-void			ct_check_secrets_extract(struct ct_op *);
-void			ct_check_secrets_upload(struct ct_op *);
-void			ctfile_delete(struct ct_op *);
 int			ctfile_verify_name(char *);
-void			ct_free_remotename(struct ct_op *);
 
 /* CT context state */
 
@@ -311,8 +302,7 @@ void			ct_free_remotename(struct ct_op *);
 RB_HEAD(ct_trans_lookup, ct_trans);
 RB_HEAD(ct_iotrans_lookup, ct_trans);
 
-typedef void (ct_op_cb)(struct ct_op *);
-
+typedef void (ct_op_cb)(struct ct_global_state *, struct ct_op *);
 struct ct_op {
 	TAILQ_ENTRY(ct_op)	 op_link;
 	ct_op_cb		*op_start;
@@ -365,14 +355,26 @@ struct ct_ctfileop_args {
 	int		 cca_ctfile; /* is ctfile or other data */
 };
 
-struct ct_op	*ct_add_operation(ct_op_cb *, ct_op_cb *, void *);
-struct ct_op	*ct_add_operation_after(struct ct_op *, ct_op_cb *, ct_op_cb *,
-		    void *);
-void		 ct_do_operation(ct_op_cb *, ct_op_cb *,
-		     void *, int, int);
+struct ct_op	*ct_add_operation(struct ct_global_state *, ct_op_cb *,
+		     ct_op_cb *, void *);
+struct ct_op	*ct_add_operation_after(struct ct_global_state *,
+		     struct ct_op *, ct_op_cb *, ct_op_cb *, void *);
+void		 ct_do_operation(ct_op_cb *, ct_op_cb *, void *, int, int);
 void		 ct_nextop(void *);
-int		 ct_op_complete(void);
+int		 ct_op_complete(struct ct_global_state *state);
 ct_op_cb	 ct_shutdown_op;
+ct_op_cb	 ct_archive;
+ct_op_cb	 ct_extract;
+ct_op_cb	 ct_list_op;
+ct_op_cb	 ctfile_archive;
+ct_op_cb	 ctfile_extract;
+ct_op_cb	 ctfile_op_cleanup;
+ct_op_cb	 ctfile_list_start;
+ct_op_cb	 ctfile_list_print;
+ct_op_cb	 ct_check_secrets_extract;
+ct_op_cb	 ct_check_secrets_upload;
+ct_op_cb	 ctfile_delete;
+ct_op_cb	 ct_free_remotename;
 
 struct ct_global_state{
 	/* PADs? */
@@ -440,7 +442,7 @@ typedef void (ct_func_cb)(void *);
 
 struct ct_ctx;
 
-void ct_setup_state(void);
+struct ct_global_state *ct_setup_state(void);
 void ct_setup_wakeup_file(void *, ct_func_cb *);
 void ct_setup_wakeup_sha(void *, ct_func_cb *);
 void ct_setup_wakeup_compress(void *, ct_func_cb *);
@@ -472,7 +474,7 @@ int				ct_xml_file_open_polled(struct ct_assl_io_ctx *,
 #define MD_O_READ	0
 #define MD_O_WRITE	1
 #define MD_O_APPEND	2
-void				ct_xml_file_close(void);
+void				ct_xml_file_close(struct ct_global_state *);
 
 #include "ct_db.h"
 
@@ -617,7 +619,8 @@ struct ct_assl_io_ctx	*ct_ssl_connect(int);
 void			ct_reconnect(evutil_socket_t, short, void *);
 int			ct_reconnect_internal(void);
 void			ct_load_certs(struct assl_context *);
-int			ct_assl_negotiate_poll(struct ct_assl_io_ctx *);
+int			ct_assl_negotiate_poll(struct ct_global_state *,
+			    struct ct_assl_io_ctx *);
 
 /* match functionality */
 #define CT_MATCH_INVALID	(0)
@@ -644,10 +647,11 @@ void			ct_ssl_cleanup_bw_lim();
 
 void			 ctfile_mode_setup(const char *);
 
-typedef void	(ctfile_find_callback)(char *, void *);
-void			 ctfile_find_for_operation(char *,
-			     ctfile_find_callback *, void *, int, int);
-
+typedef void	(ctfile_find_callback)(struct ct_global_state *,
+		    char *, void *);
+void		 ctfile_find_for_operation(struct ct_global_state *, char *,
+		    ctfile_find_callback *, void *, int, int);
+		
 void		 ct_upload_secrets_file(void);
 void		 ct_download_secrets_file(void);
 int		 ct_have_remote_secrets_file(void);
@@ -658,7 +662,8 @@ ctfile_find_callback	 ctfile_nextop_archive;
 ctfile_find_callback	 ctfile_nextop_justdl;
 
 
-void			 ct_complete_metadata(struct ct_trans *);
+void			 ct_complete_metadata(struct ct_global_state *,
+			     struct ct_trans *);
 void			 ctfile_trim_cache(const char *, long long);
 
 char			*ctfile_cook_name(const char *);
@@ -672,11 +677,11 @@ int			ct_prompt_password(char *, char *, size_t, char *,
 			    size_t, int);
 
 /* init/cleanup */
-void			ct_init(int, int, int);
-void			ct_init_eventloop(void);
+struct ct_global_state	*ct_init(int, int, int);
+struct ct_global_state	*ct_init_eventloop(void);
 void			ct_update_secrets(void);
-void			ct_cleanup(void);
-void			ct_cleanup_eventloop(void);
+void			ct_cleanup(struct ct_global_state *);
+void			ct_cleanup_eventloop(struct ct_global_state *);
 void			ct_cleanup_login_cache(void);
 
 /* XXX this should be hidden */
@@ -755,7 +760,7 @@ void	ct_extract_cleanup_queue(struct ct_extract_head *);
 /* cull  */
 int ct_cull_add_shafile(const char *);
 void ct_cull_sha_insert(const uint8_t *);
-void ct_cull_kick(void);
+void ct_cull_kick(struct ct_global_state *);
 
 /*
  * Extract an individual file from ctfile at ctfile_off, op_localname is

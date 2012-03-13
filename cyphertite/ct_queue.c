@@ -36,7 +36,7 @@ void ct_handle_write_reply(struct ct_global_state *, struct ct_trans *,
 void ct_handle_read_reply(struct ct_global_state *, struct ct_trans *,
     struct ct_header *, void *);
 
-void ct_complete_normal(struct ct_trans *);
+void ct_complete_normal(struct ct_global_state *, struct ct_trans *);
 
 /* ct flags - these are named wrongly, should come from config */
 
@@ -82,43 +82,53 @@ int c_trans_free = 0;
 struct ct_global_state *ct_state = &ct_int_state;
 struct ct_stat *ct_stats = &ct_int_stats;
 
-void
+struct ct_global_state *
 ct_setup_state(void)
 {
+	struct ct_global_state *state;
+
 	/* unless we have shared memory, init is simple */
-	ct_state = &ct_int_state;
+	state = ct_state = &ct_int_state;
 
 	ct_stats = &ct_int_stats;
 
-	ct_state->ct_file_state = CT_S_STARTING;
-	ct_state->ct_comp_state = CT_S_WAITING_TRANS;
-	ct_state->ct_crypt_state = CT_S_WAITING_TRANS;
+	state->ct_file_state = CT_S_STARTING;
+	state->ct_comp_state = CT_S_WAITING_TRANS;
+	state->ct_crypt_state = CT_S_WAITING_TRANS;
 	/* XXX: We need this? */
 	/* ct_state->ct_write_state = CT_S_WAITING_TRANS; */
 
-	TAILQ_INIT(&ct_state->ct_sha_queue);
-	TAILQ_INIT(&ct_state->ct_comp_queue);
-	TAILQ_INIT(&ct_state->ct_crypt_queue);
-	TAILQ_INIT(&ct_state->ct_csha_queue);
-	TAILQ_INIT(&ct_state->ct_write_queue);
-	TAILQ_INIT(&ct_state->ct_queued);
-	RB_INIT(&ct_state->ct_inflight);
-	RB_INIT(&ct_state->ct_complete);
-	TAILQ_INIT(&ct_state->ct_operations);
+	TAILQ_INIT(&state->ct_sha_queue);
+	TAILQ_INIT(&state->ct_comp_queue);
+	TAILQ_INIT(&state->ct_crypt_queue);
+	TAILQ_INIT(&state->ct_csha_queue);
+	TAILQ_INIT(&state->ct_write_queue);
+	TAILQ_INIT(&state->ct_queued);
+	RB_INIT(&state->ct_inflight);
+	RB_INIT(&state->ct_complete);
+	TAILQ_INIT(&state->ct_operations);
 
-	ct_state->ct_sha_qlen = 0;
-	ct_state->ct_comp_qlen = 0;
-	ct_state->ct_crypt_qlen = 0;
-	ct_state->ct_csha_qlen = 0;
-	ct_state->ct_write_qlen = 0;
-	ct_state->ct_inflight_rblen = 0;
-	ct_state->ct_complete_rblen = 0;
+	state->ct_sha_qlen = 0;
+	state->ct_comp_qlen = 0;
+	state->ct_crypt_qlen = 0;
+	state->ct_csha_qlen = 0;
+	state->ct_write_qlen = 0;
+	state->ct_inflight_rblen = 0;
+	state->ct_complete_rblen = 0;
+
+	return (state);
 }
 
 void
-ct_set_file_state(int newstate)
+ct_set_file_state(struct ct_global_state *state, int newstate)
 {
-	ct_state->ct_file_state = newstate;
+	state->ct_file_state = newstate;
+}
+
+int
+ct_get_file_state(struct ct_global_state *state)
+{
+	return (ct_state->ct_file_state);
 }
 
 void
@@ -458,7 +468,7 @@ ct_reconnect_internal(void)
 
 	ct_assl_ctx = ct_ssl_connect(1);
 	if (ct_assl_ctx) {
-		if (ct_assl_negotiate_poll(ct_assl_ctx)) {
+		if (ct_assl_negotiate_poll(ct_state, ct_assl_ctx)) {
 			CFATALX("negotiate failed");
 		}
 
@@ -707,7 +717,7 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 		trans = (struct ct_trans *)hdr; /* cast to parent struct */
 		CT_LOCK(&state->ct_queued_lock);
 		TAILQ_REMOVE(&state->ct_queued, trans, tr_next);
-		CT_UNLOCK(&cstate->ct_queued_lock);
+		CT_UNLOCK(&state->ct_queued_lock);
 		RB_INSERT(ct_iotrans_lookup, &state->ct_inflight, trans);
 		state->ct_queued_qlen--;
 		state->ct_inflight_rblen++;
@@ -906,7 +916,7 @@ ct_compute_csha(void *vctx)
 
 /* completion handler for states for non-metadata actions. */
 void
-ct_complete_normal(struct ct_trans *trans)
+ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 {
 	int			slot;
 	struct fnode		*fnode = trans->tr_fl_node;
@@ -919,11 +929,11 @@ ct_complete_normal(struct ct_trans *trans)
 		}
 		ct_dnode_cleanup();
 		/* do we have more operations queued up? */
-		if (ct_op_complete() == 0)
+		if (ct_op_complete(state) == 0)
 			return;
 		if (ct_verbose_ratios)
 			ct_dump_stats(stdout);
-		ct_shutdown();
+		ct_shutdown(state);
 		break;
 	case TR_S_SPECIAL:
 		if (ct_verbose)
@@ -1050,9 +1060,9 @@ ct_process_completions(void *vctx)
 		ct_packet_id++;
 
 		if (trans->hdr.c_flags & C_HDR_F_METADATA) {
-			ct_complete_metadata(trans);
+			ct_complete_metadata(state, trans);
 		} else {
-			ct_complete_normal(trans);
+			ct_complete_normal(state, trans);
 		}
 		ct_trans_free(trans);
 
@@ -1288,7 +1298,7 @@ ct_handle_read_reply(struct ct_global_state *state, struct ct_trans *trans,
 		if (hdr->c_flags & C_HDR_F_METADATA) {
 			/* FAIL on metadata read is 'eof' */
 			if (state->ct_file_state != CT_S_FINISHED) {
-				ct_set_file_state(CT_S_FINISHED);
+				ct_set_file_state(state, CT_S_FINISHED);
 				trans->tr_state = TR_S_EX_FILE_END;
 			} else {
 				/*

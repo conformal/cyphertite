@@ -274,8 +274,8 @@ ctctl_main(int argc, char *argv[])
 void
 cull(struct ct_cli_cmd *c, int argc, char **argv)
 {
-	int	need_secrets;
-	int	ret;
+	struct ct_global_state	*state;
+	int			 need_secrets, ret;
 
 	/* XXX */
 
@@ -283,9 +283,9 @@ cull(struct ct_cli_cmd *c, int argc, char **argv)
 
 	need_secrets = 1;
 
-	ct_init(1, need_secrets, 0);
+	state = ct_init(1, need_secrets, 0);
 
-	ct_cull_kick();
+	ct_cull_kick(state);
 	ct_wakeup_file();
 
 	ret = ct_event_dispatch();
@@ -293,7 +293,7 @@ cull(struct ct_cli_cmd *c, int argc, char **argv)
 		CWARNX("event_dispatch returned, %d %s", errno,
 		    strerror(errno));
 
-	ct_cleanup();
+	ct_cleanup(state);
 	e_check_memory();
 }
 

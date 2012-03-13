@@ -56,12 +56,13 @@ struct ct_io_queue	*ct_ioctx_alloc(void);
 void			ct_ioctx_free(struct ct_io_queue *);
 void			ct_print_scaled_stat(FILE *, const char *, int64_t,
 			    int64_t, int);
-int			ct_validate_xml_negotiate_xml(struct ct_header *,
-			    char *);
+int			ct_validate_xml_negotiate_xml(struct ct_global_state *,
+			    struct ct_header *, char *);
 char			*ct_getloginbyuid(uid_t);
 
 struct ct_op *
-ct_add_operation(ct_op_cb *start, ct_op_cb *complete, void *args)
+ct_add_operation(struct ct_global_state *state, ct_op_cb *start,
+    ct_op_cb *complete, void *args)
 {
 	struct ct_op	*op;
 
@@ -70,14 +71,14 @@ ct_add_operation(ct_op_cb *start, ct_op_cb *complete, void *args)
 	op->op_complete = complete;
 	op->op_args = args;
 
-	TAILQ_INSERT_TAIL(&ct_state->ct_operations, op, op_link);
+	TAILQ_INSERT_TAIL(&state->ct_operations, op, op_link);
 
 	return (op);
 }
 
 struct ct_op *
-ct_add_operation_after(struct ct_op *after, ct_op_cb *start, ct_op_cb *complete,
-    void *args)
+ct_add_operation_after(struct ct_global_state *state, struct ct_op *after,
+    ct_op_cb *start, ct_op_cb *complete, void *args)
 {
 	struct ct_op	*op;
 
@@ -86,7 +87,7 @@ ct_add_operation_after(struct ct_op *after, ct_op_cb *start, ct_op_cb *complete,
 	op->op_complete = complete;
 	op->op_args = args;
 
-	TAILQ_INSERT_AFTER(&ct_state->ct_operations, after, op, op_link);
+	TAILQ_INSERT_AFTER(&state->ct_operations, after, op, op_link);
 
 	return (op);
 }
@@ -96,50 +97,52 @@ void
 ct_do_operation(ct_op_cb *start, ct_op_cb *complete, void *args,
     int need_secrets, int only_metadata)
 {
-	int		 ret;
+	struct ct_global_state	*state;
+	int		 	 ret;
 
 	ct_prompt_for_login_password();
 
-	ct_init(1, need_secrets, only_metadata);
-	ct_add_operation(start, complete, args);
+	state = ct_init(1, need_secrets, only_metadata);
+	ct_add_operation(state, start, complete, args);
 	ct_wakeup_file();
 	if ((ret = ct_event_dispatch()) != 0)
 		CWARN("event_dispatch returned failure");
-	ct_cleanup();
+	ct_cleanup(state);
 }
 
 void
 ct_nextop(void *vctx)
 {
-	struct ct_op *op;
+	struct ct_global_state	*state = vctx;
+	struct ct_op		*op;
 
-	op = TAILQ_FIRST(&ct_state->ct_operations);
+	op = TAILQ_FIRST(&state->ct_operations);
 	if (op == NULL)
 		CFATALX("no operation in queue");
 
-	op->op_start(op);
+	op->op_start(state, op);
 }
 
 int
-ct_op_complete(void)
+ct_op_complete(struct ct_global_state *state)
 {
 	struct ct_op *op;
 
-	op = TAILQ_FIRST(&ct_state->ct_operations);
+	op = TAILQ_FIRST(&state->ct_operations);
 	if (op == NULL)
 		CFATALX("no operation in queue");
 
 	if (op->op_complete)
-		op->op_complete(op);
+		op->op_complete(state, op);
 
-	TAILQ_REMOVE(&ct_state->ct_operations, op, op_link);
+	TAILQ_REMOVE(&state->ct_operations, op, op_link);
 	e_free(&op);
 
-	if (TAILQ_EMPTY(&ct_state->ct_operations))
+	if (TAILQ_EMPTY(&state->ct_operations))
 		return (1);
 
 	/* set up for the next loop */
-	ct_set_file_state(CT_S_STARTING);
+	ct_set_file_state(state, CT_S_STARTING);
 	ct_wakeup_file();
 	return (0);
 }
@@ -237,7 +240,8 @@ ct_header_free(void *vctx, struct ct_header *hdr)
 
 #define ASSL_TIMEOUT 20
 int
-ct_assl_negotiate_poll(struct ct_assl_io_ctx *asslctx)
+ct_assl_negotiate_poll(struct ct_global_state *state,
+    struct ct_assl_io_ctx *asslctx)
 {
 	struct xmlsd_element		*xe;
 	struct xmlsd_element_list	 xl;
@@ -376,7 +380,7 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *asslctx)
 	xe = xmlsd_create(&xl, "ct_negotiate");
 	xe = xmlsd_add_element(&xl, xe, "clientdbgenid");
 	xmlsd_set_attr_int32(xe, "value",
-	    ctdb_get_genid(ct_state->ct_db_state));
+	    ctdb_get_genid(state->ct_db_state));
 
 	body = xmlsd_generate(&xl, ct_body_alloc_xml, &orig_size, 1);
 	hdr.c_size = payload_sz = orig_size;
@@ -414,7 +418,7 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *asslctx)
 		goto done;
 	}
 	/* XXX check xml data */
-	if (ct_validate_xml_negotiate_xml(&hdr, body)) {
+	if (ct_validate_xml_negotiate_xml(state, &hdr, body)) {
 		e_free(&body);
 		goto done;
 	}
@@ -428,7 +432,8 @@ done:
 	return (rv);
 }
 int
-ct_validate_xml_negotiate_xml(struct ct_header *hdr, char *xml_body)
+ct_validate_xml_negotiate_xml(struct ct_global_state *state,
+    struct ct_header *hdr, char *xml_body)
 {
 	struct xmlsd_element_list xl;
 	struct xmlsd_element	*xe;
@@ -479,9 +484,9 @@ ct_validate_xml_negotiate_xml(struct ct_header *hdr, char *xml_body)
 	}
 
 	if (attrval_i != -1 && attrval_i !=
-	    ctdb_get_genid(ct_state->ct_db_state)) {
+	    ctdb_get_genid(state->ct_db_state)) {
 		CNDBG(CT_LOG_DB, "need to recreate localdb");
-		ctdb_reopendb(ct_state->ct_db_state, attrval_i);
+		ctdb_reopendb(state->ct_db_state, attrval_i);
 	}
 
 
@@ -492,16 +497,16 @@ done:
 }
 
 void
-ct_shutdown_op(struct ct_op *unused)
+ct_shutdown_op(struct ct_global_state *state, struct ct_op *unused)
 {
-	ct_shutdown();
+	ct_shutdown(state);
 }
 
 void
-ct_shutdown()
+ct_shutdown(struct ct_global_state *state)
 {
-	ctdb_shutdown(ct_state->ct_db_state);
-	ct_state->ct_db_state = NULL;
+	ctdb_shutdown(state->ct_db_state);
+	state->ct_db_state = NULL;
 	ct_ssl_cleanup_bw_lim();
 	ct_event_loopbreak();
 }

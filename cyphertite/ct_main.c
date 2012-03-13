@@ -127,7 +127,7 @@ show_version(void)
 	fprintf(stderr, fmt, "xmlsd", xmlsd_verstring());
 }
 
-void
+struct ct_global_state *
 ct_init(int foreground, int need_secrets, int only_metadata)
 {
 	struct stat	sb;
@@ -169,72 +169,75 @@ ct_init(int foreground, int need_secrets, int only_metadata)
 			CFATALX("can't unlock secrets file");
 	}
 
-	ct_init_eventloop();
+	return (ct_init_eventloop());
 }
 
-void
+struct ct_global_state *
 ct_init_eventloop(void)
 {
+	struct ct_global_state	*state;
 	assl_initialize();
 	ct_event_init();
-	ct_setup_state();
+	state = ct_setup_state();
 
 #if defined(CT_EXT_INIT)
 	CT_EXT_INIT();
 #endif
 
-	ct_state->ct_db_state = ctdb_setup(ct_localdb,
+	state->ct_db_state = ctdb_setup(ct_localdb,
 	    ct_crypto_secrets != NULL);
 
 	gettimeofday(&ct_stats->st_time_start, NULL);
 	ct_assl_ctx = ct_ssl_connect(0);
-	if (ct_assl_negotiate_poll(ct_assl_ctx))
+	if (ct_assl_negotiate_poll(state, ct_assl_ctx))
 		CFATALX("negotiate failed");
 
 	CNDBG(CT_LOG_NET, "assl data: as bits %d, protocol [%s]",
 	    ct_assl_ctx->c->as_bits, ct_assl_ctx->c->as_protocol);
 
-	CT_LOCK_INIT(&ct_state->ct_sha_lock);
-	CT_LOCK_INIT(&ct_state->ct_comp_lock);
-	CT_LOCK_INIT(&ct_state->ct_crypt_lock);
-	CT_LOCK_INIT(&ct_state->ct_csha_lock);
-	CT_LOCK_INIT(&ct_state->ct_write_lock);
-	CT_LOCK_INIT(&ct_state->ct_queued_lock);
-	CT_LOCK_INIT(&ct_state->ct_complete_lock);
+	CT_LOCK_INIT(&state->ct_sha_lock);
+	CT_LOCK_INIT(&state->ct_comp_lock);
+	CT_LOCK_INIT(&state->ct_crypt_lock);
+	CT_LOCK_INIT(&state->ct_csha_lock);
+	CT_LOCK_INIT(&state->ct_write_lock);
+	CT_LOCK_INIT(&state->ct_queued_lock);
+	CT_LOCK_INIT(&state->ct_complete_lock);
 
-	ct_setup_wakeup_file(ct_state, ct_nextop);
-	ct_setup_wakeup_sha(ct_state, ct_compute_sha);
-	ct_setup_wakeup_compress(ct_state, ct_compute_compress);
-	ct_setup_wakeup_csha(ct_state, ct_compute_csha);
-	ct_setup_wakeup_encrypt(ct_state, ct_compute_encrypt);
-	ct_setup_wakeup_write(ct_state, ct_process_write);
-	ct_setup_wakeup_complete(ct_state, ct_process_completions);
+	ct_setup_wakeup_file(state, ct_nextop);
+	ct_setup_wakeup_sha(state, ct_compute_sha);
+	ct_setup_wakeup_compress(state, ct_compute_compress);
+	ct_setup_wakeup_csha(state, ct_compute_csha);
+	ct_setup_wakeup_encrypt(state, ct_compute_encrypt);
+	ct_setup_wakeup_write(state, ct_process_write);
+	ct_setup_wakeup_complete(state, ct_process_completions);
+
+	return (state);
 }
 
 void
-ct_cleanup_eventloop(void)
+ct_cleanup_eventloop(struct ct_global_state *state)
 {
 	ct_trans_cleanup();
 	ct_ssl_cleanup();
-	ctdb_shutdown(ct_state->ct_db_state);
+	ctdb_shutdown(state->ct_db_state);
 	ct_cleanup_login_cache();
 	// XXX: ct_lock_cleanup();
-	CT_LOCK_RELEASE(&ct_state->ct_sha_lock);
-	CT_LOCK_RELEASE(&ct_state->ct_comp_lock);
-	CT_LOCK_RELEASE(&ct_state->ct_crypt_lock);
-	CT_LOCK_RELEASE(&ct_state->ct_csha_lock);
-	CT_LOCK_RELEASE(&ct_state->ct_write_lock);
-	CT_LOCK_RELEASE(&ct_state->ct_queued_lock);
-	CT_LOCK_RELEASE(&ct_state->ct_complete_lock);
+	CT_LOCK_RELEASE(&state->ct_sha_lock);
+	CT_LOCK_RELEASE(&state->ct_comp_lock);
+	CT_LOCK_RELEASE(&state->ct_crypt_lock);
+	CT_LOCK_RELEASE(&state->ct_csha_lock);
+	CT_LOCK_RELEASE(&state->ct_write_lock);
+	CT_LOCK_RELEASE(&state->ct_queued_lock);
+	CT_LOCK_RELEASE(&state->ct_complete_lock);
 	ct_event_cleanup();
 }
 
 void
-ct_cleanup(void)
+ct_cleanup(struct ct_global_state *state)
 {
 	if (ct_configfile)
 		e_free(&ct_configfile);
-	ct_cleanup_eventloop();
+	ct_cleanup_eventloop(state);
 }
 
 uint64_t
@@ -301,6 +304,7 @@ ct_main(int argc, char **argv)
 	struct ct_archive_args		 caa;
 	struct ct_ctfileop_args 	 cca;
 	struct ct_ctfile_list_args	 ccla;
+	struct ct_global_state		*state = NULL;
 	char				*ct_tdir = NULL;
 	char				*ct_basisbackup = NULL;
 	char				*ctfile = NULL;
@@ -497,10 +501,10 @@ ct_main(int argc, char **argv)
 	    ct_action == CT_A_ARCHIVE || (ct_action == CT_A_LIST &&
 	    ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0));
 
-	ct_init(foreground, need_secrets, ct_metadata);
+	state = ct_init(foreground, need_secrets, ct_metadata);
 	if (ct_crypto_passphrase != NULL && ct_secrets_upload != 0) {
-		ct_add_operation(ctfile_list_start, ct_check_secrets_extract,
-		    ct_crypto_secrets);
+		ct_add_operation(state, ctfile_list_start,
+		    ct_check_secrets_extract, ct_crypto_secrets);
 	}
 
 	if (ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
@@ -512,7 +516,7 @@ ct_main(int argc, char **argv)
 			cea.cea_excllist = excludelist;
 			cea.cea_matchmode = ct_match_mode;
 			cea.cea_tdir = ct_tdir;
-			ctfile_find_for_operation(ctfile,
+			ctfile_find_for_operation(state, ctfile,
 			    ((ct_action == CT_A_EXTRACT)  ?
 			    ctfile_nextop_extract : ctfile_nextop_list),
 			    &cea, 1, 0);
@@ -533,11 +537,11 @@ ct_main(int argc, char **argv)
 				 * Need to work out basis filename and
 				 * download it if necessary
 				 */
-				ctfile_find_for_operation(ctfile,
+				ctfile_find_for_operation(state, ctfile,
 				    ctfile_nextop_archive, &caa, 0, 1);
 			else   {
 				/* No basis, just start the op */
-				ctfile_nextop_archive(NULL, &caa);
+				ctfile_nextop_archive(state, NULL, &caa);
 			}
 			break;
 		default:
@@ -554,16 +558,18 @@ ct_main(int argc, char **argv)
 			cca.cca_ctfile = 1;
 			/* only matters for archive */
 			cca.cca_encrypted = (ct_crypto_secrets != NULL);
-			ct_add_operation(((ct_action == CT_A_ARCHIVE) ?
-			    ctfile_archive : ctfile_extract), ctfile_op_cleanup, &cca);
+			ct_add_operation(state,
+			    ((ct_action == CT_A_ARCHIVE) ?
+			    ctfile_archive : ctfile_extract),
+			    ctfile_op_cleanup, &cca);
 		} else if (ct_action == CT_A_ERASE) {
-			ct_add_operation(ctfile_delete, NULL, ctfile);
+			ct_add_operation(state, ctfile_delete, NULL, ctfile);
 		} else if (ct_action == CT_A_LIST) {
 			ccla.ccla_search = includelist;
 			ccla.ccla_exclude = excludelist;
 			ccla.ccla_matchmode = ct_match_mode;
-			ct_add_operation(ctfile_list_start, ctfile_list_print,
-			    &ccla);
+			ct_add_operation(state, ctfile_list_start,
+			    ctfile_list_print, &ccla);
 		} else {
 			CWARNX("must specify action");
 			ct_usage();
@@ -579,13 +585,13 @@ ct_main(int argc, char **argv)
 			caa.caa_matchmode = ct_match_mode;
 			caa.caa_includefile = ct_includefile;
 			caa.caa_tag = ctfile;
-			ct_add_operation(ct_archive, NULL, &caa);
+			ct_add_operation(state, ct_archive, NULL, &caa);
 		} else if (ct_action == CT_A_EXTRACT) {
 			cea.cea_local_ctfile = ctfile;
 			cea.cea_filelist = includelist;
 			cea.cea_excllist = excludelist;
 			cea.cea_matchmode = ct_match_mode;
-			ct_add_operation(ct_extract, NULL, &cea);
+			ct_add_operation(state, ct_extract, NULL, &cea);
 		} else {
 			CWARNX("must specify action");
 			ct_usage();
@@ -600,7 +606,7 @@ ct_main(int argc, char **argv)
 		CWARNX("event_dispatch returned, %d %s", errno,
 		    strerror(errno));
 
-	ct_cleanup();
+	ct_cleanup(state);
 out:
 	if (includelist && freeincludes == 1)
 		ct_matchlist_free(includelist);

@@ -49,14 +49,14 @@ SIMPLEQ_HEAD(ctfile_list, ctfile_list_file);
 struct ctfile_list			ctfile_list_files =
 				     SIMPLEQ_HEAD_INITIALIZER(ctfile_list_files);
 
-void ct_cull_send_shas(struct ct_op *);
-void ct_cull_setup(struct ct_op *);
-void ct_cull_start_shas(struct ct_op *);
-void ct_cull_start_complete(struct ct_op *op);
-void ct_cull_send_complete(struct ct_op *op);
-void ct_cull_complete(struct ct_op *op);
-void ct_cull_collect_ctfiles(struct ct_op *op);
-void ct_cull_fetch_all_ctfiles(struct ct_op *op);
+ct_op_cb ct_cull_send_shas;
+ct_op_cb ct_cull_setup;
+ct_op_cb ct_cull_start_shas;
+ct_op_cb ct_cull_start_complete;
+ct_op_cb ct_cull_send_complete;
+ct_op_cb ct_cull_complete;
+ct_op_cb ct_cull_collect_ctfiles;
+ct_op_cb ct_cull_fetch_all_ctfiles;
 
 struct xmlsd_v_elements ct_xml_cmds[] = {
 	{ "ct_md_list", xe_ct_md_list },
@@ -81,7 +81,7 @@ struct xmlsd_v_elements ct_xml_cmds[] = {
  * clean up after a ctfile archive/extract operation by freeing the remotename
  */
 void
-ctfile_op_cleanup(struct ct_op *op)
+ctfile_op_cleanup(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfileop_args	*cca = op->op_args;
 
@@ -98,7 +98,7 @@ struct ctfile_archive_state {
 };
 
 void
-ctfile_archive(struct ct_op *op)
+ctfile_archive(struct ct_global_state *state, struct ct_op *op)
 {
 	char				 tpath[PATH_MAX];
 	struct ct_ctfileop_args		*cca = op->op_args;
@@ -110,7 +110,7 @@ ctfile_archive(struct ct_op *op)
 	ssize_t				 rsz, rlen;
 	int				 error;
 
-	if (ct_state->ct_file_state == CT_S_STARTING) {
+	if (state->ct_file_state == CT_S_STARTING) {
 		cas = e_calloc(1, sizeof(*cas));
 		op->op_priv = cas;
 
@@ -152,22 +152,22 @@ ctfile_archive(struct ct_op *op)
 			rname = ctfile_cook_name(ctfile);
 			cca->cca_remotename = (char *)rname;
 		}
-	} else if (ct_state->ct_file_state == CT_S_FINISHED) {
+	} else if (state->ct_file_state == CT_S_FINISHED) {
 		/* We're done here */
 		return;
-	} else if (ct_state->ct_file_state == CT_S_WAITING_SERVER) {
+	} else if (state->ct_file_state == CT_S_WAITING_SERVER) {
 		CNDBG(CT_LOG_FILE, "waiting on remote open");
 		return;
 	}
 
 	CNDBG(CT_LOG_FILE, "entered for block %d", cas->cas_block_no);
-	ct_set_file_state(CT_S_RUNNING);
+	ct_set_file_state(state, CT_S_RUNNING);
 loop:
 	ct_trans = ct_trans_alloc();
 	if (ct_trans == NULL) {
 		/* system busy, return */
 		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
-		ct_set_file_state(CT_S_WAITING_TRANS);
+		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
 
@@ -175,13 +175,13 @@ loop:
 		cas->cas_open_sent = 1;
 		ct_xml_file_open(ct_trans, rname, MD_O_WRITE, 0);
 		/* xml thread will wake us up when it gets the open */
-		ct_set_file_state(CT_S_WAITING_SERVER);
+		ct_set_file_state(state, CT_S_WAITING_SERVER);
 		return;
 	}
 
 	/* Are we done here? */
 	if (cas->cas_size == cas->cas_offset) {
-		ct_set_file_state(CT_S_FINISHED);
+		ct_set_file_state(state, CT_S_FINISHED);
 
 		ct_trans->tr_fl_node = NULL;
 		ct_trans->tr_state = TR_S_XML_CLOSE;
@@ -406,7 +406,7 @@ done:
 }
 
 void
-ct_xml_file_close(void)
+ct_xml_file_close(struct ct_global_state *state)
 {
 	struct xmlsd_element_list	 xl;
 	struct xmlsd_element		*xe;
@@ -415,9 +415,9 @@ ct_xml_file_close(void)
 
 	trans = ct_trans_alloc();
 	if (trans == NULL) {
-		/* system busy, return */
+		/* system busy, return  XXX this would be pretty bad. */
 		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
-		ct_set_file_state(CT_S_WAITING_TRANS);
+		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
 
@@ -447,7 +447,7 @@ struct ctfile_extract_state {
 };
 
 void
-ctfile_extract(struct ct_op *op)
+ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfileop_args		*cca = op->op_args;
 	struct ctfile_extract_state	*ces = op->op_priv;
@@ -456,7 +456,7 @@ ctfile_extract(struct ct_op *op)
 	struct ct_trans			*trans;
 	struct ct_header		*hdr;
 
-	if (ct_state->ct_file_state == CT_S_STARTING) {
+	if (state->ct_file_state == CT_S_STARTING) {
 		ces = e_calloc(1, sizeof(*ces));
 		op->op_priv = ces;
 
@@ -465,28 +465,28 @@ ctfile_extract(struct ct_op *op)
 			cca->cca_remotename = (char *)rname;
 		}
 		ct_file_extract_setup_dir(cca->cca_tdir);
-	} else if (ct_state->ct_file_state == CT_S_FINISHED) {
+	} else if (state->ct_file_state == CT_S_FINISHED) {
 		return;
-	} else if (ct_state->ct_file_state == CT_S_WAITING_SERVER) {
+	} else if (state->ct_file_state == CT_S_WAITING_SERVER) {
 		CNDBG(CT_LOG_FILE, "waiting on remote open");
 		return;
 	}
 
-	ct_set_file_state(CT_S_RUNNING);
+	ct_set_file_state(state, CT_S_RUNNING);
 
 again:
 	trans = ct_trans_alloc();
 	if (trans == NULL) {
 		/* system busy, return */
 		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
-		ct_set_file_state(CT_S_WAITING_TRANS);
+		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
 	if (ces->ces_open_sent == 0) {
 		ct_xml_file_open(trans, rname, MD_O_READ, 0);
 		ces->ces_open_sent = 1;
 		/* xml thread will wake us up when it gets the open */
-		ct_set_file_state(CT_S_WAITING_SERVER);
+		ct_set_file_state(state, CT_S_WAITING_SERVER);
 		return;
 	} else if (ces->ces_is_open == 0) {
 		ces->ces_is_open = 1;
@@ -544,7 +544,7 @@ again:
 }
 
 void
-ct_complete_metadata(struct ct_trans *trans)
+ct_complete_metadata(struct ct_global_state *state, struct ct_trans *trans)
 {
 	int			slot, done = 0, release_fnode = 0;
 
@@ -565,13 +565,13 @@ ct_complete_metadata(struct ct_trans *trans)
 			ct_file_extract_write(trans->tr_fl_node,
 			    trans->tr_data[slot], trans->tr_size[slot]);
 		} else {
-			ct_state->ct_file_state = CT_S_FINISHED;
+			state->ct_file_state = CT_S_FINISHED;
 		}
 		break;
 
 	case TR_S_DONE:
 		/* More operations to be done? */
-		if (ct_op_complete())
+		if (ct_op_complete(state))
 			done = 1;
 
 		/* Clean up reconnect name, shared between all trans */
@@ -583,7 +583,7 @@ ct_complete_metadata(struct ct_trans *trans)
 		if (ct_verbose_ratios)
 			ct_dump_stats(stdout);
 
-		ct_shutdown();
+		ct_shutdown(state);
 		break;
 	case TR_S_WMD_READY:
 		if (trans->tr_eof != 0)
@@ -601,7 +601,7 @@ ct_complete_metadata(struct ct_trans *trans)
 		/* FALLTHROUGH */
 	case TR_S_XML_CLOSE:
 		CNDBG(CT_LOG_FILE, "eof reached, closing file");
-		ct_xml_file_close();
+		ct_xml_file_close(state);
 		break;
 
 	case TR_S_XML_CULL_REPLIED:
@@ -617,14 +617,14 @@ ct_complete_metadata(struct ct_trans *trans)
 }
 
 void
-ctfile_list_start(struct ct_op *op)
+ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 {
 	struct xmlsd_element_list	 xl;
 	struct xmlsd_element		*xe;
 	struct ct_trans			*trans;
 	size_t				 sz;
 
-	ct_set_file_state(CT_S_FINISHED);
+	ct_set_file_state(state, CT_S_FINISHED);
 
 	trans = ct_trans_alloc();
 
@@ -682,7 +682,7 @@ ct_cmp_ctfile(struct ctfile_list_file *f1, struct ctfile_list_file *f2)
 RB_GENERATE(ctfile_list_tree, ctfile_list_file, mlf_next, ct_cmp_ctfile);
 
 void
-ctfile_delete(struct ct_op *op)
+ctfile_delete(struct ct_global_state *state, struct ct_op *op)
 {
 	struct xmlsd_element_list	 xl;
 	struct xmlsd_element		*xe;
@@ -765,7 +765,7 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 					CNDBG(CT_LOG_FILE, "%s opened\n",
 					    filename);
 					die = 0;
-					ct_set_file_state(CT_S_RUNNING);
+					ct_set_file_state(state, CT_S_RUNNING);
 					ct_wakeup_file();
 				}
 			}
@@ -970,21 +970,22 @@ ct_cull_sha_insert(const uint8_t *sha)
 }
 
 void
-ct_cull_kick(void)
+ct_cull_kick(struct ct_global_state *state)
 {
 
 	CNDBG(CT_LOG_TRANS, "add_op cull_setup");
 	CNDBG(CT_LOG_SHA, "shacnt %" PRIu64 , shacnt);
 
-	ct_add_operation(ctfile_list_start, ct_cull_fetch_all_ctfiles, NULL);
-	ct_add_operation(ct_cull_collect_ctfiles, NULL,  NULL);
-	ct_add_operation(ct_cull_setup, NULL, NULL);
-	ct_add_operation(ct_cull_send_shas, NULL, NULL);
-	ct_add_operation(ct_cull_send_complete, ct_cull_complete, NULL);
+	ct_add_operation(state, ctfile_list_start,
+	    ct_cull_fetch_all_ctfiles, NULL);
+	ct_add_operation(state, ct_cull_collect_ctfiles, NULL,  NULL);
+	ct_add_operation(state, ct_cull_setup, NULL, NULL);
+	ct_add_operation(state, ct_cull_send_shas, NULL, NULL);
+	ct_add_operation(state, ct_cull_send_complete, ct_cull_complete, NULL);
 }
 
 void
-ct_cull_complete(struct ct_op *op)
+ct_cull_complete(struct ct_global_state *state, struct ct_op *op)
 {
 	CNDBG(CT_LOG_SHA, "shacnt %" PRIu64 " shapayload %" PRIu64, shacnt,
 	    sha_payload_sz);
@@ -995,7 +996,7 @@ uint64_t cull_uuid; /* set up with random number in ct_cull_setup() */
 int sha_per_packet = 1000;
 
 void
-ct_cull_setup(struct ct_op *op)
+ct_cull_setup(struct ct_global_state *state, struct ct_op *op)
 {
 	struct xmlsd_element_list	xl;
 	struct xmlsd_element		*xp, *xe;
@@ -1005,12 +1006,12 @@ ct_cull_setup(struct ct_op *op)
 	arc4random_buf(&cull_uuid, sizeof(cull_uuid));
 
 	CNDBG(CT_LOG_TRANS, "cull_setup");
-	ct_set_file_state(CT_S_RUNNING);
+	ct_set_file_state(state, CT_S_RUNNING);
 
 	trans = ct_trans_alloc();
 
 	if (trans == NULL) {
-		ct_set_file_state(CT_S_WAITING_TRANS);
+		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
 
@@ -1035,7 +1036,7 @@ ct_cull_setup(struct ct_op *op)
 
 int sent_complete;
 void
-ct_cull_send_complete(struct ct_op *op)
+ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 {
 	struct xmlsd_element_list	xl;
 	struct xmlsd_element		*xp, *xe;
@@ -1051,7 +1052,7 @@ ct_cull_send_complete(struct ct_op *op)
 	trans = ct_trans_alloc();
 
 	if (trans == NULL) {
-		ct_set_file_state(CT_S_WAITING_TRANS);
+		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
 
@@ -1070,14 +1071,14 @@ ct_cull_send_complete(struct ct_op *op)
 	xmlsd_unwind(&xl);
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = sz;
-	ct_set_file_state(CT_S_FINISHED);
+	ct_set_file_state(state, CT_S_FINISHED);
 
 	ct_queue_transfer(trans);
 }
 
 
 void
-ct_cull_send_shas(struct ct_op *op)
+ct_cull_send_shas(struct ct_global_state *state, struct ct_op *op)
 {
 	struct xmlsd_element_list	xl;
 	struct xmlsd_element		*xe, *xp;
@@ -1090,16 +1091,15 @@ ct_cull_send_shas(struct ct_op *op)
 	CNDBG(CT_LOG_TRANS, "cull_send_shas");
 	node = RB_ROOT(&ct_sha_rb_head);
 	if (shacnt == 0 || node == NULL) {
-		ct_set_file_state(CT_S_FINISHED);
+		ct_set_file_state(state, CT_S_FINISHED);
 		return;
 	}
-	ct_set_file_state(CT_S_RUNNING);
+	ct_set_file_state(state, CT_S_RUNNING);
 
 	trans = ct_trans_alloc();
 
 	if (trans == NULL) {
-
-		ct_set_file_state(CT_S_WAITING_TRANS);
+		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
 
@@ -1140,7 +1140,7 @@ ct_cull_send_shas(struct ct_op *op)
 	ct_queue_transfer(trans);
 
 	if (shacnt == 0 || node == NULL) {
-		ct_set_file_state(CT_S_FINISHED);
+		ct_set_file_state(state, CT_S_FINISHED);
 		trans->tr_eof = 1;
 		CNDBG(CT_LOG_SHA, "shacnt %" PRIu64, shacnt);
 	}
@@ -1157,9 +1157,9 @@ char		*all_ctfiles_pattern[] = {
 			NULL,
 		 };
 
-void	ct_cull_extract_cleanup(struct ct_op *);
+ct_op_cb	ct_cull_extract_cleanup;
 void
-ct_cull_fetch_all_ctfiles(struct ct_op *op)
+ct_cull_fetch_all_ctfiles(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfileop_args	*cca;
 	struct ctfile_list_tree	 results;
@@ -1181,7 +1181,7 @@ ct_cull_fetch_all_ctfiles(struct ct_op *op)
 			cca->cca_remotename = cca->cca_localname;
 			cca->cca_tdir = ctfile_cachedir;
 			cca->cca_ctfile = 1;
-			ct_add_operation_after(op, ctfile_extract,
+			ct_add_operation_after(state, op, ctfile_extract,
 			    ct_cull_extract_cleanup, cca);
 		} else {
 			CNDBG(CT_LOG_CTFILE, "already got %s", file->mlf_name);
@@ -1191,7 +1191,7 @@ ct_cull_fetch_all_ctfiles(struct ct_op *op)
 }
 
 void
-ct_cull_extract_cleanup(struct ct_op *op)
+ct_cull_extract_cleanup(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfileop_args *cca = op->op_args;
 
@@ -1199,9 +1199,9 @@ ct_cull_extract_cleanup(struct ct_op *op)
 	e_free(&cca);
 }
 
-void	ct_cull_delete_cleanup(struct ct_op *);
+ct_op_cb	ct_cull_delete_cleanup;
 void
-ct_cull_collect_ctfiles(struct ct_op *op)
+ct_cull_collect_ctfiles(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ctfile_list_file	*file, *prevfile, filesearch;
 	char			*prev_filename;
@@ -1268,8 +1268,8 @@ prev_ct_file:
 		if (file->mlf_keep == 0) {
 			CNDBG(CT_LOG_CTFILE, "adding %s to delete list",
 			    file->mlf_name);
-			ct_add_operation(ctfile_delete, ct_cull_delete_cleanup,
-			    e_strdup(file->mlf_name));
+			ct_add_operation(state, ctfile_delete,
+			    ct_cull_delete_cleanup, e_strdup(file->mlf_name));
 		} else {
 			CNDBG(CT_LOG_CTFILE, "adding %s to keep list",
 			    file->mlf_name);
@@ -1283,11 +1283,11 @@ prev_ct_file:
 		e_free(&file);
 		/* XXX - name  */
 	}
-	ct_op_complete();
+	ct_op_complete(state);
 }
 
 void
-ct_cull_delete_cleanup(struct ct_op *op)
+ct_cull_delete_cleanup(struct ct_global_state *state, struct ct_op *op)
 {
 	char	*ctfile = op->op_args;
 
