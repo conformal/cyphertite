@@ -683,9 +683,8 @@ loop:
 		cap->cap_curnode->fl_size = 0;
 		ct_trans->tr_state = TR_S_SPECIAL;
 		ct_trans->tr_type = TR_T_SPECIAL;
-		ct_trans->tr_trans_id = ct_trans_id++;
 		ct_trans->tr_eof = 0;
-		ct_queue_transfer(state, ct_trans);
+		ct_queue_first(state, ct_trans);
 		goto next_file;
 	}
 
@@ -765,9 +764,8 @@ loop:
 			goto skip;
 		}
 
-		/* must not allocate trans_id if not skipped */
-		ct_trans->tr_trans_id = ct_trans_id++;
-		ct_queue_transfer(state, ct_trans);
+		ct_queue_first(state, ct_trans);
+
 		if (cap->cap_curnode->fl_size == 0 ||
 		    cap->cap_curnode->fl_skip_file) {
 			goto next_file;
@@ -803,12 +801,8 @@ loop:
 	ct_trans->tr_chsize = rlen;
 	ct_trans->tr_state = TR_S_READ;
 	ct_trans->tr_type = TR_T_WRITE_CHUNK;
-	ct_trans->tr_trans_id = ct_trans_id++;
 	ct_trans->tr_eof = 0;
 	ct_trans->hdr.c_flags = caa->caa_encrypted ? C_HDR_F_ENCRYPTED : 0;
-	CNDBG(CT_LOG_FILE, "read %ld for block %" PRIu64, (long) rlen,
-	    ct_trans->tr_trans_id);
-
 	/* update offset */
 	if (rsz != rlen || rlen == 0 || ((cap->cap_curnode->fl_offset + rlen) ==
 	        cap->cap_curnode->fl_size)) {
@@ -832,20 +826,21 @@ loop:
 			ct_trans->tr_state = TR_S_WMD_READY;
 			ct_trans->tr_eof = 2;
 		}
-		CNDBG(CT_LOG_FILE, "going to next file %s",
-		    cap->cap_curnode->fl_sname);
-		CNDBG(CT_LOG_TRANS, "setting eof on trans %" PRIu64 " %s",
-		    ct_trans->tr_trans_id, cap->cap_curnode->fl_sname);
 	} else {
 		cap->cap_curnode->fl_offset += rlen;
 	}
-	ct_queue_transfer(state, ct_trans);
+	ct_queue_first(state, ct_trans);
+	CNDBG(CT_LOG_FILE, "read %ld for block %" PRIu64 " eof %d",
+	    (long)rlen, ct_trans->tr_trans_id, ct_trans->tr_eof);
+
 
 	/* if file finished, update curnode to next node in list */
 	/* XXX is there other file metadata that needs to be saved?  */
 next_file:
 	/* XXX should node be removed from list at this time? */
 	if (cap->cap_curnode->fl_state == CT_FILE_FINISHED) {
+		CNDBG(CT_LOG_FILE, "going to next file %s",
+		    cap->cap_curnode->fl_sname);
 skip:
 		if ((cap->cap_curnode = ct_get_next_fnode(&cap->cap_flist,
 		    &cap->cap_curlist, cap->cap_include,
@@ -876,7 +871,6 @@ done:
 	ct_trans->tr_fl_node = NULL;
 	ct_trans->tr_state = TR_S_DONE;
 	ct_trans->tr_eof = 0;
-	ct_trans->tr_trans_id = ct_trans_id++;
 
 	/* We're done, cleanup local state. */
 	if (cap->cap_include)
@@ -888,7 +882,7 @@ done:
 	/* cws is cleaned up by the completion handler */
 	e_free(&cap);
 
-	ct_queue_transfer(state, ct_trans);
+	ct_queue_first(state, ct_trans);
 }
 
 static void

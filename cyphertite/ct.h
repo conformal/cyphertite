@@ -54,7 +54,6 @@ extern int		ct_verbose_ratios;
 extern int		ct_cur_compress_mode;
 extern struct ct_stat	*ct_stats;
 extern int		ct_no_cross_mounts;
-extern int		ct_trans_id;
 extern int		ct_max_differentials;
 extern char		*__progname;
 extern char		*ct_crypto_passphrase;
@@ -232,6 +231,8 @@ void			ct_dnode_cleanup(void);
 void			ct_free_fnode(struct fnode *);
 void			ct_ssl_cleanup(void);
 
+void			ct_queue_first(struct ct_global_state *,
+			    struct ct_trans *);
 void			ct_queue_transfer(struct ct_global_state *,
 			    struct ct_trans *);
 
@@ -381,6 +382,7 @@ ct_op_cb	 ct_free_remotename;
 
 struct ct_global_state {
 	/* PADs? */
+	int				ct_trans_id; /* next transaction id */
 	int				ct_sha_state;
 	int				ct_csha_state;
 	int				ct_file_state;

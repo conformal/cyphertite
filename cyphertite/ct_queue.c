@@ -203,7 +203,19 @@ ct_queue_complete(struct ct_global_state *state, struct ct_trans *trans)
 	CT_UNLOCK(&state->ct_complete_lock);
 }
 
+/*
+ * Enqueue a new transaction, setting up the transaction id etc.
+ */
+void
+ct_queue_first(struct ct_global_state *state, struct ct_trans *trans)
+{
+	trans->tr_trans_id = state->ct_trans_id++;
+	ct_queue_transfer(state, trans);
+}
 
+/*
+ * Move a transaction to the next state.
+ */
 void
 ct_queue_transfer(struct ct_global_state *state, struct ct_trans *trans)
 {

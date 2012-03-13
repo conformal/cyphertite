@@ -55,8 +55,7 @@ ct_list_op(struct ct_global_state *state, struct ct_op *op)
 		return;
 	}
 	trans->tr_state = TR_S_DONE;
-	trans->tr_trans_id = ct_trans_id++;
-	ct_queue_transfer(state, trans);
+	ct_queue_first(state, trans);
 	ct_set_file_state(state, CT_S_FINISHED);
 }
 
@@ -409,8 +408,7 @@ skip:
 			    "file %s numshas %" PRId64, fnode->fl_sname,
 			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas);
 
-			trans->tr_trans_id = ct_trans_id++;
-			ct_queue_transfer(state, trans);
+			ct_queue_first(state, trans);
 			break;
 		case XS_RET_SHA:
 			if (ex_priv->doextract == 0 ||
@@ -453,8 +451,7 @@ skip:
 			}
 			trans->tr_state = TR_S_EX_SHA;
 			trans->tr_dataslot = 0;
-			trans->tr_trans_id = ct_trans_id++;
-			ct_queue_transfer(state, trans);
+			ct_queue_first(state, trans);
 			break;
 		case XS_RET_FILE_END:
 			trans = ct_trans_realloc_local(state, trans);
@@ -470,8 +467,7 @@ skip:
 			trans->tr_state = TR_S_EX_FILE_END;
 			trans->tr_fl_node->fl_size =
 			    ex_priv->xdr_ctx.xs_trl.cmt_orig_size;
-			trans->tr_trans_id = ct_trans_id++;
-			ct_queue_transfer(state, trans);
+			ct_queue_first(state, trans);
 			break;
 		case XS_RET_EOF:
 			CNDBG(CT_LOG_CTFILE, "Hit end of ctfile");
@@ -534,13 +530,12 @@ we_re_done_here:
 				e_free(&ex_priv);
 				op->op_priv = NULL;
 				trans->tr_state = TR_S_DONE;
-				trans->tr_trans_id = ct_trans_id++;
 				/*
 				 * Technically this should be a local
 				 * transaction. However, since we are done
 				 * it doesn't really matter either way.
 				 */
-				ct_queue_transfer(state, trans);
+				ct_queue_first(state, trans);
 				CNDBG(CT_LOG_TRANS, "extract finished");
 				ct_set_file_state(state, CT_S_FINISHED);
 			}
@@ -568,7 +563,6 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 	struct ct_file_extract_priv	*ex_priv = op->op_priv;
 	const char			*localfile = cefa->cefa_filename;
 	struct ct_trans			*trans;
-	uint64_t			 ltrans_id;
 	int				 ret;
 	char				 shat[SHA_DIGEST_STRING_LENGTH];
 
@@ -599,14 +593,13 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 		}
 		/* unless start of file this is right */
 		trans->tr_fl_node = ex_priv->fl_ex_node;
-		trans->tr_trans_id = ltrans_id = ct_trans_id++;
 
 		if (ex_priv->done) {
 			CNDBG(CT_LOG_CTFILE, "Hit end of ctfile");
 			ctfile_parse_close(&ex_priv->xdr_ctx);
 			e_free(&ex_priv);
 			trans->tr_state = TR_S_DONE;
-			ct_queue_transfer(state, trans);
+			ct_queue_first(state, trans);
 			CNDBG(CT_LOG_TRANS, "extract finished");
 			ct_set_file_state(state, CT_S_FINISHED);
 			e_free(&ex_priv);
@@ -620,7 +613,6 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 				CFATALX("can't extract file with -1 shas");
 
 			trans = ct_trans_realloc_local(state, trans);
-			trans->tr_trans_id = ltrans_id;
 			trans->tr_fl_node = ex_priv->fl_ex_node =
 			    e_calloc(1, sizeof(*trans->tr_fl_node));
 
@@ -667,7 +659,6 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 		case XS_RET_FILE_END:
 			trans = ct_trans_realloc_local(state, trans);
 			trans->tr_fl_node = ex_priv->fl_ex_node; /* reload */
-			trans->tr_trans_id = ltrans_id;
 
 			CNDBG(CT_LOG_CTFILE, "file end!");
 			bcopy(ex_priv->xdr_ctx.xs_trl.cmt_sha, trans->tr_sha,
@@ -684,7 +675,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 		default:
 			CFATALX("%s: invalid state %d", __func__, ret);
 		}
-		ct_queue_transfer(state, trans);
+		ct_queue_first(state, trans);
 	}
 }
 
