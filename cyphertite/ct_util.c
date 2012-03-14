@@ -449,7 +449,7 @@ ct_validate_xml_negotiate_xml(struct ct_header *hdr, char *xml_body)
 	 * - other than validating it parses correctly, seems that
 	 *   additional validation would just complicate future
 	 *   client-server communication.
-	 * - because of this assumption, any non-recognised 
+	 * - because of this assumption, any non-recognised
 	 *   elements must be ignored.
 	 */
 
@@ -890,7 +890,7 @@ ct_getloginbyuid(uid_t uid)
 		entry->lc_name = NULL; /* entry not found cache NULL */
 
 	RB_INSERT(ct_login_cache_tree, &ct_login_cache, entry);
-	
+
 	return entry->lc_name;
 }
 

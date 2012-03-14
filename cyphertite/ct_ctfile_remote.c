@@ -242,9 +242,9 @@ ctfile_find_for_extract_complete(struct ct_op *op)
 
 	/* grab the newest one */
 	if ((tmp = RB_MAX(ctfile_list_tree, &result)) == NULL) {
-		if (ccfa->ccfa_empty_ok) 
+		if (ccfa->ccfa_empty_ok)
 			goto do_operation;
-		else 
+		else
 			CFATALX("unable to find metadata tagged %s",
 			    ccfa->ccfa_tag);
 	}
@@ -347,7 +347,7 @@ ctfile_extract_nextop(struct ct_op *op)
 void
 ctfile_download_next(struct ct_op *op)
 {
-	struct ct_ctfileop_args	*cca = op->op_args, *nextcca; 
+	struct ct_ctfileop_args	*cca = op->op_args, *nextcca;
 	const char		*ctfile = cca->cca_localname;
 	const char		*rfile = cca->cca_remotename;
 	char			*prevfile;
@@ -534,7 +534,7 @@ ct_compare_secrets(struct ct_op *op)
 	strlcat(temp_path, "cyphertite-server.secrets", sizeof(temp_path));
 	if (stat(ct_crypto_secrets, &sb) != 0)
 		CFATAL("can't stat secrets file at \"%s\"", ct_crypto_secrets);
-	if (stat(temp_path, &tsb) != 0) 
+	if (stat(temp_path, &tsb) != 0)
 		CFATAL("can't stat temporary secrets file");
 
 	/* Compare size first */

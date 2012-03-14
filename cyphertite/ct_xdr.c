@@ -840,7 +840,7 @@ void
 ctfile_write_special(struct ctfile_write_state *ctx, struct fnode *fnode)
 {
 	int type = fnode->fl_type;
-	
+
 	if (C_ISDIR(type)) {
 		if (ctfile_write_header(ctx, fnode, fnode->fl_sname, 1))
 			CWARNX("header write failed");

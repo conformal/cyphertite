@@ -327,7 +327,7 @@ ct_populate_fnode_from_flist(struct flist *flnode)
 	 * we stat the directory this second time then we may hit the case
 	 * where we think a file is a directory, but it is a symlink,
 	 * allowing evil path manipulation games. Therefore, if we think it is
-	 * a directory then check that it is, in case we have children. 
+	 * a directory then check that it is, in case we have children.
 	 */
 	if (flnode->fl_flags & C_FF_WASDIR && fnode->fl_type != C_TY_DIR) {
 		CWARNX("%s is no longer a directory", fnode->fl_sname);
@@ -354,7 +354,7 @@ ct_populate_fnode_from_flist(struct flist *flnode)
 		dopenflags = O_DIRECTORY | O_RDONLY | O_NOFOLLOW;
 		if ((flnode->fl_flags & C_FF_FORCEDIR) || ct_follow_symlinks)
 			dopenflags &= ~O_NOFOLLOW;
-			
+
 		if ((dfound->d_fd = openat(fnode->fl_parent_dir->d_fd,
 		    fnode->fl_fname, dopenflags)) == -1) {
 			CWARN("can't open directory %s", fnode->fl_sname);
@@ -1326,7 +1326,7 @@ link_again:
 
 				/*
 				 * XXX don't necessarily have the cwd of
-				 * the hardlink open. 
+				 * the hardlink open.
 				 */
 				if (lstat(appath, &tsb) != 0) {
 					CWARN("can't stat %s", appath);
@@ -1412,7 +1412,7 @@ link_out:
 				safe_mode = ~0;
 		}
 
-		if (ct_chown(fnode, fnode->fl_mode & safe_mode) != 0) 
+		if (ct_chown(fnode, fnode->fl_mode & safe_mode) != 0)
 			CFATAL("chmod failed on %s", fnode->fl_sname);
 
 		if (ct_attr) {
@@ -1444,7 +1444,7 @@ try_again:
 	/* Open the root directory fd node */
 #ifdef CT_NO_OPENAT
 	struct stat sb;
-	
+
 	if (stat(tpath, &sb) == -1) {
 #else
 	if ((ct_rootdir.d_fd = open(tpath, O_RDONLY | O_DIRECTORY)) == -1) {
@@ -1497,7 +1497,7 @@ ct_file_extract_nextdir(struct fnode *fnode)
 	newdirlist = e_calloc(ndirs + 1, sizeof(*newdirlist));
 
 	/* newdirlist is NULL terminated, build it backwards */
-	for (tdir = newdir, i = ndirs - 1; tdir != NULL; tdir = tdir->d_parent) 
+	for (tdir = newdir, i = ndirs - 1; tdir != NULL; tdir = tdir->d_parent)
 		newdirlist[i--] = tdir;
 	if (ct_ex_prevdir_list == NULL) {
 		i = 0;
@@ -1512,7 +1512,7 @@ ct_file_extract_nextdir(struct fnode *fnode)
 		if (newdirlist[i + 1] != ct_ex_prevdir_list[i + 1])
 			break;
 	}
-	
+
 	/* close all children from common parent up to old dir */
 	ct_file_extract_closefrom(ct_ex_prevdir_list[i], ct_ex_prevdir);
 open:
@@ -1827,7 +1827,7 @@ ct_chown(struct fnode *fnode, int follow_symlinks)
 	if (follow_symlinks)
 		return (chown(path, fnode->fl_uid,
 		    fnode->fl_gid));
-	else 
+	else
 		return (lchown(path, fnode->fl_uid,
 		   fnode->fl_gid));
 #else

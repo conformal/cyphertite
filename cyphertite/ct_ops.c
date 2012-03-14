@@ -25,7 +25,7 @@
 
 #include "ct.h"
 
-int	ct_populate_fnode(struct ctfile_parse_state *, struct fnode *, 
+int	ct_populate_fnode(struct ctfile_parse_state *, struct fnode *,
 	    int *, int);
 
 const uint8_t	 zerosha[SHA_DIGEST_LENGTH];
@@ -313,7 +313,7 @@ ct_extract_setup(struct ct_extract_head *extract_head,
 			ctfile_parse_close(ctx);
 			/* reopen first file */
 			ct_extract_open_next(extract_head, ctx);
-		} 
+		}
 	}
 
 	ct_set_file_state(CT_S_WAITING_TRANS);
@@ -711,7 +711,7 @@ ct_extract_file(struct ct_op *op)
 		switch ((ret = ctfile_parse(&ex_priv->xdr_ctx))) {
 		case XS_RET_FILE:
 			CNDBG(CT_LOG_CTFILE, "opening file");
-			if (ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas == -1) 
+			if (ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas == -1)
 				CFATALX("can't extract file with -1 shas");
 
 			trans = ct_trans_realloc_local(trans);

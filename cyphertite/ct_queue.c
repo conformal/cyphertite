@@ -306,7 +306,7 @@ static int ct_num_local_transactions;
 static struct ct_trans *
 ct_trans_alloc_local(void)
 {
-	
+
 	struct ct_trans *trans;
 
 	if (ct_num_local_transactions >= CT_MAX_LOCAL_TRANSACTIONS)

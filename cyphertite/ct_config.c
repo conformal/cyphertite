@@ -351,7 +351,7 @@ ct_create_config(void)
 			CWARNX("deleting existing secrets file");
 			unlink(ct_crypto_secrets);
 		}
-			
+
 	}
 	strlcpy(prompt, "Upload crypto secrets file to server? [yes]: ",
 	    sizeof(prompt));

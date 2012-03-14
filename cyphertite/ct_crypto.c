@@ -301,7 +301,7 @@ ct_fscanfhex(char *src, uint8_t *dst, size_t dstlen)
  * key) and d) hmac of uncrypted mask key
  */
 int
-ct_create_secrets(const char *passphrase, const char *filename, 
+ct_create_secrets(const char *passphrase, const char *filename,
     uint8_t *myaeskey, uint8_t *myivkey)
 {
 	const char		*p;

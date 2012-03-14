@@ -635,7 +635,7 @@ void			 ctfile_mode_setup(const char *);
 typedef void	(ctfile_find_callback)(char *, void *);
 void			 ctfile_find_for_operation(char *,
 			     ctfile_find_callback *, void *, int, int);
-		
+
 void		 ct_upload_secrets_file(void);
 void		 ct_download_secrets_file(void);
 int		 ct_have_remote_secrets_file(void);
@@ -712,7 +712,7 @@ struct dnode *ctfile_parse_finddir(struct ctfile_parse_state *, int);
 struct dnode *ctfile_parse_insertdir(struct ctfile_parse_state *, struct dnode *);
 
 struct ctfile_write_state;
-struct ctfile_write_state	
+struct ctfile_write_state
 	*ctfile_write_init(const char *, int, const char *, int, char *,
 	    char **, int, int);
 void	 ctfile_write_special(struct ctfile_write_state *, struct fnode *);
@@ -771,6 +771,6 @@ ct_op_cb	ct_extract_file_cleanup;
 uint64_t ct_get_debugmask(char *);
 
 /* FreeBSD 7 doesn't have openat() */
-#if defined(__FreeBSD__) &&  __FreeBSD_version < 800000 
+#if defined(__FreeBSD__) &&  __FreeBSD_version < 800000
 #define CT_NO_OPENAT
 #endif

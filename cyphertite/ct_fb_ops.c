@@ -386,7 +386,7 @@ ctfb_main(int argc, char *argv[])
 }
 
 /*
- * Code for tab completion. 
+ * Code for tab completion.
  * All either original or adapted from sftp under the following license:
  *
  * Copyright (c) 2001-2004 Damien Miller <djm@openbsd.org>
@@ -426,7 +426,7 @@ complete(EditLine *el, int cb)
 	line = e_malloc(len + 1);
 	bcopy(li->buffer,  line, len);
 	line[len] = '\0';
-	
+
 	/*
 	 * XXX the problem with using tok_ here is that we don't get a proper
 	 * return if we have a " or a ' unterminated in the line. This should
@@ -499,7 +499,7 @@ complete_file(EditLine *el, const char *file, int lastarg, char quote,
 	char *tmp, *tmp2, ins[3];
 	u_int i, hadglob, pwdlen, len, tmplen, filelen;
 	const LineInfo *lf;
-	
+
 	/* Glob from "file" location */
 	if (file == NULL)
 		tmp = e_strdup("*");
@@ -512,7 +512,7 @@ complete_file(EditLine *el, const char *file, int lastarg, char quote,
 	} else {
 		glob(tmp, GLOB_DOOFFS|GLOB_MARK, NULL, &g);
 	}
-	
+
 	/* Determine length of pwd so we can trim completion display */
 	for (hadglob = tmplen = pwdlen = 0; tmp[tmplen] != 0; tmplen++) {
 		/* Terminate counting on first unescaped glob metacharacter */
@@ -528,7 +528,7 @@ complete_file(EditLine *el, const char *file, int lastarg, char quote,
 	}
 	e_free(&tmp);
 
-	if (g.gl_matchc == 0) 
+	if (g.gl_matchc == 0)
 		goto out;
 
 	if (g.gl_matchc > 1)
@@ -551,7 +551,7 @@ complete_file(EditLine *el, const char *file, int lastarg, char quote,
 
 	if (tmplen > filelen)  {
 		tmp2 = tmp + filelen;
-		len = strlen(tmp2); 
+		len = strlen(tmp2);
 		/* quote argument on way out */
 		for (i = 0; i < len; i++) {
 			ins[0] = '\\';
@@ -607,7 +607,7 @@ complete_display(char **list, u_int len)
 	char *tmp;
 
 	/* Count entries for sort and find longest */
-	for (y = 0; list[y]; y++) 
+	for (y = 0; list[y]; y++)
 		m = MAX(m, strlen(list[y]));
 
 	if (ioctl(fileno(stdin), TIOCGWINSZ, &ws) != -1)
@@ -652,8 +652,8 @@ complete_ambiguous(const char *word, char **list, size_t count)
 		for (y = 1; list[y]; y++) {
 			u_int x;
 
-			for (x = 0; x < matchlen; x++) 
-				if (list[0][x] != list[y][x]) 
+			for (x = 0; x < matchlen; x++)
+				if (list[0][x] != list[y][x])
 					break;
 
 			matchlen = x;
@@ -665,7 +665,7 @@ complete_ambiguous(const char *word, char **list, size_t count)
 			tmp[matchlen] = '\0';
 			return tmp;
 		}
-	} 
+	}
 
 	return e_strdup(word);
 }
@@ -685,12 +685,12 @@ complete_cmd_parse(EditLine *el, const char *cmd, int lastarg, char quote,
 	if (cmd == NULL) {
 		for (y = 0; y < nitems(cmds); y++)
 			list[count++] = e_strdup(cmds[y].name);
-		
+
 		list[count] = NULL;
 		complete_display(list, 0);
 
-		for (y = 0; list[y] != NULL; y++)  
-			e_free(&list[y]);	
+		for (y = 0; list[y] != NULL; y++)
+			e_free(&list[y]);
 		e_free(&list);
 		return count;
 	}
@@ -698,7 +698,7 @@ complete_cmd_parse(EditLine *el, const char *cmd, int lastarg, char quote,
 	/* Prepare subset of commands that start with "cmd" */
 	cmdlen = strlen(cmd);
 	for (y = 0; y < nitems(cmds); y++)  {
-		if (!strncasecmp(cmd, cmds[y].name, cmdlen)) 
+		if (!strncasecmp(cmd, cmds[y].name, cmdlen))
 			list[count++] = e_strdup(cmds[y].name);
 	}
 	list[count] = NULL;
@@ -713,8 +713,8 @@ complete_cmd_parse(EditLine *el, const char *cmd, int lastarg, char quote,
 	if (count > 1)
 		complete_display(list, 0);
 
-	for (y = 0; list[y]; y++)  
-		e_free(&list[y]);	
+	for (y = 0; list[y]; y++)
+		e_free(&list[y]);
 	e_free(&list);
 
 	if (tmp != NULL) {

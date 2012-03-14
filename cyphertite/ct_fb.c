@@ -315,7 +315,7 @@ ctfb_follow_path(struct ct_fb_state *cfs, const char *path,
 		CNDBG(CT_LOG_VERTREE, "should go back to /");
 		home = 1;
 	} else if (path[0] == '/') {
-		CNDBG(CT_LOG_VERTREE, "absolute path %s", path); 
+		CNDBG(CT_LOG_VERTREE, "absolute path %s", path);
 		absolute = 1;
 	}
 
@@ -324,13 +324,13 @@ ctfb_follow_path(struct ct_fb_state *cfs, const char *path,
 		cwdbuf[0] = '\0';
 		if (absolute) /* Skip initial / */
 			path++;
-			
+
 	} else {
 		cwd = cfs->cfs_cwd;
 		if (newcwd != NULL)
 			strlcpy(cwdbuf, newcwd, sizeof(cwdbuf));
 	}
-		
+
 	if (path != NULL) {
 		strlcpy(pbuf, path, sizeof(pbuf));
 	} else {
@@ -437,7 +437,7 @@ search:
 			*postfix = '.';
 		return (-1);
 	}
-		
+
 	if (noversion) {
 		if (preferdir) {
 			/* See if we have a directory, pick the latest */
@@ -474,7 +474,7 @@ int
 ctfb_chdir(struct ct_fb_state *state, const char *path)
 {
 	struct ct_fb_entry *result;
-	
+
 	if ((result = ctfb_follow_path(state, path,
 	    state->cfs_curpath, sizeof(state->cfs_curpath))) == NULL)
 		return (-1);
@@ -606,7 +606,7 @@ ctfb_get(int argc, const char **argv)
 			CWARNX("version %s is not a file", g.gl_pathv[i]);
 			continue;
 		}
-			
+
 		file = (struct ct_fb_file *)key;
 		cefa = e_calloc(1, sizeof(*cefa));
 		cefa->cefa_ctfile = e_strdup(file->cfb_file->cff_path);
@@ -821,7 +821,7 @@ ctfb_opendir(const char *path)
 	struct ct_fb_entry		*entry;
 
 	CNDBG(CT_LOG_VERTREE, "%s: %s", __func__, path);
-	
+
 	if ((entry = ctfb_follow_path(ctfb_cfs, path, NULL, 0)) == NULL) {
 		CWARNX("%s: %s not found", __func__, path);
 		return (NULL);
@@ -850,7 +850,7 @@ ctfb_readdir(void *arg)
 	}
 
 	entry = ctx->nextentry;
-	
+
 	CNDBG(CT_LOG_VERTREE, "%s: %s", __func__, entry->cfb_name);
 	/*
 	 * OpenBSD doesn't have d_ino, but does have d_type. posix only
@@ -909,7 +909,7 @@ ctfb_readdir_versions(void *arg)
 	ctx->nextkey = TAILQ_FIRST(&entry->cfb_versions);
 	ctx->curentry = entry;
 	ctx->nextentry = RB_NEXT(ct_fb_entries, &ctx->cwd, entry);
-	
+
 	/* d_ino shouldn't matter here */
 	strlcpy(ret.d_name, entry->cfb_name, sizeof(ret.d_name));
 	return (&ret);
