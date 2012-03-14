@@ -620,7 +620,7 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		if ((cap->cap_cws = ctfile_write_init(ctfile, CT_MD_REGULAR,
 		    basisbackup, nextlvl, cwd, filelist,
 		    caa->caa_encrypted, caa->caa_allfiles,
-		    ct_max_block_size)) == NULL)
+		    state->ct_max_block_size)) == NULL)
 			CFATAL("can't create %s", ctfile);
 
 		if (basisbackup != NULL)
@@ -784,9 +784,9 @@ loop:
 	/* perform read */
 	rsz = cap->cap_curnode->fl_size - cap->cap_curnode->fl_offset;
 	CNDBG(CT_LOG_FILE, "rsz %lu max %d", (unsigned long) rsz,
-	    ct_max_block_size);
-	if (rsz > ct_max_block_size) {
-		rsz = ct_max_block_size;
+	    state->ct_max_block_size);
+	if (rsz > state->ct_max_block_size) {
+		rsz = state->ct_max_block_size;
 	}
 	ct_trans->tr_dataslot = 0;
 	rlen = 0;

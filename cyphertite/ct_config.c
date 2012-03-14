@@ -40,7 +40,6 @@
 #include <ct_ext.h>
 
 int			ct_max_trans = 100;
-int			ct_max_block_size = 256 * 1024;
 int			ct_io_bw_limit = 0;
 char			*ct_host;
 char			*ct_hostport;

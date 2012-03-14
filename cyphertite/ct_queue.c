@@ -90,6 +90,8 @@ ct_setup_state(void)
 	state->ct_tr_tag = 0;
 	state->ct_trans_free = 0;
 	state->ct_trans_alloc = 0;
+	 /* default block size, modified on server negotiation */
+	state->ct_max_block_size = 256 * 1024;
 
 	state->ct_file_state = CT_S_STARTING;
 	state->ct_comp_state = CT_S_WAITING_TRANS;
@@ -408,9 +410,9 @@ ct_trans_alloc(struct ct_global_state *state)
 
 		if (ct_compress_enabled)
 			ct_alloc_block_size = s_compress_bounds(
-			    ct_max_block_size);
+			    state->ct_max_block_size);
 		else
-			ct_alloc_block_size = ct_max_block_size;
+			ct_alloc_block_size = state->ct_max_block_size;
 
 		ct_alloc_block_size += ct_crypto_blocksz();
 
@@ -1420,7 +1422,7 @@ ct_compute_compress(void *vctx)
 			ct_stats->st_bytes_compressed += newlen;
 			ct_stats->st_bytes_uncompressed += trans->tr_chsize;
 		} else {
-			newlen = ct_max_block_size;
+			newlen = state->ct_max_block_size;
 			rv = ct_uncompress(src, dst, len, &newlen);
 
 			if (rv)

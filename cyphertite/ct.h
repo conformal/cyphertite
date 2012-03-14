@@ -240,7 +240,6 @@ void			ct_unload_config(void);
 int			ct_load_config(struct ct_settings *);
 
 extern int		ct_max_trans;
-extern int		ct_max_block_size;
 extern int		ct_io_bw_limit;
 extern char		*ct_host;
 extern char		*ct_hostport;
@@ -383,6 +382,7 @@ struct ct_global_state {
 	int				ct_trans_id; /* next transaction id */
 	uint64_t			ct_packet_id; /* next complete id */
 	int				ct_tr_tag; /* next packet tag */
+	int				ct_max_block_size;
 	int				ct_trans_alloc;
 	int				ct_trans_free;
 	int				ct_sha_state;

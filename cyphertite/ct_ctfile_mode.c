@@ -203,9 +203,10 @@ loop:
 	/* perform read */
 	rsz = cas->cas_size - cas->cas_offset;
 
-	CNDBG(CT_LOG_FILE, "rsz %ld max %d", (long) rsz, ct_max_block_size);
-	if (rsz > ct_max_block_size) {
-		rsz = ct_max_block_size;
+	CNDBG(CT_LOG_FILE, "rsz %ld max %d", (long) rsz,
+	    state->ct_max_block_size);
+	if (rsz > state->ct_max_block_size) {
+		rsz = state->ct_max_block_size;
 	}
 
 	ct_trans->tr_dataslot = 0;

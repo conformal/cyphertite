@@ -265,8 +265,6 @@ ctfile_open_f(FILE *f, struct ctfile_gheader *gh, XDR *xdr)
 		goto cleanup;
 	}
 
-	ct_max_block_size = gh->cmg_chunk_size;
-
 	return (f);
 
 cleanup:

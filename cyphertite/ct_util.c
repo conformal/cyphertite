@@ -250,16 +250,15 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 	hdr.c_version = C_HDR_VERSION;
 	hdr.c_opcode = C_HDR_O_NEG;
 	hdr.c_tag = ct_max_trans;			/* XXX - fix */
-	hdr.c_size = ct_max_block_size;			/* XXX - fix */
 	hdr.c_size = 8;
 	buf[0] = (ct_max_trans >>  0) & 0xff;
 	buf[1] = (ct_max_trans >>  8) & 0xff;
 	buf[2] = (ct_max_trans >> 16) & 0xff;
 	buf[3] = (ct_max_trans >> 24) & 0xff;
-	buf[4] = (ct_max_block_size >>  0) & 0xff;
-	buf[5] = (ct_max_block_size >>  8) & 0xff;
-	buf[6] = (ct_max_block_size >> 16) & 0xff;
-	buf[7] = (ct_max_block_size >> 24) & 0xff;
+	buf[4] = (state->ct_max_block_size >>  0) & 0xff;
+	buf[5] = (state->ct_max_block_size >>  8) & 0xff;
+	buf[6] = (state->ct_max_block_size >> 16) & 0xff;
+	buf[7] = (state->ct_max_block_size >> 24) & 0xff;
 	ct_wire_header(&hdr);
 	if (ct_assl_io_write_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
 	    ASSL_TIMEOUT) != sizeof hdr) {
@@ -291,13 +290,13 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 			}
 			ct_max_trans = buf[0] | (buf[1] << 8) |
 			    (buf[2] << 16) | (buf[3] << 24);
-			ct_max_block_size = buf[4] | (buf[5] << 8) |
+			state->ct_max_block_size = buf[4] | (buf[5] << 8) |
 			    (buf[6] << 16) | (buf[7] << 24);
 		} else {
 			ct_max_trans =
 			    MIN(hdr.c_tag, ct_max_trans);
-			ct_max_block_size =
-			    MIN(hdr.c_size, ct_max_block_size);
+			state->ct_max_block_size =
+			    MIN(hdr.c_size, state->ct_max_block_size);
 		}
 	} else {
 		CWARNX("invalid server reply");
@@ -305,7 +304,7 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 	}
 
 	CNDBG(CT_LOG_NET, "negotiated queue depth: %u max chunk size: %u",
-	    ct_max_trans, ct_max_block_size);
+	    ct_max_trans, state->ct_max_block_size);
 
 	ct_sha512((uint8_t *)ct_password, pwd_digest, strlen(ct_password));
 	if (ct_base64_encode(CT_B64_ENCODE, pwd_digest, sizeof pwd_digest,

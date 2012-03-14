@@ -333,6 +333,12 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 		ct_extract_setup(&ex_priv->extract_head,
 		    &ex_priv->xdr_ctx, ctfile, &ex_priv->allfiles);
 		ct_file_extract_setup_dir(cea->cea_tdir);
+		if (state->ct_max_block_size <
+		    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size)
+			CFATALX("block size negotiated with server %d is "
+			    "smaller than file max block size %d",
+			    state->ct_max_block_size,
+			    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size);
 		/* create rb tree head, prepare to start inserting */
 		if (ex_priv->allfiles) {
 			char *nothing = NULL;
@@ -576,6 +582,12 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 		    cefa->cefa_ctfile, cefa->cefa_ctfile_off) != 0)
 			CFATALX("can't open metadata file %s",
 			    cefa->cefa_ctfile);
+		if (state->ct_max_block_size <
+		    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size)
+			CFATALX("block size negotiated with server %d is "
+			    "smaller than file max block size %d",
+			    state->ct_max_block_size,
+			    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size);
 		ct_file_extract_setup_dir(NULL);
 		break;
 	case CT_S_FINISHED:
