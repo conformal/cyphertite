@@ -67,7 +67,6 @@ ct_cmp_iotrans(struct ct_trans *c1, struct ct_trans *c2)
 /* structure to push data to next cache line - cache isolation */
 struct ct_global_state  ct_int_state;
 struct ct_stat ct_int_stats;
-int ct_alloc_block_size;
 int ct_cur_compress_mode = 0;
 
 
@@ -92,6 +91,14 @@ ct_setup_state(void)
 	state->ct_trans_alloc = 0;
 	 /* default block size, modified on server negotiation */
 	state->ct_max_block_size = 256 * 1024;
+
+	if (ct_compress_enabled)
+		state->ct_alloc_block_size = s_compress_bounds(
+		    state->ct_max_block_size);
+	else
+		state->ct_alloc_block_size = state->ct_max_block_size;
+
+	state->ct_alloc_block_size += ct_crypto_blocksz();
 
 	state->ct_file_state = CT_S_STARTING;
 	state->ct_comp_state = CT_S_WAITING_TRANS;
@@ -408,19 +415,12 @@ ct_trans_alloc(struct ct_global_state *state)
 
 		state->ct_trans_alloc++;
 
-		if (ct_compress_enabled)
-			ct_alloc_block_size = s_compress_bounds(
-			    state->ct_max_block_size);
-		else
-			ct_alloc_block_size = state->ct_max_block_size;
-
-		ct_alloc_block_size += ct_crypto_blocksz();
-
-		trans = e_calloc(1, ct_alloc_block_size * 2 + sizeof(*trans));
+		trans = e_calloc(1, state->ct_alloc_block_size * 2
+		    + sizeof(*trans));
 		/* need to allocate body and compressed body */
 		trans->tr_data[0] = (uint8_t *)trans + sizeof(*trans);
 		trans->tr_data[1] = (uint8_t *)trans + sizeof(*trans)
-		    + ct_alloc_block_size;
+		    + state->ct_alloc_block_size;
 
 		trans->hdr.c_tag = state->ct_tr_tag++;
 		if (state->ct_tr_tag >= 0x10000)
@@ -1511,10 +1511,10 @@ ct_compute_encrypt(void *vctx)
 			}
 
 			newlen = ct_encrypt(key, keysz, iv, ivlen, src,
-			    len, dst, ct_alloc_block_size);
+			    len, dst, state->ct_alloc_block_size);
 		} else {
 			newlen = ct_decrypt(key, keysz, iv, ivlen,
-			    src, len, dst, ct_alloc_block_size);
+			    src, len, dst, state->ct_alloc_block_size);
 		}
 
 		if (newlen < 0)

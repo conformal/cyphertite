@@ -382,7 +382,8 @@ struct ct_global_state {
 	int				ct_trans_id; /* next transaction id */
 	uint64_t			ct_packet_id; /* next complete id */
 	int				ct_tr_tag; /* next packet tag */
-	int				ct_max_block_size;
+	int				ct_max_block_size; /* negotiated */
+	int				ct_alloc_block_size; /* trans data sz */
 	int				ct_trans_alloc;
 	int				ct_trans_free;
 	int				ct_sha_state;
