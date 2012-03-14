@@ -683,6 +683,7 @@ struct ctfile_parse_state {
 	struct d_num_tree	 xs_dnum_head;
 	int			 xs_dnum;
 	int			 xs_state;
+	int			 xs_wasfile;
 	int			 xs_sha_cnt;
 	size_t			 xs_sha_sz;
 

@@ -131,6 +131,7 @@ ctfile_archive(struct ct_op *op)
 
 			}
 			ctfile_parse_close(&xs_ctx);
+			fseek(cas->cas_handle, 0L, SEEK_SET);
 		}
 
 		if (fstat(fileno(cas->cas_handle), &sb) == -1)

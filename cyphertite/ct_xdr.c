@@ -403,6 +403,7 @@ ctfile_parse_init_f(struct ctfile_parse_state *ctx, FILE *f)
 
 	ctx->xs_sha_sz = 0;
 	ctx->xs_state = XS_STATE_FILE;
+	ctx->xs_wasfile = 1;
 	return 0;
 }
 
@@ -648,7 +649,11 @@ ctfile_parse_close(struct ctfile_parse_state *ctx)
 	while ((dnode = RB_ROOT(&ctx->xs_dnum_head)) != NULL)
 		RB_REMOVE(d_num_tree, &ctx->xs_dnum_head, dnode);
 
-	ctfile_close(ctx->xs_f, &ctx->xs_xdr);
+	if (ctx->xs_wasfile) {
+		xdr_destroy(&ctx->xs_xdr);
+	} else {
+		ctfile_close(ctx->xs_f, &ctx->xs_xdr);
+	}
 }
 
 struct ctfile_write_state {
