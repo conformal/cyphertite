@@ -663,6 +663,7 @@ struct ctfile_write_state {
 	XDR		 cws_xdr;
 	int		 cws_version;
 	int		 cws_flags;
+	int		 cws_block_size;
 	int64_t		 cws_dirnum;
 };
 static int	ctfile_alloc_dirnum(struct ctfile_write_state *,
@@ -678,7 +679,7 @@ static int	 ctfile_write_header_entry(struct ctfile_write_state *, char *,
  */
 struct ctfile_write_state *
 ctfile_write_init(const char *ctfile, int type, const char *basis, int lvl,
-    char *cwd, char **filelist, int encrypted, int allfiles)
+    char *cwd, char **filelist, int encrypted, int allfiles, int max_block_size)
 {
 	struct ctfile_write_state	*ctx;
 	char				**fptr;
@@ -701,7 +702,7 @@ ctfile_write_init(const char *ctfile, int type, const char *basis, int lvl,
 	bzero(&gh, sizeof gh);
 	gh.cmg_beacon = CT_MD_BEACON;
 	gh.cmg_version = CT_MD_VERSION;
-	gh.cmg_chunk_size = ct_max_block_size;
+	gh.cmg_chunk_size = ctx->cws_block_size = max_block_size;
 	gh.cmg_created = time(NULL);
 	gh.cmg_type = type;
 	gh.cmg_flags = 0;
@@ -789,8 +790,8 @@ ctfile_write_header(struct ctfile_write_state *ctx, struct fnode *fnode,
 	} else if (fnode->fl_skip_file)
 		nr_shas = -1LL;
 	else if (C_ISREG(fnode->fl_type)) {
-		nr_shas = fnode->fl_size / ct_max_block_size;
-		if (fnode->fl_size % ct_max_block_size)
+		nr_shas = fnode->fl_size / ctx->cws_block_size;
+		if (fnode->fl_size % ctx->cws_block_size)
 			nr_shas++;
 	}
 
@@ -935,7 +936,7 @@ ctfile_write_file_pad(struct ctfile_write_state *ctx, struct fnode *fn)
 	 * zero shas to the original size of the file.
 	 */
 	while (padlen > 0) {
-		padlen -= ct_max_block_size;
+		padlen -= ctx->cws_block_size;
 		if ((ret = ctfile_write_file_sha(ctx, sha, sha, iv)) != 0)
 			goto out;
 	}
@@ -980,8 +981,8 @@ ctfile_write_file_end(struct ctfile_write_state *ctx, struct fnode *fnode)
 			    fnode->fl_comp_size) / fnode->fl_size;
 		if (ct_verbose > 2) {
 			nrshas = fnode->fl_size /
-			    ct_max_block_size;
-			if (fnode->fl_size % ct_max_block_size)
+			    ctx->cws_block_size;
+			if (fnode->fl_size % ctx->cws_block_size)
 				nrshas++;
 
 			printf(" shas %d", nrshas);
