@@ -1419,6 +1419,10 @@ try_again:
 	/* ct_make_full_path can mess with the string we are using */
 	if (tdir != NULL) {
 		strlcpy(tpath, tdir, sizeof(tpath));
+		/* Make sure it is / terminated for make_full_path() */
+		if (tpath[strlen(tpath) - 1] != '/')
+			strlcat(tpath, "/", sizeof(tpath));
+
 	} else {
 		strlcpy(tpath, ".", sizeof(tpath));
 	}
