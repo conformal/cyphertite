@@ -128,6 +128,8 @@ ct_setup_state(void)
 	state->ct_reconnect_pending = 0;
 	state->ct_reconnect_timeout = CT_RECONNECT_DEFAULT_TIMEOUT;
 
+	SIMPLEQ_INIT(&state->ctfile_list_files);
+
 	return (state);
 }
 

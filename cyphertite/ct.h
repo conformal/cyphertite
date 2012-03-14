@@ -274,6 +274,7 @@ struct ct_op;
 /*
  * remote listing structures.
  */
+SIMPLEQ_HEAD(ctfile_list, ctfile_list_file);
 RB_HEAD(ctfile_list_tree, ctfile_list_file);
 RB_PROTOTYPE(ctfile_list_tree, ctfile_list_file, next, ct_cmp_ctfile);
 struct ctfile_list_file {
@@ -290,8 +291,8 @@ struct ctfile_list_file {
 };
 
 int			ct_list(const char *, char **, char **, int);
-void			ctfile_list_complete(int, char **, char **,
-			    struct ctfile_list_tree *);
+void			ctfile_list_complete(struct ctfile_list *, int,
+			    char **, char **, struct ctfile_list_tree *);
 int			ctfile_verify_name(char *);
 
 /* CT context state */
@@ -430,6 +431,9 @@ struct ct_global_state {
 	int				ct_reconnect_pending;
 #define CT_RECONNECT_DEFAULT_TIMEOUT	30
 	int				ct_reconnect_timeout;
+
+	/* ctfile list state */
+	struct ctfile_list		ctfile_list_files;
 };
 extern struct ct_global_state		*ct_state;
 

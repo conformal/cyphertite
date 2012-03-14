@@ -76,8 +76,8 @@ ctfile_list_print(struct ct_global_state *state, struct ct_op *op)
 	int				 numlen;
 
 	RB_INIT(&results);
-	ctfile_list_complete(ccla->ccla_matchmode, ccla->ccla_search,
-	    ccla->ccla_exclude, &results);
+	ctfile_list_complete(&state->ctfile_list_files, ccla->ccla_matchmode,
+	    ccla->ccla_search, ccla->ccla_exclude, &results);
 	RB_FOREACH(file, ctfile_list_tree, &results) {
 		if (maxsz < (int64_t)file->mlf_size)
 			maxsz  = (int64_t)file->mlf_size;

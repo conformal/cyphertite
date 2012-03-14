@@ -43,12 +43,6 @@
 #include "ct_crypto.h"
 #include <ct_ext.h>
 
-
-SIMPLEQ_HEAD(ctfile_list, ctfile_list_file);
-
-struct ctfile_list			ctfile_list_files =
-				     SIMPLEQ_HEAD_INITIALIZER(ctfile_list_files);
-
 ct_op_cb ct_cull_send_shas;
 ct_op_cb ct_cull_setup;
 ct_op_cb ct_cull_start_shas;
@@ -75,7 +69,6 @@ struct xmlsd_v_elements ct_xml_cmds[] = {
 #endif
 	{ NULL, NULL }
 };
-
 
 /*
  * clean up after a ctfile archive/extract operation by freeing the remotename
@@ -648,20 +641,20 @@ ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 }
 
 void
-ctfile_list_complete(int matchmode, char **flist, char **excludelist,
-    struct ctfile_list_tree *results)
+ctfile_list_complete(struct ctfile_list *files,  int matchmode, char **flist,
+    char **excludelist, struct ctfile_list_tree *results)
 {
 	struct ct_match		*match, *ex_match = NULL;
 	struct ctfile_list_file	*file;
 
-	if (SIMPLEQ_EMPTY(&ctfile_list_files))
+	if (SIMPLEQ_EMPTY(files))
 		return;
 
 	match = ct_match_compile(matchmode, flist);
 	if (excludelist)
 		ex_match = ct_match_compile(matchmode, excludelist);
-	while ((file = SIMPLEQ_FIRST(&ctfile_list_files)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(&ctfile_list_files, mlf_link);
+	while ((file = SIMPLEQ_FIRST(files)) != NULL) {
+		SIMPLEQ_REMOVE_HEAD(files, mlf_link);
 		if (ct_match(match, file->mlf_name) == 0 && (ex_match == NULL ||
 		    ct_match(ex_match, file->mlf_name) == 1)) {
 			RB_INSERT(ctfile_list_tree, results, file);
@@ -809,8 +802,8 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 				    &errstr);
 				if (errstr != NULL)
 					CFATAL("can't parse mtime: %s", errstr);
-				SIMPLEQ_INSERT_HEAD(&ctfile_list_files, file,
-				    mlf_link);
+				SIMPLEQ_INSERT_TAIL(&state->ctfile_list_files,
+				    file, mlf_link);
 			}
 		}
 		trans->tr_state = TR_S_DONE;
@@ -1164,8 +1157,8 @@ ct_cull_fetch_all_ctfiles(struct ct_global_state *state, struct ct_op *op)
 	char			*cachename;
 
 	RB_INIT(&results);
-	ctfile_list_complete(CT_MATCH_REGEX, all_ctfiles_pattern, NULL,
-	    &results);
+	ctfile_list_complete(&state->ctfile_list_files, CT_MATCH_REGEX,
+	    all_ctfiles_pattern, NULL, &results);
 	while ((file = RB_ROOT(&results)) != NULL) {
 		RB_REMOVE(ctfile_list_tree, &results, file);
 		CNDBG(CT_LOG_CTFILE, "looking for file %s ", file->mlf_name);

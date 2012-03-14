@@ -42,7 +42,7 @@ ct_op_cb	ctfile_extract_nextop;
 ct_op_cb	ctfile_download_next;
 ct_op_cb	ctfile_nextop_extract_cleanup;
 ct_op_cb	ctfile_nextop_archive_cleanup;
-int	ct_file_on_server(char *filename);
+int	ct_file_on_server(struct ct_global_state *, char *filename);
 
 void
 ctfile_mode_setup(const char *mode)
@@ -225,8 +225,8 @@ ctfile_find_for_extract_complete(struct ct_global_state *state,
 	char	 				*best = NULL;
 
 	RB_INIT(&result);
-	ctfile_list_complete(ccla->ccla_matchmode, ccla->ccla_search,
-	    ccla->ccla_exclude, &result);
+	ctfile_list_complete(&state->ctfile_list_files, ccla->ccla_matchmode,
+	    ccla->ccla_search, ccla->ccla_exclude, &result);
 	e_free(ccla->ccla_search);
 	e_free(&ccla->ccla_search);
 	e_free(&ccla);
@@ -505,10 +505,9 @@ ct_check_secrets_extract(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfileop_args	*cca;
 
-	if (!ct_file_on_server("crypto.secrets"))
-		CFATALX("upload_crypto_secrets is set but no secrets file "
-		    "exists on the server.  Please use cyphertitectl "
-		    "secrets upload to correct this.");
+	if (!ct_file_on_server(state, "crypto.secrets"))
+		CFATALX("upload_crypto_secrets set but not secrets file on"
+		    "server, please use cyphertitectl secrets_upload");
 
 	cca = e_calloc(1, sizeof(*cca));
 	/* XXX temporary name? */
@@ -585,7 +584,7 @@ ct_check_secrets_upload(struct ct_global_state *state, struct ct_op *op)
 	char			 answer[1024];
 
 	/* Check to see if we already have a secrets file on the server */
-	if (ct_file_on_server(cca->cca_remotename)) {
+	if (ct_file_on_server(state, cca->cca_remotename)) {
 		if (ct_get_answer("There is already a crypto secrets file on "
 		    "the server, would you like to replace it? [no]: ",
 		    "yes", "no", "no", answer, sizeof answer, 0) != 1)
@@ -603,7 +602,7 @@ ct_check_secrets_upload(struct ct_global_state *state, struct ct_op *op)
  * filename.
  */
 int
-ct_file_on_server(char *filename)
+ct_file_on_server(struct ct_global_state *state, char *filename)
 {
 	struct ctfile_list_tree	 results;
 	struct ctfile_list_file	*file = NULL;
@@ -613,7 +612,8 @@ ct_file_on_server(char *filename)
 	RB_INIT(&results);
 	filelist[0] = filename;
 	filelist[1] = NULL;
-	ctfile_list_complete(CT_MATCH_GLOB, filelist, NULL, &results);
+	ctfile_list_complete(&state->ctfile_list_files, CT_MATCH_GLOB,
+	    filelist, NULL, &results);
 
 	/* Check to see if we already have a secrets file on the server */
 	if (RB_MIN(ctfile_list_tree, &results) != NULL) {
@@ -632,7 +632,7 @@ ct_secrets_exists(struct ct_global_state *state, struct ct_op *op)
 {
 	int *exists = op->op_args;
 
-	*exists = ct_file_on_server("crypto.secrets");
+	*exists = ct_file_on_server(state, "crypto.secrets");
 }
 
 int
