@@ -226,7 +226,7 @@ struct ct_trans		*ct_trans_realloc_local(struct ct_global_state *,
 			    struct ct_trans *);
 void			ct_trans_free(struct ct_global_state *,
 			    struct ct_trans *);
-void			ct_trans_cleanup(void);
+void			ct_trans_cleanup(struct ct_global_state *);
 void			ct_dnode_cleanup(void);
 void			ct_free_fnode(struct fnode *);
 
@@ -379,9 +379,12 @@ ct_op_cb	 ct_free_remotename;
 struct ct_global_state {
 	/* PADs? */
 	struct ct_assl_io_ctx		*ct_assl_ctx; /* Connection state */
+	TAILQ_HEAD(,ct_trans)		ct_trans_free_head;
 	int				ct_trans_id; /* next transaction id */
 	uint64_t			ct_packet_id; /* next complete id */
 	int				ct_tr_tag; /* next packet tag */
+	int				ct_trans_alloc;
+	int				ct_trans_free;
 	int				ct_sha_state;
 	int				ct_csha_state;
 	int				ct_file_state;

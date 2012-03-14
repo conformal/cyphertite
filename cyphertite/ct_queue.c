@@ -67,13 +67,9 @@ ct_cmp_iotrans(struct ct_trans *c1, struct ct_trans *c2)
 /* structure to push data to next cache line - cache isolation */
 struct ct_global_state  ct_int_state;
 struct ct_stat ct_int_stats;
-TAILQ_HEAD(,ct_trans)ct_trans_free_head =
-    TAILQ_HEAD_INITIALIZER(ct_trans_free_head);;
-int ct_numalloc = 0;
 int ct_alloc_block_size;
 int ct_cur_compress_mode = 0;
 
-int c_trans_free = 0;
 
 struct ct_global_state *ct_state = &ct_int_state;
 struct ct_stat *ct_stats = &ct_int_stats;
@@ -88,9 +84,12 @@ ct_setup_state(void)
 
 	ct_stats = &ct_int_stats;
 
+	TAILQ_INIT(&state->ct_trans_free_head);
 	state->ct_trans_id = 0;
 	state->ct_packet_id = 0;
 	state->ct_tr_tag = 0;
+	state->ct_trans_free = 0;
+	state->ct_trans_alloc = 0;
 
 	state->ct_file_state = CT_S_STARTING;
 	state->ct_comp_state = CT_S_WAITING_TRANS;
@@ -390,9 +389,9 @@ ct_trans_alloc(struct ct_global_state *state)
 	uint16_t tag;
 
 	/* This should come from preallocated shared memory */
-	if (!TAILQ_EMPTY(&ct_trans_free_head)) {
-		trans = TAILQ_FIRST(&ct_trans_free_head);
-		TAILQ_REMOVE(&ct_trans_free_head, trans, tr_next);
+	if (!TAILQ_EMPTY(&state->ct_trans_free_head)) {
+		trans = TAILQ_FIRST(&state->ct_trans_free_head);
+		TAILQ_REMOVE(&state->ct_trans_free_head, trans, tr_next);
 		tr_data[0] = trans->tr_data[0];
 		tr_data[1] = trans->tr_data[1];
 		tag = trans->hdr.c_tag;
@@ -400,12 +399,12 @@ ct_trans_alloc(struct ct_global_state *state)
 		trans->tr_data[0] = tr_data[0];
 		trans->tr_data[1] = tr_data[1];
 		trans->hdr.c_tag = tag;
-		c_trans_free--;
+		state->ct_trans_free--;
 	} else {
-		if (ct_numalloc > ct_max_trans)
+		if (state->ct_trans_alloc > ct_max_trans)
 			return NULL;
 
-		ct_numalloc++;
+		state->ct_trans_alloc++;
 
 		if (ct_compress_enabled)
 			ct_alloc_block_size = s_compress_bounds(
@@ -440,9 +439,9 @@ ct_trans_free(struct ct_global_state *state, struct ct_trans *trans)
 
 		return;
 	} else {
-		TAILQ_INSERT_HEAD(&ct_trans_free_head, trans, tr_next);
+		TAILQ_INSERT_HEAD(&state->ct_trans_free_head, trans, tr_next);
 	}
-	c_trans_free++;
+	state->ct_trans_free++;
 	if (trans->tr_dataslot == 2) {
 		ct_body_free(NULL, trans->tr_data[2], &trans->hdr);
 		trans->tr_data[2] = NULL;
@@ -456,20 +455,20 @@ ct_trans_free(struct ct_global_state *state, struct ct_trans *trans)
 }
 
 void
-ct_trans_cleanup(void)
+ct_trans_cleanup(struct ct_global_state *state)
 {
 	struct ct_trans *trans;
 	int count = 0;
 
-	CNDBG(CT_LOG_TRANS, "trans num free  %d", c_trans_free);
+	CNDBG(CT_LOG_TRANS, "trans num free  %d", state->ct_trans_free);
 	/* free the transaction data block/or each element */
-	while (!TAILQ_EMPTY(&ct_trans_free_head)) {
-		trans = TAILQ_FIRST(&ct_trans_free_head);
-		TAILQ_REMOVE(&ct_trans_free_head, trans, tr_next);
+	while (!TAILQ_EMPTY(&state->ct_trans_free_head)) {
+		trans = TAILQ_FIRST(&state->ct_trans_free_head);
+		TAILQ_REMOVE(&state->ct_trans_free_head, trans, tr_next);
 		e_free(&trans);
 		count++;
 	}
-	c_trans_free = ct_numalloc = 0;
+	state->ct_trans_free = state->ct_trans_alloc = 0;
 	CNDBG(CT_LOG_TRANS, "freed %d transactions", count);
 }
 
@@ -1574,7 +1573,8 @@ ct_display_queues(struct ct_global_state *state)
 		fprintf(stderr, "Complete queue len %d\n",
 		    state->ct_complete_rblen);
 		CT_UNLOCK(&state->ct_complete_lock);
-		fprintf(stderr, "Free     queue len %d\n", c_trans_free);
+		fprintf(stderr, "Free     queue len %d\n",
+		    state->ct_trans_free);
 	}
 	ct_dump_stats(state, stderr);
 }
