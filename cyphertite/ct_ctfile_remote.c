@@ -527,7 +527,8 @@ ct_compare_secrets(struct ct_op *op)
 	char		 		 temp_path[PATH_MAX];
 	struct stat	 		 sb, tsb;
 	char				 buf[1024], tbuf[1024];
-	size_t				 sz, rsz;
+	size_t				 rsz;
+	off_t				 sz;
 
 	/* cachedir is '/' terminated */
 	strlcpy(temp_path, ctfile_cachedir, sizeof(temp_path));
@@ -554,14 +555,15 @@ ct_compare_secrets(struct ct_op *op)
 		if (sz > 1024)
 			sz = 1024;
 		sb.st_size -= sz;
-		CNDBG(CT_LOG_FILE, "sz = %zu remaining = %" PRId64,
-		    sz, (int64_t)sb.st_size);
+		CNDBG(CT_LOG_FILE, "sz = %" PRId64 " remaining = %" PRId64,
+		    (int64_t)sz, (int64_t)sb.st_size);
 		if ((rsz = fread(buf, 1, sz, f)) != sz)
-			CFATALX("short read on secrets file (%zu %zu)",
-			    sz, rsz);
+			CFATALX("short read on secrets file (%" PRId64
+			    " %" PRId64 ")", (int64_t)sz, (int64_t)rsz);
 		if ((rsz = fread(tbuf, 1, sz, tf)) != sz)
 			CFATALX("short read on temporary secrets file "
-			    "(%zu %zu)", sz, rsz);
+			    "(%" PRId64 " %" PRId64 ")", (int64_t)sz,
+			    (int64_t)rsz);
 
 		if (memcmp(buf, tbuf, sz) != 0)
 			CFATALX("secrets file on server differs from local"
