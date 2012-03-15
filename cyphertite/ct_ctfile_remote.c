@@ -433,7 +433,7 @@ ctfile_nextop_archive(char *basis, void *args)
 	char	 		 buf[TIMEDATA_LEN], *fullname, *cachename;
 	time_t	 		 now;
 
-	CNDBG(CT_LOG_CTFILE, "setting basisname %s", basis);
+	CNDBG(CT_LOG_CTFILE, "setting basisname %s", basis ? basis : "<none>");
 	caa->caa_basis = basis;
 
 	/*
