@@ -725,7 +725,6 @@ loop:
 		ct_trans->tr_fl_node = cap->cap_curnode;
 		ct_trans->tr_state = TR_S_FILE_START;
 		ct_trans->tr_type = TR_T_WRITE_HEADER;
-		ct_trans->tr_trans_id = ct_trans_id++;
 		if (cap->cap_curnode->fl_size == 0 ||
 		    cap->cap_curnode->fl_skip_file) {
 			close(cap->cap_fd);
@@ -744,9 +743,11 @@ loop:
 		if (cap->cap_curnode->fl_skip_file && caa->caa_allfiles == 0) {
 			ct_free_fnode(cap->cap_curnode);
 			ct_trans_free(ct_trans);
-			goto next_file;
+			goto skip;
 		}
 
+		/* must not allocate trans_id if not skipped */
+		ct_trans->tr_trans_id = ct_trans_id++;
 		ct_queue_transfer(ct_trans);
 		if (cap->cap_curnode->fl_size == 0 ||
 		    cap->cap_curnode->fl_skip_file) {
