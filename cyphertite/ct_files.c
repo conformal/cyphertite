@@ -269,7 +269,7 @@ ct_populate_fnode_from_flist(struct flist *flnode)
 	int			ret;
 
 	if (flnode->fl_flags & C_FF_CLOSEDIR) {
-		dsearch.d_name = gen_sname(flnode);
+		dsearch.d_name = gen_fname(flnode);
 		if ((dfound = RB_FIND(d_name_tree, &ct_dname_head,
 		    &dsearch)) == NULL)
 			CFATALX("close entry for non existant directory %s",
@@ -342,7 +342,7 @@ ct_populate_fnode_from_flist(struct flist *flnode)
 	ct_sha1_setup(&fnode->fl_shactx);
 
 	if (C_ISDIR(fnode->fl_type)) {
-		dsearch.d_name = fnode->fl_sname;
+		dsearch.d_name = fnode->fl_fname;
 		dfound = RB_FIND(d_name_tree, &ct_dname_head, &dsearch);
 		if (dfound == NULL)
 			CFATALX("directory not found in d_name_tree %s",
@@ -441,14 +441,14 @@ ct_sched_backup_file(struct stat *sb, char *filename, int forcedir,
 		return 0;
 
 	if (closedir) {
-		dsearch.d_name = (char *)safe;
+		dsearch.d_name = (char *)filename;
 		dnode = RB_FIND(d_name_tree, &ct_dname_head, &dsearch);
 		if (dnode == NULL)
 			CFATALX("close directory for nonexistant dir %s",
-			    safe);
+			    filename);
 	} else if (forcedir || S_ISDIR(sb->st_mode)) {
 		dnode = e_calloc(1, sizeof(*dnode));
-		dnode->d_name = e_strdup(safe);
+		dnode->d_name = e_strdup(filename);
 		dnode->d_num = -1; /* numbers are allocated on xdr write */
 		e_dnode = RB_INSERT(d_name_tree, &ct_dname_head, dnode);
 		if (e_dnode != NULL) {
