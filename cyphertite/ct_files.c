@@ -342,11 +342,12 @@ ct_populate_fnode_from_flist(struct flist *flnode)
 	ct_sha1_setup(&fnode->fl_shactx);
 
 	if (C_ISDIR(fnode->fl_type)) {
-		dsearch.d_name = fnode->fl_fname;
+		dsearch.d_name = gen_fname(flnode);
 		dfound = RB_FIND(d_name_tree, &ct_dname_head, &dsearch);
 		if (dfound == NULL)
 			CFATALX("directory not found in d_name_tree %s",
 			    fnode->fl_fname);
+		e_free(&dsearch.d_name);
 		fnode->fl_curdir_dir = dfound;
 
 #ifndef CT_NO_OPENAT
