@@ -1796,7 +1796,6 @@ ct_rename(struct fnode *fnode)
 
 	snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
 	    fnode->fl_sname);
-	CWARNX("renaming %s to %s", fnode->fl_fname, path);
 	return (rename(fnode->fl_fname, path));
 #else
 	return (renameat(fnode->fl_parent_dir->d_fd, fnode->fl_fname,
