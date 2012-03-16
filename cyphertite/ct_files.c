@@ -1304,7 +1304,7 @@ ct_file_extract_special(struct fnode *fnode)
 	} else if (C_ISLINK(fnode->fl_type)){
 		if (fnode->fl_hardlink) {
 			snprintf(apath, sizeof(apath), "%s/%s",
-			    ct_rootdir.d_name, fnode->fl_sname);
+			    ct_rootdir.d_name, fnode->fl_hlname);
 			appath = apath;
 		} else {
 			appath = fnode->fl_hlname;
