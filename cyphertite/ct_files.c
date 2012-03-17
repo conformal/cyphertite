@@ -85,7 +85,7 @@ static int		 s_to_e_type(int);
 int                      ct_dname_cmp(struct dnode *, struct dnode *);
 
 int			 ct_open(struct fnode *, int , int);
-int			 ct_stat(struct fnode *, struct stat *, int);
+int			 ct_stat(struct fnode *, struct stat *, int, int);
 int			 ct_mkdir(struct fnode *, mode_t);
 int			 ct_mknod(struct fnode *);
 int			 ct_link(struct fnode *, char *);
@@ -263,6 +263,7 @@ ct_populate_fnode_from_flist(struct flist *flnode)
 	struct fnode		*fnode;
 	struct stat		*sb, sbstore;
 	struct dnode		dsearch, *dfound;
+	char			*fname;
 #ifndef CT_NO_OPENAT
 	int			dopenflags;
 #endif
@@ -285,17 +286,28 @@ ct_populate_fnode_from_flist(struct flist *flnode)
 
 	sb = &sbstore;
 #ifdef CT_NO_OPENAT
-	char *sname = gen_sname(flnode);
+	char	path[PATH_MAX];
+
+	fname = gen_fname(flnode);
+
+	if (fname[0] == '/') {
+		strlcpy(path, fname, sizeof(path));
+	} else {
+		snprintf(path, sizeof(path), "%s%s%s", ct_tdir ? ct_tdir : "",
+		    ct_tdir ? "/" : "", fname);
+	}
+
 	if (ct_follow_symlinks)
-		ret = stat(sname, sb);
+		ret = stat(path, sb);
 	else
-		ret = lstat(sname, sb);
-	e_free(&sname);
+		ret = lstat(path, sb);
 #else
+	fname = e_strdup(flnode->fl_fname);
 	ret = fstatat(flnode->fl_parent_dir->d_fd, flnode->fl_fname,
 	    sb, ct_follow_symlinks ? 0 : AT_SYMLINK_NOFOLLOW);
 #endif
 	if (ret != 0) {
+		e_free(&fname);
 		/* file no longer available return failure */
 		return NULL;
 	}
@@ -306,7 +318,7 @@ ct_populate_fnode_from_flist(struct flist *flnode)
 	 * ct_name_to_safename has run before and not returned failure
 	 * so safe to not check for failure of gen_sname() here.
 	 */
-	fnode->fl_fname = e_strdup(flnode->fl_fname);
+	fnode->fl_fname = fname;
 	fnode->fl_sname = gen_sname(flnode);
 	fnode->fl_dev = sb->st_dev;
 	fnode->fl_rdev = sb->st_rdev;
@@ -645,7 +657,7 @@ loop:
 			 * no (new) files in them
 			 */
 			if (ct_stat(cap->cap_curnode, &sb,
-			    ct_follow_symlinks) != 0) {
+			    ct_follow_symlinks, 0) != 0) {
 				CWARN("archive: dir %s stat error",
 				    cap->cap_curnode->fl_sname);
 			} else {
@@ -1335,7 +1347,7 @@ link_again:
 					goto link_out;
 				}
 				if (ct_stat(fnode, &lsb,
-				    ct_follow_symlinks) != 0) {
+				    ct_follow_symlinks, 1) != 0) {
 					CWARN("can't stat %s", fnode->fl_sname);
 					goto link_out;
 				}
@@ -1676,13 +1688,19 @@ try_again:
 }
 
 int
-ct_stat(struct fnode *fnode, struct stat *sb, int follow_symlinks)
+ct_stat(struct fnode *fnode, struct stat *sb, int follow_symlinks, int extract)
 {
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
 
-	snprintf(path, sizeof(path), "%s%s%s", ct_tdir ? ct_tdir : "",
-	    ct_tdir ? "/" : "", fnode->fl_sname);
+	if (fnode->fl_fname[0] == '/') {
+		strlcpy(path, extract ? fnode->fl_sname : fnode->fl_fname,
+		    sizeof(path));
+	} else {
+		snprintf(path, sizeof(path), "%s%s%s", ct_tdir ? ct_tdir : "",
+		    ct_tdir ? "/" : "", extract ? fnode->fl_sname :
+		    fnode->fl_fname);
+	}
 	if (ct_follow_symlinks)
 		return (stat(path, sb));
 	else
@@ -1700,8 +1718,13 @@ ct_open(struct fnode *fnode, int flags, int follow_symlinks)
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
 
-	snprintf(path, sizeof(path), "%s%s%s", ct_tdir ? ct_tdir : "",
-	    ct_tdir ? "/" : "", fnode->fl_sname);
+	if (fnode->fl_fname[0] == '/') {
+		strlcpy(path, fnode->fl_fname, sizeof(path));
+	} else {
+		snprintf(path, sizeof(path), "%s%s%s", ct_tdir ? ct_tdir : "",
+		    ct_tdir ? "/" : "", fnode->fl_fname);
+	}
+
 	return (open(path, flags | follow_symlinks ? 0 : O_NOFOLLOW));
 #else
 	return (openat(fnode->fl_parent_dir->d_fd, fnode->fl_fname,
@@ -1759,11 +1782,13 @@ ct_readlink(struct fnode *fnode, char *mylink, size_t mylinksz)
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
 
-	snprintf(path, sizeof(path), "%s%s%s", ct_tdir ? ct_tdir : "",
-	    ct_tdir ? "/" : "", fnode->fl_sname);
-	/*
-	 * XXX no tdir because this is called from traverse (which is chdired).
-	 */
+	if (fnode->fl_fname[0] == '/') {
+		strlcpy(path, fnode->fl_fname, sizeof(path));
+	} else {
+		snprintf(path, sizeof(path), "%s%s%s", ct_tdir ? ct_tdir : "",
+		    ct_tdir ? "/" : "", fnode->fl_fname);
+	}
+
 	snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
 	    fnode->fl_sname);
 	return (readlink(path, mylink, mylinksz));
