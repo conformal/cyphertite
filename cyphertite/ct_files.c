@@ -388,6 +388,10 @@ ct_populate_fnode_from_flist(struct flist *flnode)
 			ct_free_fnode(fnode);
 			return (NULL);
 		}
+		/*
+		 * readlink(2) does not append a NUL.
+		 */
+		mylink[ret] = '\0';
 		fnode->fl_hlname = e_strdup(mylink);
 	}
 
