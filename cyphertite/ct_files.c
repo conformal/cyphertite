@@ -1789,8 +1789,6 @@ ct_readlink(struct fnode *fnode, char *mylink, size_t mylinksz)
 		    ct_tdir ? "/" : "", fnode->fl_fname);
 	}
 
-	snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
-	    fnode->fl_sname);
 	return (readlink(path, mylink, mylinksz));
 #else
 	return (readlinkat(fnode->fl_parent_dir->d_fd, fnode->fl_fname,
