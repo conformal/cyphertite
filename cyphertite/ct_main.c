@@ -61,7 +61,6 @@ extern char		*__progname;
 /* command line flags */
 int			ct_debug = 0;
 int			ct_action = 0;
-char			*ct_tdir;
 int			ct_strip_slash = 1;
 int			ct_verbose_ratios;
 int			ct_no_cross_mounts;
@@ -296,6 +295,7 @@ ct_main(int argc, char **argv)
 	struct ct_archive_args		 caa;
 	struct ct_ctfileop_args 	 cca;
 	struct ct_ctfile_list_args	 ccla;
+	char				*ct_tdir = NULL;
 	char				*ct_basisbackup = NULL;
 	char				*ctfile = NULL;
 	char				*ct_includefile = NULL;

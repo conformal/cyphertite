@@ -111,7 +111,7 @@ ctfile_archive(struct ct_op *op)
 
 		if (cca->cca_tdir) {
 			snprintf(tpath, sizeof tpath, "%s/%s",
-			    ct_tdir, ctfile);
+			    cca->cca_tdir, ctfile);
 		} else {
 			strlcpy(tpath, ctfile, sizeof(tpath));
 		}
