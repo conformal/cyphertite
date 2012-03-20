@@ -159,7 +159,7 @@ ct_init(int foreground, int need_secrets, int only_metadata)
 
 	if (need_secrets != 0 && ct_crypto_secrets != NULL) {
 		if (stat(ct_crypto_secrets, &sb) == -1) {
-			CFATALX("No crypto secrets file, please run"
+			CFATALX("No crypto secrets file, please run "
 			    "ctctl secrets generate or ctctl secrets download");
 		}
 		/* we got crypto */
