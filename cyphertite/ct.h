@@ -52,7 +52,6 @@ extern int		ct_strip_slash;
 extern int		ct_verbose;
 extern int		ct_cur_compress_mode;
 extern struct ct_stat	*ct_stats;
-extern int		ct_no_cross_mounts;
 extern int		ct_max_differentials;
 extern char		*__progname;
 extern char		*ct_crypto_passphrase;
