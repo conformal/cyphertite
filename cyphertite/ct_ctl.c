@@ -212,6 +212,7 @@ ctctl_main(int argc, char *argv[])
 	char			*configfile = NULL;
 	char			*debugstring = NULL;
 	uint64_t		debug_mask = 0;
+	uint32_t		cflags = CLOG_F_ENABLE | CLOG_F_STDERR;
 
 	while ((c = getopt(argc, argv, "D:F:")) != -1) {
 		switch (c) {

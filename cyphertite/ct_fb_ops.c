@@ -267,6 +267,7 @@ ctfb_main(int argc, char *argv[])
 	HistEvent		 hev;
 	Tokenizer		*tokenizer;
 	uint64_t		 debug_mask = 0;
+	uint32_t		 cflags = CLOG_F_ENABLE | CLOG_F_STDERR;
 	int		 	 c, cnt, l_argc, ret;
 
 	bzero(&cfs, sizeof(cfs));

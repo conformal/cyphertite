@@ -70,7 +70,6 @@ char			*ct_configfile;
 int			ct_attr;
 
 /* runtime */
-uint32_t		cflags;
 unsigned char		ct_iv[CT_IV_LEN];
 unsigned char		ct_crypto_key[CT_KEY_LEN];
 
@@ -307,6 +306,7 @@ ct_main(int argc, char **argv)
 	char				**excludelist = NULL;
 	char				**includelist = NULL;
 	uint64_t			 debug_mask = 0;
+	uint32_t			 cflags = CLOG_F_ENABLE | CLOG_F_STDERR;
 	int				 ct_metadata = 0;
 	int				 ct_match_mode = CT_MATCH_GLOB;
 	int				 c;
@@ -628,8 +628,7 @@ main(int argc, char *argv[])
 	ct_savecore();
 
 	clog_init(1);
-	cflags = CLOG_F_ENABLE | CLOG_F_STDERR;
-	if (clog_set_flags(cflags))
+	if (clog_set_flags(CLOG_F_ENABLE | CLOG_F_STDERR))
 		errx(1, "illegal clog flags");
 
 	/* set string defaults, don't use e_ functions for now */
