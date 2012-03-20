@@ -63,7 +63,6 @@ extern char		*__progname;
 int			ct_debug = 0;
 int			ct_action = 0;
 int			ct_strip_slash = 1;
-int			ct_verbose_ratios;
 int			ct_follow_symlinks = 0;
 int			ct_root_symlink = 0;
 int			ct_verbose;
@@ -327,6 +326,7 @@ ct_main(int argc, char **argv)
 	int				 need_secrets;
 	int				 force_allfiles = -1;
 	int				 no_cross_mounts = 0;
+	int				 verbose_ratios;
 
 	while ((c = getopt(argc, argv,
 	    "AB:C:D:E:F:HI:PRVXacdef:hmprtvx0")) != -1) {
@@ -362,7 +362,7 @@ ct_main(int argc, char **argv)
 			ct_strip_slash = 0;
 			break;
 		case 'R':
-			ct_verbose_ratios = 1;
+			verbose_ratios = 1;
 			break;
 		case 'V':
 			show_version();
@@ -610,6 +610,8 @@ ct_main(int argc, char **argv)
 		CWARNX("event_dispatch returned, %d %s", errno,
 		    strerror(errno));
 
+	if (verbose_ratios)
+		ct_dump_stats(state, stdout);
 	ct_cleanup(state);
 out:
 	if (includelist && freeincludes == 1)

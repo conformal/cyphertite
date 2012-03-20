@@ -952,8 +952,6 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 		/* do we have more operations queued up? */
 		if (ct_op_complete(state) == 0)
 			return;
-		if (ct_verbose_ratios)
-			ct_dump_stats(state, stdout);
 		ct_shutdown(state);
 		break;
 	case TR_S_SPECIAL:

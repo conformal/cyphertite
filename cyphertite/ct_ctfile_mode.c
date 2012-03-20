@@ -575,9 +575,6 @@ ct_complete_metadata(struct ct_global_state *state, struct ct_trans *trans)
 
 		if (!done)
 			return;
-		if (ct_verbose_ratios)
-			ct_dump_stats(state, stdout);
-
 		ct_shutdown(state);
 		break;
 	case TR_S_WMD_READY:

@@ -50,7 +50,6 @@ extern int		ct_multilevel_allfiles;
 extern int		ct_attr;
 extern int		ct_strip_slash;
 extern int		ct_verbose;
-extern int		ct_verbose_ratios;
 extern int		ct_cur_compress_mode;
 extern struct ct_stat	*ct_stats;
 extern int		ct_no_cross_mounts;
