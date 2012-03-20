@@ -853,7 +853,10 @@ next_file:
 			/* nothing to do */
 			break;
 		case XS_RET_SHA:
-			ct_cull_sha_insert(xs_ctx.xs_sha);
+			if (xs_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO)
+				ct_cull_sha_insert(xs_ctx.xs_csha);
+			else
+				ct_cull_sha_insert(xs_ctx.xs_sha);
 			break;
 		case XS_RET_EOF:
 			break;
