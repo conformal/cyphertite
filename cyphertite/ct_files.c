@@ -68,7 +68,7 @@ RB_PROTOTYPE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 RB_GENERATE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 
 /* Directory traversal and transformation of generated data */
-static void		 ct_traverse(char **, struct flist_head *);
+static void		 ct_traverse(char **, struct flist_head *, int);
 static int		 ct_sched_backup_file(struct stat *, char *, int, int,
 			     struct flist_head *, struct fl_tree *);
 static struct fnode	*ct_populate_fnode_from_flist(struct flist *);
@@ -600,7 +600,8 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		ct_setup_root_dir(caa->caa_tdir);
 		if (caa->caa_tdir && chdir(caa->caa_tdir) != 0)
 			CFATALX("can't chdir to %s", caa->caa_tdir);
-		ct_traverse(filelist, &cap->cap_flist);
+		ct_traverse(filelist, &cap->cap_flist,
+		    caa->caa_no_cross_mounts);
 		if (caa->caa_tdir && chdir(caa->caa_tdir) != 0)
 			CFATALX("can't chdir back to %s", cwd);
 		/*
@@ -887,7 +888,7 @@ done:
 }
 
 static void
-ct_traverse(char **paths, struct flist_head *files)
+ct_traverse(char **paths, struct flist_head *files, int no_cross_mounts)
 {
 	FTS			*ftsp;
 	FTSENT			*fe;
@@ -908,7 +909,7 @@ ct_traverse(char **paths, struct flist_head *files)
 		CWARNX("-H");
 		fts_options |= FTS_COMFOLLOW;
 	}
-	if (ct_no_cross_mounts)
+	if (no_cross_mounts)
 		fts_options |= FTS_XDEV;
 	ftsp = fts_open(paths, fts_options, NULL);
 	if (ftsp == NULL)

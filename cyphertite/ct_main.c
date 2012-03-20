@@ -64,7 +64,6 @@ int			ct_debug = 0;
 int			ct_action = 0;
 int			ct_strip_slash = 1;
 int			ct_verbose_ratios;
-int			ct_no_cross_mounts;
 int			ct_follow_symlinks = 0;
 int			ct_root_symlink = 0;
 int			ct_verbose;
@@ -75,8 +74,6 @@ int			ct_attr;
 uint32_t		cflags;
 unsigned char		ct_iv[CT_IV_LEN];
 unsigned char		ct_crypto_key[CT_KEY_LEN];
-char			*secrets_file_pattern[] =
-			    { "^[[:digit:]]+-crypto.secrets", NULL };
 
 void
 ct_usage(void)
@@ -329,6 +326,7 @@ ct_main(int argc, char **argv)
 	int				 freeincludes = 0;
 	int				 need_secrets;
 	int				 force_allfiles = -1;
+	int				 no_cross_mounts = 0;
 
 	while ((c = getopt(argc, argv,
 	    "AB:C:D:E:F:HI:PRVXacdef:hmprtvx0")) != -1) {
@@ -371,7 +369,7 @@ ct_main(int argc, char **argv)
 			exit(0);
 			break;
 		case 'X':
-			ct_no_cross_mounts = 1;
+			no_cross_mounts = 1;
 			break;
 		case 'a':
 			force_allfiles = 1;
@@ -536,6 +534,7 @@ ct_main(int argc, char **argv)
 			/* we want to encrypt as long as we have keys */
 			caa.caa_encrypted = (ct_crypto_secrets != NULL);
 			caa.caa_allfiles = ct_multilevel_allfiles;
+			caa.caa_no_cross_mounts = no_cross_mounts;
 			if (ct_auto_differential)
 				/*
 				 * Need to work out basis filename and
@@ -588,6 +587,7 @@ ct_main(int argc, char **argv)
 			caa.caa_excllist = excludelist;
 			caa.caa_matchmode = ct_match_mode;
 			caa.caa_includefile = ct_includefile;
+			caa.caa_no_cross_mounts = no_cross_mounts;
 			caa.caa_tag = ctfile;
 			ct_add_operation(state, ct_archive, NULL, &caa);
 		} else if (ct_action == CT_A_EXTRACT) {

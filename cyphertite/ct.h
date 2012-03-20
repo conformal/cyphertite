@@ -333,6 +333,7 @@ struct ct_archive_args {
 	int			 caa_matchmode;
 	int			 caa_encrypted;
 	int			 caa_allfiles;
+	int			 caa_no_cross_mounts;
 };
 
 struct ct_extract_file_args {
