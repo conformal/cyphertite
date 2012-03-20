@@ -96,7 +96,7 @@ ct_do_operation(ct_op_cb *start, ct_op_cb *complete, void *args,
 
 	ct_prompt_for_login_password();
 
-	state = ct_init(1, need_secrets, only_metadata);
+	state = ct_init(need_secrets, only_metadata);
 	ct_add_operation(state, start, complete, args);
 	ct_wakeup_file();
 	if ((ret = ct_event_dispatch()) != 0)

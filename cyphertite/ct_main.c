@@ -124,7 +124,7 @@ show_version(void)
 }
 
 struct ct_global_state *
-ct_init(int foreground, int need_secrets, int only_metadata)
+ct_init(int need_secrets, int only_metadata)
 {
 	struct stat	sb;
 
@@ -135,15 +135,6 @@ ct_init(int foreground, int need_secrets, int only_metadata)
 	if (ct_io_bw_limit) {
 		ct_io_bw_limit = ct_io_bw_limit * 10 / 7;
 	}
-
-	if (!foreground)
-		cflags |= CLOG_F_SYSLOG;
-	if (clog_set_flags(cflags))
-		errx(1, "illegal clog flags");
-
-	if (!foreground)
-		if (daemon(1, ct_debug) == -1)
-			errx(1, "failed to daemonize");
 
 	/* set polltype used by libevent */
 	ct_polltype_setup(ct_polltype);
@@ -319,7 +310,6 @@ ct_main(int argc, char **argv)
 	int				 ct_metadata = 0;
 	int				 ct_match_mode = CT_MATCH_GLOB;
 	int				 c;
-	int				 foreground = 1;
 	int				 ret = 0;
 	int				 level0 = 0;
 	int				 freeincludes = 0;
@@ -461,7 +451,6 @@ ct_main(int argc, char **argv)
 		excludelist = ct_matchlist_fromfile(ct_excludefile);
 
 
-	/* Generate config file if one doesn't exist and there are no params. */
 	if (ct_load_config(settings)) {
 		CFATALX("config file not found.  Use the -F option to "
 		    "specify its path or run \"cyphertitectl config generate\" "
@@ -503,7 +492,7 @@ ct_main(int argc, char **argv)
 	    ct_action == CT_A_ARCHIVE || (ct_action == CT_A_LIST &&
 	    ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0));
 
-	state = ct_init(foreground, need_secrets, ct_metadata);
+	state = ct_init(need_secrets, ct_metadata);
 	if (ct_crypto_passphrase != NULL && ct_secrets_upload != 0) {
 		ct_add_operation(state, ctfile_list_start,
 		    ct_check_secrets_extract, ct_crypto_secrets);

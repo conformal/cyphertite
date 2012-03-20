@@ -695,7 +695,7 @@ int			ct_prompt_password(char *, char *, size_t, char *,
 			    size_t, int);
 
 /* init/cleanup */
-struct ct_global_state	*ct_init(int, int, int);
+struct ct_global_state	*ct_init(int, int);
 struct ct_global_state	*ct_init_eventloop(void);
 void			ct_update_secrets(void);
 void			ct_cleanup(struct ct_global_state *);

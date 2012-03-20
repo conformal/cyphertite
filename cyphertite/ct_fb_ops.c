@@ -327,7 +327,7 @@ ctfb_main(int argc, char *argv[])
 	ct_prompt_for_login_password();
 
 	/* We may have to download files later, always set up */
-	state = ct_init(1, 1, 0);
+	state = ct_init(1, 0);
 
 	/* if we're in remote mode, try and grab the appropriate files */
 	if (ctfile_mode == CT_MDMODE_REMOTE) {
