@@ -53,12 +53,12 @@ struct event	*wakeuptimer_ev;
 void ct_ssl_over_bw_wakeup(evutil_socket_t, short, void *);
 
 void
-ct_ssl_init_bw_lim(struct ct_assl_io_ctx *ctx)
+ct_ssl_init_bw_lim(struct ct_assl_io_ctx *ctx, int io_bw_limit)
 {
 	int packet_len;
 
 	/* 1/4 of the number of bytes to send per timeslot */
-	packet_len = ((ct_io_bw_limit * 1024) / (US_PER_SEC/BW_TIMESLOT))/4;
+	packet_len = ((io_bw_limit * 1024) / (US_PER_SEC/BW_TIMESLOT))/4;
 	CNDBG(CT_LOG_NET, "packet_len %d",  packet_len);
 	ct_assl_io_ctx_set_maxtrans(ctx, packet_len);
 	ct_assl_io_ctx_set_over_bw_func(ctx, ct_ssl_over_bw_func);
@@ -69,7 +69,7 @@ ct_ssl_init_bw_lim(struct ct_assl_io_ctx *ctx)
 	single_slot_time.tv_sec = 0;
 	single_slot_time.tv_usec = BW_TIMESLOT;
 
-	slot_max =  ((ct_io_bw_limit * 1024) / (US_PER_SEC/BW_TIMESLOT));
+	slot_max =  ((io_bw_limit * 1024) / (US_PER_SEC/BW_TIMESLOT));
 	CNDBG(CT_LOG_NET, "slottime %d max_bw_total %d",
 	    BW_TIMESLOT, slot_max);
 }

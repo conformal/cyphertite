@@ -49,6 +49,8 @@ void secrets_upload(struct ct_cli_cmd *, int, char **);
 void secrets_generate(struct ct_cli_cmd *, int, char **);
 void config_generate(struct ct_cli_cmd *, int, char **);
 
+struct ct_config *ctctl_config;
+
 void
 cpasswd(struct ct_cli_cmd *c, int argc, char **argv)
 {
@@ -65,18 +67,20 @@ cpasswd(struct ct_cli_cmd *c, int argc, char **argv)
 	FILE		*fr, *fw;
 
 	snprintf(prompt, sizeof prompt, "This operation overwrites %s "
-	    "and %s, continue? [yes]: ", ct_configfile, ct_crypto_secrets);
+	    "and %s, continue? [yes]: ", ct_configfile,
+	    ctctl_config->ct_crypto_secrets);
 	if (ct_get_answer(prompt, "yes", "no", "yes", answer,
 	    sizeof answer, 0) != 1)
 		CFATALX("operation aborted");
 
-	if (ct_crypto_secrets == NULL)
+	if (ctctl_config->ct_crypto_secrets == NULL)
 		CFATALX("Crypto not enabled");
 
-	if (stat(ct_crypto_secrets, &sb) == -1)
+	if (stat(ctctl_config->ct_crypto_secrets, &sb) == -1)
 		CFATALX("secrets file does not exist");
 
-	if (ct_unlock_secrets(ct_crypto_passphrase, ct_crypto_secrets,
+	if (ct_unlock_secrets(ctctl_config->ct_crypto_passphrase,
+	    ctctl_config->ct_crypto_secrets,
 	    ct_crypto_key, sizeof(ct_crypto_key), ct_iv, sizeof (ct_iv)))
 		CFATALX("can't unlock secrets");
 
@@ -130,9 +134,9 @@ cpasswd(struct ct_cli_cmd *c, int argc, char **argv)
 		CFATAL("%s", ct_configfile);
 
 	snprintf(old_crypto_secrets, sizeof old_crypto_secrets, "%s~",
-	    ct_crypto_secrets);
-	if (rename(ct_crypto_secrets, old_crypto_secrets))
-		CFATAL("%s", ct_crypto_secrets);
+	    ctctl_config->ct_crypto_secrets);
+	if (rename(ctctl_config->ct_crypto_secrets, old_crypto_secrets))
+		CFATAL("%s", ctctl_config->ct_crypto_secrets);
 
 	/* rewrite files */
 	fr = fopen(old_configfile, "r");
@@ -166,8 +170,8 @@ cpasswd(struct ct_cli_cmd *c, int argc, char **argv)
 	fclose(fr);
 	fclose(fw);
 
-	ct_create_secrets(crypto_passphrase, ct_crypto_secrets, ct_crypto_key,
-	    ct_iv);
+	ct_create_secrets(crypto_passphrase, ctctl_config->ct_crypto_secrets,
+	    ct_crypto_key, ct_iv);
 
 	bzero(crypto_passphrase, strlen(crypto_passphrase));
 	free(crypto_passphrase);
@@ -256,7 +260,8 @@ ctctl_main(int argc, char *argv[])
 
 	/* load config XXX ick... unless we're generating one. */
 	if (!(argc == 2 && strcmp(argv[0], "config") == 0 && strcmp(argv[1],
-	    "generate") == 0) && ct_load_config(settings))
+	    "generate") == 0) &&
+	    (ctctl_config = ct_load_config()) == NULL)
 		CFATALX("config file not found.  Use the -F option to "
 		    "specify its path or run \"%s config generate\" to create "
 		    "one.", __progname);
@@ -280,11 +285,11 @@ cull(struct ct_cli_cmd *c, int argc, char **argv)
 
 	/* XXX */
 
-	ct_prompt_for_login_password();
+	ct_prompt_for_login_password(ctctl_config);
 
 	need_secrets = 1;
 
-	state = ct_init(need_secrets, 0);
+	state = ct_init(ctctl_config, need_secrets, 0);
 
 	ct_cull_kick(state);
 	ct_wakeup_file();
@@ -301,13 +306,13 @@ cull(struct ct_cli_cmd *c, int argc, char **argv)
 void
 secrets_upload(struct ct_cli_cmd *c, int argc, char **argv)
 {
-	ct_upload_secrets_file();
+	ct_upload_secrets_file(ctctl_config);
 }
 
 void
 secrets_download(struct ct_cli_cmd *c, int argc, char **argv)
 {
-	ct_download_secrets_file();
+	ct_download_secrets_file(ctctl_config);
 }
 
 void
@@ -315,16 +320,16 @@ secrets_generate(struct ct_cli_cmd *c, int argc, char **argv)
 {
 	struct stat	sb;
 
-	if (stat(ct_crypto_secrets, &sb) != -1)
+	if (stat(ctctl_config->ct_crypto_secrets, &sb) != -1)
 		CFATALX("A crypto secrets file already exists!\n"
 		    "Please check if it is valid before deleting.");
 	CWARNX("Generating crypto secrets file...");
-	if (ct_create_secrets(ct_crypto_passphrase, ct_crypto_secrets,
-	    NULL, NULL))
+	if (ct_create_secrets(ctctl_config->ct_crypto_passphrase,
+	    ctctl_config->ct_crypto_secrets, NULL, NULL))
 		CFATALX("can't create secrets");
 
-	if (ct_secrets_upload != 0)
-		ct_upload_secrets_file();
+	if (ctctl_config->ct_secrets_upload != 0)
+		ct_upload_secrets_file(ctctl_config);
 }
 
 void

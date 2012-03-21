@@ -123,7 +123,7 @@ show_version(void)
 }
 
 struct ct_global_state *
-ct_init(int need_secrets, int only_metadata)
+ct_init(struct ct_config *conf, int need_secrets, int only_metadata)
 {
 	struct stat	sb;
 
@@ -131,47 +131,40 @@ ct_init(int need_secrets, int only_metadata)
 	umask(S_IRWXG|S_IRWXO);
 
 	/* XXX - scale bandwith limiting until the algorithm is improved */
-	if (ct_io_bw_limit) {
-		ct_io_bw_limit = ct_io_bw_limit * 10 / 7;
+	if (conf->ct_io_bw_limit) {
+		conf->ct_io_bw_limit = conf->ct_io_bw_limit * 10 / 7;
 	}
 
-	/* set polltype used by libevent */
-	ct_polltype_setup(ct_polltype);
-
-	if (ctfile_mode == CT_MDMODE_REMOTE && only_metadata == 0) {
-		if (ctfile_cachedir == NULL)
-			CFATALX("remote mode needs a cache directory set");
-	}
-
-	if (need_secrets != 0 && ct_crypto_secrets != NULL) {
-		if (stat(ct_crypto_secrets, &sb) == -1) {
-			CFATALX("No crypto secrets file, please run "
+	if (need_secrets != 0 && conf->ct_crypto_secrets != NULL) {
+		if (stat(conf->ct_crypto_secrets, &sb) == -1) {
+			CFATALX("No crypto secrets file, please run"
 			    "ctctl secrets generate or ctctl secrets download");
 		}
 		/* we got crypto */
-		if (ct_unlock_secrets(ct_crypto_passphrase, ct_crypto_secrets,
+		if (ct_unlock_secrets(conf->ct_crypto_passphrase,
+		    conf->ct_crypto_secrets,
 		    ct_crypto_key, sizeof(ct_crypto_key), ct_iv,
 		    sizeof (ct_iv)))
 			CFATALX("can't unlock secrets file");
 	}
 
-	return (ct_init_eventloop());
+	return (ct_init_eventloop(conf));
 }
 
 struct ct_global_state *
-ct_init_eventloop(void)
+ct_init_eventloop(struct ct_config *conf)
 {
 	struct ct_global_state	*state;
 	assl_initialize();
 	ct_event_init();
-	state = ct_setup_state();
+	state = ct_setup_state(conf);
 
 #if defined(CT_EXT_INIT)
 	CT_EXT_INIT();
 #endif
 
-	state->ct_db_state = ctdb_setup(ct_localdb,
-	    ct_crypto_secrets != NULL);
+	state->ct_db_state = ctdb_setup(conf->ct_localdb,
+	    conf->ct_crypto_secrets != NULL);
 
 	gettimeofday(&ct_stats->st_time_start, NULL);
 	state->ct_assl_ctx = ct_ssl_connect(state, 0);
@@ -295,6 +288,7 @@ ct_main(int argc, char **argv)
 	struct ct_ctfileop_args 	 cca;
 	struct ct_ctfile_list_args	 ccla;
 	struct ct_global_state		*state = NULL;
+	struct ct_config		*conf;
 	char				*ct_tdir = NULL;
 	char				*ct_basisbackup = NULL;
 	char				*ctfile = NULL;
@@ -404,7 +398,6 @@ ct_main(int argc, char **argv)
 			break;
 		case '0':
 			level0 = 1;
-			ct_auto_differential = 0; /* force differential off */
 			break;
 		default:
 			ct_usage();
@@ -451,7 +444,7 @@ ct_main(int argc, char **argv)
 		excludelist = ct_matchlist_fromfile(ct_excludefile);
 
 
-	if (ct_load_config(settings)) {
+	if ((conf = ct_load_config()) == NULL) {
 		CFATALX("config file not found.  Use the -F option to "
 		    "specify its path or run \"cyphertitectl config generate\" "
 		    "to generate one.");
@@ -459,7 +452,7 @@ ct_main(int argc, char **argv)
 
 	/* ct -A or ct -a force allfiles on and off and cancel each other */
 	if (force_allfiles != -1)
-		ct_multilevel_allfiles = force_allfiles;
+		conf->ct_multilevel_allfiles = force_allfiles;
 
 	if (!(ct_metadata && ct_action == CT_A_LIST)) {
 		if (ctfile == NULL) {
@@ -467,38 +460,41 @@ ct_main(int argc, char **argv)
 			ct_usage();
 		}
 
-		if (ctfile_verify_name(ctfile))
+		if (conf->ct_ctfile_mode == CT_MDMODE_REMOTE &&
+		    ctfile_verify_name(ctfile))
 			CFATALX("invalid ctfile: %s", ctfile);
 	}
 
 	if (level0)
-		ct_auto_differential = 0; /* force differential off */
+		conf->ct_auto_differential = 0; /* force differential off */
 
-	if (ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0 &&
+	if (conf->ct_ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0 &&
 	    ct_basisbackup != NULL)
 		CFATALX("differential basis in remote mode");
 
 	/* Don't bother starting a connection if just listing local files. */
-	if (ct_action == CT_A_LIST && ctfile_mode == CT_MDMODE_LOCAL &&
+	if (ct_action == CT_A_LIST &&
+	    conf->ct_ctfile_mode == CT_MDMODE_LOCAL &&
 	    ct_metadata == 0 ) {
 		ret = ct_list(ctfile, includelist, excludelist,
 		    ct_match_mode, NULL);
 		goto out;
 	}
 
-	ct_prompt_for_login_password();
+	ct_prompt_for_login_password(conf);
 
 	need_secrets = (ct_action == CT_A_EXTRACT ||
 	    ct_action == CT_A_ARCHIVE || (ct_action == CT_A_LIST &&
-	    ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0));
+	    conf->ct_ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0));
 
-	state = ct_init(need_secrets, ct_metadata);
-	if (ct_crypto_passphrase != NULL && ct_secrets_upload != 0) {
+	state = ct_init(conf, need_secrets, ct_metadata);
+	if (conf->ct_crypto_passphrase != NULL &&
+	    conf->ct_secrets_upload != 0) {
 		ct_add_operation(state, ctfile_list_start,
-		    ct_check_secrets_extract, ct_crypto_secrets);
+		    ct_check_secrets_extract, conf->ct_crypto_secrets);
 	}
 
-	if (ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
+	if (conf->ct_ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
 		switch (ct_action) {
 		case CT_A_EXTRACT:
 		case CT_A_LIST:
@@ -506,7 +502,7 @@ ct_main(int argc, char **argv)
 			cea.cea_filelist = includelist;
 			cea.cea_excllist = excludelist;
 			cea.cea_matchmode = ct_match_mode;
-			cea.cea_ctfile_basedir = ctfile_cachedir;
+			cea.cea_ctfile_basedir = conf->ct_ctfile_cachedir;
 			cea.cea_tdir = ct_tdir;
 			ctfile_find_for_operation(state, ctfile,
 			    ((ct_action == CT_A_EXTRACT)  ?
@@ -521,13 +517,13 @@ ct_main(int argc, char **argv)
 			caa.caa_includefile = ct_includefile;
 			caa.caa_tdir = ct_tdir;
 			caa.caa_tag = ctfile;
-			caa.caa_ctfile_basedir = ctfile_cachedir;
+			caa.caa_ctfile_basedir = conf->ct_ctfile_cachedir;
 			/* we want to encrypt as long as we have keys */
-			caa.caa_encrypted = (ct_crypto_secrets != NULL);
-			caa.caa_allfiles = ct_multilevel_allfiles;
+			caa.caa_encrypted = (conf->ct_crypto_secrets != NULL);
+			caa.caa_allfiles = conf->ct_multilevel_allfiles;
 			caa.caa_no_cross_mounts = no_cross_mounts;
-			caa.caa_max_differentials = ct_max_differentials;
-			if (ct_auto_differential)
+			caa.caa_max_differentials = conf->ct_max_differentials;
+			if (conf->ct_auto_differential)
 				/*
 				 * Need to work out basis filename and
 				 * download it if necessary
@@ -552,7 +548,7 @@ ct_main(int argc, char **argv)
 			cca.cca_tdir = ct_tdir;
 			cca.cca_ctfile = 1;
 			/* only matters for archive */
-			cca.cca_encrypted = (ct_crypto_secrets != NULL);
+			cca.cca_encrypted = (conf->ct_crypto_secrets != NULL);
 			ct_add_operation(state,
 			    ((ct_action == CT_A_ARCHIVE) ?
 			    ctfile_archive : ctfile_extract),
@@ -612,9 +608,11 @@ out:
 		ct_matchlist_free(includelist);
 	if (excludelist)
 		ct_matchlist_free(excludelist);
-	if (ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0)
-		ctfile_trim_cache(ctfile_cachedir, ctfile_max_cachesize);
+	if (conf->ct_ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0)
+		ctfile_trim_cache(conf->ct_ctfile_cachedir,
+		    conf->ct_ctfile_max_cachesize);
 
+	ct_unload_config(conf);
 #ifdef notyet
 	e_check_memory();
 #endif
@@ -635,12 +633,6 @@ main(int argc, char *argv[])
 	clog_init(1);
 	if (clog_set_flags(CLOG_F_ENABLE | CLOG_F_STDERR))
 		errx(1, "illegal clog flags");
-
-	/* set string defaults, don't use e_ functions for now */
-	ct_host = strdup("auth.cyphertite.com");
-	ct_hostport = strdup("48879");
-	if (ct_host == NULL || ct_hostport == NULL)
-		CFATALX("no memory for defaults");
 
 	executablepath = strdup(argv[0]);
 	executablename = basename(executablepath);

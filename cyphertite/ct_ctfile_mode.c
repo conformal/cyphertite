@@ -875,7 +875,7 @@ ctfile_trigger_delete(struct ct_op *op)
 #endif
 
 /*
- * Verify that the ctfile name is kosher.
+ * Verify that the ctfile name is kosher for remote mode.
  * - Encode the name (with a fake prefix) to make sure it fits.
  * - To help with interoperability, scan for a few special characters
  *   and punt if we find those.
@@ -890,10 +890,6 @@ ctfile_verify_name(char *ctfile)
 
 	if (ctfile == NULL)
 		return 1;
-
-	/* No processing for local mode. */
-	if (ctfile_mode == CT_MDMODE_LOCAL)
-		return 0;
 
 	sz = snprintf(b, sizeof(b), "YYYYMMDD-HHMMSS-%s", ctfile);
 	if (sz == -1 || sz >= sizeof(b))
@@ -1159,14 +1155,16 @@ ct_cull_fetch_all_ctfiles(struct ct_global_state *state, struct ct_op *op)
 	while ((file = RB_ROOT(&results)) != NULL) {
 		RB_REMOVE(ctfile_list_tree, &results, file);
 		CNDBG(CT_LOG_CTFILE, "looking for file %s ", file->mlf_name);
-		if (!ctfile_in_cache(file->mlf_name)) {
-			cachename = ctfile_get_cachename(file->mlf_name);
+		if (!ctfile_in_cache(file->mlf_name,
+		    state->ct_config->ct_ctfile_cachedir)) {
+			cachename = ctfile_get_cachename(file->mlf_name,
+			    state->ct_config->ct_ctfile_cachedir);
 			CNDBG(CT_LOG_CTFILE, "getting %s to %s", file->mlf_name,
 			    cachename);
 			cca = e_calloc(1, sizeof(*cca));
 			cca->cca_localname =  e_strdup(file->mlf_name);
 			cca->cca_remotename = cca->cca_localname;
-			cca->cca_tdir = ctfile_cachedir;
+			cca->cca_tdir = state->ct_config->ct_ctfile_cachedir;
 			cca->cca_ctfile = 1;
 			ct_add_operation_after(state, op, ctfile_extract,
 			    ct_cull_extract_cleanup, cca);
@@ -1197,12 +1195,12 @@ ct_cull_collect_ctfiles(struct ct_global_state *state, struct ct_op *op)
 	time_t			now;
 	int			keep_files = 0;
 
-	if (ct_ctfile_keep_days == 0)
+	if (state->ct_config->ct_ctfile_keep_days == 0)
 		CFATALX("cull: ctfile_cull_keep_days must be specified in "
 		    "config");
 
 	now = time(NULL);
-	now -= (24 * 60 * 60 * ct_ctfile_keep_days);
+	now -= (24 * 60 * 60 * state->ct_config->ct_ctfile_keep_days);
 	if (strftime(buf, TIMEDATA_LEN, "%Y%m%d-%H%M%S",
 	    localtime(&now)) == 0)
 		CFATALX("can't format time");
@@ -1260,7 +1258,8 @@ prev_ct_file:
 		} else {
 			CNDBG(CT_LOG_CTFILE, "adding %s to keep list",
 			    file->mlf_name);
-			ct_cull_add_shafile(file->mlf_name, ctfile_cachedir);
+			ct_cull_add_shafile(file->mlf_name,
+			    state->ct_config->ct_ctfile_cachedir);
 		}
 	}
 

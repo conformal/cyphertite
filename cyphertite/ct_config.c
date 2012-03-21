@@ -39,79 +39,10 @@
 #include "ct.h"
 #include <ct_ext.h>
 
-int			ct_max_trans = 100;
-int			ct_io_bw_limit = 0;
-char			*ct_host;
-char			*ct_hostport;
-char			*ct_localdb;
-char			*ct_username;
-char			*ct_password;
-char			*ct_ca_cert;
-char			*ct_cert;
-char			*ct_key;
-char			*ct_crypto_secrets;
-char			*ct_crypto_passphrase;
-char			*ct_compression_type;
-char			*ct_polltype;
-char			*ctfile_mode_str;
-char			*ctfile_cachedir;
-int			ctfile_mode = CT_MDMODE_LOCAL;
-int			ct_compress_enabled;
-int			ct_multilevel_allfiles;
-int			ct_auto_differential;
-long long		ctfile_max_cachesize = LLONG_MAX; /* unbounded */
-int			ct_max_differentials;
-int			ct_secrets_upload = 0;
-int			ct_ctfile_keep_days = 0;
+void ct_write_config(struct ct_config *, FILE *, int, int);
+void ct_default_config(struct ct_config *);
 
-struct ct_settings	settings[] = {
-	{ "queue_depth", CT_S_INT, &ct_max_trans, NULL, NULL, NULL },
-	{ "bandwidth", CT_S_INT, &ct_io_bw_limit, NULL, NULL, NULL },
-	{ "host", CT_S_STR, NULL, &ct_host, NULL, NULL },
-	{ "hostport", CT_S_STR, NULL, &ct_hostport, NULL, NULL },
-	{ "cache_db", CT_S_DIR, NULL, &ct_localdb, NULL, NULL },
-	{ "username", CT_S_STR, NULL, &ct_username, NULL, NULL },
-	{ "password", CT_S_STR, NULL, &ct_password, NULL, NULL, NULL, 1 },
-	{ "ca_cert", CT_S_DIR, NULL, &ct_ca_cert, NULL, NULL },
-	{ "cert", CT_S_DIR, NULL, &ct_cert, NULL, NULL },
-	{ "key", CT_S_DIR, NULL, &ct_key, NULL, NULL },
-	{ "crypto_secrets", CT_S_DIR, NULL, &ct_crypto_secrets, NULL, NULL },
-	{ "crypto_passphrase", CT_S_STR, NULL, &ct_crypto_passphrase, NULL,
-	   NULL, NULL, 1}, /* name may NOT be modified */
-	{ "session_compression", CT_S_STR, NULL, &ct_compression_type, NULL,
-	    NULL },
-	{ "polltype", CT_S_STR, NULL, &ct_polltype, NULL, NULL },
-	{ "upload_crypto_secrets" , CT_S_INT, &ct_secrets_upload,
-	    NULL, NULL, NULL },
-	{ "ctfile_cull_keep_days" , CT_S_INT, &ct_ctfile_keep_days,
-	    NULL, NULL, NULL },
-	{ "ctfile_mode", CT_S_STR, NULL, &ctfile_mode_str, NULL, NULL },
-	{ "ctfile_cachedir", CT_S_DIR, NULL, &ctfile_cachedir, NULL, NULL },
-	{ "ctfile_cachedir_max_size", CT_S_SIZE, NULL, NULL, NULL,
-	    &ctfile_max_cachesize, NULL },
-	{ "ctfile_remote_auto_differential" , CT_S_INT, &ct_auto_differential,
-	    NULL, NULL, NULL },
-	{ "ctfile_max_differentials" , CT_S_INT, &ct_max_differentials,
-	    NULL, NULL, NULL },
-	{ "ctfile_differential_allfiles", CT_S_INT, &ct_multilevel_allfiles,
-	    NULL, NULL, NULL },
-	/* backwards compat, old names */
-	{ "md_mode", CT_S_STR, NULL, &ctfile_mode_str, NULL, NULL },
-	{ "md_cachedir", CT_S_DIR, NULL, &ctfile_cachedir, NULL, NULL },
-	{ "md_cachedir_max_size", CT_S_SIZE, NULL, NULL, NULL,
-	    &ctfile_max_cachesize, NULL },
-	{ "md_remote_auto_differential" , CT_S_INT, &ct_auto_differential,
-	    NULL, NULL, NULL },
-	{ "md_max_differentials" , CT_S_INT, &ct_max_differentials,
-	    NULL, NULL, NULL },
-	{ "ctfile_expire_day" , CT_S_INT, &ct_ctfile_keep_days,
-	    NULL, NULL, NULL },
-	{ "crypto_password", CT_S_STR, NULL, &ct_crypto_passphrase, NULL, NULL },
-#if defined(CT_EXT_SETTINGS)
-	CT_EXT_SETTINGS
-#endif	/* CT_EXT_SETTINGS */
-	{ NULL, 0, NULL, NULL, NULL,  NULL }
-};
+int			ct_max_trans = 100;
 
 int
 ct_get_answer(char *prompt, char *a1, char *a2, char *default_val,
@@ -196,7 +127,7 @@ ct_prompt_password(char *prompt, char *answer, size_t answer_len,
 }
 
 void
-ct_download_decode_and_save_certs(const char *username, const char *password)
+ct_download_decode_and_save_certs(struct ct_config *config)
 {
 	int			 rv, fd;
 	uint8_t			 pwd_digest[SHA512_DIGEST_LENGTH];
@@ -208,13 +139,15 @@ ct_download_decode_and_save_certs(const char *username, const char *password)
 	FILE			*f = NULL;
 	struct stat		sb;
 
-	ct_sha512((uint8_t *)password, pwd_digest, strlen(password));
+	ct_sha512((uint8_t *)config->ct_password, pwd_digest,
+	    strlen(config->ct_password));
 	if (ct_base64_encode(CT_B64_ENCODE, pwd_digest, sizeof pwd_digest,
 	    (uint8_t *)b64, sizeof b64)) {
 		CFATALX("can't base64 encode password");
 	}
 
-	if ((rv = ct_get_cert_bundle(username, b64, &xml, &xml_size))) {
+	if ((rv = ct_get_cert_bundle(config->ct_username, b64, &xml,
+	    &xml_size))) {
 		if (rv == CT_CERT_BUNDLE_LOGIN_FAILED)
 			CFATALX("Invalid login credentials.  Please check "
 			    "your username and password.");
@@ -228,7 +161,7 @@ ct_download_decode_and_save_certs(const char *username, const char *password)
 	}
 
 	/* ca cert */
-	if (stat(ct_ca_cert , &sb) != 0) {
+	if (stat(config->ct_ca_cert , &sb) != 0) {
 		xml_val = xmlsd_get_value(&xel, "ca_cert", NULL);
 		if (xml_val == NULL) {
 			CFATALX("unable to get ca cert xml");
@@ -239,16 +172,16 @@ ct_download_decode_and_save_certs(const char *username, const char *password)
 			CFATALX("failed to decode ca cert xml");
 		}
 		e_asprintf(&ca_cert, "%s", b64);
-		if (ct_make_full_path(ct_ca_cert, 0700)) {
-			CFATAL("failed to make path to %s", ct_ca_cert);
+		if (ct_make_full_path(config->ct_ca_cert, 0700)) {
+			CFATAL("failed to make path to %s", config->ct_ca_cert);
 		}
-		if ((fd = open(ct_ca_cert, O_RDWR | O_CREAT | O_TRUNC,
+		if ((fd = open(config->ct_ca_cert, O_RDWR | O_CREAT | O_TRUNC,
 				    0644)) == -1) {
 			CFATAL("unable to open file for writing %s",
-			    ct_ca_cert);
+			    config->ct_ca_cert);
 		}
 		if ((f = fdopen(fd, "r+")) == NULL) {
-			CFATAL("unable to open file %s", ct_ca_cert);
+			CFATAL("unable to open file %s", config->ct_ca_cert);
 		}
 		fprintf(f, "%s", ca_cert);
 		fclose(f);
@@ -258,7 +191,7 @@ ct_download_decode_and_save_certs(const char *username, const char *password)
 	}
 
 	/* user cert */
-	if (stat(ct_cert , &sb) != 0) {
+	if (stat(config->ct_cert , &sb) != 0) {
 		xml_val = xmlsd_get_value(&xel, "user_cert", NULL);
 		if (xml_val == NULL) {
 			CFATALX("unable to get user cert xml");
@@ -269,15 +202,16 @@ ct_download_decode_and_save_certs(const char *username, const char *password)
 			CFATALX("failed to decode user cert xml");
 		}
 		e_asprintf(&user_cert, "%s", b64);
-		if (ct_make_full_path(ct_cert, 0700)) {
-			CFATAL("failed to make path to %s", ct_cert);
+		if (ct_make_full_path(config->ct_cert, 0700)) {
+			CFATAL("failed to make path to %s", config->ct_cert);
 		}
-		if ((fd = open(ct_cert, O_RDWR | O_CREAT | O_TRUNC,
+		if ((fd = open(config->ct_cert, O_RDWR | O_CREAT | O_TRUNC,
 				    0644)) == -1) {
-			CFATAL("unable to open file for writing %s", ct_cert);
+			CFATAL("unable to open file for writing %s",
+			    config->ct_cert);
 		}
 		if ((f = fdopen(fd, "r+")) == NULL) {
-			CFATAL("unable to open file %s", ct_cert);
+			CFATAL("unable to open file %s", config->ct_cert);
 		}
 		fprintf(f, "%s", user_cert);
 		fclose(f);
@@ -287,7 +221,7 @@ ct_download_decode_and_save_certs(const char *username, const char *password)
 	}
 
 	/* user key */
-	if (stat(ct_key, &sb) != 0) {
+	if (stat(config->ct_key, &sb) != 0) {
 		xml_val = xmlsd_get_value(&xel, "user_key", NULL);
 		if (xml_val == NULL) {
 			CFATALX("unable to get user key xml");
@@ -298,15 +232,16 @@ ct_download_decode_and_save_certs(const char *username, const char *password)
 			CFATALX("failed to decode user key xml");
 		}
 		e_asprintf(&user_key, "%s", b64);
-		if (ct_make_full_path(ct_key, 0700)) {
-			CFATAL("failed to make path to %s", ct_key);
+		if (ct_make_full_path(config->ct_key, 0700)) {
+			CFATAL("failed to make path to %s", config->ct_key);
 		}
-		if ((fd = open(ct_key, O_RDWR | O_CREAT | O_TRUNC,
+		if ((fd = open(config->ct_key, O_RDWR | O_CREAT | O_TRUNC,
 				    0600)) == -1) {
-			CFATAL("unable to open file for writing %s", ct_key);
+			CFATAL("unable to open file for writing %s",
+			    config->ct_key);
 		}
 		if ((f = fdopen(fd, "r+")) == NULL) {
-			CFATAL("unable to open file %s", ct_key);
+			CFATAL("unable to open file %s", config->ct_key);
 		}
 		fprintf(f, "%s", user_key);
 		fclose(f);
@@ -323,13 +258,13 @@ void
 ct_create_config(void)
 {
 	struct ct_global_state	*state;
+	struct ct_config	config;
 	char			prompt[1024];
 	char			answer[1024], answer2[1024];
 	uint8_t			ad[SHA512_DIGEST_LENGTH];
 	char			b64d[128];
 	char			*conf_buf = NULL, *conf = NULL;
 	char			*conf_tmp = NULL, *dir = NULL;
-	char			*mode = NULL;
 	int			rv, fd;
 	int			save_password = 0, save_crypto_passphrase = 0;
 	int			autogen_crypto_passphrase = 0;
@@ -341,11 +276,7 @@ ct_create_config(void)
 	 * config should not have been loaded by this point, but enforce
 	 * defaults just in case.
 	 */
-	ct_auto_differential = ct_secrets_upload = 0;
-	ct_username = ct_password = ct_crypto_passphrase =
-	    ctfile_cachedir = NULL;
-	ct_ca_cert = ct_cert = ct_key = NULL;
-
+	ct_default_config(&config);
 
 	/* help user create config file */
 	strlcpy(prompt, "Use expert setup mode? [no]: ",
@@ -395,7 +326,7 @@ ct_create_config(void)
 	if ((f = fdopen(fd, "r+")) == NULL)
 		CFATAL("unable to open file %s", conf_tmp);
 
-	while (ct_username == NULL) {
+	while (config.ct_username == NULL) {
 		strlcpy(prompt, "login username: ", sizeof(prompt));
 		if (ct_get_answer(prompt, NULL, NULL, NULL, answer,
 		    sizeof answer, 0)) {
@@ -406,37 +337,43 @@ ct_create_config(void)
 			printf("invalid username length\n");
 			continue;
 		}
-		ct_username = e_strdup(answer);
-		ct_normalize_username(ct_username);
+		config.ct_username = e_strdup(answer);
+		ct_normalize_username(config.ct_username);
 	}
 
 
-	e_asprintf(&ctfile_cachedir, "%s/ct_cachedir", dir);
-	e_asprintf(&ct_crypto_secrets, "%s/ct_crypto", dir);
-	e_asprintf(&ct_cert, "%s/ct_certs/ct_%s.crt", dir, ct_username);
-	e_asprintf(&ct_ca_cert, "%s/ct_certs/ct_ca.crt", dir);
-	e_asprintf(&ct_key, "%s/ct_certs/private/ct_%s.key", dir, ct_username);
+	e_asprintf(&config.ct_localdb, "%s%cct_db", dir, CT_PATHSEP);
+	e_asprintf(&config.ct_ctfile_cachedir, "%s%cct_cachedir", dir,
+	    CT_PATHSEP);
+	e_asprintf(&config.ct_crypto_secrets, "%s%cct_crypto", dir, CT_PATHSEP);
+	e_asprintf(&config.ct_cert, "%s%cct_certs%cct_%s.crt", dir,
+	    CT_PATHSEP, CT_PATHSEP, config.ct_username);
+	e_asprintf(&config.ct_ca_cert, "%s%cct_certs%cct_ca.crt", dir,
+	    CT_PATHSEP, CT_PATHSEP);
+	e_asprintf(&config.ct_key, "%s%cct_certs%cprivate%cct_%s.key", dir,
+	    CT_PATHSEP, CT_PATHSEP, CT_PATHSEP, config.ct_username);
 
-	while (ct_password == NULL) {
+	while (config.ct_password == NULL) {
 		if (ct_prompt_password("login password: ", answer,
 		    sizeof answer, answer2, sizeof answer2, 0))
 			CFATALX("password");
 
 		if (strlen(answer))
-			ct_password = e_strdup(answer);
+			config.ct_password = e_strdup(answer);
 		bzero(answer, sizeof answer);
 		bzero(answer2, sizeof answer2);
 	}
 
 	/* download certs if needed */
-	if ((stat(ct_cert, &sb) != 0) || (stat(ct_ca_cert , &sb) != 0) ||
-	    (stat(ct_key, &sb) != 0)) {
+	if ((stat(config.ct_cert, &sb) != 0) ||
+	    (stat(config.ct_ca_cert , &sb) != 0) ||
+	    (stat(config.ct_key, &sb) != 0)) {
 		CWARNX("Downloading certificates...");
-		ct_download_decode_and_save_certs(ct_username, ct_password);
+		ct_download_decode_and_save_certs(&config);
 	}
 
 	/* Verify username and password are correct before continuing. */
-	state = ct_setup_state();
+	state = ct_setup_state(&config);
 	assl_initialize();
 	ct_event_init();
 	state->ct_assl_ctx = ct_ssl_connect(state, 0);
@@ -461,7 +398,7 @@ ct_create_config(void)
 		save_password = 1;
 	}
 
-	if (ct_have_remote_secrets_file()) {
+	if (ct_have_remote_secrets_file(&config)) {
 		if (expert_mode) {
 			strlcpy(prompt,
 			    "Your account already has a crypto secrets "
@@ -470,20 +407,20 @@ ct_create_config(void)
 			rv = ct_get_answer(prompt, "yes", "no", "yes", answer,
 			    sizeof answer, 0);
 			if (rv == 1) {
-				ct_secrets_upload = 1;
-				ct_download_secrets_file();
+				config.ct_secrets_upload = 1;
+				ct_download_secrets_file(&config);
 				goto crypto_passphrase;
 			}
 			/* XXX delete remote secrets if not? */
 		} else {
-			ct_secrets_upload = 1;
-			ct_download_secrets_file();
+			config.ct_secrets_upload = 1;
+			ct_download_secrets_file(&config);
 			goto crypto_passphrase;
 		}
 	}
 
 	/* No remote secrets file (or user didn't want to use it). */
-	if (stat(ct_crypto_secrets, &sb) == 0) {
+	if (stat(config.ct_crypto_secrets, &sb) == 0) {
 		if (expert_mode) {
 			strlcpy(prompt,
 			    "Found an existing crypto secrets file. Use "
@@ -493,7 +430,7 @@ ct_create_config(void)
 				goto crypto_passphrase;
 			} else {
 				CWARNX("deleting existing secrets file");
-				unlink(ct_crypto_secrets);
+				unlink(config.ct_crypto_secrets);
 			}
 		} else {
 			goto crypto_passphrase;
@@ -521,7 +458,7 @@ ct_create_config(void)
 		    sizeof ad, (uint8_t *)b64d, sizeof b64d))
 			CFATALX("can't base64 encode crypto passphrase");
 
-		ct_crypto_passphrase = e_strdup(b64d);
+		config.ct_crypto_passphrase = e_strdup(b64d);
 		save_crypto_passphrase = 1;
 	} else {
 		if (ct_prompt_password("crypto passphrase: ", answer,
@@ -529,7 +466,7 @@ ct_create_config(void)
 			CFATALX("crypto passphrase");
 
 		if (strlen(answer))
-			ct_crypto_passphrase = e_strdup(answer);
+			config.ct_crypto_passphrase = e_strdup(answer);
 
 		bzero(answer, sizeof answer);
 		bzero(answer2, sizeof answer2);
@@ -538,27 +475,27 @@ ct_create_config(void)
 	secrets_generated = 1;
 
 crypto_passphrase:
-	while (!secrets_generated && ct_crypto_passphrase == NULL) {
+	while (!secrets_generated && config.ct_crypto_passphrase == NULL) {
 		if (ct_prompt_password("crypto passphrase: ", answer,
 		    sizeof answer, answer2, sizeof answer2, 0))
 			CFATALX("crypto password");
 
 		if (strlen(answer))
-			ct_crypto_passphrase = e_strdup(answer);
+			config.ct_crypto_passphrase = e_strdup(answer);
 
 		bzero(answer, sizeof answer);
 		bzero(answer2, sizeof answer2);
 
 		/* Check passphrase works for the file */
 		CWARNX("checking local secrets file is valid");
-		if (ct_unlock_secrets(ct_crypto_passphrase,
-		    ct_crypto_secrets, ct_crypto_key,
+		if (ct_unlock_secrets(config.ct_crypto_passphrase,
+		    config.ct_crypto_secrets, ct_crypto_key,
 		    sizeof(ct_crypto_key),
 		    ct_iv, sizeof (ct_iv))) {
 			CWARNX("password incorrect, try again");
-			bzero(ct_crypto_passphrase,
-			    strlen(ct_crypto_passphrase));
-			e_free(&ct_crypto_passphrase);
+			bzero(config.ct_crypto_passphrase,
+			    strlen(config.ct_crypto_passphrase));
+			e_free(&config.ct_crypto_passphrase);
 		}
 	}
 
@@ -582,16 +519,16 @@ crypto_passphrase:
 
 
 	/* Prompt to store secrets file on server if not set. */
-	if (!ct_secrets_upload) {
+	if (!config.ct_secrets_upload) {
 		if (expert_mode) {
 			strlcpy(prompt,
 			    "Store crypto secrets file on server? [yes]: ",
 			    sizeof(prompt));
 			if ((ct_get_answer(prompt, "yes", "no", "yes", answer,
 			    sizeof answer, 0)) == 1)
-				ct_secrets_upload = 1;
+				config.ct_secrets_upload = 1;
 		} else {
-			ct_secrets_upload = 1;
+			config.ct_secrets_upload = 1;
 		}
 	}
 
@@ -599,8 +536,8 @@ crypto_passphrase:
 	 * Store secrets file to the server now if flag is set and it was
 	 * generated.
 	 */
-	if (secrets_generated && ct_secrets_upload) {
-		ct_upload_secrets_file();
+	if (secrets_generated && config.ct_secrets_upload) {
+		ct_upload_secrets_file(&config);
 	}
 
 	if (expert_mode) {
@@ -609,7 +546,11 @@ crypto_passphrase:
 		    sizeof(prompt));
 		rv = ct_get_answer(prompt, "remote", "local", "remote", answer,
 		    sizeof answer, 0);
-		mode = e_strdup(answer);
+		if (strcmp(answer, "remote") == 0) {
+			config.ct_ctfile_mode = CT_MDMODE_REMOTE;
+		} else {
+			config.ct_ctfile_mode = CT_MDMODE_LOCAL;
+		}
 
 		if (rv == 1) {
 			strlcpy(prompt,
@@ -618,43 +559,16 @@ crypto_passphrase:
 			rv = ct_get_answer(prompt, "yes", "no", "no", answer,
 			    sizeof answer, 0);
 			if (rv == 1)
-				ct_auto_differential = 1;
+				config.ct_auto_differential = 1;
 		}
 	} else {
-		mode = e_strdup("remote");
+		config.ct_ctfile_mode = CT_MDMODE_REMOTE;
 	}
 
-	fprintf(f, "username\t\t\t\t= %s\n", ct_username);
-	if (save_password && ct_password)
-		fprintf(f, "password\t\t\t\t= %s\n", ct_password);
-	else
-		fprintf(f, "#password\t\t\t\t=\n");
-	if (save_crypto_passphrase && ct_crypto_passphrase)
-		fprintf(f, "crypto_passphrase\t\t\t= %s\n", ct_crypto_passphrase);
-	else
-		fprintf(f, "#crypto_passphrase\t\t\t=\n");
-
-	fprintf(f, "cache_db\t\t\t\t= %s%cct_db\n", dir, CT_PATHSEP);
-	fprintf(f, "session_compression\t\t\t= lzo\n");
-	fprintf(f, "crypto_secrets\t\t\t\t= %s\n", ct_crypto_secrets);
-	fprintf(f, "ca_cert\t\t\t\t\t= %s\n", ct_ca_cert);
-	fprintf(f, "cert\t\t\t\t\t= %s\n", ct_cert);
-	fprintf(f, "key\t\t\t\t\t= %s\n", ct_key);
-
-	fprintf(f, "ctfile_mode\t\t\t\t= %s\n", mode);
-	if (strcmp(mode, "remote") == 0) {
-		fprintf(f, "ctfile_cachedir\t\t\t\t= %s\n", ctfile_cachedir);
-		fprintf(f, "ctfile_remote_auto_differential\t\t= %d\n",
-		    ct_auto_differential);
-	} else {
-		fprintf(f, "#ctfile_cachedir\t\t\t= %s\n", ctfile_cachedir);
-		fprintf(f, "#ctfile_remote_auto_differential\t= %d\n",
-		    ct_auto_differential);
-	}
-	fprintf(f, "upload_crypto_secrets\t\t\t= %d\n", ct_secrets_upload);
+	ct_write_config(&config, f, save_password, save_crypto_passphrase);
 
 	printf("Configuration file created.\n");
-	if (save_crypto_passphrase && ct_crypto_passphrase) {
+	if (save_crypto_passphrase && config.ct_crypto_passphrase) {
 		printf("WARNING: It is highly recommended that you store your "
 		    "'%s' file to an offline location, preferrably offsite, as "
 		    " your crypto passphrase CANNOT be recovered.\n", conf);
@@ -678,33 +592,92 @@ crypto_passphrase:
 		e_free(&conf_tmp);
 	if (conf)
 		e_free(&conf);
-	if (ct_username)
-		e_free(&ct_username);
-	if (ct_password) {
-		bzero(ct_password, strlen(ct_password));
-		e_free(&ct_password);
+	if (config.ct_username)
+		e_free(&config.ct_username);
+	if (config.ct_password) {
+		bzero(config.ct_password, strlen(config.ct_password));
+		e_free(&config.ct_password);
 	}
-	if (ct_crypto_passphrase) {
-		bzero(ct_crypto_passphrase, strlen(ct_crypto_passphrase));
-		e_free(&ct_crypto_passphrase);
+	if (config.ct_crypto_passphrase) {
+		bzero(config.ct_crypto_passphrase,
+		    strlen(config.ct_crypto_passphrase));
+		e_free(&config.ct_crypto_passphrase);
 	}
-	if (ct_crypto_secrets)
-		e_free(&ct_crypto_secrets);
-	if (mode)
-		e_free(&mode);
-	if (ctfile_cachedir)
-		e_free(&ctfile_cachedir);
+	if (config.ct_crypto_secrets)
+		e_free(&config.ct_crypto_secrets);
+	if (config.ct_ctfile_cachedir)
+		e_free(&config.ct_ctfile_cachedir);
+	if (config.ct_localdb)
+		e_free(&config.ct_localdb);
 }
 
-int
-ct_load_config(struct ct_settings *mysettings)
+struct ct_config *
+ct_load_config(void)
 {
-	char		*config_path = NULL;
-	int		config_try = 0;
-	static char	ct_fullcachedir[PATH_MAX];
+	struct ct_config	 conf, *config;
+	char			*ct_compression_type = NULL;
+	char			*ct_polltype = NULL;
+	char			*ctfile_mode_str = NULL;
+	char			*config_path = NULL;
+	char			 ct_fullcachedir[PATH_MAX];
+	int			 config_try = 0;
+	struct ct_settings	 settings[] = {
+		{ "queue_depth", CT_S_INT, &ct_max_trans, NULL, NULL, NULL },
+		{ "bandwidth", CT_S_INT, &conf.ct_io_bw_limit, NULL, NULL, NULL },
+		{ "host", CT_S_STR, NULL, &conf.ct_host, NULL, NULL },
+		{ "hostport", CT_S_STR, NULL, &conf.ct_hostport, NULL, NULL },
+		{ "cache_db", CT_S_DIR, NULL, &conf.ct_localdb, NULL, NULL },
+		{ "username", CT_S_STR, NULL, &conf.ct_username, NULL, NULL },
+		{ "password", CT_S_STR, NULL, &conf.ct_password, NULL,
+		    NULL, NULL, 1 },
+		{ "ca_cert", CT_S_DIR, NULL, &conf.ct_ca_cert, NULL, NULL },
+		{ "cert", CT_S_DIR, NULL, &conf.ct_cert, NULL, NULL },
+		{ "key", CT_S_DIR, NULL, &conf.ct_key, NULL, NULL },
+		{ "crypto_secrets", CT_S_DIR, NULL, &conf.ct_crypto_secrets, NULL,
+		    NULL },
+		{ "crypto_passphrase", CT_S_STR, NULL, &conf.ct_crypto_passphrase,
+		    NULL, NULL, NULL,  1 }, /* name may NOT be modified */
+		{ "session_compression", CT_S_STR, NULL, &ct_compression_type,
+		   NULL, NULL },
+		{ "polltype", CT_S_STR, NULL, &ct_polltype, NULL, NULL },
+		{ "upload_crypto_secrets" , CT_S_INT, &conf.ct_secrets_upload,
+		    NULL, NULL, NULL },
+		{ "ctfile_cull_keep_days" , CT_S_INT, &conf.ct_ctfile_keep_days,
+		    NULL, NULL, NULL },
+		{ "ctfile_mode", CT_S_STR, NULL, &ctfile_mode_str, NULL, NULL },
+		{ "ctfile_cachedir", CT_S_DIR, NULL, &conf.ct_ctfile_cachedir, NULL,
+		    NULL },
+		{ "ctfile_cachedir_max_size", CT_S_SIZE, NULL, NULL, NULL,
+		    &conf.ct_ctfile_max_cachesize, NULL },
+		{ "ctfile_remote_auto_differential" , CT_S_INT,
+		    &conf.ct_auto_differential, NULL, NULL, NULL },
+		{ "ctfile_max_differentials" , CT_S_INT, &conf.ct_max_differentials,
+		    NULL, NULL, NULL },
+		{ "ctfile_differential_allfiles", CT_S_INT,
+		    &conf.ct_multilevel_allfiles, NULL, NULL, NULL },
+		/* backwards compat, old names */
+		{ "md_mode", CT_S_STR, NULL, &ctfile_mode_str, NULL, NULL },
+		{ "md_cachedir", CT_S_DIR, NULL, &conf.ct_ctfile_cachedir, NULL, NULL },
+		{ "md_cachedir_max_size", CT_S_SIZE, NULL, NULL, NULL,
+		    &conf.ct_ctfile_max_cachesize, NULL },
+		{ "md_remote_auto_differential" , CT_S_INT,
+		    &conf.ct_auto_differential, NULL, NULL, NULL },
+		{ "md_max_differentials" , CT_S_INT, &conf.ct_max_differentials,
+		    NULL, NULL, NULL },
+		{ "ctfile_expire_day" , CT_S_INT, &conf.ct_ctfile_keep_days,
+		    NULL, NULL, NULL },
+		{ "crypto_password", CT_S_STR, NULL, &conf.ct_crypto_passphrase,
+		    NULL, NULL, NULL, 1 },
+#if defined(CT_EXT_SETTINGS)
+		CT_EXT_SETTINGS
+#endif	/* CT_EXT_SETTINGS */
+		{ NULL, 0, NULL, NULL, NULL,  NULL }
+	};
 
+	/* setup default */
+	ct_default_config(&conf);
 	if (ct_configfile) {
-		if (ct_config_parse(mysettings, ct_configfile))
+		if (ct_config_parse(settings, ct_configfile))
 			CFATALX("Unable to open specified config file %s",
 			   ct_configfile);
 	} else {
@@ -724,10 +697,10 @@ ct_load_config(struct ct_settings *mysettings)
 				config_path = ct_system_config();
 				break;
 			default:
-				return (1);
+				return (NULL);
 				break;
 			}
-			if (ct_config_parse(mysettings, config_path) == 0) {
+			if (ct_config_parse(settings, config_path) == 0) {
 				ct_configfile = config_path;
 				break;
 			}
@@ -735,47 +708,119 @@ ct_load_config(struct ct_settings *mysettings)
 		}
 	}
 
-	ctfile_mode_setup(ctfile_mode_str);
+	if (ctfile_mode_str != NULL) {
+		if (strcmp(ctfile_mode_str, "remote") == 0)
+			conf.ct_ctfile_mode = CT_MDMODE_REMOTE;
+		else if (strcmp(ctfile_mode_str, "local") == 0)
+			conf.ct_ctfile_mode = CT_MDMODE_LOCAL;
+		else
+			CFATALX("invalid ctfile mode specified");
+	}
+
 	/* Fix up cachedir: code requires it to end with a slash. */
-	if (ctfile_cachedir != NULL &&
-	    ctfile_cachedir[strlen(ctfile_cachedir) - 1] != CT_PATHSEP) {
+	if (conf.ct_ctfile_cachedir != NULL &&
+	    conf.ct_ctfile_cachedir[strlen(conf.ct_ctfile_cachedir) - 1]
+	    != CT_PATHSEP) {
 		int rv;
 
 		if ((rv = snprintf(ct_fullcachedir, sizeof(ct_fullcachedir),
-		    "%s%c", ctfile_cachedir, CT_PATHSEP)) == -1 ||
+		    "%s%c", conf.ct_ctfile_cachedir, CT_PATHSEP)) == -1 ||
 		    rv > PATH_MAX)
 			CFATALX("invalid metadata pathname");
-		ctfile_cachedir = ct_fullcachedir;
+		free(conf.ct_ctfile_cachedir);
+		conf.ct_ctfile_cachedir = strdup(ct_fullcachedir);
+		if (ct_fullcachedir == NULL)
+			CFATALX("can't allocate memory for cachedir");
 
 	}
+
+	if (conf.ct_ctfile_mode == CT_MDMODE_REMOTE &&
+	    conf.ct_ctfile_cachedir == NULL)
+		CFATALX("remote mode needs a cache directory set");
+
 	/* And make sure it exists. */
-	if (ctfile_cachedir != NULL &&
-	    ct_make_full_path(ctfile_cachedir, 0700) != 0)
+	if (conf.ct_ctfile_cachedir != NULL &&
+	    ct_make_full_path(conf.ct_ctfile_cachedir, 0700) != 0)
 		CFATALX("can't create ctfile cache directory %s",
-		    ctfile_cachedir);
+		    conf.ct_ctfile_cachedir);
 
 	/* Apply compression from config. */
 	if (ct_compression_type == NULL) {
-		ct_compress_enabled = 0;
+		conf.ct_compress = 0;
 	} else if (strcmp("lzo", ct_compression_type) == 0) {
-		ct_compress_enabled = C_HDR_F_COMP_LZO;
+		conf.ct_compress = C_HDR_F_COMP_LZO;
 	} else if (strcmp("lzma", ct_compression_type) == 0) {
-		ct_compress_enabled = C_HDR_F_COMP_LZMA;
+		conf.ct_compress = C_HDR_F_COMP_LZMA;
 	} else if (strcmp("lzw", ct_compression_type) == 0) {
-		ct_compress_enabled = C_HDR_F_COMP_LZW;
+		conf.ct_compress = C_HDR_F_COMP_LZW;
 	} else {
 		CFATAL("compression type %s not recognized",
 		    ct_compression_type);
 	}
-	if (ct_compress_enabled != 0) {
-		ct_init_compression(ct_compress_enabled);
-		ct_cur_compress_mode = ct_compress_enabled;
-	}
 
-	return (0);
+	/* set polltype used by libevent */
+	ct_polltype_setup(ct_polltype);
+
+	config = e_calloc(1, sizeof(*config));
+
+	memcpy(config, &conf, sizeof(*config));
+
+	return (config);
 }
 
 void
-ct_unload_config(void)
+ct_unload_config(struct ct_config *config)
 {
+}
+
+void
+ct_default_config(struct ct_config *config)
+{
+	bzero(config, sizeof(*config));
+	config->ct_host = strdup("auth.cyphertite.com");
+	config->ct_hostport = strdup("48879");
+	config->ct_strip_slash = 1;
+	config->ct_ctfile_mode = CT_MDMODE_LOCAL;
+	config->ct_ctfile_max_cachesize = LLONG_MAX;
+}
+
+void
+ct_write_config(struct ct_config *config, FILE *f, int save_password,
+    int save_crypto_passphrase)
+{
+	fprintf(f, "username\t\t\t\t= %s\n", config->ct_username);
+	if (save_password && config->ct_password)
+		fprintf(f, "password\t\t\t\t= %s\n", config->ct_password);
+	else
+		fprintf(f, "#password\t\t\t\t=\n");
+	if (save_crypto_passphrase && config->ct_crypto_passphrase)
+		fprintf(f, "crypto_passphrase\t\t\t= %s\n", config->ct_crypto_passphrase);
+	else
+		fprintf(f, "#crypto_passphrase\t\t\t=\n");
+
+	if (config->ct_localdb)
+		fprintf(f, "cache_db\t\t\t\t= %s/ct_db\n", config->ct_localdb);
+	else
+		fprintf(f, "#cache_db\t\t\t\t=\n");
+	fprintf(f, "session_compression\t\t\t= lzo\n");
+	fprintf(f, "crypto_secrets\t\t\t\t= %s\n", config->ct_crypto_secrets);
+	fprintf(f, "ca_cert\t\t\t\t\t= %s\n", config->ct_ca_cert);
+	fprintf(f, "cert\t\t\t\t\t= %s\n", config->ct_cert);
+	fprintf(f, "key\t\t\t\t\t= %s\n", config->ct_key);
+
+	fprintf(f, "ctfile_mode\t\t\t\t= %s\n",
+	    config->ct_ctfile_mode == CT_MDMODE_REMOTE ? "remote" : "local");
+	if (config->ct_ctfile_mode == CT_MDMODE_REMOTE) {
+		fprintf(f, "ctfile_cachedir\t\t\t\t= %s\n",
+		    config->ct_ctfile_cachedir);
+		fprintf(f, "ctfile_remote_auto_differential\t\t= %d\n",
+		    config->ct_auto_differential);
+	} else {
+		fprintf(f, "#ctfile_cachedir\t\t\t= %s\n",
+		    config->ct_ctfile_cachedir);
+		fprintf(f, "#ctfile_remote_auto_differential\t= %d\n",
+		    config->ct_auto_differential);
+	}
+	fprintf(f, "upload_crypto_secrets\t\t\t= %d\n",
+	    config->ct_secrets_upload);
 }

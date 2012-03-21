@@ -44,21 +44,6 @@ ct_op_cb	ctfile_nextop_extract_cleanup;
 ct_op_cb	ctfile_nextop_archive_cleanup;
 int	ct_file_on_server(struct ct_global_state *, char *filename);
 
-void
-ctfile_mode_setup(const char *mode)
-{
-	CNDBG(CT_LOG_CTFILE, "%s", mode ? mode : "");
-	if (mode == NULL)
-		return;
-
-	if (strcmp(mode, "remote") == 0)
-		ctfile_mode = CT_MDMODE_REMOTE;
-	else if (strcmp(mode, "local") == 0)
-		ctfile_mode = CT_MDMODE_LOCAL;
-	else
-		CFATALX("invalid ctfile mode specified");
-}
-
 char *
 ctfile_cook_name(const char *path)
 {
@@ -77,14 +62,14 @@ ctfile_cook_name(const char *path)
  * Return boolean whether the ctfile in question is already in the cache.
  */
 int
-ctfile_in_cache(const char *ctfile)
+ctfile_in_cache(const char *ctfile, const char *cachedir)
 {
 	struct dirent	*dp;
 	DIR		*dirp;
 	int		 found = 0;
 
-	if ((dirp = opendir(ctfile_cachedir)) == NULL)
-		CFATALX("can't open metadata cache dir");
+	if ((dirp = opendir(cachedir)) == NULL)
+		CFATAL("can't open ctfile cache dir");
 	while ((dp = readdir(dirp)) != NULL) {
 		if (strcmp(dp->d_name, ctfile) == 0) {
 			CNDBG(CT_LOG_CTFILE, "found in cachedir");
@@ -102,12 +87,12 @@ ctfile_in_cache(const char *ctfile)
  * if it extisted.
  */
 char *
-ctfile_get_cachename(const char *ctfile)
+ctfile_get_cachename(const char *ctfile, const char *cachedir)
 {
 	char	*cachename;
 
 	/* cachedir was made sure to terminate with / earlier */
-	e_asprintf(&cachename, "%s%s", ctfile_cachedir, ctfile);
+	e_asprintf(&cachename, "%s%s", cachedir, ctfile);
 	return cachename;
 }
 
@@ -135,6 +120,7 @@ ctfile_is_fullname(const char *ctfile)
 
 struct ct_ctfile_find_args {
 	char			*ccfa_tag;
+	char			*ccfa_cachedir;
 	ctfile_find_callback	*ccfa_nextop;
 	void			*ccfa_nextop_args;
 	int			 ccfa_download_chain;
@@ -156,6 +142,7 @@ ctfile_find_for_operation(struct ct_global_state *state, char *tag,
 	struct ct_ctfile_find_args  *ccfa;
 	ccfa = e_calloc(1, sizeof(*ccfa));
 	ccfa->ccfa_tag = tag;
+	ccfa->ccfa_cachedir = state->ct_config->ct_ctfile_cachedir;
 	ccfa->ccfa_nextop = nextop;
 	ccfa->ccfa_nextop_args = nextop_args;
 	ccfa->ccfa_download_chain = download_chain;
@@ -267,9 +254,9 @@ ctfile_find_for_extract_complete(struct ct_global_state *state,
 	 * those operations too. If we have it, we still need to check
 	 * that all others in the chain exist, however.
 	 */
-	if (!ctfile_in_cache(best)) {
+	if (!ctfile_in_cache(best, ccfa->ccfa_cachedir)) {
 		ccffa->ccffa_base.cca_localname = best;
-		ccffa->ccffa_base.cca_tdir = ctfile_cachedir;
+		ccffa->ccffa_base.cca_tdir = ccfa->ccfa_cachedir;
 		ccffa->ccffa_base.cca_remotename = e_strdup(best);
 		ccffa->ccffa_base.cca_ctfile = 1;
 		ct_add_operation(state, ctfile_extract, ctfile_extract_nextop,
@@ -281,7 +268,7 @@ do_operation:
 		 * to see if we need anymore.
 		 */
 		ccffa->ccffa_base.cca_localname = best;
-		ccffa->ccffa_base.cca_tdir = ctfile_cachedir;
+		ccffa->ccffa_base.cca_tdir = ccfa->ccfa_cachedir;
 		ccffa->ccffa_base.cca_ctfile = 1;
 		op->op_args = ccffa;
 		ctfile_extract_nextop(state, op);
@@ -330,7 +317,8 @@ ctfile_extract_nextop(struct ct_global_state *state, struct ct_op *op)
 	 */
 	if (ccffa->ccffa_base.cca_localname != NULL) {
 		cachename =
-		    ctfile_get_cachename(ccffa->ccffa_base.cca_localname);
+		    ctfile_get_cachename(ccffa->ccffa_base.cca_localname,
+		    ccffa->ccffa_base.cca_tdir);
 	} else {
 		cachename = NULL;
 	}
@@ -359,7 +347,7 @@ ctfile_download_next(struct ct_global_state *state, struct ct_op *op)
 again:
 	CNDBG(CT_LOG_CTFILE, "ctfile %s", ctfile);
 
-	cachename = ctfile_get_cachename(ctfile);
+	cachename = ctfile_get_cachename(ctfile, cca->cca_tdir);
 	/* this will provide us the path that we need to use */
 	prevfile = ctfile_get_previous(cachename);
 	e_free(&cachename);
@@ -370,11 +358,11 @@ again:
 		cookedname = ctfile_cook_name(prevfile);
 		CNDBG(CT_LOG_CTFILE, "prev file %s cookedname %s", prevfile,
 		    cookedname);
-		if (!ctfile_in_cache(cookedname)) {
+		if (!ctfile_in_cache(cookedname, cca->cca_tdir)) {
 			nextcca = e_calloc(1, sizeof(*nextcca));
 			nextcca->cca_localname = cookedname;
 			nextcca->cca_remotename = e_strdup(cookedname);
-			nextcca->cca_tdir = ctfile_cachedir;
+			nextcca->cca_tdir = cca->cca_tdir;
 			nextcca->cca_ctfile = 1;
 			ct_add_operation_after(state, op, ctfile_extract,
 			    ctfile_download_next, nextcca);
@@ -454,8 +442,9 @@ ctfile_nextop_archive(struct ct_global_state *state, char *basis, void *args)
 	CNDBG(CT_LOG_CTFILE, "backup file is %s", fullname);
 
 	/* check it isn't already in the cache */
-	cachename = ctfile_get_cachename(fullname);
-	if (ctfile_in_cache(fullname))
+	cachename = ctfile_get_cachename(fullname,
+	    state->ct_config->ct_ctfile_cachedir);
+	if (ctfile_in_cache(fullname, state->ct_config->ct_ctfile_cachedir))
 		CFATALX("generated metadata name %s already in cache dir",
 		    fullname);
 
@@ -506,14 +495,14 @@ ct_check_secrets_extract(struct ct_global_state *state, struct ct_op *op)
 	struct ct_ctfileop_args	*cca;
 
 	if (!ct_file_on_server(state, "crypto.secrets"))
-		CFATALX("upload_crypto_secrets set but not secrets file on"
+		CFATALX("upload_crypto_secrets set but no secrets file on"
 		    "server, please use cyphertitectl secrets_upload");
 
 	cca = e_calloc(1, sizeof(*cca));
 	/* XXX temporary name? */
 	cca->cca_localname = "cyphertite-server.secrets";
 	cca->cca_remotename = "crypto.secrets";
-	cca->cca_tdir = ctfile_cachedir;
+	cca->cca_tdir = state->ct_config->ct_ctfile_cachedir;
 	cca->cca_encrypted = 0; /* ignored */
 	cca->cca_ctfile = 0;
 	ct_add_operation_after(state, op, ctfile_extract, ct_compare_secrets,
@@ -534,10 +523,11 @@ ct_compare_secrets(struct ct_global_state *state, struct ct_op *op)
 	off_t				 sz;
 
 	/* cachedir is '/' terminated */
-	strlcpy(temp_path, ctfile_cachedir, sizeof(temp_path));
-	strlcat(temp_path, "cyphertite-server.secrets", sizeof(temp_path));
-	if (stat(ct_crypto_secrets, &sb) != 0)
-		CFATAL("can't stat secrets file at \"%s\"", ct_crypto_secrets);
+	strlcpy(temp_path, cca->cca_tdir, sizeof(temp_path));
+	strlcat(temp_path, cca->cca_localname, sizeof(temp_path));
+	if (stat(state->ct_config->ct_crypto_secrets, &sb) != 0)
+		CFATAL("can't stat secrets file at \"%s\"",
+		    state->ct_config->ct_crypto_secrets);
 	if (stat(temp_path, &tsb) != 0)
 		CFATAL("can't stat temporary secrets file");
 
@@ -547,7 +537,7 @@ ct_compare_secrets(struct ct_global_state *state, struct ct_op *op)
 		    "(%" PRId64 " vs %" PRId64 "), please confirm that local "
 		    "secrets file is the correct one", (int64_t)tsb.st_size, (int64_t)sb.st_size);
 
-	if ((f = fopen(ct_crypto_secrets, "rb")) == NULL)
+	if ((f = fopen(state->ct_config->ct_crypto_secrets, "rb")) == NULL)
 		CFATAL("can't open secrets file");
 	if ((tf = fopen(temp_path, "rb")) == NULL)
 		CFATAL("can't open temporary secrets file");
@@ -636,28 +626,27 @@ ct_secrets_exists(struct ct_global_state *state, struct ct_op *op)
 }
 
 int
-ct_have_remote_secrets_file(void)
+ct_have_remote_secrets_file(struct ct_config *conf)
 {
 	int have;
 
-	ct_do_operation(ctfile_list_start, ct_secrets_exists,
+	ct_do_operation(conf, ctfile_list_start, ct_secrets_exists,
 	    &have, 0, 1);
 
 	return (have);
 }
 void
-ct_download_secrets_file(void)
+ct_download_secrets_file(struct ct_config *conf)
 {
-	char		*dirpath, *fname;
-
 	struct ct_ctfileop_args	 cca;
+	char			*dirpath, *fname;
 
 	CWARNX("Downloading secrets file from server...");
 
-	if ((dirpath = ct_dirname(ct_crypto_secrets)) == NULL)
-		CFATALX("can't get dirname of %s", ct_crypto_secrets);
-	if ((fname = ct_basename(ct_crypto_secrets)) == NULL)
-		CFATALX("can't get basename of %s", ct_crypto_secrets);
+	if ((dirpath = ct_dirname(conf->ct_crypto_secrets)) == NULL)
+		CFATALX("can't get dirname of %s", conf->ct_crypto_secrets);
+	if ((fname = ct_basename(conf->ct_crypto_secrets)) == NULL)
+		CFATALX("can't get basename of %s", conf->ct_crypto_secrets);
 
 	cca.cca_localname = fname;
 	cca.cca_remotename = "crypto.secrets";
@@ -665,25 +654,25 @@ ct_download_secrets_file(void)
 	cca.cca_encrypted = 0;
 	cca.cca_ctfile = 0;
 
-	ct_do_operation(ctfile_extract, NULL, &cca, 0, 1);
+	ct_do_operation(conf, ctfile_extract, NULL, &cca, 0, 1);
 
 	e_free(&dirpath);
 	e_free(&fname);
 }
 
 void
-ct_upload_secrets_file(void)
+ct_upload_secrets_file(struct ct_config *conf)
 {
 	struct ct_ctfileop_args	 cca;
 
 	CWARNX("Uploading secrets file to server...");
 
-	cca.cca_localname = ct_crypto_secrets;
+	cca.cca_localname = conf->ct_crypto_secrets;
 	cca.cca_remotename = "crypto.secrets";
 	cca.cca_tdir = NULL;
 	cca.cca_encrypted = 0;
 	cca.cca_ctfile = 0;
 
-	ct_do_operation(ctfile_list_start, ct_check_secrets_upload,
+	ct_do_operation(conf, ctfile_list_start, ct_check_secrets_upload,
 	    &cca, 0, 1);
 }

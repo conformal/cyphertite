@@ -255,6 +255,7 @@ int
 ctfb_main(int argc, char *argv[])
 {
 	struct ct_global_state	*state;
+	struct ct_config	*conf;
 	struct ct_fb_state	 cfs;
 	struct ctfb_cmd		*cmd;
 	const char		**l_argv;
@@ -321,17 +322,17 @@ ctfb_main(int argc, char *argv[])
 		ct_configfile = e_strdup(configfile);
 
 	/* load config */
-	if (ct_load_config(settings))
+	if ((conf = ct_load_config()) == NULL)
 		CFATALX("config file not found.  Use the -F option to "
 		    "specify its path.");
 
-	ct_prompt_for_login_password();
+	ct_prompt_for_login_password(conf);
 
 	/* We may have to download files later, always set up */
-	state = ct_init(1, 0);
+	state = ct_init(conf, 1, 0);
 
 	/* if we're in remote mode, try and grab the appropriate files */
-	if (ctfile_mode == CT_MDMODE_REMOTE) {
+	if (conf->ct_ctfile_mode == CT_MDMODE_REMOTE) {
 		ctfile_find_for_operation(state, ctfile,
 		    ctfile_nextop_justdl, &ct_fb_filename, 1, 0);
 		ct_wakeup_file();
@@ -346,7 +347,8 @@ ctfb_main(int argc, char *argv[])
 	}
 	/* now have name of the file we actually want to open... */
 	ct_build_tree(ct_fb_filename, &cfs.cfs_tree,
-	    ctfile_mode == CT_MDMODE_REMOTE ? ctfile_cachedir : NULL);
+	    conf->ct_ctfile_mode == CT_MDMODE_REMOTE ?
+	    conf->ct_ctfile_cachedir : NULL);
 	ctfb_cfs = &cfs;
 	ctfb_cfs->cfs_cwd = &ctfb_cfs->cfs_tree;
 	ctfb_cfs->cfs_curpath[0] = '\0';

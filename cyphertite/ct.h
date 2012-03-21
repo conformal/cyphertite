@@ -43,29 +43,46 @@
 				CT_STR(CT_VERSION_MINOR) "." \
 				CT_STR(CT_VERSION_PATCH)
 
+struct ct_config {
+	char	*ct_host;
+	char	*ct_hostport;
+	char	*ct_username;
+	char	*ct_password;
+	char	*ct_localdb;
+	char	*ct_ca_cert;
+	char	*ct_cert;
+	char	*ct_key;
+	char	*ct_crypto_secrets;
+	char	*ct_crypto_passphrase;
+	char	*ct_polltype;
+	char	*ct_ctfile_cachedir;
+
+	int	ct_compress;
+	int	ct_multilevel_allfiles;
+	int	ct_attr;
+	int	ct_strip_slash;
+	int	ct_verbose;
+	int	ct_auto_differential;
+	int	ct_max_differentials;
+	int	ct_ctfile_keep_days;
+	int	ct_ctfile_mode;
+	long long	ct_ctfile_max_cachesize;
+	int	ct_secrets_upload;
+	int	ct_io_bw_limit;
+};
 extern int		ct_debug;
-extern int		ct_compress_enabled;
-extern int		ct_multilevel_allfiles;
 extern int		ct_attr;
 extern int		ct_strip_slash;
 extern int		ct_verbose;
 extern int		ct_cur_compress_mode;
 extern struct ct_stat	*ct_stats;
-extern int		ct_max_differentials;
 extern char		*__progname;
-extern char		*ct_crypto_passphrase;
 extern char		*ct_configfile;
-extern int		ct_ctfile_keep_days;
-extern int		ctfile_mode;
-extern char		*ctfile_cachedir;
-extern long long	ctfile_max_cachesize;
 extern int		ct_skip_xml_negotiate;
 
 /* crypto */
 extern unsigned char		ct_iv[CT_IV_LEN];
 extern unsigned char		ct_crypto_key[CT_KEY_LEN];
-
-extern struct ct_settings	settings[];
 
 struct ct_global_state;
 
@@ -233,25 +250,12 @@ void			ct_queue_transfer(struct ct_global_state *,
 			    struct ct_trans *);
 
 /* config */
-void			ct_unload_config(void);
-int			ct_load_config(struct ct_settings *);
+struct ct_config	*ct_load_config(void);
+void			 ct_unload_config(struct ct_config *);
 
 extern int		ct_max_trans;
-extern int		ct_io_bw_limit;
-extern char		*ct_host;
-extern char		*ct_hostport;
-extern char		*ct_localdb;
-extern char		*ct_ca_cert;
-extern char		*ct_cert;
-extern char		*ct_key;
-extern char		*ct_username;
-extern char		*ct_password;
-extern char		*ct_crypto_secrets;
-extern char		*ct_polltype;
-extern int		 ct_secrets_upload;
-extern int		 ct_auto_differential;
 
-void			 ct_prompt_for_login_password(void);
+void			 ct_prompt_for_login_password(struct ct_config *);
 void			 ct_normalize_username(char *);
 char			*ct_normalize_path(char *);
 void			 ct_normalize_filelist(char **);
@@ -361,7 +365,8 @@ struct ct_op	*ct_add_operation(struct ct_global_state *, ct_op_cb *,
 		     ct_op_cb *, void *);
 struct ct_op	*ct_add_operation_after(struct ct_global_state *,
 		     struct ct_op *, ct_op_cb *, ct_op_cb *, void *);
-void		 ct_do_operation(ct_op_cb *, ct_op_cb *, void *, int, int);
+void		 ct_do_operation(struct ct_config *, ct_op_cb *, ct_op_cb *,
+		     void *, int, int);
 void		 ct_nextop(void *);
 int		 ct_op_complete(struct ct_global_state *state);
 ct_op_cb	 ct_shutdown_op;
@@ -381,6 +386,7 @@ ct_op_cb	 ct_free_remotename;
 struct ct_global_state {
 	/* PADs? */
 	struct ct_assl_io_ctx		*ct_assl_ctx; /* Connection state */
+	struct ct_config		*ct_config;
 	TAILQ_HEAD(,ct_trans)		ct_trans_free_head;
 	int				ct_trans_id; /* next transaction id */
 	uint64_t			ct_packet_id; /* next complete id */
@@ -462,7 +468,7 @@ typedef void (ct_func_cb)(void *);
 
 struct ct_ctx;
 
-struct ct_global_state *ct_setup_state(void);
+struct ct_global_state *ct_setup_state(struct ct_config *);
 void ct_setup_wakeup_file(void *, ct_func_cb *);
 void ct_setup_wakeup_sha(void *, ct_func_cb *);
 void ct_setup_wakeup_compress(void *, ct_func_cb *);
@@ -640,7 +646,6 @@ struct ct_assl_io_ctx	*ct_ssl_connect(struct ct_global_state *, int);
 void			ct_ssl_cleanup(struct ct_assl_io_ctx *);
 void			ct_reconnect(evutil_socket_t, short, void *);
 int			ct_reconnect_internal(struct ct_global_state *);
-void			ct_load_certs(struct assl_context *);
 int			ct_assl_negotiate_poll(struct ct_global_state *);
 
 /* match functionality */
@@ -659,7 +664,7 @@ void			 ct_match_unwind(struct ct_match *);
 void			 ct_match_insert_rb(struct ct_match *, char *);
 int			 ct_match_rb_is_empty(struct ct_match *);
 
-void			ct_ssl_init_bw_lim(struct ct_assl_io_ctx *);
+void			ct_ssl_init_bw_lim(struct ct_assl_io_ctx *, int);
 void			ct_ssl_cleanup_bw_lim();
 
 /* MD mode handling */
@@ -673,9 +678,9 @@ typedef void	(ctfile_find_callback)(struct ct_global_state *,
 void		 ctfile_find_for_operation(struct ct_global_state *, char *,
 		    ctfile_find_callback *, void *, int, int);
 		
-void		 ct_upload_secrets_file(void);
-void		 ct_download_secrets_file(void);
-int		 ct_have_remote_secrets_file(void);
+void		 ct_upload_secrets_file(struct ct_config *);
+void		 ct_download_secrets_file(struct ct_config *);
+int		 ct_have_remote_secrets_file(struct ct_config *);
 
 ctfile_find_callback	 ctfile_nextop_extract;
 ctfile_find_callback	 ctfile_nextop_list;
@@ -688,8 +693,8 @@ void			 ct_complete_metadata(struct ct_global_state *,
 void			 ctfile_trim_cache(const char *, long long);
 
 char			*ctfile_cook_name(const char *);
-int			 ctfile_in_cache(const char *);
-char			*ctfile_get_cachename(const char *);
+int			 ctfile_in_cache(const char *, const char *);
+char			*ctfile_get_cachename(const char *, const char *);
 
 /* misc */
 int			ct_get_answer(char *, char *, char *, char *, char *,
@@ -698,8 +703,8 @@ int			ct_prompt_password(char *, char *, size_t, char *,
 			    size_t, int);
 
 /* init/cleanup */
-struct ct_global_state	*ct_init(int, int);
-struct ct_global_state	*ct_init_eventloop(void);
+struct ct_global_state	*ct_init(struct ct_config *, int, int);
+struct ct_global_state	*ct_init_eventloop(struct ct_config *);
 void			ct_update_secrets(void);
 void			ct_cleanup(struct ct_global_state *);
 void			ct_cleanup_eventloop(struct ct_global_state *);

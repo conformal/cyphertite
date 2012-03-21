@@ -74,13 +74,14 @@ struct ct_global_state *ct_state = &ct_int_state;
 struct ct_stat *ct_stats = &ct_int_stats;
 
 struct ct_global_state *
-ct_setup_state(void)
+ct_setup_state(struct ct_config *conf)
 {
 	struct ct_global_state *state;
 
 	/* unless we have shared memory, init is simple */
 	state = ct_state = &ct_int_state;
 
+	state->ct_config = conf;
 	ct_stats = &ct_int_stats;
 
 	TAILQ_INIT(&state->ct_trans_free_head);
@@ -92,11 +93,14 @@ ct_setup_state(void)
 	 /* default block size, modified on server negotiation */
 	state->ct_max_block_size = 256 * 1024;
 
-	if (ct_compress_enabled)
+	if (conf->ct_compress) {
+		ct_init_compression(conf->ct_compress);
+		ct_cur_compress_mode = conf->ct_compress;
 		state->ct_alloc_block_size = s_compress_bounds(
 		    state->ct_max_block_size);
-	else
+	} else {
 		state->ct_alloc_block_size = state->ct_max_block_size;
+	}
 
 	state->ct_alloc_block_size += ct_crypto_blocksz();
 
@@ -244,7 +248,7 @@ ct_queue_transfer(struct ct_global_state *state, struct ct_trans *trans)
 	case TR_S_UNCOMPSHA_ED:
 skip_sha:	/* metadata skips shas */
 		/* try to compress trans body, if compression enabled */
-		if (ct_compress_enabled) {
+		if (state->ct_config->ct_compress) {
 			ct_queue_compress(state, trans);
 			break;
 		}
@@ -1376,7 +1380,7 @@ ct_compute_compress(void *vctx)
 		case TR_S_READ: /* if metadata */
 		case TR_S_UNCOMPSHA_ED:
 			compress = 1;
-			ncompmode = ct_compress_enabled;
+			ncompmode = state->ct_config->ct_compress;
 			break;
 		default:
 			CFATALX("unexpected state for compress %d",

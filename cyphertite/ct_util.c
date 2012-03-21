@@ -88,15 +88,15 @@ ct_add_operation_after(struct ct_global_state *state, struct ct_op *after,
 
 /* Do a complete ct operation from start to finish */
 void
-ct_do_operation(ct_op_cb *start, ct_op_cb *complete, void *args,
-    int need_secrets, int only_metadata)
+ct_do_operation(struct ct_config *conf,  ct_op_cb *start, ct_op_cb *complete,
+    void *args, int need_secrets, int only_metadata)
 {
 	struct ct_global_state	*state;
 	int		 	 ret;
 
-	ct_prompt_for_login_password();
+	ct_prompt_for_login_password(conf);
 
-	state = ct_init(need_secrets, only_metadata);
+	state = ct_init(conf, need_secrets, only_metadata);
 	ct_add_operation(state, start, complete, args);
 	ct_wakeup_file();
 	if ((ret = ct_event_dispatch()) != 0)
@@ -141,17 +141,18 @@ ct_op_complete(struct ct_global_state *state)
 	return (0);
 }
 
-void
-ct_load_certs(struct assl_context *c)
+static void
+ct_load_certs(struct ct_global_state *state, struct assl_context *c)
 {
-	if (ct_cert == NULL)
+	if (state->ct_config->ct_cert == NULL)
 		CFATALX("no cert provided in config");
-	if (ct_ca_cert == NULL)
+	if (state->ct_config->ct_ca_cert == NULL)
 		CFATALX("no ca_cert provided in config");
-	if (ct_key == NULL)
+	if (state->ct_config->ct_key == NULL)
 		CFATALX("no key provided in config");
 
-	if (assl_load_file_certs(c, ct_ca_cert, ct_cert, ct_key))
+	if (assl_load_file_certs(c, state->ct_config->ct_ca_cert,
+	    state->ct_config->ct_cert, state->ct_config->ct_key))
 		assl_fatalx("Failed to load certs. Ensure that "
 		    "the ca_cert, cert and key are set to valid paths in %s",
 		    ct_configfile);
@@ -169,14 +170,15 @@ ct_ssl_connect(struct ct_global_state *state, int nonfatal)
 	if (c == NULL)
 		assl_fatalx("assl_alloc_context");
 
-	ct_load_certs(c);
+	ct_load_certs(state, c);
 
 	ct_assl_io_ctx_init(ctx, c, ct_handle_msg, ct_write_done,
 	    state, ct_header_alloc, ct_header_free, ct_body_alloc,
 	    ct_body_free, ct_ioctx_alloc, ct_ioctx_free);
 
-	if (assl_event_connect(c, ct_host, ct_hostport,
-		ASSL_F_NONBLOCK|ASSL_F_KEEPALIVE|ASSL_F_THROUGHPUT,
+	if (assl_event_connect(c, state->ct_config->ct_host,
+	    state->ct_config->ct_hostport,
+	    ASSL_F_NONBLOCK|ASSL_F_KEEPALIVE|ASSL_F_THROUGHPUT,
 	    ct_evt_base, ct_event_assl_read, ct_event_assl_write, ctx)) {
 		if (nonfatal) {
 			/* XXX */
@@ -186,8 +188,8 @@ ct_ssl_connect(struct ct_global_state *state, int nonfatal)
 		} else
 			assl_fatalx("server connect failed");
 	}
-	if (ct_io_bw_limit && ctx != NULL)
-		ct_ssl_init_bw_lim(ctx);
+	if (state->ct_config->ct_io_bw_limit && ctx != NULL)
+		ct_ssl_init_bw_lim(ctx, state->ct_config->ct_io_bw_limit);
 
 	return ctx;
 }
@@ -306,19 +308,20 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 	CNDBG(CT_LOG_NET, "negotiated queue depth: %u max chunk size: %u",
 	    ct_max_trans, state->ct_max_block_size);
 
-	ct_sha512((uint8_t *)ct_password, pwd_digest, strlen(ct_password));
+	ct_sha512((uint8_t *)state->ct_config->ct_password, pwd_digest,
+	    strlen(state->ct_config->ct_password));
 	if (ct_base64_encode(CT_B64_ENCODE, pwd_digest, sizeof pwd_digest,
 	    (uint8_t *)b64_digest, sizeof b64_digest)) {
 		CWARNX("can't base64 encode password");
 		goto done;
 	}
 
-	user_len = strlen(ct_username);
+	user_len = strlen(state->ct_config->ct_username);
 	payload_sz = user_len + 1 + strlen(b64_digest) + 1;
 
 	body = e_calloc(1, payload_sz);
 
-	strlcpy(body, ct_username, payload_sz);
+	strlcpy(body, state->ct_config->ct_username, payload_sz);
 	strlcpy(body + user_len + 1, b64_digest,
 	    payload_sz - user_len - 1);
 
@@ -328,7 +331,7 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 	hdr.c_opcode = C_HDR_O_LOGIN;
 	hdr.c_tag = 1;
 	hdr.c_size = payload_sz;
-	hdr.c_flags = ct_compress_enabled;
+	hdr.c_flags = state->ct_config->ct_compress;
 
 	ct_wire_header(&hdr);
 	if (ct_assl_io_write_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
@@ -909,30 +912,30 @@ ct_cmp_logincache(struct ct_login_cache *f1, struct ct_login_cache *f2)
 }
 
 void
-ct_prompt_for_login_password(void)
+ct_prompt_for_login_password(struct ct_config *conf)
 {
 	char	answer[1024];
 
-	if (ct_username == NULL) {
+	if (conf->ct_username == NULL) {
 		if (ct_get_answer("Login username: ", NULL, NULL, NULL,
 			answer, sizeof answer, 0)) {
 			CFATALX("invalid username");
 		} else if (!strlen(answer)) {
 			CFATALX("username must not be empty");
 		}
-		ct_username = e_strdup(answer);
+		conf->ct_username = e_strdup(answer);
 		bzero(answer, sizeof answer);
 	}
-	ct_normalize_username(ct_username);
+	ct_normalize_username(conf->ct_username);
 
-	if (ct_password == NULL) {
+	if (conf->ct_password == NULL) {
 		if (ct_get_answer("Login password: ", NULL, NULL, NULL,
 			answer, sizeof answer, 1)) {
 			CFATALX("invalid password");
 		} else if (!strlen(answer)) {
 			CFATALX("password must not be empty");
 		}
-		ct_password = e_strdup(answer);
+		conf->ct_password = e_strdup(answer);
 		bzero(answer, sizeof answer);
 	}
 

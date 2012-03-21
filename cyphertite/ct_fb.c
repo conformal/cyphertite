@@ -587,7 +587,8 @@ ctfb_get(int argc, const char **argv)
 		goto out;
 	}
 
-	state = ct_init_eventloop();
+	/* XXX Fix this, this won't work */
+	state = ct_init_eventloop(NULL);
 
 	if (stat(argv[2], &sb) == 0 && (S_ISDIR(sb.st_mode)))
 		isdir = 1;

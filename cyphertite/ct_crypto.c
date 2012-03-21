@@ -696,11 +696,11 @@ ct_unlock_secrets(const char *passphrase, const char *filename,
 	if (f_version <= 0) {
 		/* rewrite file */
 		snprintf(old_crypto_secrets, sizeof old_crypto_secrets, "%s~",
-		    ct_crypto_secrets);
+		    filename);
 
-		if (rename(ct_crypto_secrets, old_crypto_secrets))
-			CFATAL("%s", ct_crypto_secrets);
-		ct_create_secrets(p, ct_crypto_secrets, aeskey, ivkey);
+		if (rename(filename, old_crypto_secrets))
+			CFATAL("%s", filename);
+		ct_create_secrets(p, filename, aeskey, ivkey);
 	}
 
 	bcopy(aeskey, outaeskey, outaeskeylen);

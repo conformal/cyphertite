@@ -172,7 +172,6 @@ next_file:
 			goto next_file;
 		}
 	}
-	ct_unload_config();
 	ct_match_unwind(match);
 	return (0);
 }
