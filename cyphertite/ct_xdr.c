@@ -44,10 +44,13 @@ bool_t		ct_xdr_dedup_sha_crypto(XDR *, uint8_t *, uint8_t *,
 bool_t          ct_xdr_header(XDR *, struct ctfile_header *, int);
 bool_t          ct_xdr_trailer(XDR *, struct ctfile_trailer *);
 bool_t          ct_xdr_stdin(XDR *, struct ctfile_stdin *);
-bool_t          ct_xdr_gheader(XDR *, struct ctfile_gheader *, int);
+bool_t          ct_xdr_gheader(XDR *, struct ctfile_gheader *, int,
+		    const char *);
 
-static FILE	*ctfile_open(const char *, struct ctfile_gheader *, XDR *);
-static FILE	*ctfile_open_f(FILE *, struct ctfile_gheader *, XDR *);
+static FILE	*ctfile_open(const char *, const char *,
+		     struct ctfile_gheader *, XDR *);
+static FILE	*ctfile_open_f(FILE *, const char *,
+		     struct ctfile_gheader *, XDR *);
 static void	 ctfile_close(FILE *, XDR *);
 static void	 ctfile_cleanup_gheader(struct ctfile_gheader *);
 
@@ -132,7 +135,7 @@ ct_xdr_stdin(XDR *xdrs, struct ctfile_stdin *objp)
 
 bool_t
 ct_xdr_gheader(XDR *xdrs, struct ctfile_gheader *objp,
-    int direction)
+    int direction, const char *ctfile_basedir)
 {
 	char	 *basep, base[PATH_MAX], *prevlvl;
 	int	 i;
@@ -149,9 +152,10 @@ ct_xdr_gheader(XDR *xdrs, struct ctfile_gheader *objp,
 		return (FALSE);
 	if (!xdr_int(xdrs, &objp->cmg_flags))
 		return (FALSE);
-	if (direction  == XDR_ENCODE && ctfile_mode == CT_MDMODE_REMOTE &&
+	if (direction  == XDR_ENCODE && ctfile_basedir != NULL &&
 	    objp->cmg_prevlvl_filename != NULL &&
 	    objp->cmg_prevlvl_filename[0] != '\0') {
+		/* XXX technically should just remove basedir if present */
 		strlcpy(base, objp->cmg_prevlvl_filename, sizeof(base));
 		if ((basep = basename(base)) == NULL)
 			CFATALX("can't basename %s",
@@ -162,13 +166,13 @@ ct_xdr_gheader(XDR *xdrs, struct ctfile_gheader *objp,
 	}
 	if (!xdr_string(xdrs, &prevlvl, PATH_MAX))
 		return (FALSE);
-	if (direction == XDR_DECODE && ctfile_mode == CT_MDMODE_REMOTE &&
+	if (direction == XDR_DECODE && ctfile_basedir != NULL &&
 	    prevlvl != NULL && prevlvl[0] != '\0') {
 		strlcpy(base, prevlvl, sizeof(base));
 		if ((basep = basename(base)) == NULL)
 			CFATALX("can't basename %s", prevlvl);
 		if (asprintf(&objp->cmg_prevlvl_filename, "%s%s",
-		    ctfile_cachedir, basep) == -1)
+		    ctfile_basedir, basep) == -1)
 			CFATALX("out of memory");
 	} else {
 		objp->cmg_prevlvl_filename = prevlvl;
@@ -212,14 +216,15 @@ ctfile_close(FILE *file, XDR *xdr)
  * Open filename as a ctfile, returning the xdr pointer and the global header.
  */
 FILE *
-ctfile_open(const char *filename, struct ctfile_gheader *gh, XDR *xdr)
+ctfile_open(const char *filename, const char *ctfile_basedir,
+    struct ctfile_gheader *gh, XDR *xdr)
 {
 	FILE			*f;
 	f = fopen(filename, "rb");
 	if (f == NULL)
 		return (NULL);
 
-	return (ctfile_open_f(f, gh, xdr));
+	return (ctfile_open_f(f, ctfile_basedir, gh, xdr));
 }
 
 /*
@@ -228,7 +233,8 @@ ctfile_open(const char *filename, struct ctfile_gheader *gh, XDR *xdr)
  * Upon failure the file will be *closed*.
  */
 FILE *
-ctfile_open_f(FILE *f, struct ctfile_gheader *gh, XDR *xdr)
+ctfile_open_f(FILE *f, const char *ctfile_basedir, struct ctfile_gheader *gh,
+    XDR *xdr)
 {
 	time_t			ltime;
 
@@ -236,7 +242,7 @@ ctfile_open_f(FILE *f, struct ctfile_gheader *gh, XDR *xdr)
 
 	bzero(gh, sizeof *gh);
 
-	if (ct_xdr_gheader(xdr, gh, XDR_DECODE) == FALSE) {
+	if (ct_xdr_gheader(xdr, gh, XDR_DECODE, ctfile_basedir) == FALSE) {
 		CWARNX("e_xdr_gheader failed");
 		goto destroy;
 	}
@@ -304,7 +310,7 @@ ct_basis_setup(const char *basisbackup, char **filelist, time_t *prev_backup)
 	time_t				 prev_backup_time = 0;
 	int			 	 nextlvl, i, rooted = 1, ret;
 
-	if (ctfile_parse_init(&xs_ctx, basisbackup))
+	if (ctfile_parse_init(&xs_ctx, basisbackup, NULL))
 		CFATALX("unable to open/parse previous backup %s",
 		    basisbackup);
 
@@ -378,7 +384,7 @@ ctfile_get_previous(const char *path)
 	XDR			 xdr;
 	struct ctfile_gheader	 gh;
 
-	if ((ctfile = ctfile_open(path, &gh, &xdr)) != NULL) {
+	if ((ctfile = ctfile_open(path, NULL, &gh, &xdr)) != NULL) {
 		if (gh.cmg_prevlvl_filename)
 			ret = e_strdup(gh.cmg_prevlvl_filename);
 
@@ -390,10 +396,12 @@ ctfile_get_previous(const char *path)
 }
 
 int
-ctfile_parse_init_f(struct ctfile_parse_state *ctx, FILE *f)
+ctfile_parse_init_f(struct ctfile_parse_state *ctx, FILE *f,
+    const char *ctfile_basedir)
 {
 	bzero (ctx, sizeof(*ctx));
-	if ((ctx->xs_f = ctfile_open_f(f,  &ctx->xs_gh, &ctx->xs_xdr)) == NULL)
+	if ((ctx->xs_f = ctfile_open_f(f, ctfile_basedir,
+	    &ctx->xs_gh, &ctx->xs_xdr)) == NULL)
 		return 2;
 
 	ctx->xs_filename  = NULL;
@@ -408,10 +416,11 @@ ctfile_parse_init_f(struct ctfile_parse_state *ctx, FILE *f)
 
 int
 ctfile_parse_init_at(struct ctfile_parse_state *ctx, const char *file,
-    off_t offset)
+    const char *ctfile_basedir, off_t offset)
 {
 	bzero (ctx, sizeof(*ctx));
-	ctx->xs_f = ctfile_open(file,  &ctx->xs_gh, &ctx->xs_xdr);
+	ctx->xs_f = ctfile_open(file,  ctfile_basedir, &ctx->xs_gh,
+	    &ctx->xs_xdr);
 	if (ctx->xs_f == NULL)
 		return 2;
 
@@ -676,8 +685,9 @@ static int	 ctfile_write_header_entry(struct ctfile_write_state *, char *,
  * API for creating ctfiles.
  */
 struct ctfile_write_state *
-ctfile_write_init(const char *ctfile, int type, const char *basis, int lvl,
-    char *cwd, char **filelist, int encrypted, int allfiles, int max_block_size)
+ctfile_write_init(const char *ctfile, const char *ctfile_basedir, int type,
+    const char *basis, int lvl, char *cwd, char **filelist, int encrypted,
+    int allfiles, int max_block_size)
 {
 	struct ctfile_write_state	*ctx;
 	char				**fptr;
@@ -721,7 +731,8 @@ ctfile_write_init(const char *ctfile, int type, const char *basis, int lvl,
 
 	/* write global header */
 	xdrstdio_create(&ctx->cws_xdr, ctx->cws_f, XDR_ENCODE);
-	if (ct_xdr_gheader(&ctx->cws_xdr, &gh, XDR_ENCODE) == FALSE)
+	if (ct_xdr_gheader(&ctx->cws_xdr, &gh, XDR_ENCODE,
+	    ctfile_basedir) == FALSE)
 		CFATALX("e_xdr_gheader failed");
 
 	return (ctx);

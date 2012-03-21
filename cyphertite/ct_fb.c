@@ -225,7 +225,8 @@ ct_add_tree(struct ct_fb_entry *head, struct ctfile_parse_state *xdr_ctx,
  * Build version tree on ``head'' from ``filename'' (and dependant files).
  */
 void
-ct_build_tree(const char *filename, struct ct_fb_entry *head)
+ct_build_tree(const char *filename, struct ct_fb_entry *head,
+    const char *ctfile_basedir)
 {
 	struct ct_extract_head		 extract_head;
 	struct ctfile_parse_state	 xdr_ctx;
@@ -239,7 +240,8 @@ ct_build_tree(const char *filename, struct ct_fb_entry *head)
 	CNDBG(CT_LOG_FILE, "entry");
 
 	TAILQ_INIT(&extract_head);
-	ct_extract_setup(&extract_head, &xdr_ctx, filename, &allfiles);
+	ct_extract_setup(&extract_head, &xdr_ctx, filename, ctfile_basedir,
+	    &allfiles);
 
 	TAILQ_INIT(&head->cfb_versions);
 	RB_INIT(&head->cfb_children);

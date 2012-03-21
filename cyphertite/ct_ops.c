@@ -40,7 +40,7 @@ ct_list_op(struct ct_global_state *state, struct ct_op *op)
 	struct ct_trans		*trans;
 
 	ct_list(cea->cea_local_ctfile, cea->cea_filelist, cea->cea_excllist,
-	    cea->cea_matchmode);
+	    cea->cea_matchmode, cea->cea_ctfile_basedir);
 	/*
 	 * Technicaly should be a local transaction.
 	 * However, since this is just so that list can fit into the normal
@@ -60,7 +60,8 @@ ct_list_op(struct ct_global_state *state, struct ct_op *op)
 }
 
 int
-ct_list(const char *file, char **flist, char **excludelist, int match_mode)
+ct_list(const char *file, char **flist, char **excludelist, int match_mode,
+    const char *ctfile_basedir)
 {
 	struct ctfile_parse_state	 xs_ctx;
 	struct fnode			 fnodestore;
@@ -82,7 +83,7 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode)
 
 	ct_next_filename = NULL;
 next_file:
-	ret = ctfile_parse_init(&xs_ctx, file);
+	ret = ctfile_parse_init(&xs_ctx, file, ctfile_basedir);
 	if (ret)
 		CFATALX("failed to open %s", file);
 
@@ -180,16 +181,17 @@ next_file:
  * Code for extract.
  */
 static void	ct_extract_setup_queue(struct ct_extract_head *,
-	    struct ctfile_parse_state *, const char *, int);
+	    struct ctfile_parse_state *, const char *, const char *, int);
 
 void
 ct_extract_setup(struct ct_extract_head *extract_head,
-    struct ctfile_parse_state *ctx, const char *file, int *is_allfiles)
+    struct ctfile_parse_state *ctx, const char *file,
+    const char *ctfile_basedir, int *is_allfiles)
 {
 	struct ct_extract_stack	*nfile;
 	char			*prevlvl;
 
-	if (ctfile_parse_init(ctx, file))
+	if (ctfile_parse_init(ctx, file, ctfile_basedir))
 		CFATALX("extract failure: unable to open metadata file '%s'\n",
 		    file);
 
@@ -204,7 +206,7 @@ ct_extract_setup(struct ct_extract_head *extract_head,
 
 		ctfile_parse_close(ctx);
 		ct_extract_setup_queue(extract_head, ctx, prevlvl,
-		    *is_allfiles);
+		    ctfile_basedir, *is_allfiles);
 
 		e_free(&prevlvl);
 
@@ -218,12 +220,13 @@ ct_extract_setup(struct ct_extract_head *extract_head,
 
 static void
 ct_extract_setup_queue(struct ct_extract_head *extract_head,
-    struct ctfile_parse_state *ctx, const char *file, int is_allfiles)
+    struct ctfile_parse_state *ctx, const char *file,
+    const char *ctfile_basedir, int is_allfiles)
 {
 	char			*prevlvl;
 	struct ct_extract_stack	*nfile;
 
-	if (ctfile_parse_init(ctx, file))
+	if (ctfile_parse_init(ctx, file, ctfile_basedir))
 		CFATALX("extract failure: unable to open differential archive"
 		    "'%s'\n", file);
 
@@ -240,7 +243,8 @@ ct_extract_setup_queue(struct ct_extract_head *extract_head,
 		prevlvl = e_strdup(ctx->xs_gh.cmg_prevlvl_filename);
 		ctfile_parse_close(ctx);
 
-		ct_extract_setup_queue(extract_head, ctx, prevlvl, is_allfiles);
+		ct_extract_setup_queue(extract_head, ctx, prevlvl,
+		    ctfile_basedir, is_allfiles);
 		e_free(&prevlvl);
 
 	} else if (is_allfiles) {
@@ -266,7 +270,8 @@ ct_extract_open_next(struct ct_extract_head *extract_head, struct ctfile_parse_s
 		    "should start restoring [%s]", next->filename);
 		TAILQ_REMOVE(extract_head, next, next);
 
-		if (ctfile_parse_init(ctx, next->filename))
+		/* Basedir not needed here because we are done with prevlvl */
+		if (ctfile_parse_init(ctx, next->filename, NULL))
 			CFATALX("failed to open %s", next->filename);
 
 		if (next->filename)
@@ -331,7 +336,8 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			op->op_priv = ex_priv;
 		}
 		ct_extract_setup(&ex_priv->extract_head,
-		    &ex_priv->xdr_ctx, ctfile, &ex_priv->allfiles);
+		    &ex_priv->xdr_ctx, ctfile, cea->cea_ctfile_basedir,
+		    &ex_priv->allfiles);
 		ct_file_extract_setup_dir(cea->cea_tdir);
 		if (state->ct_max_block_size <
 		    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size)
@@ -579,7 +585,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 		ex_priv = e_calloc(1, sizeof(*ex_priv));
 		/* open file and seek to beginning of file */
 		if (ctfile_parse_init_at(&ex_priv->xdr_ctx,
-		    cefa->cefa_ctfile, cefa->cefa_ctfile_off) != 0)
+		    cefa->cefa_ctfile, NULL, cefa->cefa_ctfile_off) != 0)
 			CFATALX("can't open metadata file %s",
 			    cefa->cefa_ctfile);
 		if (state->ct_max_block_size <
@@ -705,7 +711,7 @@ ct_extract_file_cleanup(struct ct_global_state *state, struct ct_op *op)
  * Cull code.
  */
 int
-ct_cull_add_shafile(const char *file)
+ct_cull_add_shafile(const char *file, const char *cachedir)
 {
 	struct ctfile_parse_state	xs_ctx;
 	char				*ct_next_filename;
@@ -730,10 +736,10 @@ next_file:
 	if (file[0] == '/') {
 		cachename = e_strdup(file);
 	} else {
-		e_asprintf(&cachename, "%s%s", ctfile_cachedir, file);
+		e_asprintf(&cachename, "%s%s", cachedir, file);
 	}
 
-	ret = ctfile_parse_init(&xs_ctx, cachename);
+	ret = ctfile_parse_init(&xs_ctx, cachename, cachedir);
 	e_free(&cachename);
 	CNDBG(CT_LOG_CTFILE, "opening [%s]", file);
 

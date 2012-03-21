@@ -482,7 +482,7 @@ ct_main(int argc, char **argv)
 	if (ct_action == CT_A_LIST && ctfile_mode == CT_MDMODE_LOCAL &&
 	    ct_metadata == 0 ) {
 		ret = ct_list(ctfile, includelist, excludelist,
-		    ct_match_mode);
+		    ct_match_mode, NULL);
 		goto out;
 	}
 
@@ -506,6 +506,7 @@ ct_main(int argc, char **argv)
 			cea.cea_filelist = includelist;
 			cea.cea_excllist = excludelist;
 			cea.cea_matchmode = ct_match_mode;
+			cea.cea_ctfile_basedir = ctfile_cachedir;
 			cea.cea_tdir = ct_tdir;
 			ctfile_find_for_operation(state, ctfile,
 			    ((ct_action == CT_A_EXTRACT)  ?
@@ -520,6 +521,7 @@ ct_main(int argc, char **argv)
 			caa.caa_includefile = ct_includefile;
 			caa.caa_tdir = ct_tdir;
 			caa.caa_tag = ctfile;
+			caa.caa_ctfile_basedir = ctfile_cachedir;
 			/* we want to encrypt as long as we have keys */
 			caa.caa_encrypted = (ct_crypto_secrets != NULL);
 			caa.caa_allfiles = ct_multilevel_allfiles;
@@ -584,6 +586,7 @@ ct_main(int argc, char **argv)
 			cea.cea_filelist = includelist;
 			cea.cea_excllist = excludelist;
 			cea.cea_matchmode = ct_match_mode;
+			cea.cea_ctfile_basedir = NULL;
 			ct_add_operation(state, ct_extract, NULL, &cea);
 		} else {
 			CWARNX("must specify action");

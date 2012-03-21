@@ -287,7 +287,8 @@ struct ctfile_list_file {
 	int					mlf_keep;
 };
 
-int			ct_list(const char *, char **, char **, int);
+int			ct_list(const char *, char **, char **, int,
+			    const char *);
 void			ctfile_list_complete(struct ctfile_list *, int,
 			    char **, char **, struct ctfile_list_tree *);
 int			ctfile_verify_name(char *);
@@ -316,6 +317,7 @@ struct ct_extract_args {
 	char			*cea_tdir;
 	char			**cea_filelist;
 	char			**cea_excllist;
+	char			*cea_ctfile_basedir;
 	int			 cea_matchmode;
 };
 
@@ -325,6 +327,7 @@ struct ct_archive_args {
 	char			*caa_tag;
 	char			*caa_basis;
 	char			*caa_tdir;
+	char			*caa_ctfile_basedir;
 	char			**caa_filelist;
 	char			**caa_excllist;
 	int			 caa_matchmode;
@@ -736,9 +739,11 @@ struct ctfile_parse_state {
 #define	XS_RET_FAIL		4
 };
 
-int ctfile_parse_init_at(struct ctfile_parse_state *, const char *, off_t);
-int ctfile_parse_init_f(struct ctfile_parse_state *, FILE *);
-#define ctfile_parse_init(ctx, file) ctfile_parse_init_at(ctx, file, 0)
+int ctfile_parse_init_at(struct ctfile_parse_state *, const char *,
+    const char *, off_t);
+int ctfile_parse_init_f(struct ctfile_parse_state *, FILE *, const char *);
+#define ctfile_parse_init(ctx, file, basedir)		\
+	ctfile_parse_init_at(ctx, file, basedir, 0)
 int ctfile_parse(struct ctfile_parse_state *);
 int ctfile_parse_seek(struct ctfile_parse_state *);
 void ctfile_parse_close(struct ctfile_parse_state *);
@@ -748,8 +753,8 @@ struct dnode *ctfile_parse_insertdir(struct ctfile_parse_state *, struct dnode *
 
 struct ctfile_write_state;
 struct ctfile_write_state
-	*ctfile_write_init(const char *, int, const char *, int, char *,
-	    char **, int, int, int);
+	*ctfile_write_init(const char *, const char *, int, const char *, int,
+	    char *, char **, int, int, int);
 void	 ctfile_write_special(struct ctfile_write_state *, struct fnode *);
 int	 ctfile_write_file_start(struct ctfile_write_state *, struct fnode *);
 int	 ctfile_write_file_sha(struct ctfile_write_state *, uint8_t *,
@@ -768,14 +773,14 @@ struct ct_extract_stack   {
 	char		*filename;
 };
 void	ct_extract_setup(struct ct_extract_head *, struct ctfile_parse_state *,
-	    const char *, int *);
+	    const char *, const char *, int *);
 void	ct_extract_setup_dir(const char *);
 void	ct_extract_open_next(struct ct_extract_head *,
 	    struct ctfile_parse_state *);
 void	ct_extract_cleanup_queue(struct ct_extract_head *);
 
 /* cull  */
-int ct_cull_add_shafile(const char *);
+int ct_cull_add_shafile(const char *, const char *);
 void ct_cull_sha_insert(const uint8_t *);
 void ct_cull_kick(struct ct_global_state *);
 

@@ -87,7 +87,7 @@ int		ctfb_lstat(const char *, struct stat *);
 
 typedef void    (ctfb_cmd)(int, const char **);
 __dead void	ctfb_usage(void);
-void		ct_build_tree(const char *, struct ct_fb_entry *);
+void		ct_build_tree(const char *, struct ct_fb_entry *, const char *);
 int		glob_ctfile(const char *, int, int (*)(const char *, int),
 		    glob_t *, int);
 void		 complete_display(char **, u_int);

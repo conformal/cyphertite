@@ -120,7 +120,7 @@ ctfile_archive(struct ct_global_state *state, struct ct_op *op)
 		if (cca->cca_ctfile) {
 			struct ctfile_parse_state	 xs_ctx;
 			int				 ret;
-			if (ctfile_parse_init_f(&xs_ctx, cas->cas_handle))
+			if (ctfile_parse_init_f(&xs_ctx, cas->cas_handle, NULL))
 				CFATALX("%s is not a valid ctfile, can't "
 				    "open", tpath);
 			while ((ret = ctfile_parse(&xs_ctx)) != XS_RET_EOF) {
@@ -1260,7 +1260,7 @@ prev_ct_file:
 		} else {
 			CNDBG(CT_LOG_CTFILE, "adding %s to keep list",
 			    file->mlf_name);
-			ct_cull_add_shafile(file->mlf_name);
+			ct_cull_add_shafile(file->mlf_name, ctfile_cachedir);
 		}
 	}
 

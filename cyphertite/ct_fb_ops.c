@@ -345,7 +345,8 @@ ctfb_main(int argc, char *argv[])
 		ct_fb_filename = e_strdup(ctfile);
 	}
 	/* now have name of the file we actually want to open... */
-	ct_build_tree(ct_fb_filename, &cfs.cfs_tree);
+	ct_build_tree(ct_fb_filename, &cfs.cfs_tree,
+	    ctfile_mode == CT_MDMODE_REMOTE ? ctfile_cachedir : NULL);
 	ctfb_cfs = &cfs;
 	ctfb_cfs->cfs_cwd = &ctfb_cfs->cfs_tree;
 	ctfb_cfs->cfs_curpath[0] = '\0';
