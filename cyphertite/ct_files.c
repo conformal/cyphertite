@@ -591,7 +591,8 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 
 		if (basisbackup != NULL &&
 		    (nextlvl = ct_basis_setup(basisbackup, filelist,
-		    &cap->cap_prev_backup_time)) == 0)
+		        caa->caa_max_differentials,
+		        &cap->cap_prev_backup_time)) == 0)
 			e_free(&basisbackup);
 
 		if (getcwd(cwd, PATH_MAX) == NULL)

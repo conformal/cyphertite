@@ -526,6 +526,7 @@ ct_main(int argc, char **argv)
 			caa.caa_encrypted = (ct_crypto_secrets != NULL);
 			caa.caa_allfiles = ct_multilevel_allfiles;
 			caa.caa_no_cross_mounts = no_cross_mounts;
+			caa.caa_max_differentials = ct_max_differentials;
 			if (ct_auto_differential)
 				/*
 				 * Need to work out basis filename and
@@ -579,6 +580,7 @@ ct_main(int argc, char **argv)
 			caa.caa_matchmode = ct_match_mode;
 			caa.caa_includefile = ct_includefile;
 			caa.caa_no_cross_mounts = no_cross_mounts;
+			caa.caa_max_differentials = 0; /* unlimited */
 			caa.caa_tag = ctfile;
 			ct_add_operation(state, ct_archive, NULL, &caa);
 		} else if (ct_action == CT_A_EXTRACT) {

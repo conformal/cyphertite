@@ -303,7 +303,8 @@ ctfile_cleanup_gheader(struct ctfile_gheader *gh)
 
 
 int
-ct_basis_setup(const char *basisbackup, char **filelist, time_t *prev_backup)
+ct_basis_setup(const char *basisbackup, char **filelist, int max_differentials,
+    time_t *prev_backup)
 {
 	struct ctfile_parse_state	 xs_ctx;
 	char				 cwd[PATH_MAX], **fptr;
@@ -314,8 +315,8 @@ ct_basis_setup(const char *basisbackup, char **filelist, time_t *prev_backup)
 		CFATALX("unable to open/parse previous backup %s",
 		    basisbackup);
 
-	if (ct_max_differentials == 0 ||
-	    xs_ctx.xs_gh.cmg_cur_lvl < ct_max_differentials) {
+	if (max_differentials == 0 ||
+	    xs_ctx.xs_gh.cmg_cur_lvl < max_differentials) {
 		prev_backup_time = xs_ctx.xs_gh.cmg_created;
 		CINFO("prev backup time %s %s", ctime(&prev_backup_time),
 		    basisbackup);

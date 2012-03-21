@@ -334,6 +334,7 @@ struct ct_archive_args {
 	int			 caa_encrypted;
 	int			 caa_allfiles;
 	int			 caa_no_cross_mounts;
+	int			 caa_max_differentials;
 };
 
 struct ct_extract_file_args {
@@ -580,7 +581,7 @@ struct ctfile_trailer {
 };
 
 int			ct_read_header(struct ctfile_header *hdr);
-int			ct_basis_setup(const char *, char **, time_t *);
+int			ct_basis_setup(const char *, char **, int, time_t *);
 
 /* ct_file.c: extract functions */
 int  ct_file_extract_open(struct fnode *fnode);
