@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2010 Conformal Systems LLC <info@conformal.com>
+ * Copyright (c) 2010-2012 Conformal Systems LLC <info@conformal.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
