@@ -85,7 +85,7 @@ ct_add_tree(struct ct_fb_entry *head, struct ctfile_parse_state *xdr_ctx,
 	size_t				 sz;
 
 	/* First find parent directory if any */
-	if (hdr->cmh_parent_dir != -1) {
+	if (hdr->cmh_parent_dir != -1 && hdr->cmh_parent_dir != -2) {
 		if ((dnode = ctfile_parse_finddir(xdr_ctx,
 		    hdr->cmh_parent_dir)) == NULL)
 			CFATALX("can't find dir %" PRId64 ,
