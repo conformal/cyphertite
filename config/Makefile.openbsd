@@ -10,5 +10,5 @@ MANDIR=${LOCALBASE}/man/man
 CFLAGS+= -fdiagnostics-show-option
 .endif
 
-#CTHREAD=-pthread -DCT_ENABLE_THREADS -DCT_ENABLE_PTHREADS
-#LDTHREAD=-pthread
+CTHREAD=-pthread -DCT_ENABLE_THREADS -DCT_ENABLE_PTHREADS
+LDTHREAD=-pthread
