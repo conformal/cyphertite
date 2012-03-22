@@ -331,7 +331,6 @@ ct_extract_setup_queue(struct ct_extract_head *extract_head,
 		    "'%s'\n", file);
 
 	if (ctx->xs_gh.cmg_prevlvl_filename) {
-		printf("next [%s]\n", ctx->xs_gh.cmg_prevlvl_filename);
 		/* need to nest another level deep.*/
 		nfile = e_malloc(sizeof(*nfile));
 		nfile->filename = e_strdup(file);
