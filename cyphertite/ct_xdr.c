@@ -394,6 +394,7 @@ ctfile_get_previous(const char *path)
 int
 ctfile_parse_init_f(struct ctfile_parse_state *ctx, FILE *f)
 {
+	bzero (ctx, sizeof(*ctx));
 	if ((ctx->xs_f = ctfile_open_f(f,  &ctx->xs_gh, &ctx->xs_xdr)) == NULL)
 		return 2;
 
@@ -411,6 +412,7 @@ int
 ctfile_parse_init_at(struct ctfile_parse_state *ctx, const char *file,
     off_t offset)
 {
+	bzero (ctx, sizeof(*ctx));
 	ctx->xs_f = ctfile_open(file,  &ctx->xs_gh, &ctx->xs_xdr);
 	if (ctx->xs_f == NULL)
 		return 2;
