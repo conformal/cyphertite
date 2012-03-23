@@ -33,7 +33,8 @@ RPM_SPEC=${PROJECT}.spec
 DEB_CHANGELOG=debian/changelog
 PORT_CATEGORY=sysutils
 PORT_NAME=${PROJECT}
-PORT_MAKEFILE=openbsd/${PORT_CATEGORY}/${PORT_NAME}/Makefile
+PORT_O_MAKEFILE=openbsd/${PORT_CATEGORY}/${PORT_NAME}/Makefile
+PORT_F_MAKEFILE=freebsd/${PORT_CATEGORY}/${PORT_NAME}/Makefile
 
 # verify params
 if [ $# -lt 2 ]; then
@@ -69,8 +70,14 @@ if [ ! -f "$DEB_CHANGELOG" ]; then
 fi
 
 # verify openbsd port file exists
-if [ ! -f "$PORT_MAKEFILE" ]; then
-	echo "$SCRIPT: error: $PORT_MAKEFILE does not exist" 1>&2
+if [ ! -f "$PORT_O_MAKEFILE" ]; then
+	echo "$SCRIPT: error: $PORT_O_MAKEFILE does not exist" 1>&2
+	exit 1
+fi
+
+# verify openbsd port file exists
+if [ ! -f "$PORT_F_MAKEFILE" ]; then
+	echo "$SCRIPT: error: $PORT_F_MAKEFILE does not exist" 1>&2
 	exit 1
 fi
 
@@ -244,14 +251,21 @@ cat "${DEB_CHANGELOG}" >>"${DEB_CHANGELOG}.tmp"
 DIST_PAT="(DISTNAME[[:space:]]+=[[:space:]]+${PROJECT}-)[0-9]+\.[0-9]+\.[0-9]+"
 sed -E "
     s/${DIST_PAT}/\1${PROJ_VER}/;
-" <"$PORT_MAKEFILE" >"${PORT_MAKEFILE}.tmp"
+" <"$PORT_O_MAKEFILE" >"${PORT_O_MAKEFILE}.tmp"
+
+# modify FreeBSD package files with new release number
+DIST_PAT="(PORTVERSION=[[:space:]]*)+[0-9]+\.[0-9]+\.[0-9]+"
+sed -E "
+    s/${DIST_PAT}/\1${PROJ_VER}/;
+" <"$PORT_F_MAKEFILE" >"${PORT_F_MAKEFILE}.tmp"
 
 # Apply changes
 mv "${PROJ_CHANGES}.tmp" "$PROJ_CHANGES"
 mv "${HEADER}.tmp" "$HEADER"
 mv "${RPM_SPEC}.tmp" "$RPM_SPEC"
 mv "${DEB_CHANGELOG}.tmp" "$DEB_CHANGELOG"
-mv "${PORT_MAKEFILE}.tmp" "$PORT_MAKEFILE"
+mv "${PORT_O_MAKEFILE}.tmp" "$PORT_O_MAKEFILE"
+mv "${PORT_F_MAKEFILE}.tmp" "$PORT_F_MAKEFILE"
 
 echo "All files have been prepared for release."
 echo "Use the following commands to review the changes for accuracy:"
