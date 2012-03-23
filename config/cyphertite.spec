@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.0.2
+%define version		1.1.0
 %define release		1
 
 Name: 		%{name}
@@ -51,6 +51,23 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Fri Mar 23 2012 - drahn 1.1.0-1
+- Fix major error in cull processing
+- Implement a major security enhancement on most systems by using
+  openat(2) to securely walk directory trees instead of opening
+  paths which could get renamed out from under the application
+- Cyphertite configuration file generation is now performed with
+  'cyphertitectl config generate'
+- Crypto secrets file generation is now done during configuration file
+  generation, or explicitly with 'cyphertitectl secrets generate', as
+  opposed  to automatically generating it
+- Add ctctl secrets upload/download to store a user's secrets file 
+  on the server
+- Change the cyphertitectl command to change the secrets password to
+  'ctctl secrets passwd'
+- Allow specific debug levels to be disabled, eg '-Dall,-exude'
+- Fix error in cyphertite file browser related to rooted backups (-cP)
+- Other minor cleanup and bug fixes
 * Tue Mar 13 2012 - drahn 1.0.2-1
 - Consistently use ctfile instead of md (metadata) file
 - Documentation cleanup
