@@ -41,6 +41,8 @@
 
 #include "ct.h"
 #include "ct_crypto.h"
+#include "ct_ext.h"
+
 
 SLIST_HEAD(ctfile_list, ctfile_list_file);
 
@@ -68,6 +70,9 @@ struct xmlsd_v_elements ct_xml_cmds[] = {
 	{ "ct_cull_setup_reply", xe_ct_cull_setup_reply },
 	{ "ct_cull_shas_reply", xe_ct_cull_shas_reply },
 	{ "ct_cull_complete_reply", xe_ct_cull_complete_reply },
+#ifdef CT_EXT_XML_CMDS
+	CT_EXT_XML_CMDS
+#endif
 	{ NULL, NULL }
 };
 
@@ -840,6 +845,11 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 	} else  if (strcmp(xe->name, "ct_cull_complete_reply") == 0) {
 		CNDBG(CT_LOG_XML, "cull_complete_reply");
 		trans->tr_state = TR_S_DONE;
+#if defined(CT_EXT_XML_REPLY_VALID) && defined(CT_EXT_XML_REPLY_HANDLE)
+	} else if (CT_EXT_XML_REPLY_VALID(xe->name) == 0) {
+		CT_EXT_XML_REPLY_HANDLE(xe, &xl);
+		trans->tr_state = TR_S_DONE;
+#endif /* CT_EXT_HANDLE_XML_REPLY && CT_EXT_XML_REPLY_HANDLE */
 	} else {
 		CABORTX("unexpected XML returned [%s]", (char *)vbody);
 	}

@@ -63,6 +63,7 @@ extern int		ct_ctfile_keep_days;
 extern int		ctfile_mode;
 extern char		*ctfile_cachedir;
 extern long long	ctfile_max_cachesize;
+extern int		ct_skip_xml_negotiate;
 
 /* crypto */
 extern unsigned char		ct_iv[CT_IV_LEN];

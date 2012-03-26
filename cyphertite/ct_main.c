@@ -41,6 +41,7 @@
 #include "ct_crypto.h"
 #include "ct_ctl.h"
 #include "ct_fb.h"
+#include "ct_ext.h"
 
 #ifndef nitems
 #define nitems(_a)      (sizeof((_a)) / sizeof((_a)[0]))
@@ -177,6 +178,10 @@ ct_init_eventloop(void)
 	assl_initialize();
 	ct_event_init();
 	ct_setup_state();
+
+#if defined(CT_EXT_INIT)
+	CT_EXT_INIT();
+#endif
 
 	ct_state->ct_db_state = ctdb_setup(ct_localdb,
 	    ct_crypto_secrets != NULL);

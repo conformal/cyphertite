@@ -47,6 +47,7 @@
 
 /* assl pipe */
 struct ct_assl_io_ctx	*ct_assl_ctx;
+int			 ct_skip_xml_negotiate;
 
 /* next transaction id */
 int			ct_trans_id = 0;
@@ -366,6 +367,9 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *asslctx)
 		goto done;
 	}
 
+	if (ct_skip_xml_negotiate)
+		goto out;
+
 	/* XML negotiation */
 	hdr.c_version = C_HDR_VERSION;
 	hdr.c_opcode = C_HDR_O_XML;
@@ -419,6 +423,7 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *asslctx)
 
 	e_free(&body);
 
+out:
 	CNDBG(CT_LOG_NET, "login successful");
 	rv = 0;
 done:

@@ -38,6 +38,9 @@
 #include "ct.h"
 #include "ct_crypto.h"
 #include "ct_ctl.h"
+#include "ct_xml.h"
+
+#include "ct_ext.h"
 
 void cull(struct ct_cli_cmd *, int , char **);
 void cpasswd(struct ct_cli_cmd *, int , char **);
@@ -187,6 +190,9 @@ struct ct_cli_cmd	cmd_list[] = {
 	{ "cull", NULL, 0, "", cull },
 	{ "secrets", cmd_secrets, CLI_CMD_SUBCOMMAND, "<action> ...", NULL },
 	{ "config", cmd_config, CLI_CMD_SUBCOMMAND, "<action> ...", NULL },
+#ifdef CT_EXT_CTCTL_CMDS
+	CT_EXT_CTCTL_CMDS
+#endif
 	{ NULL, NULL, 0, NULL, NULL }
 };
 

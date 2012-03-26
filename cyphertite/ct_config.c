@@ -36,6 +36,7 @@
 #include <exude.h>
 
 #include "ct.h"
+#include "ct_ext.h"
 
 int			ct_max_trans = 100;
 int			ct_max_block_size = 256 * 1024;
@@ -106,6 +107,9 @@ struct ct_settings	settings[] = {
 	{ "ctfile_expire_day" , CT_S_INT, &ct_ctfile_keep_days,
 	    NULL, NULL, NULL },
 	{ "crypto_password", CT_S_STR, NULL, &ct_crypto_passphrase, NULL, NULL },
+#if defined(CT_EXT_SETTINGS)
+	CT_EXT_SETTINGS
+#endif	/* CT_EXT_SETTINGS */
 	{ NULL, 0, NULL, NULL, NULL,  NULL }
 };
 
