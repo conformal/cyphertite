@@ -64,7 +64,6 @@ int			ct_debug = 0;
 int			ct_action = 0;
 int			ct_follow_symlinks = 0;
 int			ct_root_symlink = 0;
-int			ct_attr;
 
 void
 ct_usage(void)
@@ -305,6 +304,7 @@ ct_main(int argc, char **argv)
 	int				 force_allfiles = -1;
 	int				 no_cross_mounts = 0;
 	int				 strip_slash = 1;
+	int				 attr = 0;
 	int				 verbose = 0;
 	int				 verbose_ratios = 0;
 
@@ -377,7 +377,7 @@ ct_main(int argc, char **argv)
 			ct_match_mode = CT_MATCH_REGEX;
 			break;
 		case 'p':
-			ct_attr = 1;
+			attr = 1;
 			break;
 		case 't':
 			if (ct_action)
@@ -501,6 +501,7 @@ ct_main(int argc, char **argv)
 			cea.cea_ctfile_basedir = conf->ct_ctfile_cachedir;
 			cea.cea_tdir = ct_tdir;
 			cea.cea_strip_slash = strip_slash;
+			cea.cea_attr = attr;
 			ctfile_find_for_operation(state, ctfile,
 			    ((ct_action == CT_A_EXTRACT)  ?
 			    ctfile_nextop_extract : ctfile_nextop_list),
@@ -585,6 +586,7 @@ ct_main(int argc, char **argv)
 			cea.cea_matchmode = ct_match_mode;
 			cea.cea_ctfile_basedir = NULL;
 			cea.cea_strip_slash = strip_slash;
+			cea.cea_attr = attr;
 			ct_add_operation(state, ct_extract, NULL, &cea);
 		} else {
 			CWARNX("must specify action");

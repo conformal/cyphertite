@@ -86,21 +86,25 @@ static int		 s_to_e_type(int);
 int                      ct_dname_cmp(struct dnode *, struct dnode *);
 
 int			 ct_open(struct fnode *, int , int);
-int			 ct_stat(struct fnode *, struct stat *, int, int);
-int			 ct_mkdir(struct fnode *, mode_t);
-int			 ct_mknod(struct fnode *);
-int			 ct_link(struct fnode *, char *);
-int			 ct_symlink(struct fnode *);
 int			 ct_readlink(struct fnode *, char *, size_t);
-int			 ct_rename(struct fnode *);
-int			 ct_chown(struct fnode *, int);
-int			 ct_chmod(struct fnode *, mode_t);
-int			 ct_utimes(struct fnode *);
-int			 ct_unlink(struct fnode *);
+int			 ct_stat(struct fnode *, struct stat *, int,
+			     struct ct_extract_state *);
+int			 ct_mkdir(struct ct_extract_state *, struct fnode *,
+			     mode_t);
+int			 ct_mknod(struct ct_extract_state *, struct fnode *);
+int			 ct_link(struct ct_extract_state *, struct fnode *,
+			     char *);
+int			 ct_symlink(struct ct_extract_state *, struct fnode *);
+int			 ct_rename(struct ct_extract_state *, struct fnode *);
+int			 ct_chown(struct ct_extract_state *, struct fnode *,
+			     int);
+int			 ct_chmod(struct ct_extract_state *, struct fnode *,
+			     mode_t);
+int			 ct_utimes(struct ct_extract_state *, struct fnode *);
+int			 ct_unlink(struct ct_extract_state *, struct fnode *);
 
 
 extern int		 ct_follow_symlinks;
-int			 ct_extract_fd = -1;
 struct dnode		 ct_rootdir;
 
 
@@ -671,7 +675,7 @@ loop:
 			 * no (new) files in them
 			 */
 			if (ct_stat(cap->cap_curnode, &sb,
-			    ct_follow_symlinks, 0) != 0) {
+			    ct_follow_symlinks, NULL) != 0) {
 				CWARN("archive: dir %s stat error",
 				    cap->cap_curnode->fl_sname);
 			} else {
@@ -1139,7 +1143,114 @@ s_to_e_type(int mode)
 	return (rv);
 }
 
-void ct_file_extract_nextdir(struct fnode *, int);
+struct ct_extract_state {
+	int			 ces_fd;
+	int			 ces_attr;
+	int			 ces_verbose;
+	struct dnode		*ces_rootdir;
+	struct dnode		*ces_prevdir;
+	struct dnode		**ces_prevdir_list;
+	struct d_name_tree	 ces_dname_head;
+};
+
+void	ct_file_extract_nextdir(struct ct_extract_state *, struct fnode *);
+void	ct_file_extract_closefrom(struct ct_extract_state *, struct dnode *,
+	    struct dnode *);
+void	ct_file_extract_opento(struct ct_extract_state *, struct dnode *,
+	    struct dnode *);
+
+struct ct_extract_state *
+ct_file_extract_init(const char *tdir, int attr, int verbose)
+{
+	struct ct_extract_state	*ces;
+	char			 tpath[PATH_MAX];
+	int			 tries = 0;
+
+	ces = e_calloc(1, sizeof(*ces));
+	ces->ces_fd = -1;
+	ces->ces_rootdir = e_calloc(1, sizeof(*ces->ces_rootdir));;
+	ces->ces_attr = attr;
+	ces->ces_verbose = verbose;
+	RB_INIT(&ces->ces_dname_head);
+
+	ces->ces_rootdir->d_num = -3;
+	ces->ces_rootdir->d_parent = NULL;
+try_again:
+	/* ct_make_full_path can mess with the string we are using */
+	if (tdir != NULL) {
+		strlcpy(tpath, tdir, sizeof(tpath));
+	} else {
+		strlcpy(tpath, ".", sizeof(tpath));
+	}
+	/* Open the root directory fd node */
+#ifdef CT_NO_OPENAT
+	struct stat sb;
+
+	if (stat(tpath, &sb) == -1) {
+#else
+	if ((ces->ces_rootdir->d_fd = open(tpath,
+	    O_RDONLY | O_DIRECTORY)) == -1) {
+#endif
+		/*
+		 * We will only hit this case for tdir.
+		 * XXX a more restrictive mask wanted?
+		 */
+		if (errno == ENOENT && tries++ == 0 &&
+		    ct_make_full_path(tpath, 0777) == 0 &&
+		    mkdir(tdir, 0777) == 0)
+			goto try_again;
+		CFATAL("can't open %s directory", tdir ? "-C" : "current");
+	}
+	ces->ces_rootdir->d_name = e_strdup(tpath);
+
+	return (ces);
+}
+
+struct dnode *
+ct_file_extract_get_rootdir(struct ct_extract_state *ces)
+{
+	return (ces->ces_rootdir);
+}
+
+struct dnode *
+ct_file_extract_insert_dir(struct ct_extract_state *ces, struct dnode *dnode)
+{
+	return (RB_INSERT(d_name_tree, &ces->ces_dname_head, dnode));
+}
+
+struct dnode *
+ct_file_extract_lookup_dir(struct ct_extract_state *ces, const char *path)
+{
+	struct dnode dsearch;
+
+	dsearch.d_name = (char *)path;
+	return (RB_FIND(d_name_tree, &ces->ces_dname_head, &dsearch));
+}
+
+void
+ct_file_extract_cleanup(struct ct_extract_state *ces)
+{
+	struct dnode *dnode;
+	/* Close all open directories, we are switching files */
+	if (ces->ces_prevdir_list != NULL) {
+		ct_file_extract_closefrom(ces, ces->ces_prevdir_list[0],
+		    ces->ces_prevdir);
+		e_free(&ces->ces_prevdir_list);
+	}
+	while ((dnode = RB_ROOT(&ces->ces_dname_head)) != NULL) {
+		RB_REMOVE(d_name_tree, &ces->ces_dname_head, dnode);
+		e_free(&dnode->d_name);
+		e_free(&dnode);
+	}
+	if (ces->ces_rootdir->d_name)
+		e_free(&ces->ces_rootdir->d_name);
+#ifndef CT_NO_OPENAT
+	close(ces->ces_rootdir->d_fd);
+#endif
+	e_free(&ces->ces_rootdir);
+	e_free(&ces);
+}
+
 
 #ifndef CT_NO_OPENAT
 #define TEMPCHARS	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
@@ -1206,13 +1317,13 @@ mkstemp_at(int dir, char *path)
 
 
 int
-ct_file_extract_open(struct fnode *fnode, int verbose)
+ct_file_extract_open(struct ct_extract_state *ces, struct fnode *fnode)
 {
-	if (ct_extract_fd != -1) {
+	if (ces->ces_fd != -1) {
 		CFATALX("file open on extract_open");
 	}
 
-	ct_file_extract_nextdir(fnode, verbose);
+	ct_file_extract_nextdir(ces, fnode);
 
 	CNDBG(CT_LOG_FILE, "opening %s for writing", fnode->fl_sname);
 
@@ -1229,8 +1340,8 @@ ct_file_extract_open(struct fnode *fnode, int verbose)
 	if (fnode->fl_sname[0] == '/') {
 		strlcpy(tpath, fnode->fl_sname, sizeof(tpath));
 	} else {
-		snprintf(tpath, sizeof(tpath), "%s%c%s", ct_rootdir.d_name,
-		    CT_PATHSEP, fnode->fl_sname);
+		snprintf(tpath, sizeof(tpath), "%s%c%s",
+		    ces->ces_rootdir->d_name, CT_PATHSEP, fnode->fl_sname);
 	}
 	strlcpy(dirpath, tpath, sizeof(dirpath));
 	if ((dirp = dirname(dirpath)) == NULL)
@@ -1238,13 +1349,13 @@ ct_file_extract_open(struct fnode *fnode, int verbose)
 
 	e_asprintf(&fnode->fl_fname, "%s%c%s", dirp, CT_PATHSEP,
 	    "cyphertite.XXXXXXXXXX");
-	ct_extract_fd = mkstemp(fnode->fl_fname);
+	ces->ces_fd = mkstemp(fnode->fl_fname);
 #else
 	fnode->fl_fname = e_strdup("cyphertite.XXXXXXXXXX");
-	ct_extract_fd = mkstemp_at(fnode->fl_parent_dir->d_fd,
+	ces->ces_fd = mkstemp_at(fnode->fl_parent_dir->d_fd,
 	    fnode->fl_fname);
 #endif
-	if (ct_extract_fd == -1) {
+	if (ces->ces_fd == -1) {
 		CWARN("unable to open file for writing %s", fnode->fl_sname);
 		return (1);
 	}
@@ -1253,11 +1364,12 @@ ct_file_extract_open(struct fnode *fnode, int verbose)
 }
 
 void
-ct_file_extract_write(struct fnode *fnode, uint8_t *buf, size_t size)
+ct_file_extract_write(struct ct_extract_state *ces, struct fnode *fnode,
+    uint8_t *buf, size_t size)
 {
 	ssize_t len;
 
-	len = write(ct_extract_fd, buf, size);
+	len = write(ces->ces_fd, buf, size);
 
 	if (len != size)
 		CFATAL("unable to write file %s",
@@ -1265,16 +1377,16 @@ ct_file_extract_write(struct fnode *fnode, uint8_t *buf, size_t size)
 }
 
 void
-ct_file_extract_close(struct fnode *fnode, int verbose)
+ct_file_extract_close(struct ct_extract_state *ces, struct fnode *fnode)
 {
 	struct timeval          tv[2];
 	int                     safe_mode;
 
 	safe_mode = S_IRWXU | S_IRWXG | S_IRWXO;
-	if (ct_attr) {
-		if (fchown(ct_extract_fd, fnode->fl_uid, fnode->fl_gid) == -1) {
+	if (ces->ces_attr) {
+		if (fchown(ces->ces_fd, fnode->fl_uid, fnode->fl_gid) == -1) {
 			if (errno == EPERM && geteuid() != 0) {
-				if (verbose)
+				if (ces->ces_verbose)
 					CWARN("chown failed: %s",
 					    fnode->fl_sname);
 			} else {
@@ -1284,25 +1396,25 @@ ct_file_extract_close(struct fnode *fnode, int verbose)
 			safe_mode = ~0;
 	}
 
-	if (fchmod(ct_extract_fd, fnode->fl_mode & safe_mode) == -1)
+	if (fchmod(ces->ces_fd, fnode->fl_mode & safe_mode) == -1)
 		CFATAL("chmod failed on %s", fnode->fl_sname);
 
-	if (ct_attr) {
+	if (ces->ces_attr) {
 		tv[0].tv_sec = fnode->fl_atime;
 		tv[1].tv_sec = fnode->fl_mtime;
 		tv[0].tv_usec = tv[1].tv_usec = 0;
-		if (futimes(ct_extract_fd, tv) == -1)
+		if (futimes(ces->ces_fd, tv) == -1)
 			CFATAL("utimes failed");
 	}
-	if (ct_rename(fnode) != 0)
+	if (ct_rename(ces, fnode) != 0)
 		CFATAL("rename to %s failed", fnode->fl_sname);
 
-	close(ct_extract_fd);
-	ct_extract_fd = -1;
+	close(ces->ces_fd);
+	ces->ces_fd = -1;
 }
 
 void
-ct_file_extract_special(struct fnode *fnode, int verbose)
+ct_file_extract_special(struct ct_extract_state *ces, struct fnode *fnode)
 {
 	char			apath[PATH_MAX];
 	char			*appath;
@@ -1313,19 +1425,19 @@ ct_file_extract_special(struct fnode *fnode, int verbose)
 	 * Create dependant directories and open/close any relvevant directory
 	 * filedescriptors.
 	 */
-	ct_file_extract_nextdir(fnode, verbose);
+	ct_file_extract_nextdir(ces, fnode);
 
 	CNDBG(CT_LOG_FILE, "special %s mode %d", fnode->fl_sname,
 	    fnode->fl_mode);
 
 	if (C_ISDIR(fnode->fl_type)) {
-		if (ct_mkdir(fnode, 0700)) {
+		if (ct_mkdir(ces, fnode, 0700)) {
 			if (errno != EEXIST) /* XXX check it is a dir */
 				CWARN("can't create directory %s",
 				    fnode->fl_sname);
 		}
 	} else if (C_ISBLK(fnode->fl_type) || C_ISCHR(fnode->fl_type))  {
-		if (ct_mknod(fnode) != 0) {
+		if (ct_mknod(ces, fnode) != 0) {
 			if (errno != EEXIST) /* XXX check it is a spec node */
 				CWARN("can't create special file %s",
 				    fnode->fl_sname);
@@ -1333,7 +1445,8 @@ ct_file_extract_special(struct fnode *fnode, int verbose)
 	} else if (C_ISLINK(fnode->fl_type)){
 		if (fnode->fl_hardlink && fnode->fl_hlname[0] != '/') {
 			snprintf(apath, sizeof(apath), "%s%c%s",
-			    ct_rootdir.d_name, CT_PATHSEP, fnode->fl_hlname);
+			    ces->ces_rootdir->d_name, CT_PATHSEP,
+			    fnode->fl_hlname);
 			appath = apath;
 		} else {
 			appath = fnode->fl_hlname;
@@ -1347,9 +1460,9 @@ link_again:
 			 * We pass SYMLINK_FOLLOW to give the same semantics
 			 * as link()
 			 */
-			ret = ct_link(fnode, appath);
+			ret = ct_link(ces, fnode, appath);
 		} else {
-			ret = ct_symlink(fnode);
+			ret = ct_symlink(ces, fnode);
 		}
 		if (ret && errno == EEXIST) {
 			if (fnode->fl_hardlink) {
@@ -1364,7 +1477,7 @@ link_again:
 					goto link_out;
 				}
 				if (ct_stat(fnode, &lsb,
-				    ct_follow_symlinks, 1) != 0) {
+				    ct_follow_symlinks, ces) != 0) {
 					CWARN("can't stat %s", fnode->fl_sname);
 					goto link_out;
 				}
@@ -1384,7 +1497,7 @@ link_again:
 				}
 			}
 
-			if (ct_unlink(fnode) == 0)
+			if (ct_unlink(ces, fnode) == 0)
 				goto link_again;
 			CWARN("can't remove old link %s", fnode->fl_sname);
 		}
@@ -1408,11 +1521,11 @@ link_out:
 	} else if (C_ISLINK(fnode->fl_type)){
 		if (!fnode->fl_hardlink) {
 			/* symlinks have no 'real' permissions */
-			if (ct_attr) {
+			if (ces->ces_attr) {
 				/* set the link's ownership */
-				if (ct_chown(fnode, 0) != 0) {
+				if (ct_chown(ces, fnode, 0) != 0) {
 					if (errno == EPERM && geteuid() != 0) {
-						if (verbose)
+						if (ces->ces_verbose)
 							CWARN("lchown failed:"
 							    " %s",
 							    fnode->fl_sname);
@@ -1428,11 +1541,11 @@ link_out:
 		}
 	} else {
 		safe_mode = S_IRWXU | S_IRWXG | S_IRWXO;
-		if (ct_attr) {
+		if (ces->ces_attr) {
 			/* XXX should this depend on ct_follow_symlinks? */
-			if (ct_chown(fnode, 1) != 0) {
+			if (ct_chown(ces, fnode, 1) != 0) {
 				if (errno == EPERM && geteuid() != 0) {
-					if (verbose)
+					if (ces->ces_verbose)
 						CWARN("chown failed: %s",
 						    fnode->fl_sname);
 				} else {
@@ -1443,75 +1556,25 @@ link_out:
 				safe_mode = ~0;
 		}
 
-		if (ct_chown(fnode, fnode->fl_mode & safe_mode) != 0)
+		if (ct_chown(ces, fnode, fnode->fl_mode & safe_mode) != 0)
 			CFATAL("chmod failed on %s", fnode->fl_sname);
 
-		if (ct_attr) {
-			if (ct_utimes(fnode) != 0)
+		if (ces->ces_attr) {
+			if (ct_utimes(ces, fnode) != 0)
 				CFATAL("utimes failed");
 		}
 	}
 }
 
-void	ct_file_extract_closefrom(struct dnode *, struct dnode *, int);
-void	ct_file_extract_opento(struct dnode *, struct dnode *);
-struct dnode	*ct_ex_prevdir = NULL;
-struct dnode	**ct_ex_prevdir_list = NULL;
-
 void
-ct_file_extract_setup_dir(const char *tdir)
-{
-	char	tpath[PATH_MAX];
-	int	tries = 0;
-	ct_rootdir.d_num = -3;
-	ct_rootdir.d_parent = NULL;
-try_again:
-	/* ct_make_full_path can mess with the string we are using */
-	if (tdir != NULL) {
-		strlcpy(tpath, tdir, sizeof(tpath));
-	} else {
-		strlcpy(tpath, ".", sizeof(tpath));
-	}
-	/* Open the root directory fd node */
-#ifdef CT_NO_OPENAT
-	struct stat sb;
-
-	if (stat(tpath, &sb) == -1) {
-#else
-	if ((ct_rootdir.d_fd = open(tpath, O_RDONLY | O_DIRECTORY)) == -1) {
-#endif
-		/*
-		 * We will only hit this case for tdir.
-		 * XXX a more restrictive mask wanted?
-		 */
-		if (errno == ENOENT && tries++ == 0 &&
-		    ct_make_full_path(tpath, 0777) == 0 &&
-		    mkdir(tdir, 0777) == 0)
-			goto try_again;
-		CFATAL("can't open %s directory", tdir ? "-C" : "current");
-	}
-	ct_rootdir.d_name = e_strdup(tpath);
-}
-
-void
-ct_file_extract_cleanup_dir(void)
-{
-	if (ct_rootdir.d_name)
-		e_free(&ct_rootdir.d_name);
-#ifndef CT_NO_OPENAT
-	close(ct_rootdir.d_fd);
-#endif
-}
-
-void
-ct_file_extract_nextdir(struct fnode *fnode, int verbose)
+ct_file_extract_nextdir(struct ct_extract_state *ces, struct fnode *fnode)
 {
 	struct dnode	*newdir = fnode->fl_parent_dir, *tdir;
 	struct dnode	**newdirlist;
 	int		 ndirs, i;
 
 	/* If we're in the same directory, we're done */
-	if (newdir == ct_ex_prevdir) {
+	if (newdir == ces->ces_prevdir) {
 		return;
 	}
 
@@ -1530,7 +1593,7 @@ ct_file_extract_nextdir(struct fnode *fnode, int verbose)
 	/* newdirlist is NULL terminated, build it backwards */
 	for (tdir = newdir, i = ndirs - 1; tdir != NULL; tdir = tdir->d_parent)
 		newdirlist[i--] = tdir;
-	if (ct_ex_prevdir_list == NULL) {
+	if (ces->ces_prevdir_list == NULL) {
 		i = 0;
 		goto open;
 	}
@@ -1540,38 +1603,26 @@ ct_file_extract_nextdir(struct fnode *fnode, int verbose)
 	 * we know the directories are not the same, so this should halt
 	 */
 	for (i = 0; ; i++) {
-		if (newdirlist[i + 1] != ct_ex_prevdir_list[i + 1])
+		if (newdirlist[i + 1] != ces->ces_prevdir_list[i + 1])
 			break;
 	}
 
 	/* close all children from common parent up to old dir */
-	ct_file_extract_closefrom(ct_ex_prevdir_list[i], ct_ex_prevdir,
-	    verbose);
+	ct_file_extract_closefrom(ces, ces->ces_prevdir_list[i],
+	    ces->ces_prevdir);
 open:
 	/* open all children from common parent up to new dir */
-	ct_file_extract_opento(newdirlist[i], newdir);
+	ct_file_extract_opento(ces, newdirlist[i], newdir);
 
-	ct_ex_prevdir = newdir;
-	if (ct_ex_prevdir_list != NULL)
-		e_free(&ct_ex_prevdir_list);
-	ct_ex_prevdir_list = newdirlist;
+	ces->ces_prevdir = newdir;
+	if (ces->ces_prevdir_list != NULL)
+		e_free(&ces->ces_prevdir_list);
+	ces->ces_prevdir_list = newdirlist;
 }
 
 void
-ct_file_extract_enddir(int verbose)
-{
-	if (ct_ex_prevdir == NULL)
-		return;
-	/* Close all open directories, we are switching files */
-	ct_file_extract_closefrom(ct_ex_prevdir_list[0], ct_ex_prevdir,
-	    verbose);
-	e_free(&ct_ex_prevdir_list);
-	ct_ex_prevdir = NULL;
-}
-
-void
-ct_file_extract_closefrom(struct dnode *parent, struct dnode *child,
-    int verbose)
+ct_file_extract_closefrom(struct ct_extract_state *ces, struct dnode *parent,
+    struct dnode *child)
 {
 #ifdef CT_NO_OPENAT
 	struct timeval		tv[2];
@@ -1589,12 +1640,12 @@ ct_file_extract_closefrom(struct dnode *parent, struct dnode *child,
 	safe_mode = S_IRWXU | S_IRWXG | S_IRWXO;
 
 #ifdef CT_NO_OPENAT
-	snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
+	snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
 	    child->d_name);
-	if (ct_attr) {
+	if (ces->ces_attr) {
 		if (chown(path, child->d_uid, child->d_gid) == -1) {
 			if (errno == EPERM && geteuid() != 0) {
-				if (ct_verbose)
+				if (ces->ces_verbose)
 					CWARN("can't chown directory: %s",
 					    child->d_name);
 			} else {
@@ -1608,7 +1659,7 @@ ct_file_extract_closefrom(struct dnode *parent, struct dnode *child,
 	if (chmod(path, child->d_mode & safe_mode) == -1) {
 		CFATAL("can't chmod directory \"%s\"", child->d_name);
 	}
-	if (ct_attr) {
+	if (ces->ces_attr) {
 		tv[0].tv_sec = child->d_atime;
 		tv[1].tv_sec = child->d_mtime;
 		tv[0].tv_usec = tv[1].tv_usec = 0;
@@ -1616,10 +1667,10 @@ ct_file_extract_closefrom(struct dnode *parent, struct dnode *child,
 			CFATAL("utimes on \"%s\" failed", child->d_name);
 	}
 #else
-	if (ct_attr) {
+	if (ces->ces_attr) {
 		if (fchown(child->d_fd, child->d_uid, child->d_gid) == -1) {
 			if (errno == EPERM && geteuid() != 0) {
-				if (verbose)
+				if (ces->ces_verbose)
 					CWARN("can't chown directory: %s",
 					    child->d_name);
 			} else {
@@ -1632,7 +1683,7 @@ ct_file_extract_closefrom(struct dnode *parent, struct dnode *child,
 	}
 	if (fchmod(child->d_fd, child->d_mode & safe_mode) == -1)
 		CFATAL("can't chmod directory \"%s\"", child->d_name);
-	if (ct_attr) {
+	if (ces->ces_attr) {
 		ts[0].tv_sec = child->d_atime;
 		ts[1].tv_sec = child->d_mtime;
 		ts[0].tv_nsec = ts[1].tv_nsec = 0;
@@ -1643,11 +1694,12 @@ ct_file_extract_closefrom(struct dnode *parent, struct dnode *child,
 #endif
 	child->d_fd = -2;
 
-	ct_file_extract_closefrom(parent, child->d_parent, verbose);
+	ct_file_extract_closefrom(ces, parent, child->d_parent);
 }
 
 void
-ct_file_extract_opento(struct dnode *parent, struct dnode *child)
+ct_file_extract_opento(struct ct_extract_state *ces, struct dnode *parent,
+    struct dnode *child)
 {
 	int			createtries = 0, chmodtries = 0, savederrno;
 #ifdef CT_NO_OPENAT
@@ -1659,7 +1711,7 @@ ct_file_extract_opento(struct dnode *parent, struct dnode *child)
 	if (child == parent)
 		return;
 
-	ct_file_extract_opento(parent, child->d_parent);
+	ct_file_extract_opento(ces, parent, child->d_parent);
 	/* check it exists, if it does not, create it */
 try_again:
 	/* XXX O_SEARCH would be applicable here but openbsd doesn't have it */
@@ -1667,7 +1719,7 @@ try_again:
 	if (child->d_name[0] == '/') {
 		strlcpy(path, child->d_name, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
+		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
 		    child->d_name);
 	}
 	if (ct_follow_symlinks) {
@@ -1759,17 +1811,19 @@ ct_readlink(struct fnode *fnode, char *mylink, size_t mylinksz)
  * Portability function used by both extract and archive like operations.
  */
 int
-ct_stat(struct fnode *fnode, struct stat *sb, int follow_symlinks, int extract)
+ct_stat(struct fnode *fnode, struct stat *sb, int follow_symlinks,
+    struct ct_extract_state *ces)
 {
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
 
-	if ((extract ? fnode->fl_sname : fnode->fl_fname)[0] == '/') {
-		strlcpy(path, extract ? fnode->fl_sname : fnode->fl_fname,
+	if ((ces ? fnode->fl_sname : fnode->fl_fname)[0] == '/') {
+		strlcpy(path, ces ? fnode->fl_sname : fnode->fl_fname,
 		    sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
-		    extract ? fnode->fl_sname : fnode->fl_fname);
+		snprintf(path, sizeof(path), "%s/%s", ces ?
+		    ces->ces_rootdir->d_name : ct_rootdir.d_name,
+		    ces ? fnode->fl_sname : fnode->fl_fname);
 	}
 	if (ct_follow_symlinks)
 		return (stat(path, sb));
@@ -1777,7 +1831,7 @@ ct_stat(struct fnode *fnode, struct stat *sb, int follow_symlinks, int extract)
 		return (lstat(path, sb));
 #else
 	return (fstatat(fnode->fl_parent_dir->d_fd,
-	    extract ? fnode->fl_name : fnode->fl_fname, sb,
+	    ces ? fnode->fl_name : fnode->fl_fname, sb,
 	    follow_symlinks ? 0 : AT_SYMLINK_NOFOLLOW));
 #endif
 }
@@ -1788,7 +1842,7 @@ ct_stat(struct fnode *fnode, struct stat *sb, int follow_symlinks, int extract)
  * These operated on fnode->fl_sname as the ``correct'' pathname.
  */
 int
-ct_mkdir(struct fnode *fnode, mode_t mode)
+ct_mkdir(struct ct_extract_state *ces, struct fnode *fnode, mode_t mode)
 {
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
@@ -1796,7 +1850,7 @@ ct_mkdir(struct fnode *fnode, mode_t mode)
 	if (fnode->fl_sname[0] == '/') {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
+		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
 		    fnode->fl_sname);
 	}
 	return (mkdir(path, mode));
@@ -1806,7 +1860,7 @@ ct_mkdir(struct fnode *fnode, mode_t mode)
 }
 
 int
-ct_mknod(struct fnode *fnode)
+ct_mknod(struct ct_extract_state *ces, struct fnode *fnode)
 {
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
@@ -1814,7 +1868,7 @@ ct_mknod(struct fnode *fnode)
 	if (fnode->fl_sname[0] == '/') {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
+		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
 		    fnode->fl_sname);
 	}
 	return (mknod(path, fnode->fl_mode, fnode->fl_dev));
@@ -1825,7 +1879,7 @@ ct_mknod(struct fnode *fnode)
 }
 
 int
-ct_link(struct fnode *fnode, char *destination)
+ct_link(struct ct_extract_state *ces, struct fnode *fnode, char *destination)
 {
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
@@ -1833,7 +1887,7 @@ ct_link(struct fnode *fnode, char *destination)
 	if (fnode->fl_sname[0] == '/') {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
+		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
 		    fnode->fl_sname);
 	}
 	return (link(destination, path));
@@ -1844,7 +1898,7 @@ ct_link(struct fnode *fnode, char *destination)
 }
 
 int
-ct_symlink(struct fnode *fnode)
+ct_symlink(struct ct_extract_state *ces, struct fnode *fnode)
 {
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
@@ -1852,7 +1906,7 @@ ct_symlink(struct fnode *fnode)
 	if (fnode->fl_sname[0] == '/') {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
+		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
 		    fnode->fl_sname);
 	}
 	return (symlink(fnode->fl_hlname, path));
@@ -1863,7 +1917,7 @@ ct_symlink(struct fnode *fnode)
 }
 
 int
-ct_rename(struct fnode *fnode)
+ct_rename(struct ct_extract_state *ces, struct fnode *fnode)
 {
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
@@ -1871,7 +1925,7 @@ ct_rename(struct fnode *fnode)
 	if (fnode->fl_sname[0] == '/') {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
+		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
 		    fnode->fl_sname);
 	}
 	return (rename(fnode->fl_fname, path));
@@ -1882,7 +1936,7 @@ ct_rename(struct fnode *fnode)
 }
 
 int
-ct_chmod(struct fnode *fnode, mode_t mode)
+ct_chmod(struct ct_extract_state *ces, struct fnode *fnode, mode_t mode)
 {
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
@@ -1890,7 +1944,7 @@ ct_chmod(struct fnode *fnode, mode_t mode)
 	if (fnode->fl_sname[0] == '/') {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
+		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
 		    fnode->fl_sname);
 	}
 	return (chmod(path, mode));
@@ -1900,7 +1954,7 @@ ct_chmod(struct fnode *fnode, mode_t mode)
 }
 
 int
-ct_chown(struct fnode *fnode, int follow_symlinks)
+ct_chown(struct ct_extract_state *ces, struct fnode *fnode, int follow_symlinks)
 {
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
@@ -1908,7 +1962,7 @@ ct_chown(struct fnode *fnode, int follow_symlinks)
 	if (fnode->fl_sname[0] == '/') {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
+		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
 		    fnode->fl_sname);
 	}
 	if (follow_symlinks)
@@ -1925,7 +1979,7 @@ ct_chown(struct fnode *fnode, int follow_symlinks)
 }
 
 int
-ct_utimes(struct fnode *fnode)
+ct_utimes(struct ct_extract_state *ces, struct fnode *fnode)
 {
 #ifdef CT_NO_OPENAT
 	char		path[PATH_MAX];
@@ -1938,7 +1992,7 @@ ct_utimes(struct fnode *fnode)
 	if (fnode->fl_sname[0] == '/') {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
+		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
 		    fnode->fl_sname);
 	}
 
@@ -1956,7 +2010,7 @@ ct_utimes(struct fnode *fnode)
 }
 
 int
-ct_unlink(struct fnode *fnode)
+ct_unlink(struct ct_extract_state *ces, struct fnode *fnode)
 {
 #ifdef CT_NO_OPENAT
 	char		path[PATH_MAX];
@@ -1964,7 +2018,7 @@ ct_unlink(struct fnode *fnode)
 	if (fnode->fl_sname[0] == '/') {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
+		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
 		    fnode->fl_sname);
 	}
 
@@ -1975,12 +2029,11 @@ ct_unlink(struct fnode *fnode)
 }
 
 int
-ct_populate_fnode(struct ctfile_parse_state *ctx, struct fnode *fnode,
-    int *state, int allfiles, int strip_slash)
+ct_populate_fnode(struct ct_extract_state *ces, struct ctfile_parse_state *ctx,
+    struct fnode *fnode, int *state, int allfiles, int strip_slash)
 {
 	struct dnode		*dnode, *tdnode;
 	char			*name;
-	extern struct dnode	 ct_rootdir;
 
 	if (C_ISLINK(ctx->xs_hdr.cmh_type)) {
 		/* hardlink/symlink */
@@ -2006,7 +2059,7 @@ ct_populate_fnode(struct ctfile_parse_state *ctx, struct fnode *fnode,
 	fnode->fl_type = ctx->xs_hdr.cmh_type;
 
 	/* Default to parent being the ``root''. */
-	fnode->fl_parent_dir = &ct_rootdir;
+	fnode->fl_parent_dir = ct_file_extract_get_rootdir(ces);
 	name = ctx->xs_hdr.cmh_filename;
 	/* fnode->fl_parent_dir default to NULL */
 	if (ctx->xs_hdr.cmh_parent_dir == -2) {
@@ -2048,8 +2101,7 @@ ct_populate_fnode(struct ctfile_parse_state *ctx, struct fnode *fnode,
 		dnode->d_gid = fnode->fl_gid;
 
 		/* Insert into the name tree first to check for duplicates. */
-		if ((tdnode = RB_INSERT(d_name_tree, &ct_dname_head, dnode))
-		    != NULL) {
+		if ((tdnode = ct_file_extract_insert_dir(ces, dnode)) != NULL) {
 			if (allfiles == 0) {
 				/* update stat data */
 				tdnode->d_mode = dnode->d_mode;

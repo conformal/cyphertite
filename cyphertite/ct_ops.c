@@ -25,8 +25,8 @@
 
 #include "ct.h"
 
-int	ct_populate_fnode(struct ctfile_parse_state *, struct fnode *,
-	    int *, int, int);
+int	ct_populate_fnode(struct ct_extract_state *,
+	    struct ctfile_parse_state *, struct fnode *, int *, int, int);
 
 const uint8_t	 zerosha[SHA_DIGEST_LENGTH];
 
@@ -64,6 +64,7 @@ int
 ct_list(const char *file, char **flist, char **excludelist, int match_mode,
     const char *ctfile_basedir, int strip_slash, int verbose)
 {
+	struct ct_extract_state		*ces;
 	struct ctfile_parse_state	 xs_ctx;
 	struct fnode			 fnodestore;
 	uint64_t			 reduction;
@@ -76,6 +77,7 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode,
 	int				 ret;
 	char				 shat[SHA_DIGEST_STRING_LENGTH];
 
+	ces = ct_file_extract_init(NULL, 1, verbose);
 	match = ct_match_compile(match_mode, flist);
 	if (excludelist != NULL)
 		ex_match = ct_match_compile(match_mode, excludelist);
@@ -103,7 +105,7 @@ next_file:
 		ret = ctfile_parse(&xs_ctx);
 		switch (ret) {
 		case XS_RET_FILE:
-			ct_populate_fnode(&xs_ctx, fnode, &state,
+			ct_populate_fnode(ces, &xs_ctx, fnode, &state,
 			    xs_ctx.xs_gh.cmg_flags & CT_MD_MLB_ALLFILES,
 			    strip_slash);
 			doprint = !ct_match(match, fnode->fl_sname);
@@ -176,6 +178,7 @@ next_file:
 		}
 	}
 	ct_match_unwind(match);
+	ct_file_extract_cleanup(ces);
 	return (0);
 }
 
@@ -346,7 +349,8 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 		ct_extract_setup(&ex_priv->extract_head,
 		    &ex_priv->xdr_ctx, ctfile, cea->cea_ctfile_basedir,
 		    &ex_priv->allfiles, state->ct_verbose);
-		ct_file_extract_setup_dir(cea->cea_tdir);
+		state->extract_state = ct_file_extract_init(cea->cea_tdir,
+		    cea->cea_attr,  state->ct_verbose);
 		if (state->ct_max_block_size <
 		    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size)
 			CFATALX("block size negotiated with server %d is "
@@ -395,9 +399,9 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			trans->tr_fl_node = ex_priv->fl_ex_node = fnode =
 			    e_calloc(1, sizeof(*fnode));
 
-			ct_populate_fnode(&ex_priv->xdr_ctx, fnode,
-			    &trans->tr_state, ex_priv->allfiles,
-			    cea->cea_strip_slash);
+			ct_populate_fnode(state->extract_state,
+			    &ex_priv->xdr_ctx, fnode, &trans->tr_state,
+			    ex_priv->allfiles, cea->cea_strip_slash);
 
 			ex_priv->doextract = !ct_match(ex_priv->inc_match,
 			    fnode->fl_sname);
@@ -603,7 +607,8 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			    "smaller than file max block size %d",
 			    state->ct_max_block_size,
 			    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size);
-		ct_file_extract_setup_dir(NULL);
+		state->extract_state = ct_file_extract_init(NULL,
+		    0,  state->ct_verbose);
 		break;
 	case CT_S_FINISHED:
 		return;
@@ -650,7 +655,8 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			 * We have a full path to extract to so always strip
 			 * slash.
 			 */
-			ct_populate_fnode(&ex_priv->xdr_ctx, trans->tr_fl_node,
+			ct_populate_fnode(state->extract_state,
+			    &ex_priv->xdr_ctx, trans->tr_fl_node,
 			    &trans->tr_state, 0, 1);
 
 			/* XXX Check filename matches what we expect */

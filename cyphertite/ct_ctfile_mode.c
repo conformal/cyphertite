@@ -459,7 +459,8 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 			rname = ctfile_cook_name(ctfile);
 			cca->cca_remotename = (char *)rname;
 		}
-		ct_file_extract_setup_dir(cca->cca_tdir);
+		state->extract_state = ct_file_extract_init(cca->cca_tdir,
+		    0, state->ct_verbose);
 		break;
 	case CT_S_WAITING_SERVER:
 		CNDBG(CT_LOG_FILE, "waiting on remote open");
@@ -487,10 +488,10 @@ again:
 		return;
 	} else if (ces->ces_is_open == 0) {
 		ces->ces_is_open = 1;
-		extern struct dnode ct_rootdir;
 		ces->ces_fnode = e_calloc(1, sizeof(*ces->ces_fnode));
 		ces->ces_fnode->fl_type = C_TY_REG;
-		ces->ces_fnode->fl_parent_dir = &ct_rootdir;
+		ces->ces_fnode->fl_parent_dir =
+		    ct_file_extract_get_rootdir(state->extract_state);
 		ces->ces_fnode->fl_name = e_strdup(ctfile);
 		ces->ces_fnode->fl_sname = e_strdup(ctfile);
 		ces->ces_fnode->fl_mode = S_IRUSR | S_IWUSR;
@@ -546,8 +547,8 @@ ct_complete_metadata(struct ct_global_state *state, struct ct_trans *trans)
 	switch(trans->tr_state) {
 	case TR_S_EX_FILE_START:
 		/* XXX can we recover from this? */
-		if (ct_file_extract_open(trans->tr_fl_node,
-		    state->ct_verbose) != 0)
+		if (ct_file_extract_open(state->extract_state,
+		    trans->tr_fl_node) != 0)
 			CFATALX("unable to open file %s",
 			    trans->tr_fl_node->fl_name);
 		break;
@@ -558,8 +559,9 @@ ct_complete_metadata(struct ct_global_state *state, struct ct_trans *trans)
 			slot = trans->tr_dataslot;
 			CNDBG(CT_LOG_FILE, "writing packet sz %d",
 			    trans->tr_size[slot]);
-			ct_file_extract_write(trans->tr_fl_node,
-			    trans->tr_data[slot], trans->tr_size[slot]);
+			ct_file_extract_write(state->extract_state,
+			    trans->tr_fl_node, trans->tr_data[slot],
+			    trans->tr_size[slot]);
 		} else {
 			ct_set_file_state(state, CT_S_FINISHED);
 		}
@@ -588,8 +590,10 @@ ct_complete_metadata(struct ct_global_state *state, struct ct_trans *trans)
 	case TR_S_READ:
 		break;
 	case TR_S_EX_FILE_END:
-		ct_file_extract_close(trans->tr_fl_node, state->ct_verbose);
-		ct_file_extract_cleanup_dir();
+		ct_file_extract_close(state->extract_state,
+		    trans->tr_fl_node);
+		ct_file_extract_cleanup(state->extract_state);
+		state->extract_state = NULL;
 		release_fnode = 1;
 		/* FALLTHROUGH */
 	case TR_S_XML_CLOSE:

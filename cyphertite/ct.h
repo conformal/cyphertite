@@ -59,7 +59,6 @@ struct ct_config {
 
 	int	ct_compress;
 	int	ct_multilevel_allfiles;
-	int	ct_attr;
 	int	ct_auto_differential;
 	int	ct_max_differentials;
 	int	ct_ctfile_keep_days;
@@ -70,8 +69,6 @@ struct ct_config {
 };
 
 extern int		ct_debug;
-extern int		ct_attr;
-extern int		ct_cur_compress_mode;
 extern struct ct_stat	*ct_stats;
 extern char		*__progname;
 extern int		ct_skip_xml_negotiate;
@@ -316,6 +313,7 @@ struct ct_extract_args {
 	char			*cea_ctfile_basedir;
 	int			 cea_matchmode;
 	int			 cea_strip_slash;
+	int			 cea_attr;
 };
 
 struct ct_archive_args {
@@ -380,6 +378,8 @@ struct ct_global_state {
 	/* PADs? */
 	struct ct_assl_io_ctx		*ct_assl_ctx; /* Connection state */
 	struct ct_config		*ct_config;
+
+	struct ct_extract_state		*extract_state;
 	TAILQ_HEAD(,ct_trans)		ct_trans_free_head;
 	int				ct_trans_id; /* next transaction id */
 	uint64_t			ct_packet_id; /* next complete id */
@@ -592,14 +592,24 @@ int			ct_basis_setup(const char *, char **, int, time_t *,
 			    int);
 
 /* ct_file.c: extract functions */
-int  ct_file_extract_open(struct fnode *fnode, int);
-void ct_file_extract_write(struct fnode *, uint8_t *buf, size_t size);
-void ct_file_extract_close(struct fnode *fnode, int);
-void ct_file_extract_special(struct fnode *fnode, int);
-void ct_file_extract_enddir(int verbose);
-void ct_file_extract_setup_dir(const char *);
-void ct_file_extract_cleanup_dir();
-void ct_create_config(void);
+struct ct_extract_state;
+struct ct_extract_state	*ct_file_extract_init(const char *, int, int);
+struct dnode		*ct_file_extract_get_rootdir(struct ct_extract_state *);
+struct dnode		*ct_file_extract_insert_dir(struct ct_extract_state *,
+			     struct dnode *);
+struct dnode		*ct_file_extract_lookup_dir(struct ct_extract_state *,
+			     const char *);
+int			 ct_file_extract_open(struct ct_extract_state *,
+			     struct fnode *fnode);
+void			 ct_file_extract_write(struct ct_extract_state *,
+			     struct fnode *, uint8_t *buf, size_t size);
+void			 ct_file_extract_close(struct ct_extract_state *,
+			     struct fnode *fnode);
+void			 ct_file_extract_special(struct ct_extract_state *,
+			     struct fnode *fnode);
+void			 ct_file_extract_cleanup(struct ct_extract_state *);
+
+void	ct_create_config(void);
 char *ct_system_config(void);
 char *ct_user_config(void);
 char *ct_user_config_old(void);

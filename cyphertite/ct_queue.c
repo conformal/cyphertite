@@ -952,6 +952,10 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 		if (trans->tr_ctfile) {
 			ctfile_write_close(trans->tr_ctfile);
 		}
+		if (state->extract_state) {
+			ct_file_extract_cleanup(state->extract_state);	
+			state->extract_state = NULL;
+		}
 		ct_dnode_cleanup();
 		/* do we have more operations queued up? */
 		if (ct_op_complete(state) == 0)
@@ -1000,8 +1004,8 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 		break;
 	case TR_S_EX_FILE_START:
 		ct_sha1_setup(&trans->tr_fl_node->fl_shactx);
-		if (ct_file_extract_open(trans->tr_fl_node,
-		    state->ct_verbose) == 0) {
+		if (ct_file_extract_open(state->extract_state,
+		    trans->tr_fl_node) == 0) {
 			if (state->ct_verbose) {
 				ct_pr_fmt_file(trans->tr_fl_node,
 				    state->ct_verbose);
@@ -1019,8 +1023,8 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 			    sizeof(trans->tr_sha)) != 0)
 				CWARNX("extract sha mismatch on %s",
 				    trans->tr_fl_node->fl_sname);
-			ct_file_extract_close(trans->tr_fl_node,
-			    state->ct_verbose);
+			ct_file_extract_close(state->extract_state,
+			    trans->tr_fl_node);
 		}
 		release_fnode = 1;
 		ct_stats->st_files_completed++;
@@ -1034,13 +1038,15 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 			ct_sha1_add(trans->tr_data[slot],
 			    &trans->tr_fl_node->fl_shactx,
 			    trans->tr_size[slot]);
-			ct_file_extract_write(trans->tr_fl_node,
-			    trans->tr_data[slot], trans->tr_size[slot]);
+			ct_file_extract_write(state->extract_state,
+			    trans->tr_fl_node, trans->tr_data[slot],
+			    trans->tr_size[slot]);
 			ct_stats->st_bytes_written += trans->tr_size[slot];
 		}
 		break;
 	case TR_S_EX_SPECIAL:
-		ct_file_extract_special(trans->tr_fl_node, state->ct_verbose);
+		ct_file_extract_special(state->extract_state,
+		    trans->tr_fl_node);
 		if (state->ct_verbose) {
 			ct_pr_fmt_file(trans->tr_fl_node, state->ct_verbose);
 			printf("\n");
