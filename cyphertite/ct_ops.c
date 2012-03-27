@@ -26,7 +26,7 @@
 #include "ct.h"
 
 int	ct_populate_fnode(struct ctfile_parse_state *, struct fnode *,
-	    int *, int);
+	    int *, int, int);
 
 const uint8_t	 zerosha[SHA_DIGEST_LENGTH];
 
@@ -40,7 +40,7 @@ ct_list_op(struct ct_global_state *state, struct ct_op *op)
 	struct ct_trans		*trans;
 
 	ct_list(cea->cea_local_ctfile, cea->cea_filelist, cea->cea_excllist,
-	    cea->cea_matchmode, cea->cea_ctfile_basedir);
+	    cea->cea_matchmode, cea->cea_ctfile_basedir, cea->cea_strip_slash);
 	/*
 	 * Technicaly should be a local transaction.
 	 * However, since this is just so that list can fit into the normal
@@ -61,7 +61,7 @@ ct_list_op(struct ct_global_state *state, struct ct_op *op)
 
 int
 ct_list(const char *file, char **flist, char **excludelist, int match_mode,
-    const char *ctfile_basedir)
+    const char *ctfile_basedir, int strip_slash)
 {
 	struct ctfile_parse_state	 xs_ctx;
 	struct fnode			 fnodestore;
@@ -102,7 +102,8 @@ next_file:
 		switch (ret) {
 		case XS_RET_FILE:
 			ct_populate_fnode(&xs_ctx, fnode, &state,
-			    xs_ctx.xs_gh.cmg_flags & CT_MD_MLB_ALLFILES);
+			    xs_ctx.xs_gh.cmg_flags & CT_MD_MLB_ALLFILES,
+			    strip_slash);
 			doprint = !ct_match(match, fnode->fl_sname);
 			if (doprint && ex_match != NULL &&
 			    !ct_match(ex_match, fnode->fl_sname))
@@ -387,7 +388,8 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			    e_calloc(1, sizeof(*fnode));
 
 			ct_populate_fnode(&ex_priv->xdr_ctx, fnode,
-			    &trans->tr_state, ex_priv->allfiles);
+			    &trans->tr_state, ex_priv->allfiles,
+			    cea->cea_strip_slash);
 
 			ex_priv->doextract = !ct_match(ex_priv->inc_match,
 			    fnode->fl_sname);
@@ -635,9 +637,13 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 
 			/* Make it local directory, it won't be set up right. */
 			ex_priv->xdr_ctx.xs_hdr.cmh_parent_dir = -1;
-			/* Allfiles doesn't matter, only processing one file. */
+			/*
+			 * Allfiles doesn't matter, only processing one file.
+			 * We have a full path to extract to so always strip
+			 * slash.
+			 */
 			ct_populate_fnode(&ex_priv->xdr_ctx, trans->tr_fl_node,
-			    &trans->tr_state, 0);
+			    &trans->tr_state, 0, 1);
 
 			/* XXX Check filename matches what we expect */
 			e_free(&trans->tr_fl_node->fl_sname);

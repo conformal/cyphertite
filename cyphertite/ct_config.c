@@ -781,7 +781,6 @@ ct_default_config(struct ct_config *config)
 	bzero(config, sizeof(*config));
 	config->ct_host = strdup("auth.cyphertite.com");
 	config->ct_hostport = strdup("48879");
-	config->ct_strip_slash = 1;
 	config->ct_ctfile_mode = CT_MDMODE_LOCAL;
 	config->ct_ctfile_max_cachesize = LLONG_MAX;
 }

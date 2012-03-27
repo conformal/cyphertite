@@ -60,7 +60,6 @@ struct ct_config {
 	int	ct_compress;
 	int	ct_multilevel_allfiles;
 	int	ct_attr;
-	int	ct_strip_slash;
 	int	ct_verbose;
 	int	ct_auto_differential;
 	int	ct_max_differentials;
@@ -70,9 +69,9 @@ struct ct_config {
 	int	ct_secrets_upload;
 	int	ct_io_bw_limit;
 };
+
 extern int		ct_debug;
 extern int		ct_attr;
-extern int		ct_strip_slash;
 extern int		ct_verbose;
 extern int		ct_cur_compress_mode;
 extern struct ct_stat	*ct_stats;
@@ -288,7 +287,7 @@ struct ctfile_list_file {
 };
 
 int			ct_list(const char *, char **, char **, int,
-			    const char *);
+			    const char *, int);
 void			ctfile_list_complete(struct ctfile_list *, int,
 			    char **, char **, struct ctfile_list_tree *);
 int			ctfile_verify_name(char *);
@@ -319,6 +318,7 @@ struct ct_extract_args {
 	char			**cea_excllist;
 	char			*cea_ctfile_basedir;
 	int			 cea_matchmode;
+	int			 cea_strip_slash;
 };
 
 struct ct_archive_args {
@@ -335,6 +335,7 @@ struct ct_archive_args {
 	int			 caa_allfiles;
 	int			 caa_no_cross_mounts;
 	int			 caa_max_differentials;
+	int			 caa_strip_slash;
 };
 
 struct ct_extract_file_args {

@@ -62,7 +62,6 @@ extern char		*__progname;
 /* command line flags */
 int			ct_debug = 0;
 int			ct_action = 0;
-int			ct_strip_slash = 1;
 int			ct_follow_symlinks = 0;
 int			ct_root_symlink = 0;
 int			ct_verbose;
@@ -308,6 +307,7 @@ ct_main(int argc, char **argv)
 	int				 need_secrets;
 	int				 force_allfiles = -1;
 	int				 no_cross_mounts = 0;
+	int				 strip_slash = 1;
 	int				 verbose_ratios;
 
 	while ((c = getopt(argc, argv,
@@ -341,7 +341,7 @@ ct_main(int argc, char **argv)
 			ct_includefile = optarg;
 			break;
 		case 'P':
-			ct_strip_slash = 0;
+			strip_slash = 0;
 			break;
 		case 'R':
 			verbose_ratios = 1;
@@ -475,7 +475,7 @@ ct_main(int argc, char **argv)
 	    conf->ct_ctfile_mode == CT_MDMODE_LOCAL &&
 	    ct_metadata == 0 ) {
 		ret = ct_list(ctfile, includelist, excludelist,
-		    ct_match_mode, NULL);
+		    ct_match_mode, NULL, strip_slash);
 		goto out;
 	}
 
@@ -502,6 +502,7 @@ ct_main(int argc, char **argv)
 			cea.cea_matchmode = ct_match_mode;
 			cea.cea_ctfile_basedir = conf->ct_ctfile_cachedir;
 			cea.cea_tdir = ct_tdir;
+			cea.cea_strip_slash = strip_slash;
 			ctfile_find_for_operation(state, ctfile,
 			    ((ct_action == CT_A_EXTRACT)  ?
 			    ctfile_nextop_extract : ctfile_nextop_list),
@@ -520,6 +521,7 @@ ct_main(int argc, char **argv)
 			caa.caa_encrypted = (conf->ct_crypto_secrets != NULL);
 			caa.caa_allfiles = conf->ct_multilevel_allfiles;
 			caa.caa_no_cross_mounts = no_cross_mounts;
+			caa.caa_strip_slash = strip_slash;
 			caa.caa_max_differentials = conf->ct_max_differentials;
 			if (conf->ct_auto_differential)
 				/*
@@ -574,6 +576,7 @@ ct_main(int argc, char **argv)
 			caa.caa_matchmode = ct_match_mode;
 			caa.caa_includefile = ct_includefile;
 			caa.caa_no_cross_mounts = no_cross_mounts;
+			caa.caa_strip_slash = strip_slash;
 			caa.caa_max_differentials = 0; /* unlimited */
 			caa.caa_tag = ctfile;
 			ct_add_operation(state, ct_archive, NULL, &caa);
@@ -583,6 +586,7 @@ ct_main(int argc, char **argv)
 			cea.cea_excllist = excludelist;
 			cea.cea_matchmode = ct_match_mode;
 			cea.cea_ctfile_basedir = NULL;
+			cea.cea_strip_slash = strip_slash;
 			ct_add_operation(state, ct_extract, NULL, &cea);
 		} else {
 			CWARNX("must specify action");
