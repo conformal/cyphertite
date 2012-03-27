@@ -63,6 +63,8 @@ cpasswd(struct ct_cli_cmd *c, int argc, char **argv)
 	int		rv, write_crypto_passphrase = 0;
 	int		crypto_passphrase_written = 0;
 	uint8_t		ad[SHA512_DIGEST_LENGTH];
+	unsigned char	iv[CT_IV_LEN];
+	unsigned char	crypto_key[CT_KEY_LEN];
 	char		b64d[128];
 	FILE		*fr, *fw;
 
@@ -81,7 +83,7 @@ cpasswd(struct ct_cli_cmd *c, int argc, char **argv)
 
 	if (ct_unlock_secrets(ctctl_config->ct_crypto_passphrase,
 	    ctctl_config->ct_crypto_secrets,
-	    ct_crypto_key, sizeof(ct_crypto_key), ct_iv, sizeof (ct_iv)))
+	    crypto_key, sizeof(crypto_key), iv, sizeof (iv)))
 		CFATALX("can't unlock secrets");
 
 	snprintf(prompt, sizeof prompt,
@@ -171,7 +173,7 @@ cpasswd(struct ct_cli_cmd *c, int argc, char **argv)
 	fclose(fw);
 
 	ct_create_secrets(crypto_passphrase, ctctl_config->ct_crypto_secrets,
-	    ct_crypto_key, ct_iv);
+	    crypto_key, iv);
 
 	bzero(crypto_passphrase, strlen(crypto_passphrase));
 	free(crypto_passphrase);

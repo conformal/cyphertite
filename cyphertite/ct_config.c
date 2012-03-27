@@ -476,6 +476,9 @@ ct_create_config(void)
 
 crypto_passphrase:
 	while (!secrets_generated && config.ct_crypto_passphrase == NULL) {
+		unsigned char		iv[CT_IV_LEN];
+		unsigned char		crypto_key[CT_KEY_LEN];
+
 		if (ct_prompt_password("crypto passphrase: ", answer,
 		    sizeof answer, answer2, sizeof answer2, 0))
 			CFATALX("crypto password");
@@ -489,9 +492,8 @@ crypto_passphrase:
 		/* Check passphrase works for the file */
 		CWARNX("checking local secrets file is valid");
 		if (ct_unlock_secrets(config.ct_crypto_passphrase,
-		    config.ct_crypto_secrets, ct_crypto_key,
-		    sizeof(ct_crypto_key),
-		    ct_iv, sizeof (ct_iv))) {
+		    config.ct_crypto_secrets, crypto_key,
+		    sizeof(crypto_key), iv, sizeof (iv))) {
 			CWARNX("password incorrect, try again");
 			bzero(config.ct_crypto_passphrase,
 			    strlen(config.ct_crypto_passphrase));

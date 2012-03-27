@@ -1500,8 +1500,8 @@ ct_compute_encrypt(void *vctx)
 		len = trans->tr_size[slot];
 		dst =  trans->tr_data[!slot];
 
-		key = ct_crypto_key;
-		keysz = sizeof ct_crypto_key;
+		key = state->ct_crypto_key;
+		keysz = sizeof(state->ct_crypto_key);
 
 		iv = trans->tr_iv;
 		ivlen = sizeof trans->tr_iv;
@@ -1509,8 +1509,8 @@ ct_compute_encrypt(void *vctx)
 		if (encr) {
 			/* encr the chunk, if metadata, iv is alread valid */
 			if ((trans->hdr.c_flags & C_HDR_F_METADATA) == 0) {
-				if (ct_create_iv(ct_iv, sizeof(ct_iv), src,
-				    len, iv, ivlen))
+				if (ct_create_iv(state->ct_iv,
+				    sizeof(state->ct_iv), src, len, iv, ivlen))
 					CFATALX("can't create iv");
 			}
 

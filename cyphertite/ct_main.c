@@ -69,10 +69,6 @@ int			ct_verbose;
 char			*ct_configfile;
 int			ct_attr;
 
-/* runtime */
-unsigned char		ct_iv[CT_IV_LEN];
-unsigned char		ct_crypto_key[CT_KEY_LEN];
-
 void
 ct_usage(void)
 {
@@ -147,8 +143,8 @@ ct_init(struct ct_config *conf, int need_secrets, int only_metadata)
 		/* we got crypto */
 		if (ct_unlock_secrets(conf->ct_crypto_passphrase,
 		    conf->ct_crypto_secrets,
-		    ct_crypto_key, sizeof(ct_crypto_key), ct_iv,
-		    sizeof (ct_iv)))
+		    state->ct_crypto_key, sizeof(state->ct_crypto_key),
+		    state->ct_iv, sizeof(state->ct_iv)))
 			CFATALX("can't unlock secrets file");
 	}
 

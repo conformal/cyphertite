@@ -34,4 +34,3 @@ int			ct_unlock_secrets(const char *, const char *, uint8_t *, size_t,
 void			ct_crypt_create_iv(uint8_t *iv, size_t, uint8_t *,
 			    size_t);
 int			ct_crypto_blocksz(void);
-int			ct_create_or_unlock_secrets(const char *, const char *);

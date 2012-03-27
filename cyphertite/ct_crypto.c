@@ -722,24 +722,3 @@ done:
 
 	return (rv);
 }
-
-int
-ct_create_or_unlock_secrets(const char *secrets, const char *password)
-{
-	struct stat	sb;
-
-	if (secrets == NULL)
-		return (0);
-
-	if (stat(secrets, &sb) == -1) {
-		fprintf(stderr, "No crypto secrets file. Creating\n");
-		if (ct_create_secrets(password, secrets, NULL, NULL))
-			CFATALX("can't create secrets");
-	}
-	/* we got crypto */
-	if (ct_unlock_secrets(password, secrets, ct_crypto_key,
-	    sizeof(ct_crypto_key), ct_iv, sizeof (ct_iv)))
-		return (1);
-
-	return (0);
-}

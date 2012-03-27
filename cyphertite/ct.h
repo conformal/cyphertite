@@ -80,10 +80,6 @@ extern char		*__progname;
 extern char		*ct_configfile;
 extern int		ct_skip_xml_negotiate;
 
-/* crypto */
-extern unsigned char		ct_iv[CT_IV_LEN];
-extern unsigned char		ct_crypto_key[CT_KEY_LEN];
-
 struct ct_global_state;
 
 void			ct_shutdown(struct ct_global_state *state);
@@ -441,6 +437,11 @@ struct ct_global_state {
 
 	/* ctfile list state */
 	struct ctfile_list		ctfile_list_files;
+
+	/* Crypto state */
+	unsigned char			ct_iv[CT_IV_LEN];
+	unsigned char			ct_crypto_key[CT_KEY_LEN];
+
 };
 extern struct ct_global_state		*ct_state;
 
