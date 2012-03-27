@@ -96,7 +96,7 @@ ct_do_operation(struct ct_config *conf,  ct_op_cb *start, ct_op_cb *complete,
 
 	ct_prompt_for_login_password(conf);
 
-	state = ct_init(conf, need_secrets, only_metadata);
+	state = ct_init(conf, need_secrets, only_metadata, 0);
 	ct_add_operation(state, start, complete, args);
 	ct_wakeup_file();
 	if ((ret = ct_event_dispatch()) != 0)
@@ -615,7 +615,7 @@ ct_dump_stats(struct ct_global_state *state, FILE *outfh)
 	}
 	print_time_scaled(outfh, "Total Time\t\t\t    ",  &time_delta);
 
-	if (ct_verbose > 2) {
+	if (state->ct_verbose > 2) {
 		fprintf(outfh, "Total chunks\t\t\t%12" PRIu64 "\n",
 		    ct_stats->st_chunks_tot);
 		fprintf(outfh, "Bytes crypted\t\t\t%12" PRIu64 "\n",
@@ -664,7 +664,7 @@ ct_display_assl_stats(struct ct_global_state *state, FILE *outfh)
 }
 
 void
-ct_pr_fmt_file(struct fnode *fnode)
+ct_pr_fmt_file(struct fnode *fnode, int verbose)
 {
 	char *loginname;
 	struct group *group;
@@ -676,7 +676,10 @@ ct_pr_fmt_file(struct fnode *fnode)
 	char lctime[26];
 	char *pchr;
 
-	if (ct_verbose > 1) {
+	if (verbose == 0)
+		return;
+
+	if (verbose > 1) {
 		switch(fnode->fl_type & C_TY_MASK) {
 		case C_TY_DIR:
 			filemode[0] = 'd'; break;
@@ -726,8 +729,7 @@ ct_pr_fmt_file(struct fnode *fnode)
 	}
 	printf("%s", fnode->fl_sname);
 
-	if (ct_verbose > 1) {
-
+	if (verbose > 1) {
 		/* XXX - translate to guid name */
 		if (C_ISLINK(fnode->fl_type))  {
 			if (fnode->fl_hardlink)  {
@@ -737,10 +739,53 @@ ct_pr_fmt_file(struct fnode *fnode)
 			}
 			printf(" %s %s", link_ty, fnode->fl_hlname);
 		} else if (C_ISREG(fnode->fl_type)) {
-			if (ct_verbose > 1) {
-			}
 		}
 	}
+}
+
+void
+ct_print_file_start(struct fnode *fnode, int verbose)
+{
+	if (verbose) {
+		printf("%s\n", fnode->fl_sname);
+		fflush(stdout);
+	}
+}
+
+void
+ct_print_file_end(struct fnode *fnode, int verbose, int block_size)
+{
+	int			compression;
+	int			nrshas;
+
+	if (verbose > 1) {
+		if (fnode->fl_size == 0)
+			compression = 0;
+		else
+			compression = 100 * (fnode->fl_size -
+			    fnode->fl_comp_size) / fnode->fl_size;
+		if (verbose > 2) {
+			nrshas = fnode->fl_size / block_size;
+			if (fnode->fl_size % block_size)
+				nrshas++;
+
+			printf(" shas %d", nrshas);
+		}
+		printf(" (%d%%)\n", compression);
+	} else if (verbose)
+		printf("\n");
+
+}
+
+void
+ct_print_ctfile_info(const char *filename, struct ctfile_gheader *gh)
+{
+	time_t ltime;
+	
+	ltime = gh->cmg_created;
+	printf("file: %s version: %d level: %d block size: %d created: %s",
+	    filename, gh->cmg_version, gh->cmg_cur_lvl, gh->cmg_chunk_size,
+	    ctime(&ltime));
 }
 
 #include "ct_fb.h"

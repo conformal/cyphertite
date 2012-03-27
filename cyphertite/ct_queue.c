@@ -959,8 +959,7 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 		ct_shutdown(state);
 		break;
 	case TR_S_SPECIAL:
-		if (ct_verbose)
-			printf("%s\n", fnode->fl_sname);
+		ct_print_file_start(fnode, state->ct_verbose);
 		ctfile_write_special(trans->tr_ctfile, fnode);
 		release_fnode = 1;
 		break;
@@ -968,14 +967,13 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 		if (ctfile_write_file_start(trans->tr_ctfile, fnode))
 			CWARNX("header write failed");
 
-		if (ct_verbose) {
-			printf("%s", fnode->fl_sname);
-			fflush(stdout);
-		}
-
+		ct_print_file_start(fnode, state->ct_verbose);
 		if (trans->tr_eof == 1 || fnode->fl_skip_file) {
-			ctfile_write_file_end(trans->tr_ctfile,
-			    trans->tr_fl_node);
+			if (ctfile_write_file_end(trans->tr_ctfile,
+			    trans->tr_fl_node))
+				CWARNX("failed to write trailer sha");
+			ct_print_file_end(fnode, state->ct_verbose,
+			    state->ct_max_block_size);
 			ct_stats->st_files_completed++;
 			release_fnode = 1;
 		}
@@ -1002,9 +1000,11 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 		break;
 	case TR_S_EX_FILE_START:
 		ct_sha1_setup(&trans->tr_fl_node->fl_shactx);
-		if (ct_file_extract_open(trans->tr_fl_node) == 0) {
-			if (ct_verbose) {
-				ct_pr_fmt_file(trans->tr_fl_node);
+		if (ct_file_extract_open(trans->tr_fl_node,
+		    state->ct_verbose) == 0) {
+			if (state->ct_verbose) {
+				ct_pr_fmt_file(trans->tr_fl_node,
+				    state->ct_verbose);
 				printf("\n");
 			}
 		} else {
@@ -1019,7 +1019,8 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 			    sizeof(trans->tr_sha)) != 0)
 				CWARNX("extract sha mismatch on %s",
 				    trans->tr_fl_node->fl_sname);
-			ct_file_extract_close(trans->tr_fl_node);
+			ct_file_extract_close(trans->tr_fl_node,
+			    state->ct_verbose);
 		}
 		release_fnode = 1;
 		ct_stats->st_files_completed++;
@@ -1039,9 +1040,9 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 		}
 		break;
 	case TR_S_EX_SPECIAL:
-		ct_file_extract_special(trans->tr_fl_node);
-		if (ct_verbose) {
-			ct_pr_fmt_file(trans->tr_fl_node);
+		ct_file_extract_special(trans->tr_fl_node, state->ct_verbose);
+		if (state->ct_verbose) {
+			ct_pr_fmt_file(trans->tr_fl_node, state->ct_verbose);
 			printf("\n");
 		}
 		release_fnode = 1;
@@ -1547,7 +1548,7 @@ ct_compute_encrypt(void *vctx)
 void
 ct_display_queues(struct ct_global_state *state)
 {
-	if (ct_verbose > 1) {
+	if (state->ct_verbose > 1) {
 		CT_LOCK(&state->ct_sha_lock);
 		CT_LOCK(&state->ct_comp_lock);
 		CT_LOCK(&state->ct_crypt_lock);

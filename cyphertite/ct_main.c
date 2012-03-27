@@ -64,7 +64,6 @@ int			ct_debug = 0;
 int			ct_action = 0;
 int			ct_follow_symlinks = 0;
 int			ct_root_symlink = 0;
-int			ct_verbose;
 char			*ct_configfile;
 int			ct_attr;
 
@@ -118,7 +117,8 @@ show_version(void)
 }
 
 struct ct_global_state *
-ct_init(struct ct_config *conf, int need_secrets, int only_metadata)
+ct_init(struct ct_config *conf, int need_secrets, int only_metadata,
+    int verbose)
 {
 	struct ct_global_state *state;
 	struct stat		sb;
@@ -133,6 +133,7 @@ ct_init(struct ct_config *conf, int need_secrets, int only_metadata)
 	assl_initialize();
 	ct_event_init();
 	state = ct_setup_state(conf);
+	state->ct_verbose = verbose;
 
 	if (need_secrets != 0 && conf->ct_crypto_secrets != NULL) {
 		if (stat(conf->ct_crypto_secrets, &sb) == -1) {
@@ -308,7 +309,8 @@ ct_main(int argc, char **argv)
 	int				 force_allfiles = -1;
 	int				 no_cross_mounts = 0;
 	int				 strip_slash = 1;
-	int				 verbose_ratios;
+	int				 verbose = 0;
+	int				 verbose_ratios = 0;
 
 	while ((c = getopt(argc, argv,
 	    "AB:C:D:E:F:HI:PRVXacdef:hmprtvx0")) != -1) {
@@ -387,7 +389,7 @@ ct_main(int argc, char **argv)
 			ct_action = CT_A_LIST;
 			break;
 		case 'v':	/* verbose */
-			ct_verbose++;
+			verbose++;
 			break;
 		case 'x':
 			if (ct_action)
@@ -475,7 +477,7 @@ ct_main(int argc, char **argv)
 	    conf->ct_ctfile_mode == CT_MDMODE_LOCAL &&
 	    ct_metadata == 0 ) {
 		ret = ct_list(ctfile, includelist, excludelist,
-		    ct_match_mode, NULL, strip_slash);
+		    ct_match_mode, NULL, strip_slash, verbose);
 		goto out;
 	}
 
@@ -485,7 +487,7 @@ ct_main(int argc, char **argv)
 	    ct_action == CT_A_ARCHIVE || (ct_action == CT_A_LIST &&
 	    conf->ct_ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0));
 
-	state = ct_init(conf, need_secrets, ct_metadata);
+	state = ct_init(conf, need_secrets, ct_metadata, verbose);
 	if (conf->ct_crypto_passphrase != NULL &&
 	    conf->ct_secrets_upload != 0) {
 		ct_add_operation(state, ctfile_list_start,

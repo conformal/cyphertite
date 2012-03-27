@@ -40,7 +40,8 @@ ct_list_op(struct ct_global_state *state, struct ct_op *op)
 	struct ct_trans		*trans;
 
 	ct_list(cea->cea_local_ctfile, cea->cea_filelist, cea->cea_excllist,
-	    cea->cea_matchmode, cea->cea_ctfile_basedir, cea->cea_strip_slash);
+	    cea->cea_matchmode, cea->cea_ctfile_basedir, cea->cea_strip_slash,
+	    state->ct_verbose);
 	/*
 	 * Technicaly should be a local transaction.
 	 * However, since this is just so that list can fit into the normal
@@ -61,7 +62,7 @@ ct_list_op(struct ct_global_state *state, struct ct_op *op)
 
 int
 ct_list(const char *file, char **flist, char **excludelist, int match_mode,
-    const char *ctfile_basedir, int strip_slash)
+    const char *ctfile_basedir, int strip_slash, int verbose)
 {
 	struct ctfile_parse_state	 xs_ctx;
 	struct fnode			 fnodestore;
@@ -79,13 +80,14 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode,
 	if (excludelist != NULL)
 		ex_match = ct_match_compile(match_mode, excludelist);
 
-	ct_verbose++;	/* by default print something. */
+	verbose++;	/* by default print something. */
 
 	ct_next_filename = NULL;
 next_file:
 	ret = ctfile_parse_init(&xs_ctx, file, ctfile_basedir);
 	if (ret)
 		CFATALX("failed to open %s", file);
+	ct_print_ctfile_info(file, &xs_ctx.xs_gh);
 
 	if (ct_next_filename)
 		e_free(&ct_next_filename);
@@ -109,9 +111,9 @@ next_file:
 			    !ct_match(ex_match, fnode->fl_sname))
 				doprint = 0;
 			if (doprint) {
-				ct_pr_fmt_file(fnode);
+				ct_pr_fmt_file(fnode, verbose);
 				if (!C_ISREG(xs_ctx.xs_hdr.cmh_type) ||
-				    ct_verbose > 2)
+				    verbose > 2)
 					printf("\n");
 			}
 			if (fnode->fl_hlname)
@@ -136,7 +138,7 @@ next_file:
 						sign = "-";
 				}
 			}
-			if (doprint && ct_verbose > 1)
+			if (doprint && verbose > 1)
 				printf(" sz: %" PRIu64 " shas: %" PRIu64
 				    " reduction: %s%" PRIu64 "%%\n",
 				    xs_ctx.xs_trl.cmt_orig_size,
@@ -146,7 +148,7 @@ next_file:
 				printf("\n");
 			break;
 		case XS_RET_SHA:
-			if (!(doprint && ct_verbose > 2)) {
+			if (!(doprint && verbose > 2)) {
 				if (ctfile_parse_seek(&xs_ctx)) {
 					CFATALX("seek failed");
 				}
@@ -181,12 +183,12 @@ next_file:
  * Code for extract.
  */
 static void	ct_extract_setup_queue(struct ct_extract_head *,
-	    struct ctfile_parse_state *, const char *, const char *, int);
+	    struct ctfile_parse_state *, const char *, const char *, int, int);
 
 void
 ct_extract_setup(struct ct_extract_head *extract_head,
     struct ctfile_parse_state *ctx, const char *file,
-    const char *ctfile_basedir, int *is_allfiles)
+    const char *ctfile_basedir, int *is_allfiles, int print)
 {
 	struct ct_extract_stack	*nfile;
 	char			*prevlvl;
@@ -206,22 +208,24 @@ ct_extract_setup(struct ct_extract_head *extract_head,
 
 		ctfile_parse_close(ctx);
 		ct_extract_setup_queue(extract_head, ctx, prevlvl,
-		    ctfile_basedir, *is_allfiles);
+		    ctfile_basedir, *is_allfiles, print);
 
 		e_free(&prevlvl);
 
 		if (*is_allfiles) {
 			ctfile_parse_close(ctx);
 			/* reopen first file */
-			ct_extract_open_next(extract_head, ctx);
+			ct_extract_open_next(extract_head, ctx, print);
 		}
+	} else if (print) {
+		ct_print_ctfile_info(file, &ctx->xs_gh);
 	}
 }
 
 static void
 ct_extract_setup_queue(struct ct_extract_head *extract_head,
     struct ctfile_parse_state *ctx, const char *file,
-    const char *ctfile_basedir, int is_allfiles)
+    const char *ctfile_basedir, int is_allfiles, int print)
 {
 	char			*prevlvl;
 	struct ct_extract_stack	*nfile;
@@ -244,7 +248,7 @@ ct_extract_setup_queue(struct ct_extract_head *extract_head,
 		ctfile_parse_close(ctx);
 
 		ct_extract_setup_queue(extract_head, ctx, prevlvl,
-		    ctfile_basedir, is_allfiles);
+		    ctfile_basedir, is_allfiles, print);
 		e_free(&prevlvl);
 
 	} else if (is_allfiles) {
@@ -256,11 +260,13 @@ ct_extract_setup_queue(struct ct_extract_head *extract_head,
 		nfile = e_malloc(sizeof(*nfile));
 		nfile->filename = e_strdup(file);
 		TAILQ_INSERT_TAIL(extract_head, nfile, next);
-	}
+	} else if (print)
+		ct_print_ctfile_info(file, &ctx->xs_gh);
+		
 }
 
 void
-ct_extract_open_next(struct ct_extract_head *extract_head, struct ctfile_parse_state *ctx)
+ct_extract_open_next(struct ct_extract_head *extract_head, struct ctfile_parse_state *ctx, int print)
 {
 	struct ct_extract_stack *next;
 
@@ -273,6 +279,8 @@ ct_extract_open_next(struct ct_extract_head *extract_head, struct ctfile_parse_s
 		/* Basedir not needed here because we are done with prevlvl */
 		if (ctfile_parse_init(ctx, next->filename, NULL))
 			CFATALX("failed to open %s", next->filename);
+		if (print)
+			ct_print_ctfile_info(next->filename, &ctx->xs_gh);
 
 		if (next->filename)
 			e_free(&next->filename);
@@ -337,7 +345,7 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 		}
 		ct_extract_setup(&ex_priv->extract_head,
 		    &ex_priv->xdr_ctx, ctfile, cea->cea_ctfile_basedir,
-		    &ex_priv->allfiles);
+		    &ex_priv->allfiles, state->ct_verbose);
 		ct_file_extract_setup_dir(cea->cea_tdir);
 		if (state->ct_max_block_size <
 		    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size)
@@ -458,7 +466,7 @@ skip:
 				bcopy(ex_priv->xdr_ctx.xs_sha, trans->tr_sha,
 				    sizeof(trans->tr_sha));
 			}
-			if (ct_verbose) {
+			if (state->ct_verbose) {
 				ct_sha1_encode(trans->tr_sha, shat);
 				CNDBG(CT_LOG_SHA, "extracting sha %s", shat);
 			}
@@ -520,7 +528,7 @@ skip:
 				ct_trans_free(state, trans);
 				/* reinits ex_priv->xdr_ctx */
 				ct_extract_open_next(&ex_priv->extract_head,
-				    &ex_priv->xdr_ctx);
+				    &ex_priv->xdr_ctx, state->ct_verbose);
 
 				/* poke file into action */
 				ct_wakeup_file();
@@ -672,7 +680,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 				bcopy(ex_priv->xdr_ctx.xs_sha, trans->tr_sha,
 				    sizeof(trans->tr_sha));
 			}
-			if (ct_verbose) {
+			if (state->ct_verbose) {
 				ct_sha1_encode(trans->tr_sha, shat);
 				CNDBG(CT_LOG_SHA, "extracting sha %s", shat);
 			}

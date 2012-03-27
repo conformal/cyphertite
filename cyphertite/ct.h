@@ -60,7 +60,6 @@ struct ct_config {
 	int	ct_compress;
 	int	ct_multilevel_allfiles;
 	int	ct_attr;
-	int	ct_verbose;
 	int	ct_auto_differential;
 	int	ct_max_differentials;
 	int	ct_ctfile_keep_days;
@@ -72,7 +71,6 @@ struct ct_config {
 
 extern int		ct_debug;
 extern int		ct_attr;
-extern int		ct_verbose;
 extern int		ct_cur_compress_mode;
 extern struct ct_stat	*ct_stats;
 extern char		*__progname;
@@ -287,7 +285,7 @@ struct ctfile_list_file {
 };
 
 int			ct_list(const char *, char **, char **, int,
-			    const char *, int);
+			    const char *, int, int);
 void			ctfile_list_complete(struct ctfile_list *, int,
 			    char **, char **, struct ctfile_list_tree *);
 int			ctfile_verify_name(char *);
@@ -443,6 +441,7 @@ struct ct_global_state {
 	unsigned char			ct_iv[CT_IV_LEN];
 	unsigned char			ct_crypto_key[CT_KEY_LEN];
 
+	int				ct_verbose;
 };
 extern struct ct_global_state		*ct_state;
 
@@ -588,14 +587,15 @@ struct ctfile_trailer {
 };
 
 int			ct_read_header(struct ctfile_header *hdr);
-int			ct_basis_setup(const char *, char **, int, time_t *);
+int			ct_basis_setup(const char *, char **, int, time_t *,
+			    int);
 
 /* ct_file.c: extract functions */
-int  ct_file_extract_open(struct fnode *fnode);
+int  ct_file_extract_open(struct fnode *fnode, int);
 void ct_file_extract_write(struct fnode *, uint8_t *buf, size_t size);
-void ct_file_extract_close(struct fnode *fnode);
-void ct_file_extract_special(struct fnode *fnode);
-void ct_file_extract_enddir(void);
+void ct_file_extract_close(struct fnode *fnode, int);
+void ct_file_extract_special(struct fnode *fnode, int);
+void ct_file_extract_enddir(int verbose);
 void ct_file_extract_setup_dir(const char *);
 void ct_file_extract_cleanup_dir();
 void ct_create_config(void);
@@ -611,7 +611,11 @@ char	*ct_basename(const char *);
 void			secrets_generate(struct ct_cli_cmd *, int, char **);
 
 /* print file data nicely */
-void			ct_pr_fmt_file(struct fnode *fnode);
+void			ct_pr_fmt_file(struct fnode *fnode, int);
+void			ct_print_file_start(struct fnode *, int);
+void			ct_print_file_end(struct fnode *, int, int);
+void			ct_print_ctfile_info(const char *,
+			    struct ctfile_gheader *);
 
 RB_PROTOTYPE(ct_iotrans_lookup, ct_trans, tr_trans_id, ct_cmp_iotrans);
 RB_PROTOTYPE(ct_trans_lookup, ct_trans, tr_trans_id, ct_cmp_trans);
@@ -704,7 +708,7 @@ int			ct_prompt_password(char *, char *, size_t, char *,
 			    size_t, int);
 
 /* init/cleanup */
-struct ct_global_state	*ct_init(struct ct_config *, int, int);
+struct ct_global_state	*ct_init(struct ct_config *, int, int, int);
 void			ct_init_eventloop(struct ct_global_state *);
 void			ct_update_secrets(void);
 void			ct_cleanup(struct ct_global_state *);
@@ -780,10 +784,10 @@ struct ct_extract_stack   {
 	char		*filename;
 };
 void	ct_extract_setup(struct ct_extract_head *, struct ctfile_parse_state *,
-	    const char *, const char *, int *);
+	    const char *, const char *, int *, int);
 void	ct_extract_setup_dir(const char *);
 void	ct_extract_open_next(struct ct_extract_head *,
-	    struct ctfile_parse_state *);
+	    struct ctfile_parse_state *, int);
 void	ct_extract_cleanup_queue(struct ct_extract_head *);
 
 /* cull  */

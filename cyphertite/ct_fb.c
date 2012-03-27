@@ -242,7 +242,7 @@ ct_build_tree(const char *filename, struct ct_fb_entry *head,
 
 	TAILQ_INIT(&extract_head);
 	ct_extract_setup(&extract_head, &xdr_ctx, filename, ctfile_basedir,
-	    &allfiles);
+	    &allfiles, 0);
 
 	TAILQ_INIT(&head->cfb_versions);
 	RB_INIT(&head->cfb_children);
@@ -284,7 +284,7 @@ nextfile:
 		ctfile_parse_close(&xdr_ctx);
 		if (!TAILQ_EMPTY(&extract_head)) {
 			CNDBG(CT_LOG_FILE, "opening next one");
-			ct_extract_open_next(&extract_head, &xdr_ctx);
+			ct_extract_open_next(&extract_head, &xdr_ctx, 0);
 			goto nextfile;
 		}
 		/* free state */

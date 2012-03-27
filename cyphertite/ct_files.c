@@ -68,7 +68,8 @@ RB_PROTOTYPE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 RB_GENERATE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 
 /* Directory traversal and transformation of generated data */
-static void		 ct_traverse(char **, struct flist_head *, int, int);
+static void		 ct_traverse(char **, struct flist_head *, int,
+			     int, int);
 static int		 ct_sched_backup_file(struct stat *, char *, int, int,
 			     int, struct flist_head *, struct fl_tree *);
 static struct fnode	*ct_populate_fnode_from_flist(struct flist *, int);
@@ -595,7 +596,7 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		if (basisbackup != NULL &&
 		    (nextlvl = ct_basis_setup(basisbackup, filelist,
 		        caa->caa_max_differentials,
-		        &cap->cap_prev_backup_time)) == 0)
+		        &cap->cap_prev_backup_time, state->ct_verbose)) == 0)
 			e_free(&basisbackup);
 
 		if (getcwd(cwd, PATH_MAX) == NULL)
@@ -605,7 +606,8 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		if (caa->caa_tdir && chdir(caa->caa_tdir) != 0)
 			CFATALX("can't chdir to %s", caa->caa_tdir);
 		ct_traverse(filelist, &cap->cap_flist,
-		    caa->caa_no_cross_mounts, caa->caa_strip_slash);
+		    caa->caa_no_cross_mounts, caa->caa_strip_slash,
+		    state->ct_verbose);
 		if (caa->caa_tdir && chdir(caa->caa_tdir) != 0)
 			CFATALX("can't chdir back to %s", cwd);
 		/*
@@ -719,7 +721,7 @@ loop:
 			    cap->cap_curnode->fl_sname);
 		} else {
 			if (sb.st_mtime < cap->cap_prev_backup_time) {
-				if (ct_verbose > 1)
+				if (state->ct_verbose > 1)
 					CINFO("skipping file based on mtime %s",
 					    cap->cap_curnode->fl_sname);
 				cap->cap_curnode->fl_skip_file = 1;
@@ -893,7 +895,7 @@ done:
 
 static void
 ct_traverse(char **paths, struct flist_head *files, int no_cross_mounts,
-    int strip_slash)
+    int strip_slash, int verbose)
 {
 	FTS			*ftsp;
 	FTSENT			*fe;
@@ -920,7 +922,7 @@ ct_traverse(char **paths, struct flist_head *files, int no_cross_mounts,
 	if (ftsp == NULL)
 		CFATAL("fts_open failed");
 
-	if (ct_verbose)
+	if (verbose)
 		CINFO("Generating filelist, this may take a few minutes...");
 
 	cnt = 0;
@@ -981,7 +983,7 @@ sched:
 	if (fts_close(ftsp))
 		CFATAL("fts_close failed");
 	gettimeofday(&ct_stats->st_time_scan_end, NULL);
-	if (ct_verbose)
+	if (verbose)
 		CINFO("Done! Initiating backup...");
 }
 
@@ -1137,7 +1139,7 @@ s_to_e_type(int mode)
 	return (rv);
 }
 
-void ct_file_extract_nextdir(struct fnode *);
+void ct_file_extract_nextdir(struct fnode *, int);
 
 #ifndef CT_NO_OPENAT
 #define TEMPCHARS	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
@@ -1204,13 +1206,13 @@ mkstemp_at(int dir, char *path)
 
 
 int
-ct_file_extract_open(struct fnode *fnode)
+ct_file_extract_open(struct fnode *fnode, int verbose)
 {
 	if (ct_extract_fd != -1) {
 		CFATALX("file open on extract_open");
 	}
 
-	ct_file_extract_nextdir(fnode);
+	ct_file_extract_nextdir(fnode, verbose);
 
 	CNDBG(CT_LOG_FILE, "opening %s for writing", fnode->fl_sname);
 
@@ -1263,7 +1265,7 @@ ct_file_extract_write(struct fnode *fnode, uint8_t *buf, size_t size)
 }
 
 void
-ct_file_extract_close(struct fnode *fnode)
+ct_file_extract_close(struct fnode *fnode, int verbose)
 {
 	struct timeval          tv[2];
 	int                     safe_mode;
@@ -1272,7 +1274,7 @@ ct_file_extract_close(struct fnode *fnode)
 	if (ct_attr) {
 		if (fchown(ct_extract_fd, fnode->fl_uid, fnode->fl_gid) == -1) {
 			if (errno == EPERM && geteuid() != 0) {
-				if (ct_verbose)
+				if (verbose)
 					CWARN("chown failed: %s",
 					    fnode->fl_sname);
 			} else {
@@ -1300,7 +1302,7 @@ ct_file_extract_close(struct fnode *fnode)
 }
 
 void
-ct_file_extract_special(struct fnode *fnode)
+ct_file_extract_special(struct fnode *fnode, int verbose)
 {
 	char			apath[PATH_MAX];
 	char			*appath;
@@ -1311,7 +1313,7 @@ ct_file_extract_special(struct fnode *fnode)
 	 * Create dependant directories and open/close any relvevant directory
 	 * filedescriptors.
 	 */
-	ct_file_extract_nextdir(fnode);
+	ct_file_extract_nextdir(fnode, verbose);
 
 	CNDBG(CT_LOG_FILE, "special %s mode %d", fnode->fl_sname,
 	    fnode->fl_mode);
@@ -1410,7 +1412,7 @@ link_out:
 				/* set the link's ownership */
 				if (ct_chown(fnode, 0) != 0) {
 					if (errno == EPERM && geteuid() != 0) {
-						if (ct_verbose)
+						if (verbose)
 							CWARN("lchown failed:"
 							    " %s",
 							    fnode->fl_sname);
@@ -1430,7 +1432,7 @@ link_out:
 			/* XXX should this depend on ct_follow_symlinks? */
 			if (ct_chown(fnode, 1) != 0) {
 				if (errno == EPERM && geteuid() != 0) {
-					if (ct_verbose)
+					if (verbose)
 						CWARN("chown failed: %s",
 						    fnode->fl_sname);
 				} else {
@@ -1451,7 +1453,7 @@ link_out:
 	}
 }
 
-void	ct_file_extract_closefrom(struct dnode *, struct dnode *);
+void	ct_file_extract_closefrom(struct dnode *, struct dnode *, int);
 void	ct_file_extract_opento(struct dnode *, struct dnode *);
 struct dnode	*ct_ex_prevdir = NULL;
 struct dnode	**ct_ex_prevdir_list = NULL;
@@ -1502,7 +1504,7 @@ ct_file_extract_cleanup_dir(void)
 }
 
 void
-ct_file_extract_nextdir(struct fnode *fnode)
+ct_file_extract_nextdir(struct fnode *fnode, int verbose)
 {
 	struct dnode	*newdir = fnode->fl_parent_dir, *tdir;
 	struct dnode	**newdirlist;
@@ -1543,7 +1545,8 @@ ct_file_extract_nextdir(struct fnode *fnode)
 	}
 
 	/* close all children from common parent up to old dir */
-	ct_file_extract_closefrom(ct_ex_prevdir_list[i], ct_ex_prevdir);
+	ct_file_extract_closefrom(ct_ex_prevdir_list[i], ct_ex_prevdir,
+	    verbose);
 open:
 	/* open all children from common parent up to new dir */
 	ct_file_extract_opento(newdirlist[i], newdir);
@@ -1555,18 +1558,20 @@ open:
 }
 
 void
-ct_file_extract_enddir()
+ct_file_extract_enddir(int verbose)
 {
 	if (ct_ex_prevdir == NULL)
 		return;
 	/* Close all open directories, we are switching files */
-	ct_file_extract_closefrom(ct_ex_prevdir_list[0], ct_ex_prevdir);
+	ct_file_extract_closefrom(ct_ex_prevdir_list[0], ct_ex_prevdir,
+	    verbose);
 	e_free(&ct_ex_prevdir_list);
 	ct_ex_prevdir = NULL;
 }
 
 void
-ct_file_extract_closefrom(struct dnode *parent, struct dnode *child)
+ct_file_extract_closefrom(struct dnode *parent, struct dnode *child,
+    int verbose)
 {
 #ifdef CT_NO_OPENAT
 	struct timeval		tv[2];
@@ -1614,7 +1619,7 @@ ct_file_extract_closefrom(struct dnode *parent, struct dnode *child)
 	if (ct_attr) {
 		if (fchown(child->d_fd, child->d_uid, child->d_gid) == -1) {
 			if (errno == EPERM && geteuid() != 0) {
-				if (ct_verbose)
+				if (verbose)
 					CWARN("can't chown directory: %s",
 					    child->d_name);
 			} else {
@@ -1638,7 +1643,7 @@ ct_file_extract_closefrom(struct dnode *parent, struct dnode *child)
 #endif
 	child->d_fd = -2;
 
-	ct_file_extract_closefrom(parent, child->d_parent);
+	ct_file_extract_closefrom(parent, child->d_parent, verbose);
 }
 
 void

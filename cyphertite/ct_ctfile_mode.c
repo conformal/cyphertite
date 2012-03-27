@@ -546,7 +546,8 @@ ct_complete_metadata(struct ct_global_state *state, struct ct_trans *trans)
 	switch(trans->tr_state) {
 	case TR_S_EX_FILE_START:
 		/* XXX can we recover from this? */
-		if (ct_file_extract_open(trans->tr_fl_node) != 0)
+		if (ct_file_extract_open(trans->tr_fl_node,
+		    state->ct_verbose) != 0)
 			CFATALX("unable to open file %s",
 			    trans->tr_fl_node->fl_name);
 		break;
@@ -587,7 +588,7 @@ ct_complete_metadata(struct ct_global_state *state, struct ct_trans *trans)
 	case TR_S_READ:
 		break;
 	case TR_S_EX_FILE_END:
-		ct_file_extract_close(trans->tr_fl_node);
+		ct_file_extract_close(trans->tr_fl_node, state->ct_verbose);
 		ct_file_extract_cleanup_dir();
 		release_fnode = 1;
 		/* FALLTHROUGH */

@@ -236,7 +236,6 @@ FILE *
 ctfile_open_f(FILE *f, const char *ctfile_basedir, struct ctfile_gheader *gh,
     XDR *xdr)
 {
-	time_t			ltime;
 
 	xdrstdio_create(xdr, f, XDR_DECODE);
 
@@ -253,13 +252,6 @@ ctfile_open_f(FILE *f, const char *ctfile_basedir, struct ctfile_gheader *gh,
 		free(gh->cmg_prevlvl_filename);
 		gh->cmg_prevlvl_filename = NULL;
 	}
-
-
-	ltime = gh->cmg_created;
-	if (ct_verbose > 1)
-		printf("version: %d level: %d block size: %d created: %s",
-		    gh->cmg_version, gh->cmg_cur_lvl, gh->cmg_chunk_size,
-		    ctime(&ltime));
 
 	if (gh->cmg_beacon != CT_MD_BEACON) {
 		CWARNX("Not a cyphertite file");
@@ -304,7 +296,7 @@ ctfile_cleanup_gheader(struct ctfile_gheader *gh)
 
 int
 ct_basis_setup(const char *basisbackup, char **filelist, int max_differentials,
-    time_t *prev_backup)
+    time_t *prev_backup, int verbose)
 {
 	struct ctfile_parse_state	 xs_ctx;
 	char				 cwd[PATH_MAX], **fptr;
@@ -342,7 +334,7 @@ ct_basis_setup(const char *basisbackup, char **filelist, int max_differentials,
 				rooted = 0;
 		}
 		if (i < xs_ctx.xs_gh.cmg_num_paths || *fptr != NULL) {
-			if (ct_verbose == 0) {
+			if (verbose == 0) {
 				CFATALX("list of directories provided does not"
 				    " match list of directories in basis");
 			} else {
@@ -960,8 +952,6 @@ int
 ctfile_write_file_end(struct ctfile_write_state *ctx, struct fnode *fnode)
 {
 	struct ctfile_trailer	trl;
-	int			compression;
-	int			nrshas;
 	bool_t			ret;
 
 	if ((ctx->cws_flags & CT_MD_MLB_ALLFILES) == 0 && fnode->fl_skip_file)
@@ -977,29 +967,7 @@ ctfile_write_file_end(struct ctfile_write_state *ctx, struct fnode *fnode)
 	trl.cmt_orig_size = fnode->fl_size;
 	trl.cmt_comp_size = fnode->fl_comp_size;
 
-	ret = ct_xdr_trailer(&ctx->cws_xdr, &trl);
-
-	if (ret == FALSE)
-		CWARNX("failed to write trailer sha");
-
-
-	if (ct_verbose > 1) {
-		if (fnode->fl_size == 0)
-			compression = 0;
-		else
-			compression = 100 * (fnode->fl_size -
-			    fnode->fl_comp_size) / fnode->fl_size;
-		if (ct_verbose > 2) {
-			nrshas = fnode->fl_size /
-			    ctx->cws_block_size;
-			if (fnode->fl_size % ctx->cws_block_size)
-				nrshas++;
-
-			printf(" shas %d", nrshas);
-		}
-		printf(" (%d%%)\n", compression);
-	} else if (ct_verbose)
-		printf("\n");
+	return (ct_xdr_trailer(&ctx->cws_xdr, &trl) == FALSE);
 
 	return (ret == FALSE);
 }
