@@ -629,7 +629,7 @@ ct_have_remote_secrets_file(struct ct_config *conf)
 	int have;
 
 	ct_do_operation(conf, ctfile_list_start, ct_secrets_exists,
-	    &have, 0, 1);
+	    &have, 0);
 
 	return (have);
 }
@@ -652,7 +652,7 @@ ct_download_secrets_file(struct ct_config *conf)
 	cca.cca_encrypted = 0;
 	cca.cca_ctfile = 0;
 
-	ct_do_operation(conf, ctfile_extract, NULL, &cca, 0, 1);
+	ct_do_operation(conf, ctfile_extract, NULL, &cca, 0);
 
 	e_free(&dirpath);
 	e_free(&fname);
@@ -672,5 +672,5 @@ ct_upload_secrets_file(struct ct_config *conf)
 	cca.cca_ctfile = 0;
 
 	ct_do_operation(conf, ctfile_list_start, ct_check_secrets_upload,
-	    &cca, 0, 1);
+	    &cca, 0);
 }

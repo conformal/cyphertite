@@ -117,8 +117,7 @@ show_version(void)
 }
 
 struct ct_global_state *
-ct_init(struct ct_config *conf, int need_secrets, int only_metadata,
-    int verbose)
+ct_init(struct ct_config *conf, int need_secrets, int verbose)
 {
 	struct ct_global_state *state;
 	struct stat		sb;
@@ -487,7 +486,7 @@ ct_main(int argc, char **argv)
 	    ct_action == CT_A_ARCHIVE || (ct_action == CT_A_LIST &&
 	    conf->ct_ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0));
 
-	state = ct_init(conf, need_secrets, ct_metadata, verbose);
+	state = ct_init(conf, need_secrets, verbose);
 	if (conf->ct_crypto_passphrase != NULL &&
 	    conf->ct_secrets_upload != 0) {
 		ct_add_operation(state, ctfile_list_start,

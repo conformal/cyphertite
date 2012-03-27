@@ -89,14 +89,14 @@ ct_add_operation_after(struct ct_global_state *state, struct ct_op *after,
 /* Do a complete ct operation from start to finish */
 void
 ct_do_operation(struct ct_config *conf,  ct_op_cb *start, ct_op_cb *complete,
-    void *args, int need_secrets, int only_metadata)
+    void *args, int need_secrets)
 {
 	struct ct_global_state	*state;
 	int		 	 ret;
 
 	ct_prompt_for_login_password(conf);
 
-	state = ct_init(conf, need_secrets, only_metadata, 0);
+	state = ct_init(conf, need_secrets, 0);
 	ct_add_operation(state, start, complete, args);
 	ct_wakeup_file();
 	if ((ret = ct_event_dispatch()) != 0)

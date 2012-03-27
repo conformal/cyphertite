@@ -361,7 +361,7 @@ struct ct_op	*ct_add_operation(struct ct_global_state *, ct_op_cb *,
 struct ct_op	*ct_add_operation_after(struct ct_global_state *,
 		     struct ct_op *, ct_op_cb *, ct_op_cb *, void *);
 void		 ct_do_operation(struct ct_config *, ct_op_cb *, ct_op_cb *,
-		     void *, int, int);
+		     void *, int);
 void		 ct_nextop(void *);
 int		 ct_op_complete(struct ct_global_state *state);
 ct_op_cb	 ct_archive;
@@ -708,7 +708,7 @@ int			ct_prompt_password(char *, char *, size_t, char *,
 			    size_t, int);
 
 /* init/cleanup */
-struct ct_global_state	*ct_init(struct ct_config *, int, int, int);
+struct ct_global_state	*ct_init(struct ct_config *, int, int);
 void			ct_init_eventloop(struct ct_global_state *);
 void			ct_update_secrets(void);
 void			ct_cleanup(struct ct_global_state *);
