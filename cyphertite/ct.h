@@ -74,7 +74,6 @@ extern int		ct_attr;
 extern int		ct_cur_compress_mode;
 extern struct ct_stat	*ct_stats;
 extern char		*__progname;
-extern char		*ct_configfile;
 extern int		ct_skip_xml_negotiate;
 
 struct ct_global_state;
@@ -243,8 +242,8 @@ void			ct_queue_transfer(struct ct_global_state *,
 			    struct ct_trans *);
 
 /* config */
-struct ct_config	*ct_load_config(void);
-void			 ct_unload_config(struct ct_config *);
+struct ct_config	*ct_load_config(char **);
+void			 ct_unload_config(char *, struct ct_config *);
 
 extern int		ct_max_trans;
 

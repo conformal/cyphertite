@@ -614,7 +614,7 @@ crypto_passphrase:
 }
 
 struct ct_config *
-ct_load_config(void)
+ct_load_config(char **configfile)
 {
 	struct ct_config	 conf, *config;
 	char			*ct_compression_type = NULL;
@@ -678,10 +678,10 @@ ct_load_config(void)
 
 	/* setup default */
 	ct_default_config(&conf);
-	if (ct_configfile) {
-		if (ct_config_parse(settings, ct_configfile))
+	if (*configfile != NULL) {
+		if (ct_config_parse(settings, *configfile))
 			CFATALX("Unable to open specified config file %s",
-			   ct_configfile);
+			   *configfile);
 	} else {
 
 		for (;;) {
@@ -703,7 +703,7 @@ ct_load_config(void)
 				break;
 			}
 			if (ct_config_parse(settings, config_path) == 0) {
-				ct_configfile = config_path;
+				*configfile = config_path;
 				break;
 			}
 			config_try++;
@@ -771,8 +771,9 @@ ct_load_config(void)
 }
 
 void
-ct_unload_config(struct ct_config *config)
+ct_unload_config(char *configfile, struct ct_config *config)
 {
+	e_free(&configfile);
 }
 
 void

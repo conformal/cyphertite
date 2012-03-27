@@ -64,7 +64,6 @@ int			ct_debug = 0;
 int			ct_action = 0;
 int			ct_follow_symlinks = 0;
 int			ct_root_symlink = 0;
-char			*ct_configfile;
 int			ct_attr;
 
 void
@@ -215,8 +214,6 @@ ct_cleanup_eventloop(struct ct_global_state *state)
 void
 ct_cleanup(struct ct_global_state *state)
 {
-	if (ct_configfile)
-		e_free(&ct_configfile);
 	ct_cleanup_eventloop(state);
 }
 
@@ -291,7 +288,7 @@ ct_main(int argc, char **argv)
 	char				*ctfile = NULL;
 	char				*ct_includefile = NULL;
 	char				*ct_excludefile = NULL;
-	char				*configfile = NULL;
+	char				*configfile = NULL, *config_file = NULL;
 	char				*basisfile = NULL;
 	char				*debugstring = NULL;
 	char				**excludelist = NULL;
@@ -424,7 +421,7 @@ ct_main(int argc, char **argv)
 
 	/* We can allocate these now that we've decided if we need exude */
 	if (configfile)
-		ct_configfile = e_strdup(configfile);
+		config_file = e_strdup(configfile);
 	if (basisfile)
 		ct_basisbackup = e_strdup(basisfile);
 
@@ -443,7 +440,7 @@ ct_main(int argc, char **argv)
 		excludelist = ct_matchlist_fromfile(ct_excludefile);
 
 
-	if ((conf = ct_load_config()) == NULL) {
+	if ((conf = ct_load_config(&config_file)) == NULL) {
 		CFATALX("config file not found.  Use the -F option to "
 		    "specify its path or run \"cyphertitectl config generate\" "
 		    "to generate one.");
@@ -615,7 +612,7 @@ out:
 		ctfile_trim_cache(conf->ct_ctfile_cachedir,
 		    conf->ct_ctfile_max_cachesize);
 
-	ct_unload_config(conf);
+	ct_unload_config(config_file, conf);
 #ifdef notyet
 	e_check_memory();
 #endif

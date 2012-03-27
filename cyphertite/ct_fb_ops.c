@@ -261,7 +261,7 @@ ctfb_main(int argc, char *argv[])
 	struct ctfb_cmd		*cmd;
 	const char		**l_argv;
 	const char		*buf;
-	char			*configfile = NULL;
+	char			*configfile = NULL, *config_file = NULL;
 	char			*ctfile = NULL;
 	char			*debugstring = NULL;
 	EditLine		*el = NULL;
@@ -320,10 +320,10 @@ ctfb_main(int argc, char *argv[])
 
 	/* We can allocate these now that we've decided if we need exude */
 	if (configfile)
-		ct_configfile = e_strdup(configfile);
+		config_file = e_strdup(configfile);
 
 	/* load config */
-	if ((conf = ct_load_config()) == NULL)
+	if ((conf = ct_load_config(&config_file)) == NULL)
 		CFATALX("config file not found.  Use the -F option to "
 		    "specify its path.");
 
@@ -390,6 +390,8 @@ ctfb_main(int argc, char *argv[])
 	tok_end(tokenizer);
 	history_end(hist);
 	el_end(el);
+
+	ct_unload_config(config_file, conf);
 
 	exude_cleanup();
 

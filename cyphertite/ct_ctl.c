@@ -49,6 +49,7 @@ void secrets_upload(struct ct_cli_cmd *, int, char **);
 void secrets_generate(struct ct_cli_cmd *, int, char **);
 void config_generate(struct ct_cli_cmd *, int, char **);
 
+char		 *ctctl_configfile;
 struct ct_config *ctctl_config;
 
 void
@@ -69,7 +70,7 @@ cpasswd(struct ct_cli_cmd *c, int argc, char **argv)
 	FILE		*fr, *fw;
 
 	snprintf(prompt, sizeof prompt, "This operation overwrites %s "
-	    "and %s, continue? [yes]: ", ct_configfile,
+	    "and %s, continue? [yes]: ", ctctl_configfile,
 	    ctctl_config->ct_crypto_secrets);
 	if (ct_get_answer(prompt, "yes", "no", "yes", answer,
 	    sizeof answer, 0) != 1)
@@ -131,22 +132,25 @@ cpasswd(struct ct_cli_cmd *c, int argc, char **argv)
 	}
 
 	/* rename files */
-	snprintf(old_configfile, sizeof old_configfile, "%s~", ct_configfile);
-	if (rename(ct_configfile, old_configfile))
-		CFATAL("%s", ct_configfile);
+	snprintf(old_configfile, sizeof old_configfile, "%s~",
+	    ctctl_configfile);
+	if (rename(ctctl_configfile, old_configfile))
+		CFATAL("Can't rename %s to %s", ctctl_configfile,
+		    old_configfile);
 
 	snprintf(old_crypto_secrets, sizeof old_crypto_secrets, "%s~",
 	    ctctl_config->ct_crypto_secrets);
 	if (rename(ctctl_config->ct_crypto_secrets, old_crypto_secrets))
-		CFATAL("%s", ctctl_config->ct_crypto_secrets);
+		CFATAL("Can't rename %s to %s",
+		    ctctl_config->ct_crypto_secrets, old_crypto_secrets);
 
 	/* rewrite files */
 	fr = fopen(old_configfile, "r");
 	if (fr == NULL)
 		CFATAL("%s", old_configfile);
-	fw = fopen(ct_configfile, "w");
+	fw = fopen(ctctl_configfile, "w");
 	if (fw == NULL)
-		CFATAL("%s", ct_configfile);
+		CFATAL("%s", ctctl_configfile);
 
 	while (fgets(buf, sizeof(buf), fr) != NULL) {
 		if ((p = strchr(buf, '\n')) == NULL)
@@ -258,12 +262,12 @@ ctctl_main(int argc, char *argv[])
 
 	/* We can allocate these now that we've decided if we need exude */
 	if (configfile)
-		ct_configfile = e_strdup(configfile);
+		ctctl_configfile= e_strdup(configfile);
 
 	/* load config XXX ick... unless we're generating one. */
 	if (!(argc == 2 && strcmp(argv[0], "config") == 0 && strcmp(argv[1],
 	    "generate") == 0) &&
-	    (ctctl_config = ct_load_config()) == NULL)
+	    (ctctl_config = ct_load_config(&ctctl_configfile)) == NULL)
 		CFATALX("config file not found.  Use the -F option to "
 		    "specify its path or run \"%s config generate\" to create "
 		    "one.", __progname);
@@ -272,6 +276,11 @@ ctctl_main(int argc, char *argv[])
 		ct_cli_usage(cmd_list, NULL);
 
 	ct_cli_execute(cc, &argc, &argv);
+
+	if (ctctl_config != NULL)
+		ct_unload_config(ctctl_configfile, ctctl_config);
+	else if (ctctl_configfile != NULL)
+		e_free(&ctctl_configfile);
 
 	exude_cleanup();
 
