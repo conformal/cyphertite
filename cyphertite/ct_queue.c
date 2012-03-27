@@ -956,7 +956,10 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 			ct_file_extract_cleanup(state->extract_state);	
 			state->extract_state = NULL;
 		}
-		ct_dnode_cleanup();
+		if (state->archive_state) {
+			ct_archive_cleanup(state->archive_state);
+			state->archive_state = NULL;
+		}
 		/* do we have more operations queued up? */
 		if (ct_op_complete(state) == 0)
 			return;

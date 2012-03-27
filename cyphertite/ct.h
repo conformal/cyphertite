@@ -133,12 +133,6 @@ struct dnode {
 	int                      d_mtime;       /* last modification time */
 };
 
-int	ct_dname_cmp(struct dnode *, struct dnode *);
-RB_HEAD(d_name_tree, dnode);
-RB_PROTOTYPE(d_name_tree, dnode, ds_rb, ct_dname_cmp);
-
-extern struct d_name_tree	ct_dname_head;
-
 /* FILE STATUS */
 
 #define CT_S_STARTING		(0)
@@ -230,7 +224,6 @@ struct ct_trans		*ct_trans_realloc_local(struct ct_global_state *,
 void			ct_trans_free(struct ct_global_state *,
 			    struct ct_trans *);
 void			ct_trans_cleanup(struct ct_global_state *);
-void			ct_dnode_cleanup(void);
 void			ct_free_fnode(struct fnode *);
 
 void			ct_queue_first(struct ct_global_state *,
@@ -381,6 +374,7 @@ struct ct_global_state {
 	struct ct_config		*ct_config;
 
 	struct ct_extract_state		*extract_state;
+	struct ct_archive_state		*archive_state;
 	TAILQ_HEAD(,ct_trans)		ct_trans_free_head;
 	int				ct_trans_id; /* next transaction id */
 	uint64_t			ct_packet_id; /* next complete id */
@@ -591,6 +585,16 @@ struct ctfile_trailer {
 int			ct_read_header(struct ctfile_header *hdr);
 int			ct_basis_setup(const char *, char **, int, time_t *,
 			    int);
+/* archive state functions: */
+struct ct_archive_state;
+struct ct_archive_state	*ct_archive_init(const char *);
+struct dnode		*ct_archive_get_rootdir(struct ct_archive_state *);
+struct dnode		*ct_archive_lookup_dir(struct ct_archive_state *,
+			     const char *);
+struct dnode		*ct_file_archive_insert_dir(struct ct_archive_state *,
+			     struct dnode *);
+void			 ct_archive_cleanup(struct ct_archive_state *);
+
 
 /* ct_file.c: extract functions */
 struct ct_extract_state;
