@@ -1711,6 +1711,53 @@ try_again:
 #endif
 }
 
+/*
+ * Portability functions to be used by archive-like operations.
+ * These operate on fnode->fl_name as the correct ``real'' path.
+ */
+int
+ct_open(struct fnode *fnode, int flags, int follow_symlinks)
+{
+#ifdef CT_NO_OPENAT
+	char	path[PATH_MAX];
+
+	if (fnode->fl_fname[0] == '/') {
+		strlcpy(path, fnode->fl_fname, sizeof(path));
+	} else {
+		snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
+		    fnode->fl_fname);
+	}
+
+	return (open(path, flags | follow_symlinks ? 0 : O_NOFOLLOW));
+#else
+	return (openat(fnode->fl_parent_dir->d_fd, fnode->fl_fname,
+	    flags | follow_symlinks ? 0 : O_NOFOLLOW));
+#endif
+}
+
+int
+ct_readlink(struct fnode *fnode, char *mylink, size_t mylinksz)
+{
+#ifdef CT_NO_OPENAT
+	char	path[PATH_MAX];
+
+	if (fnode->fl_fname[0] == '/') {
+		strlcpy(path, fnode->fl_fname, sizeof(path));
+	} else {
+		snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
+		    fnode->fl_fname);
+	}
+
+	return (readlink(path, mylink, mylinksz));
+#else
+	return (readlinkat(fnode->fl_parent_dir->d_fd, fnode->fl_fname,
+	    mylink, mylinksz));
+#endif
+}
+
+/*
+ * Portability function used by both extract and archive like operations.
+ */
 int
 ct_stat(struct fnode *fnode, struct stat *sb, int follow_symlinks, int extract)
 {
@@ -1735,26 +1782,11 @@ ct_stat(struct fnode *fnode, struct stat *sb, int follow_symlinks, int extract)
 #endif
 }
 
-int
-ct_open(struct fnode *fnode, int flags, int follow_symlinks)
-{
-#ifdef CT_NO_OPENAT
-	char	path[PATH_MAX];
 
-	if (fnode->fl_fname[0] == '/') {
-		strlcpy(path, fnode->fl_fname, sizeof(path));
-	} else {
-		snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
-		    fnode->fl_fname);
-	}
-
-	return (open(path, flags | follow_symlinks ? 0 : O_NOFOLLOW));
-#else
-	return (openat(fnode->fl_parent_dir->d_fd, fnode->fl_fname,
-	    flags | follow_symlinks ? 0 : O_NOFOLLOW));
-#endif
-}
-
+/*
+ * Portability functions to be used by extract operations.
+ * These operated on fnode->fl_sname as the ``correct'' pathname.
+ */
 int
 ct_mkdir(struct fnode *fnode, mode_t mode)
 {
@@ -1808,26 +1840,6 @@ ct_link(struct fnode *fnode, char *destination)
 #else
 	return (linkat(AT_FDCWD, destination, fnode->fl_parent_dir->d_fd,
 	    fnode->fl_name, AT_SYMLINK_FOLLOW));
-#endif
-}
-
-int
-ct_readlink(struct fnode *fnode, char *mylink, size_t mylinksz)
-{
-#ifdef CT_NO_OPENAT
-	char	path[PATH_MAX];
-
-	if (fnode->fl_fname[0] == '/') {
-		strlcpy(path, fnode->fl_fname, sizeof(path));
-	} else {
-		snprintf(path, sizeof(path), "%s/%s", ct_rootdir.d_name,
-		    fnode->fl_fname);
-	}
-
-	return (readlink(path, mylink, mylinksz));
-#else
-	return (readlinkat(fnode->fl_parent_dir->d_fd, fnode->fl_fname,
-	    mylink, mylinksz));
 #endif
 }
 
