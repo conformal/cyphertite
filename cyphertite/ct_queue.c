@@ -67,7 +67,6 @@ ct_cmp_iotrans(struct ct_trans *c1, struct ct_trans *c2)
 /* structure to push data to next cache line - cache isolation */
 struct ct_global_state  ct_int_state;
 struct ct_stat ct_int_stats;
-int ct_cur_compress_mode = 0;
 
 
 struct ct_global_state *ct_state = &ct_int_state;
@@ -95,10 +94,11 @@ ct_setup_state(struct ct_config *conf)
 
 	if (conf->ct_compress) {
 		ct_init_compression(conf->ct_compress);
-		ct_cur_compress_mode = conf->ct_compress;
+		state->ct_cur_compress_mode = conf->ct_compress;
 		state->ct_alloc_block_size = s_compress_bounds(
 		    state->ct_max_block_size);
 	} else {
+		state->ct_cur_compress_mode = 0;
 		state->ct_alloc_block_size = state->ct_max_block_size;
 	}
 
@@ -1388,13 +1388,13 @@ ct_compute_compress(void *vctx)
 			    trans->tr_state);
 		}
 
-		if (ct_cur_compress_mode != ncompmode) {
+		if (state->ct_cur_compress_mode != ncompmode) {
 			/* initial or (change in the middle!) mode */
 			ct_init_compression(ncompmode);
-			ct_cur_compress_mode = ncompmode;
+			state->ct_cur_compress_mode = ncompmode;
 		}
 
-		if (ct_cur_compress_mode == 0)
+		if (state->ct_cur_compress_mode == 0)
 			CFATALX("compression mode 0?");
 
 		slot = trans->tr_dataslot;

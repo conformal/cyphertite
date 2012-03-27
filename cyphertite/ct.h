@@ -442,6 +442,8 @@ struct ct_global_state {
 	unsigned char			ct_crypto_key[CT_KEY_LEN];
 
 	int				ct_verbose;
+
+	int				ct_cur_compress_mode;
 };
 extern struct ct_global_state		*ct_state;
 
