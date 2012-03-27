@@ -63,7 +63,6 @@ extern char		*__progname;
 int			ct_debug = 0;
 int			ct_action = 0;
 int			ct_follow_symlinks = 0;
-int			ct_root_symlink = 0;
 
 void
 ct_usage(void)
@@ -304,6 +303,7 @@ ct_main(int argc, char **argv)
 	int				 force_allfiles = -1;
 	int				 no_cross_mounts = 0;
 	int				 strip_slash = 1;
+	int				 follow_root_symlink = 0;
 	int				 attr = 0;
 	int				 verbose = 0;
 	int				 verbose_ratios = 0;
@@ -333,7 +333,7 @@ ct_main(int argc, char **argv)
 			configfile = optarg;
 			break;
 		case 'H':
-			ct_root_symlink = 1;
+			follow_root_symlink = 1;
 			break;
 		case 'I':
 			ct_includefile = optarg;
@@ -521,6 +521,7 @@ ct_main(int argc, char **argv)
 			caa.caa_allfiles = conf->ct_multilevel_allfiles;
 			caa.caa_no_cross_mounts = no_cross_mounts;
 			caa.caa_strip_slash = strip_slash;
+			caa.caa_follow_root_symlink = follow_root_symlink;
 			caa.caa_max_differentials = conf->ct_max_differentials;
 			if (conf->ct_auto_differential)
 				/*
@@ -576,6 +577,7 @@ ct_main(int argc, char **argv)
 			caa.caa_includefile = ct_includefile;
 			caa.caa_no_cross_mounts = no_cross_mounts;
 			caa.caa_strip_slash = strip_slash;
+			caa.caa_follow_root_symlink = follow_root_symlink;
 			caa.caa_max_differentials = 0; /* unlimited */
 			caa.caa_tag = ctfile;
 			ct_add_operation(state, ct_archive, NULL, &caa);

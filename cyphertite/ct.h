@@ -331,6 +331,7 @@ struct ct_archive_args {
 	int			 caa_no_cross_mounts;
 	int			 caa_max_differentials;
 	int			 caa_strip_slash;
+	int			 caa_follow_root_symlink;
 };
 
 struct ct_extract_file_args {

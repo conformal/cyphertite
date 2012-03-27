@@ -69,7 +69,7 @@ RB_GENERATE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 
 /* Directory traversal and transformation of generated data */
 static void		 ct_traverse(char **, struct flist_head *, int,
-			     int, int);
+			     int, int, int);
 static int		 ct_sched_backup_file(struct stat *, char *, int, int,
 			     int, struct flist_head *, struct fl_tree *);
 static struct fnode	*ct_populate_fnode_from_flist(struct flist *, int);
@@ -611,7 +611,7 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 			CFATALX("can't chdir to %s", caa->caa_tdir);
 		ct_traverse(filelist, &cap->cap_flist,
 		    caa->caa_no_cross_mounts, caa->caa_strip_slash,
-		    state->ct_verbose);
+		    caa->caa_follow_root_symlink, state->ct_verbose);
 		if (caa->caa_tdir && chdir(caa->caa_tdir) != 0)
 			CFATALX("can't chdir back to %s", cwd);
 		/*
@@ -899,7 +899,7 @@ done:
 
 static void
 ct_traverse(char **paths, struct flist_head *files, int no_cross_mounts,
-    int strip_slash, int verbose)
+    int strip_slash, int follow_root_symlink, int verbose)
 {
 	FTS			*ftsp;
 	FTSENT			*fe;
@@ -908,7 +908,6 @@ ct_traverse(char **paths, struct flist_head *files, int no_cross_mounts,
 	int			 fts_options;
 	int			 cnt;
 	int			 forcedir;
-	extern int		 ct_root_symlink;
 
 	RB_INIT(&ino_tree);
 	fts_options = FTS_NOCHDIR;
@@ -916,7 +915,7 @@ ct_traverse(char **paths, struct flist_head *files, int no_cross_mounts,
 		fts_options |= FTS_LOGICAL;
 	else
 		fts_options |= FTS_PHYSICAL;
-	if (ct_root_symlink) {
+	if (follow_root_symlink) {
 		CWARNX("-H");
 		fts_options |= FTS_COMFOLLOW;
 	}
@@ -963,7 +962,7 @@ ct_traverse(char **paths, struct flist_head *files, int no_cross_mounts,
 		/* backup dirs above fts starting point */
 		if (fe->fts_level == 0) {
 			/* XXX technically this should apply to files too */
-			if (ct_root_symlink && fe->fts_info == FTS_D)
+			if (follow_root_symlink && fe->fts_info == FTS_D)
 				forcedir = 1;
 			if (backup_prefix(clean, files, &ino_tree, strip_slash))
 				CFATAL("backup_prefix failed");
