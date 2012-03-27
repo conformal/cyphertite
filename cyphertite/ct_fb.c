@@ -44,6 +44,7 @@ struct ct_fb_dnode {
 	struct ct_fb_entry	*dir;
 };
 
+struct ct_global_state	*ctfb_state;
 struct ct_fb_state	*ctfb_cfs;
 
 __dead void		 ctfb_usage(void);
@@ -566,7 +567,6 @@ ctfb_cd(int argc, const char **argv)
 void
 ctfb_get(int argc, const char **argv)
 {
-	struct ct_global_state		*state;
 	struct ct_fb_entry		*entry;
 	struct ct_fb_key		*key;
 	struct ct_fb_file		*file;
@@ -587,8 +587,7 @@ ctfb_get(int argc, const char **argv)
 		goto out;
 	}
 
-	/* XXX Fix this, this won't work */
-	state = ct_init_eventloop(NULL);
+	ct_init_eventloop(ctfb_state);
 
 	if (stat(argv[2], &sb) == 0 && (S_ISDIR(sb.st_mode)))
 		isdir = 1;
@@ -631,8 +630,7 @@ ctfb_get(int argc, const char **argv)
 			dest = e_strdup(name); /* XXX version? */
 		}
 		cefa->cefa_filename = dest;
-		CWARNX("getting %s to %s", g.gl_pathv[i], dest);
-		ct_add_operation(state, ct_extract_file,
+		ct_add_operation(ctfb_state, ct_extract_file,
 		    ct_extract_file_cleanup, cefa);
 		count++;
 	}
@@ -644,7 +642,7 @@ ctfb_get(int argc, const char **argv)
 			goto out;
 		}
 	}
-	ct_cleanup_eventloop(state);
+	ct_cleanup_eventloop(ctfb_state);
 
 out:
 	globfree(&g);

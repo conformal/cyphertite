@@ -125,7 +125,8 @@ show_version(void)
 struct ct_global_state *
 ct_init(struct ct_config *conf, int need_secrets, int only_metadata)
 {
-	struct stat	sb;
+	struct ct_global_state *state;
+	struct stat		sb;
 
 	/* Run with restricted umask as we create numerous sensitive files. */
 	umask(S_IRWXG|S_IRWXO);
@@ -134,6 +135,9 @@ ct_init(struct ct_config *conf, int need_secrets, int only_metadata)
 	if (conf->ct_io_bw_limit) {
 		conf->ct_io_bw_limit = conf->ct_io_bw_limit * 10 / 7;
 	}
+	assl_initialize();
+	ct_event_init();
+	state = ct_setup_state(conf);
 
 	if (need_secrets != 0 && conf->ct_crypto_secrets != NULL) {
 		if (stat(conf->ct_crypto_secrets, &sb) == -1) {
@@ -148,23 +152,21 @@ ct_init(struct ct_config *conf, int need_secrets, int only_metadata)
 			CFATALX("can't unlock secrets file");
 	}
 
-	return (ct_init_eventloop(conf));
+	ct_init_eventloop(state);
+
+	return (state);
 }
 
-struct ct_global_state *
-ct_init_eventloop(struct ct_config *conf)
+void
+ct_init_eventloop(struct ct_global_state *state)
 {
-	struct ct_global_state	*state;
-	assl_initialize();
-	ct_event_init();
-	state = ct_setup_state(conf);
 
 #if defined(CT_EXT_INIT)
 	CT_EXT_INIT();
 #endif
 
-	state->ct_db_state = ctdb_setup(conf->ct_localdb,
-	    conf->ct_crypto_secrets != NULL);
+	state->ct_db_state = ctdb_setup(state->ct_config->ct_localdb,
+	    state->ct_config->ct_crypto_secrets != NULL);
 
 	gettimeofday(&ct_stats->st_time_start, NULL);
 	state->ct_assl_ctx = ct_ssl_connect(state, 0);
@@ -175,6 +177,7 @@ ct_init_eventloop(struct ct_config *conf)
 	    state->ct_assl_ctx->c->as_bits,
 	    state->ct_assl_ctx->c->as_protocol);
 
+	ct_set_file_state(state, CT_S_STARTING);
 	CT_LOCK_INIT(&state->ct_sha_lock);
 	CT_LOCK_INIT(&state->ct_comp_lock);
 	CT_LOCK_INIT(&state->ct_crypt_lock);
@@ -190,8 +193,6 @@ ct_init_eventloop(struct ct_config *conf)
 	ct_setup_wakeup_encrypt(state, ct_compute_encrypt);
 	ct_setup_wakeup_write(state, ct_process_write);
 	ct_setup_wakeup_complete(state, ct_process_completions);
-
-	return (state);
 }
 
 void
@@ -203,6 +204,7 @@ ct_cleanup_eventloop(struct ct_global_state *state)
 		state->ct_assl_ctx = NULL;
 	}
 	ctdb_shutdown(state->ct_db_state);
+	state->ct_db_state = NULL;
 	ct_cleanup_login_cache();
 	// XXX: ct_lock_cleanup();
 	CT_LOCK_RELEASE(&state->ct_sha_lock);

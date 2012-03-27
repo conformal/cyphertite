@@ -483,9 +483,7 @@ ctfile_nextop_justdl(struct ct_global_state *state, char *ctfile, void *args)
 	char		**filename = args;
 
 	*filename = ctfile;
-
-	/* done, jump out of the loop */
-	ct_add_operation(state, ct_shutdown_op, NULL, NULL);
+	/* done here, no more ops */
 }
 
 ct_op_cb	ct_compare_secrets;

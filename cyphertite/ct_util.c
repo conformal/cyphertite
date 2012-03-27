@@ -496,12 +496,6 @@ done:
 }
 
 void
-ct_shutdown_op(struct ct_global_state *state, struct ct_op *unused)
-{
-	ct_shutdown(state);
-}
-
-void
 ct_shutdown(struct ct_global_state *state)
 {
 	ctdb_shutdown(state->ct_db_state);

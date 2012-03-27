@@ -68,6 +68,7 @@ ctfb_cmd	ctfb_help;
 
 extern int 			 ctfb_quit;
 extern struct ct_fb_state	*ctfb_cfs;
+extern struct ct_global_state	*ctfb_state;
 char				*ct_fb_filename;
 
 #define _PATH_LS "ls"
@@ -329,7 +330,7 @@ ctfb_main(int argc, char *argv[])
 	ct_prompt_for_login_password(conf);
 
 	/* We may have to download files later, always set up */
-	state = ct_init(conf, 1, 0);
+	ctfb_state = state = ct_init(conf, 1, 0);
 
 	/* if we're in remote mode, try and grab the appropriate files */
 	if (conf->ct_ctfile_mode == CT_MDMODE_REMOTE) {
