@@ -69,12 +69,12 @@ RB_GENERATE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 
 /* Directory traversal and transformation of generated data */
 static void		 ct_traverse(struct ct_archive_state *, char **,
-			     struct flist_head *, int, int, int, int);
+			     struct flist_head *, int, int, int, int, int);
 static int		 ct_sched_backup_file(struct ct_archive_state *,
 			     struct stat *, char *, int, int, int,
 			     struct flist_head *, struct fl_tree *);
 static struct fnode	*ct_populate_fnode_from_flist(struct ct_archive_state *,
-			     struct flist *, int);
+			     struct flist *, int, int);
 static char		*ct_name_to_safename(char *, int);
 
 /* Helper functions for the above */
@@ -108,9 +108,6 @@ int			 ct_chmod(struct ct_extract_state *, struct fnode *,
 int			 ct_utimes(struct ct_extract_state *, struct fnode *);
 int			 ct_unlink(struct ct_extract_state *, struct fnode *);
 
-
-extern int		 ct_follow_symlinks;
-
 RB_HEAD(d_name_tree, dnode);
 RB_PROTOTYPE(d_name_tree, dnode, ds_rb, ct_dname_cmp);
 RB_GENERATE(d_name_tree, dnode, d_rb_name, ct_dname_cmp);
@@ -120,7 +117,6 @@ ct_dname_cmp(struct dnode *d1, struct dnode *d2)
 {
 	return strcmp(d2->d_name, d1->d_name);
 }
-
 
 static void
 ct_flnode_cleanup(struct flist_head *head)
@@ -218,7 +214,7 @@ gen_sname(struct flist *flnode, int strip_slash)
 struct fnode *
 ct_get_next_fnode(struct ct_archive_state *cas, struct flist_head *head,
     struct flist **flist, struct ct_match *include, struct ct_match *exclude,
-    int strip_slash)
+    int strip_slash, int follow_symlinks)
 {
 	struct fnode	*fnode;
 again:
@@ -233,7 +229,7 @@ again:
 	 * we find a valid file or we run out of options.
 	 */
 	while ((fnode = ct_populate_fnode_from_flist(cas, *flist,
-	    strip_slash)) == NULL &&
+	    strip_slash, follow_symlinks)) == NULL &&
 	    (*flist = TAILQ_NEXT(*flist, fl_list)) != NULL)
 		;
 	if (fnode == NULL)
@@ -257,7 +253,7 @@ again:
 
 static struct fnode *
 ct_populate_fnode_from_flist(struct ct_archive_state *cas,
-    struct flist *flnode, int strip_slash)
+    struct flist *flnode, int strip_slash, int follow_symlinks)
 {
 	struct fnode		*fnode;
 	struct stat		*sb, sbstore;
@@ -295,14 +291,14 @@ ct_populate_fnode_from_flist(struct ct_archive_state *cas,
 		    ct_archive_get_rootdir(cas)->d_name, fname);
 	}
 
-	if (ct_follow_symlinks)
+	if (follow_symlinks)
 		ret = stat(path, sb);
 	else
 		ret = lstat(path, sb);
 #else
 	fname = e_strdup(flnode->fl_fname);
 	ret = fstatat(flnode->fl_parent_dir->d_fd, flnode->fl_fname,
-	    sb, ct_follow_symlinks ? 0 : AT_SYMLINK_NOFOLLOW);
+	    sb, follow_symlinks ? 0 : AT_SYMLINK_NOFOLLOW);
 #endif
 	if (ret != 0) {
 		e_free(&fname);
@@ -362,7 +358,7 @@ ct_populate_fnode_from_flist(struct ct_archive_state *cas,
 #ifndef CT_NO_OPENAT
 		/* XXX O_SEARCH */
 		dopenflags = O_DIRECTORY | O_RDONLY | O_NOFOLLOW;
-		if ((flnode->fl_flags & C_FF_FORCEDIR) || ct_follow_symlinks)
+		if ((flnode->fl_flags & C_FF_FORCEDIR) || follow_symlinks)
 			dopenflags &= ~O_NOFOLLOW;
 
 		if ((dfound->d_fd = openat(fnode->fl_parent_dir->d_fd,
@@ -631,7 +627,8 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 			CFATALX("can't chdir to %s", caa->caa_tdir);
 		ct_traverse(state->archive_state, filelist, &cap->cap_flist,
 		    caa->caa_no_cross_mounts, caa->caa_strip_slash,
-		    caa->caa_follow_root_symlink, state->ct_verbose);
+		    caa->caa_follow_root_symlink, caa->caa_follow_symlinks,
+		    state->ct_verbose);
 		if (caa->caa_tdir && chdir(caa->caa_tdir) != 0)
 			CFATALX("can't chdir back to %s", cwd);
 		/*
@@ -642,7 +639,8 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		cap->cap_curlist = NULL;
 		if ((cap->cap_curnode = ct_get_next_fnode(state->archive_state,
 		    &cap->cap_flist, &cap->cap_curlist, cap->cap_include,
-		    cap->cap_exclude, caa->caa_strip_slash)) == NULL)
+		    cap->cap_exclude, caa->caa_strip_slash,
+		    caa->caa_follow_symlinks)) == NULL)
 			CFATALX("all files specified excluded or nonexistant");
 
 
@@ -695,7 +693,7 @@ loop:
 			 * no (new) files in them
 			 */
 			if (ct_stat(cap->cap_curnode, &sb,
-			    ct_follow_symlinks, NULL,
+			    caa->caa_follow_symlinks, NULL,
 			    state->archive_state) != 0) {
 				CWARN("archive: dir %s stat error",
 				    cap->cap_curnode->fl_sname);
@@ -732,7 +730,8 @@ loop:
 		}
 
 		if ((cap->cap_fd = ct_open(state->archive_state,
-		    cap->cap_curnode, O_RDONLY, ct_follow_symlinks)) == -1) {
+		    cap->cap_curnode, O_RDONLY,
+		    caa->caa_follow_symlinks)) == -1) {
 			CWARN("archive: unable to open file '%s'",
 			    cap->cap_curnode->fl_sname);
 			ct_trans_free(state, ct_trans);
@@ -877,7 +876,8 @@ next_file:
 skip:
 		if ((cap->cap_curnode = ct_get_next_fnode(state->archive_state,
 		    &cap->cap_flist, &cap->cap_curlist, cap->cap_include,
-		    cap->cap_exclude, caa->caa_strip_slash)) == NULL) {
+		    cap->cap_exclude, caa->caa_strip_slash,
+		    caa->caa_follow_symlinks)) == NULL) {
 			CNDBG(CT_LOG_FILE, "no more files");
 		} else {
 			CNDBG(CT_LOG_FILE, "going to next file %s",
@@ -921,7 +921,7 @@ done:
 static void
 ct_traverse(struct ct_archive_state *cas, char **paths,
     struct flist_head *files, int no_cross_mounts, int strip_slash,
-    int follow_root_symlink, int verbose)
+    int follow_root_symlink, int follow_symlinks, int verbose)
 {
 	FTS			*ftsp;
 	FTSENT			*fe;
@@ -933,12 +933,11 @@ ct_traverse(struct ct_archive_state *cas, char **paths,
 
 	RB_INIT(&ino_tree);
 	fts_options = FTS_NOCHDIR;
-	if (ct_follow_symlinks)
+	if (follow_symlinks)
 		fts_options |= FTS_LOGICAL;
 	else
 		fts_options |= FTS_PHYSICAL;
 	if (follow_root_symlink) {
-		CWARNX("-H");
 		fts_options |= FTS_COMFOLLOW;
 	}
 	if (no_cross_mounts)
@@ -1169,6 +1168,7 @@ struct ct_extract_state {
 	int			 ces_fd;
 	int			 ces_attr;
 	int			 ces_verbose;
+	int			 ces_follow_symlinks;
 	struct dnode		*ces_rootdir;
 	struct dnode		*ces_prevdir;
 	struct dnode		**ces_prevdir_list;
@@ -1182,7 +1182,8 @@ void	ct_file_extract_opento(struct ct_extract_state *, struct dnode *,
 	    struct dnode *);
 
 struct ct_extract_state *
-ct_file_extract_init(const char *tdir, int attr, int verbose)
+ct_file_extract_init(const char *tdir, int attr, int follow_symlinks,
+    int verbose)
 {
 	struct ct_extract_state	*ces;
 	char			 tpath[PATH_MAX];
@@ -1192,6 +1193,7 @@ ct_file_extract_init(const char *tdir, int attr, int verbose)
 	ces->ces_fd = -1;
 	ces->ces_rootdir = e_calloc(1, sizeof(*ces->ces_rootdir));;
 	ces->ces_attr = attr;
+	ces->ces_follow_symlinks = follow_symlinks;
 	ces->ces_verbose = verbose;
 	RB_INIT(&ces->ces_dname_head);
 
@@ -1499,7 +1501,7 @@ link_again:
 					goto link_out;
 				}
 				if (ct_stat(fnode, &lsb,
-				    ct_follow_symlinks, ces, NULL) != 0) {
+				    ces->ces_follow_symlinks, ces, NULL) != 0) {
 					CWARN("can't stat %s", fnode->fl_sname);
 					goto link_out;
 				}
@@ -1564,7 +1566,7 @@ link_out:
 	} else {
 		safe_mode = S_IRWXU | S_IRWXG | S_IRWXO;
 		if (ces->ces_attr) {
-			/* XXX should this depend on ct_follow_symlinks? */
+			/* XXX should this depend on follow_symlinks? */
 			if (ct_chown(ces, fnode, 1) != 0) {
 				if (errno == EPERM && geteuid() != 0) {
 					if (ces->ces_verbose)
@@ -1744,7 +1746,7 @@ try_again:
 		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
 		    child->d_name);
 	}
-	if (ct_follow_symlinks) {
+	if (ces->ces_follow_symlinks) {
 		ret = stat(path, &sb);
 	} else {
 		ret = lstat(path, &sb);
@@ -1766,7 +1768,7 @@ try_again:
 #else
 	if ((child->d_fd = openat(child->d_parent->d_fd, child->d_sname,
 	    O_DIRECTORY | O_RDONLY |
-	    ct_follow_symlinks ? 0 : O_NOFOLLOW)) == -1) {
+	    ces->ces_follow_symlinks ? 0 : O_NOFOLLOW)) == -1) {
 		savederrno = errno;
 		/* if it doesn't exist, make the file with safe permissions */
 		if (errno == ENOENT && createtries++ == 0 &&
@@ -1776,7 +1778,7 @@ try_again:
 		/* if it exists but we can't access it, try and chmod the dir */
 		if (errno == EACCES && chmodtries++ == 0 &&
 		    fchmodat(child->d_parent->d_fd, child->d_sname,
-			S_IRWXU, ct_follow_symlinks ? 0 :
+			S_IRWXU, ces->ces_follow_symlinks ? 0 :
 			AT_SYMLINK_NOFOLLOW) == 0)
 			goto try_again;
 		errno = savederrno;
@@ -1849,7 +1851,7 @@ ct_stat(struct fnode *fnode, struct stat *sb, int follow_symlinks,
 		    ces->ces_rootdir->d_name : cas->cas_rootdir->d_name,
 		    ces ? fnode->fl_sname : fnode->fl_fname);
 	}
-	if (ct_follow_symlinks)
+	if (follow_symlinks)
 		return (stat(path, sb));
 	else
 		return (lstat(path, sb));

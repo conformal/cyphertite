@@ -307,6 +307,7 @@ struct ct_extract_args {
 	int			 cea_matchmode;
 	int			 cea_strip_slash;
 	int			 cea_attr;
+	int			 cea_follow_symlinks;
 };
 
 struct ct_archive_args {
@@ -325,6 +326,7 @@ struct ct_archive_args {
 	int			 caa_max_differentials;
 	int			 caa_strip_slash;
 	int			 caa_follow_root_symlink;
+	int			 caa_follow_symlinks;
 };
 
 struct ct_extract_file_args {
@@ -598,7 +600,7 @@ void			 ct_archive_cleanup(struct ct_archive_state *);
 
 /* ct_file.c: extract functions */
 struct ct_extract_state;
-struct ct_extract_state	*ct_file_extract_init(const char *, int, int);
+struct ct_extract_state	*ct_file_extract_init(const char *, int, int, int);
 struct dnode		*ct_file_extract_get_rootdir(struct ct_extract_state *);
 struct dnode		*ct_file_extract_insert_dir(struct ct_extract_state *,
 			     struct dnode *);

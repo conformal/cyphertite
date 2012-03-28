@@ -62,7 +62,6 @@ extern char		*__progname;
 /* command line flags */
 int			ct_debug = 0;
 int			ct_action = 0;
-int			ct_follow_symlinks = 0;
 
 void
 ct_usage(void)
@@ -304,6 +303,7 @@ ct_main(int argc, char **argv)
 	int				 no_cross_mounts = 0;
 	int				 strip_slash = 1;
 	int				 follow_root_symlink = 0;
+	int				 follow_symlinks = 0;
 	int				 attr = 0;
 	int				 verbose = 0;
 	int				 verbose_ratios = 0;
@@ -368,7 +368,7 @@ ct_main(int argc, char **argv)
 			ctfile = optarg;
 			break;
 		case 'h':
-			ct_follow_symlinks = 1;
+			follow_symlinks = 1;
 			break;
 		case 'm': /* metadata processing - XXX temporary? */
 			ct_metadata = 1;
@@ -502,6 +502,7 @@ ct_main(int argc, char **argv)
 			cea.cea_tdir = ct_tdir;
 			cea.cea_strip_slash = strip_slash;
 			cea.cea_attr = attr;
+			cea.cea_follow_symlinks = follow_symlinks;
 			ctfile_find_for_operation(state, ctfile,
 			    ((ct_action == CT_A_EXTRACT)  ?
 			    ctfile_nextop_extract : ctfile_nextop_list),
@@ -522,6 +523,7 @@ ct_main(int argc, char **argv)
 			caa.caa_no_cross_mounts = no_cross_mounts;
 			caa.caa_strip_slash = strip_slash;
 			caa.caa_follow_root_symlink = follow_root_symlink;
+			cea.cea_follow_symlinks = follow_symlinks;
 			caa.caa_max_differentials = conf->ct_max_differentials;
 			if (conf->ct_auto_differential)
 				/*
@@ -578,6 +580,7 @@ ct_main(int argc, char **argv)
 			caa.caa_no_cross_mounts = no_cross_mounts;
 			caa.caa_strip_slash = strip_slash;
 			caa.caa_follow_root_symlink = follow_root_symlink;
+			caa.caa_follow_symlinks = follow_symlinks;
 			caa.caa_max_differentials = 0; /* unlimited */
 			caa.caa_tag = ctfile;
 			ct_add_operation(state, ct_archive, NULL, &caa);
@@ -589,6 +592,7 @@ ct_main(int argc, char **argv)
 			cea.cea_ctfile_basedir = NULL;
 			cea.cea_strip_slash = strip_slash;
 			cea.cea_attr = attr;
+			cea.cea_follow_symlinks = follow_symlinks;
 			ct_add_operation(state, ct_extract, NULL, &cea);
 		} else {
 			CWARNX("must specify action");

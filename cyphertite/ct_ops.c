@@ -77,7 +77,7 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode,
 	int				 ret;
 	char				 shat[SHA_DIGEST_STRING_LENGTH];
 
-	ces = ct_file_extract_init(NULL, 1, verbose);
+	ces = ct_file_extract_init(NULL, 1, 1, verbose);
 	match = ct_match_compile(match_mode, flist);
 	if (excludelist != NULL)
 		ex_match = ct_match_compile(match_mode, excludelist);
@@ -350,7 +350,8 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 		    &ex_priv->xdr_ctx, ctfile, cea->cea_ctfile_basedir,
 		    &ex_priv->allfiles, state->ct_verbose);
 		state->extract_state = ct_file_extract_init(cea->cea_tdir,
-		    cea->cea_attr,  state->ct_verbose);
+		    cea->cea_attr,  cea->cea_follow_symlinks,
+		    state->ct_verbose);
 		if (state->ct_max_block_size <
 		    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size)
 			CFATALX("block size negotiated with server %d is "
@@ -608,7 +609,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			    state->ct_max_block_size,
 			    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size);
 		state->extract_state = ct_file_extract_init(NULL,
-		    0,  state->ct_verbose);
+		    0, 0, state->ct_verbose);
 		break;
 	case CT_S_FINISHED:
 		return;
