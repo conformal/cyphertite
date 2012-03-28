@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.1.2
+%define version		1.1.1
 %define release		1
 
 Name: 		%{name}
