@@ -7,6 +7,7 @@ Changes in 1.1.1 (Wed Mar 28 2012)
   - Add pthreads support to provide a performance boost over previous
     releases of cyphertite
   - Fix extract error when extracting to another directory ie '-C'
+  - Fix cull path problem where files were downloaded incorrectly
   - Update Copyrights for 2012
   - Packaging fixes for FreeBSD
 
