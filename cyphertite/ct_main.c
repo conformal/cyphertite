@@ -159,7 +159,7 @@ ct_init_eventloop(struct ct_global_state *state)
 	state->ct_db_state = ctdb_setup(state->ct_config->ct_localdb,
 	    state->ct_config->ct_crypto_secrets != NULL);
 
-	gettimeofday(&ct_stats->st_time_start, NULL);
+	gettimeofday(&state->ct_stats->st_time_start, NULL);
 	state->ct_assl_ctx = ct_ssl_connect(state, 0);
 	if (ct_assl_negotiate_poll(state))
 		CFATALX("negotiate failed");

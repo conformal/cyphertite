@@ -69,10 +69,12 @@ RB_GENERATE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 
 /* Directory traversal and transformation of generated data */
 static void		 ct_traverse(struct ct_archive_state *, char **,
-			     struct flist_head *, int, int, int, int, int);
+			     struct flist_head *, int, int, int, int, int,
+			     struct ct_statistics *);
 static int		 ct_sched_backup_file(struct ct_archive_state *,
 			     struct stat *, char *, int, int, int,
-			     struct flist_head *, struct fl_tree *);
+			     struct flist_head *, struct fl_tree *,
+			     struct ct_statistics *);
 static struct fnode	*ct_populate_fnode_from_flist(struct ct_archive_state *,
 			     struct flist *, int, int);
 static char		*ct_name_to_safename(char *, int);
@@ -80,7 +82,8 @@ static char		*ct_name_to_safename(char *, int);
 /* Helper functions for the above */
 static char		*eat_double_dots(char *, char *);
 static int		 backup_prefix(struct ct_archive_state *, char *,
-			     struct flist_head *, struct fl_tree *, int);
+			     struct flist_head *, struct fl_tree *, int,
+			     struct ct_statistics *);
 static char		*gen_fname(struct flist *);
 static int		 s_to_e_type(int);
 
@@ -470,7 +473,8 @@ ct_archive_cleanup(struct ct_archive_state *cas)
 static int
 ct_sched_backup_file(struct ct_archive_state *cas, struct stat *sb,
     char *filename, int forcedir, int closedir, int strip_slash,
-    struct flist_head *flist, struct fl_tree *ino_tree)
+    struct flist_head *flist, struct fl_tree *ino_tree,
+    struct ct_statistics *ct_stats)
 {
 	struct flist		*flnode;
 	const char		*safe;
@@ -628,7 +632,7 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		ct_traverse(state->archive_state, filelist, &cap->cap_flist,
 		    caa->caa_no_cross_mounts, caa->caa_strip_slash,
 		    caa->caa_follow_root_symlink, caa->caa_follow_symlinks,
-		    state->ct_verbose);
+		    state->ct_verbose, state->ct_stats);
 		if (caa->caa_tdir && chdir(caa->caa_tdir) != 0)
 			CFATALX("can't chdir back to %s", cwd);
 		/*
@@ -825,7 +829,7 @@ loop:
 		rlen = read(cap->cap_fd, ct_trans->tr_data[0], rsz);
 
 	if (rlen > 0)
-		ct_stats->st_bytes_read += rlen;
+		state->ct_stats->st_bytes_read += rlen;
 
 	ct_trans->tr_ctfile = cap->cap_cws;
 	ct_trans->tr_fl_node = cap->cap_curnode;
@@ -921,7 +925,8 @@ done:
 static void
 ct_traverse(struct ct_archive_state *cas, char **paths,
     struct flist_head *files, int no_cross_mounts, int strip_slash,
-    int follow_root_symlink, int follow_symlinks, int verbose)
+    int follow_root_symlink, int follow_symlinks, int verbose, struct
+    ct_statistics *ct_stats)
 {
 	FTS			*ftsp;
 	FTSENT			*fe;
@@ -986,7 +991,7 @@ ct_traverse(struct ct_archive_state *cas, char **paths,
 			if (follow_root_symlink && fe->fts_info == FTS_D)
 				forcedir = 1;
 			if (backup_prefix(cas, clean, files, &ino_tree,
-			    strip_slash))
+			    strip_slash, ct_stats))
 				CFATAL("backup_prefix failed");
 		}
 
@@ -995,7 +1000,7 @@ ct_traverse(struct ct_archive_state *cas, char **paths,
 sched:
 		if (ct_sched_backup_file(cas, fe->fts_statp, clean, forcedir,
 		    fe->fts_info == FTS_DP ? 1 : 0, strip_slash, files,
-		    &ino_tree))
+		    &ino_tree, ct_stats))
 			CFATAL("backup_file failed: %s", clean);
 
 	}
@@ -1100,7 +1105,8 @@ done:
 
 static int
 backup_prefix(struct ct_archive_state *cas, char *root,
-    struct flist_head *flist, struct fl_tree *ino_tree, int strip_slash)
+    struct flist_head *flist, struct fl_tree *ino_tree, int strip_slash,
+    struct ct_statistics *ct_stats)
 {
 	char			dir[PATH_MAX], rbuf[PATH_MAX], pfx[PATH_MAX];
 	char			*cp, *p;
@@ -1134,7 +1140,7 @@ backup_prefix(struct ct_archive_state *cas, char *root,
 		}
 
 		if (ct_sched_backup_file(cas, &sb, dir, 1, 0, strip_slash,
-		    flist, ino_tree))
+		    flist, ino_tree, ct_stats))
 			return (1);
 	}
 

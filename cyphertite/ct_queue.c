@@ -66,11 +66,10 @@ ct_cmp_iotrans(struct ct_trans *c1, struct ct_trans *c2)
 
 /* structure to push data to next cache line - cache isolation */
 struct ct_global_state  ct_int_state;
-struct ct_stat ct_int_stats;
+struct ct_statistics ct_int_stats;
 
 
 struct ct_global_state *ct_state = &ct_int_state;
-struct ct_stat *ct_stats = &ct_int_stats;
 
 struct ct_global_state *
 ct_setup_state(struct ct_config *conf)
@@ -81,7 +80,7 @@ ct_setup_state(struct ct_config *conf)
 	state = ct_state = &ct_int_state;
 
 	state->ct_config = conf;
-	ct_stats = &ct_int_stats;
+	state->ct_stats = &ct_int_stats;
 
 	TAILQ_INIT(&state->ct_trans_free_head);
 	state->ct_trans_id = 0;
@@ -284,7 +283,7 @@ skip_csha:
 	/* extract path */
 	case TR_S_EX_SHA:
 		/* XXX - atomic increment */
-		ct_stats->st_chunks_tot++;
+		state->ct_stats->st_chunks_tot++;
 		ct_queue_write(state, trans);
 		break;
 	case TR_S_EX_READ:
@@ -878,7 +877,7 @@ ct_compute_sha(void *vctx)
 			CFATALX("unexpected transaction state %d",
 			    trans->tr_state);
 		}
-		ct_stats->st_chunks_tot++;
+		state->ct_stats->st_chunks_tot++;
 		slot = trans->tr_dataslot;
 		CNDBG(CT_LOG_SHA,
 		    "computing sha for trans %" PRIu64 " slot %d, size %d",
@@ -888,7 +887,7 @@ ct_compute_sha(void *vctx)
 		ct_sha1_add(trans->tr_data[slot], &fnode->fl_shactx,
 		    trans->tr_size[slot]);
 
-		ct_stats->st_bytes_sha += trans->tr_size[slot];
+		state->ct_stats->st_bytes_sha += trans->tr_size[slot];
 
 		if (ct_debug) {
 			ct_sha1_encode(trans->tr_sha, shat);
@@ -897,7 +896,7 @@ ct_compute_sha(void *vctx)
 			    trans->tr_trans_id, shat, trans->tr_size[slot]);
 		}
 		if (ctdb_exists(state->ct_db_state, trans)) {
-			ct_stats->st_bytes_exists += trans->tr_chsize;
+			state->ct_stats->st_bytes_exists += trans->tr_chsize;
 			trans->tr_state = TR_S_WMD_READY;
 		} else {
 			trans->tr_state = TR_S_UNCOMPSHA_ED;
@@ -927,7 +926,7 @@ ct_compute_csha(void *vctx)
 		ct_sha1(trans->tr_data[slot], trans->tr_csha,
 		    trans->tr_size[slot]);
 
-		ct_stats->st_bytes_csha += trans->tr_size[slot];
+		state->ct_stats->st_bytes_csha += trans->tr_size[slot];
 
 		if (ct_debug) {
 			ct_sha1_encode(trans->tr_sha, shat);
@@ -983,12 +982,12 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 				CWARNX("failed to write trailer sha");
 			ct_print_file_end(fnode, state->ct_verbose,
 			    state->ct_max_block_size);
-			ct_stats->st_files_completed++;
+			state->ct_stats->st_files_completed++;
 			release_fnode = 1;
 		}
 		break;
 	case TR_S_WMD_READY:
-		ct_stats->st_chunks_completed++;
+		state->ct_stats->st_chunks_completed++;
 		if (trans->tr_eof < 2) {
 			CNDBG(CT_LOG_CTFILE, "XoX sha sz %d eof %d",
 			    trans->tr_size[(int)trans->tr_dataslot],
@@ -1032,12 +1031,12 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 			    trans->tr_fl_node);
 		}
 		release_fnode = 1;
-		ct_stats->st_files_completed++;
+		state->ct_stats->st_files_completed++;
 		break;
 	case TR_S_EX_READ:
 	case TR_S_EX_DECRYPTED:
 	case TR_S_EX_UNCOMPRESSED:
-		ct_stats->st_chunks_completed++;
+		state->ct_stats->st_chunks_completed++;
 		if (trans->tr_fl_node->fl_skip_file == 0) {
 			slot = trans->tr_dataslot;
 			ct_sha1_add(trans->tr_data[slot],
@@ -1046,7 +1045,8 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 			ct_file_extract_write(state->extract_state,
 			    trans->tr_fl_node, trans->tr_data[slot],
 			    trans->tr_size[slot]);
-			ct_stats->st_bytes_written += trans->tr_size[slot];
+			state->ct_stats->st_bytes_written +=
+			    trans->tr_size[slot];
 		}
 		break;
 	case TR_S_EX_SPECIAL:
@@ -1163,7 +1163,7 @@ ct_process_write(void *vctx)
 			data = trans->tr_data[slot];
 			hdr->c_opcode = C_HDR_O_WRITE;
 			hdr->c_size = trans->tr_size[slot];
-			ct_stats->st_bytes_sent += trans->tr_size[slot];
+			state->ct_stats->st_bytes_sent += trans->tr_size[slot];
 			break;
 		case TR_S_COMPSHA_ED:
 			data = trans->tr_csha;
@@ -1247,7 +1247,7 @@ ct_handle_exists_reply(struct ct_global_state *state, struct ct_trans *trans,
 	case C_HDR_S_EXISTS:
 		/* enter shas into local db */
 		trans->tr_state = TR_S_EXISTS;
-		ct_stats->st_bytes_exists += trans->tr_chsize;
+		state->ct_stats->st_bytes_exists += trans->tr_chsize;
 		ct_queue_transfer(state, trans);
 		break;
 	case C_HDR_S_DOESNTEXIST:
@@ -1355,7 +1355,7 @@ ct_handle_read_reply(struct ct_global_state *state, struct ct_trans *trans,
 	}
 	trans->tr_size[slot] = trans->hdr.c_size = hdr->c_size;
 	trans->hdr.c_flags = hdr->c_flags;
-	ct_stats->st_bytes_read += trans->tr_size[slot];
+	state->ct_stats->st_bytes_read += trans->tr_size[slot];
 
 	ct_queue_transfer(state, trans);
 	ct_header_free(NULL, hdr);
@@ -1435,8 +1435,9 @@ ct_compute_compress(void *vctx)
 			}
 			if (rv == 0)
 				trans->hdr.c_flags |= ncompmode;
-			ct_stats->st_bytes_compressed += newlen;
-			ct_stats->st_bytes_uncompressed += trans->tr_chsize;
+			state->ct_stats->st_bytes_compressed += newlen;
+			state->ct_stats->st_bytes_uncompressed +=
+			    trans->tr_chsize;
 		} else {
 			newlen = state->ct_max_block_size;
 			rv = ct_uncompress(src, dst, len, &newlen);
@@ -1541,7 +1542,7 @@ ct_compute_encrypt(void *vctx)
 		    "%scrypt block of %d to %lu", encr ? "en" : "de",
 		    len, (unsigned long) newlen);
 
-		ct_stats->st_bytes_crypted += newlen;
+		state->ct_stats->st_bytes_crypted += newlen;
 
 		trans->tr_size[!slot] = newlen;
 		trans->tr_dataslot = !slot;

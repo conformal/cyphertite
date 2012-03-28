@@ -185,7 +185,7 @@ loop:
 		ct_trans->tr_eof = 1;
 		ct_trans->hdr.c_flags = C_HDR_F_METADATA;
 		ct_trans->tr_ctfile_name = rname;
-		ct_stats->st_bytes_tot += cas->cas_size;
+		state->ct_stats->st_bytes_tot += cas->cas_size;
 		e_free(&cas);
 		op->op_priv = NULL;
 		ct_queue_first(state, ct_trans);
@@ -207,7 +207,7 @@ loop:
 
 	CNDBG(CT_LOG_FILE, "read %ld", (long) rlen);
 
-	ct_stats->st_bytes_read += rlen;
+	state->ct_stats->st_bytes_read += rlen;
 
 	ct_trans->tr_fl_node = cas->cas_fnode;
 	ct_trans->tr_chsize = ct_trans->tr_size[0] = rlen;

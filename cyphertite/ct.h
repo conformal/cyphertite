@@ -70,7 +70,6 @@ struct ct_config {
 };
 
 extern int		ct_debug;
-extern struct ct_stat	*ct_stats;
 extern char		*__progname;
 extern int		ct_skip_xml_negotiate;
 
@@ -376,6 +375,7 @@ struct ct_global_state {
 
 	struct ct_extract_state		*extract_state;
 	struct ct_archive_state		*archive_state;
+	struct ct_statistics		*ct_stats;
 	TAILQ_HEAD(,ct_trans)		ct_trans_free_head;
 	int				ct_trans_id; /* next transaction id */
 	uint64_t			ct_packet_id; /* next complete id */
@@ -640,7 +640,7 @@ RB_PROTOTYPE(ct_trans_lookup, ct_trans, tr_trans_id, ct_cmp_trans);
 
 /* statistics */
 
-struct ct_stat {
+struct ct_statistics {
 	struct timeval		st_time_start;
 	struct timeval		st_time_scan_end;
 

@@ -556,50 +556,50 @@ ct_dump_stats(struct ct_global_state *state, FILE *outfh)
 
 	gettimeofday(&time_end, NULL);
 
-	timersub(&time_end, &ct_stats->st_time_start, &time_delta);
+	timersub(&time_end, &state->ct_stats->st_time_start, &time_delta);
 	sec = (int64_t)time_delta.tv_sec;
-	timersub(&ct_stats->st_time_scan_end, &ct_stats->st_time_start,
-		    &scan_delta);
+	timersub(&state->ct_stats->st_time_scan_end,
+	    &state->ct_stats->st_time_start, &scan_delta);
 
 	if (ct_action == CT_A_ARCHIVE) {
 		fprintf(outfh, "Files scanned\t\t\t%12" PRIu64 "\n",
-		    ct_stats->st_files_scanned);
+		    state->ct_stats->st_files_scanned);
 
 		ct_print_scaled_stat(outfh, "Total bytes\t\t\t",
-		    (int64_t)ct_stats->st_bytes_tot, sec, 1);
+		    (int64_t)state->ct_stats->st_bytes_tot, sec, 1);
 	}
 
 	if (ct_action == CT_A_ARCHIVE &&
-	    ct_stats->st_bytes_tot != ct_stats->st_bytes_read)
+	    state->ct_stats->st_bytes_tot != state->ct_stats->st_bytes_read)
 		ct_print_scaled_stat(outfh, "Bytes read\t\t\t",
-		    (int64_t)ct_stats->st_bytes_read, sec, 1);
+		    (int64_t)state->ct_stats->st_bytes_read, sec, 1);
 
 	if (ct_action == CT_A_EXTRACT)
 		ct_print_scaled_stat(outfh, "Bytes written\t\t\t",
-		    (int64_t)ct_stats->st_bytes_written, sec, 1);
+		    (int64_t)state->ct_stats->st_bytes_written, sec, 1);
 
 	if (ct_action == CT_A_ARCHIVE) {
 		ct_print_scaled_stat(outfh, "Bytes compressed\t\t",
-		    (int64_t)ct_stats->st_bytes_compressed, sec, 0);
+		    (int64_t)state->ct_stats->st_bytes_compressed, sec, 0);
 		fprintf(outfh, "\t(%" PRId64 "%%)\n",
-		    (ct_stats->st_bytes_uncompressed == 0) ? (int64_t)0 :
-		    (int64_t)(ct_stats->st_bytes_compressed * 100 /
-		    ct_stats->st_bytes_uncompressed));
+		    (state->ct_stats->st_bytes_uncompressed == 0) ? (int64_t)0 :
+		    (int64_t)(state->ct_stats->st_bytes_compressed * 100 /
+		    state->ct_stats->st_bytes_uncompressed));
 
 		fprintf(outfh,
 		    "Bytes exists\t\t\t%12" PRIu64 "\t(%" PRId64 "%%)\n",
-		    ct_stats->st_bytes_exists,
-		    (ct_stats->st_bytes_exists == 0) ? (int64_t)0 :
-		    (int64_t)(ct_stats->st_bytes_exists * 100 /
-		    ct_stats->st_bytes_tot));
+		    state->ct_stats->st_bytes_exists,
+		    (state->ct_stats->st_bytes_exists == 0) ? (int64_t)0 :
+		    (int64_t)(state->ct_stats->st_bytes_exists * 100 /
+		    state->ct_stats->st_bytes_tot));
 
 		fprintf(outfh, "Bytes sent\t\t\t%12" PRIu64 "\n",
-		    ct_stats->st_bytes_sent);
+		    state->ct_stats->st_bytes_sent);
 
 		sign = " ";
-		if (ct_stats->st_bytes_tot != 0) {
-			total = ct_stats->st_bytes_tot;
-			sent = ct_stats->st_bytes_sent;
+		if (state->ct_stats->st_bytes_tot != 0) {
+			total = state->ct_stats->st_bytes_tot;
+			sent = state->ct_stats->st_bytes_sent;
 
 			if (sent <= total) {
 				val = 100 * (total - sent) / total;
@@ -617,20 +617,20 @@ ct_dump_stats(struct ct_global_state *state, FILE *outfh)
 
 	if (state->ct_verbose > 2) {
 		fprintf(outfh, "Total chunks\t\t\t%12" PRIu64 "\n",
-		    ct_stats->st_chunks_tot);
+		    state->ct_stats->st_chunks_tot);
 		fprintf(outfh, "Bytes crypted\t\t\t%12" PRIu64 "\n",
-		    ct_stats->st_bytes_crypted);
+		    state->ct_stats->st_bytes_crypted);
 
 		fprintf(outfh, "Bytes sha\t\t\t%12" PRIu64 "\n",
-		    ct_stats->st_bytes_sha);
+		    state->ct_stats->st_bytes_sha);
 		fprintf(outfh, "Bytes crypt\t\t\t%12" PRIu64 "\n",
-		    ct_stats->st_bytes_crypt);
+		    state->ct_stats->st_bytes_crypt);
 		fprintf(outfh, "Bytes csha\t\t\t%12" PRIu64 "\n",
-		    ct_stats->st_bytes_csha);
+		    state->ct_stats->st_bytes_csha);
 		fprintf(outfh, "Chunks completed\t\t%12" PRIu64 "\n",
-		    ct_stats->st_chunks_completed);
+		    state->ct_stats->st_chunks_completed);
 		fprintf(outfh, "Files completed\t\t\t%12" PRIu64 "\n",
-		    ct_stats->st_files_completed);
+		    state->ct_stats->st_files_completed);
 
 		if (ct_action == CT_A_ARCHIVE)
 			print_time_scaled(outfh, "Scan Time\t\t\t    ",
