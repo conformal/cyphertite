@@ -91,6 +91,8 @@ ct_setup_state(struct ct_config *conf)
 	state->ct_trans_alloc = 0;
 	 /* default block size, modified on server negotiation */
 	state->ct_max_block_size = 256 * 1024;
+	/* default max trans, modified by negotiation */
+	state->ct_max_trans = conf->ct_max_trans;
 
 	if (conf->ct_compress) {
 		ct_init_compression(conf->ct_compress);
@@ -416,7 +418,7 @@ ct_trans_alloc(struct ct_global_state *state)
 		trans->hdr.c_tag = tag;
 		state->ct_trans_free--;
 	} else {
-		if (state->ct_trans_alloc > ct_max_trans)
+		if (state->ct_trans_alloc > state->ct_max_trans)
 			return NULL;
 
 		state->ct_trans_alloc++;

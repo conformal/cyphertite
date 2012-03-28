@@ -42,8 +42,6 @@
 void ct_write_config(struct ct_config *, FILE *, int, int);
 void ct_default_config(struct ct_config *);
 
-int			ct_max_trans = 100;
-
 int
 ct_get_answer(char *prompt, char *a1, char *a2, char *default_val,
     char *answer, size_t answer_len, int secret)
@@ -624,8 +622,10 @@ ct_load_config(char **configfile)
 	char			 ct_fullcachedir[PATH_MAX];
 	int			 config_try = 0;
 	struct ct_settings	 settings[] = {
-		{ "queue_depth", CT_S_INT, &ct_max_trans, NULL, NULL, NULL },
-		{ "bandwidth", CT_S_INT, &conf.ct_io_bw_limit, NULL, NULL, NULL },
+		{ "queue_depth", CT_S_INT, &conf.ct_max_trans, NULL, NULL,
+		    NULL },
+		{ "bandwidth", CT_S_INT, &conf.ct_io_bw_limit, NULL, NULL,
+		    NULL },
 		{ "host", CT_S_STR, NULL, &conf.ct_host, NULL, NULL },
 		{ "hostport", CT_S_STR, NULL, &conf.ct_hostport, NULL, NULL },
 		{ "cache_db", CT_S_DIR, NULL, &conf.ct_localdb, NULL, NULL },
@@ -784,6 +784,7 @@ ct_default_config(struct ct_config *config)
 	config->ct_hostport = strdup("48879");
 	config->ct_ctfile_mode = CT_MDMODE_LOCAL;
 	config->ct_ctfile_max_cachesize = LLONG_MAX;
+	config->ct_max_trans = 100;
 }
 
 void

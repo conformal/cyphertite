@@ -57,6 +57,7 @@ struct ct_config {
 	char	*ct_polltype;
 	char	*ct_ctfile_cachedir;
 
+	int	ct_max_trans;
 	int	ct_compress;
 	int	ct_multilevel_allfiles;
 	int	ct_auto_differential;
@@ -235,8 +236,6 @@ void			ct_queue_transfer(struct ct_global_state *,
 struct ct_config	*ct_load_config(char **);
 void			 ct_unload_config(char *, struct ct_config *);
 
-extern int		ct_max_trans;
-
 void			 ct_prompt_for_login_password(struct ct_config *);
 void			 ct_normalize_username(char *);
 char			*ct_normalize_path(char *);
@@ -383,6 +382,7 @@ struct ct_global_state {
 	int				ct_tr_tag; /* next packet tag */
 	int				ct_max_block_size; /* negotiated */
 	int				ct_alloc_block_size; /* trans data sz */
+	int				ct_max_trans;
 	int				ct_trans_alloc;
 	int				ct_trans_free;
 	int				ct_sha_state;

@@ -251,12 +251,12 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 	/* send server request */
 	hdr.c_version = C_HDR_VERSION;
 	hdr.c_opcode = C_HDR_O_NEG;
-	hdr.c_tag = ct_max_trans;			/* XXX - fix */
+	hdr.c_tag = state->ct_max_trans;		/* XXX - fix */
 	hdr.c_size = 8;
-	buf[0] = (ct_max_trans >>  0) & 0xff;
-	buf[1] = (ct_max_trans >>  8) & 0xff;
-	buf[2] = (ct_max_trans >> 16) & 0xff;
-	buf[3] = (ct_max_trans >> 24) & 0xff;
+	buf[0] = (state->ct_max_trans >>  0) & 0xff;
+	buf[1] = (state->ct_max_trans >>  8) & 0xff;
+	buf[2] = (state->ct_max_trans >> 16) & 0xff;
+	buf[3] = (state->ct_max_trans >> 24) & 0xff;
 	buf[4] = (state->ct_max_block_size >>  0) & 0xff;
 	buf[5] = (state->ct_max_block_size >>  8) & 0xff;
 	buf[6] = (state->ct_max_block_size >> 16) & 0xff;
@@ -290,13 +290,13 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 				CWARNX("couldn't read neg parameters");
 				goto done;
 			}
-			ct_max_trans = buf[0] | (buf[1] << 8) |
+			state->ct_max_trans = buf[0] | (buf[1] << 8) |
 			    (buf[2] << 16) | (buf[3] << 24);
 			state->ct_max_block_size = buf[4] | (buf[5] << 8) |
 			    (buf[6] << 16) | (buf[7] << 24);
 		} else {
-			ct_max_trans =
-			    MIN(hdr.c_tag, ct_max_trans);
+			state->ct_max_trans =
+			    MIN(hdr.c_tag, state->ct_max_trans);
 			state->ct_max_block_size =
 			    MIN(hdr.c_size, state->ct_max_block_size);
 		}
@@ -306,7 +306,7 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 	}
 
 	CNDBG(CT_LOG_NET, "negotiated queue depth: %u max chunk size: %u",
-	    ct_max_trans, state->ct_max_block_size);
+	    state->ct_max_trans, state->ct_max_block_size);
 
 	ct_sha512((uint8_t *)state->ct_config->ct_password, pwd_digest,
 	    strlen(state->ct_config->ct_password));
