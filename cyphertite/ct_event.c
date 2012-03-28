@@ -242,7 +242,8 @@ ct_wakeup_write()
 void
 ct_info_sig(int fd, short event, void *vctx)
 {
-	ct_display_queues(ct_state);
+	struct ct_global_state	*state = vctx;
+	ct_display_queues(state);
 }
 
 void
@@ -255,21 +256,21 @@ ct_pipe_sig(int fd, short event, void *vctx)
  * wrap the event code in this file.
  */
 void
-ct_event_init(void)
+ct_event_init(struct ct_global_state *state)
 {
 	ct_evt_base = event_base_new();
 
 	/* cache siginfo */
 #if defined(SIGINFO) && SIGINFO != SIGUSR1
-	ct_ev_sig_info = evsignal_new(ct_evt_base, SIGINFO, ct_info_sig, NULL);
+	ct_ev_sig_info = evsignal_new(ct_evt_base, SIGINFO, ct_info_sig, state);
 	evsignal_add(ct_ev_sig_info, NULL);
 #endif
 #if defined(SIGUSR1)
-	ct_ev_sig_usr1 = evsignal_new(ct_evt_base, SIGUSR1, ct_info_sig, NULL);
+	ct_ev_sig_usr1 = evsignal_new(ct_evt_base, SIGUSR1, ct_info_sig, state);
 	evsignal_add(ct_ev_sig_usr1, NULL);
 #endif
 #if defined(SIGPIPE)
-	ct_ev_sig_pipe = evsignal_new(ct_evt_base, SIGPIPE, ct_pipe_sig, NULL);
+	ct_ev_sig_pipe = evsignal_new(ct_evt_base, SIGPIPE, ct_pipe_sig, state);
 	evsignal_add(ct_ev_sig_pipe, NULL);
 #endif
 }

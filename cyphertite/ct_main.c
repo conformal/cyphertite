@@ -126,9 +126,10 @@ ct_init(struct ct_config *conf, int need_secrets, int verbose)
 		conf->ct_io_bw_limit = conf->ct_io_bw_limit * 10 / 7;
 	}
 	assl_initialize();
-	ct_event_init();
 	state = ct_setup_state(conf);
 	state->ct_verbose = verbose;
+
+	ct_event_init(state);
 
 	if (need_secrets != 0 && conf->ct_crypto_secrets != NULL) {
 		if (stat(conf->ct_crypto_secrets, &sb) == -1) {

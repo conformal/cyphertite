@@ -441,10 +441,9 @@ struct ct_global_state {
 
 	int				ct_cur_compress_mode;
 };
-extern struct ct_global_state		*ct_state;
 
 extern struct event_base *ct_evt_base;
-void ct_event_init(void);
+void ct_event_init(struct ct_global_state *);
 int ct_event_dispatch(void);
 int ct_event_loopbreak(void);
 void ct_event_cleanup(void);
