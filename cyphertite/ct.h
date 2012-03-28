@@ -69,7 +69,6 @@ struct ct_config {
 	int	ct_io_bw_limit;
 };
 
-extern int		ct_debug;
 extern char		*__progname;
 extern int		ct_skip_xml_negotiate;
 

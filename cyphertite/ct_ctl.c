@@ -229,7 +229,6 @@ ctctl_main(int argc, char *argv[])
 		case 'D':
 			if (debugstring != NULL)
 				CFATALX("only one -D argument is valid");
-			ct_debug++;
 			debugstring = optarg;
 			break;
 		case 'F':
@@ -245,7 +244,7 @@ ctctl_main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (ct_debug) {
+	if (debugstring) {
 		cflags |= CLOG_F_DBGENABLE | CLOG_F_FILE | CLOG_F_FUNC |
 		    CLOG_F_LINE | CLOG_F_DTIME;
 		exude_enable(CT_LOG_EXUDE);

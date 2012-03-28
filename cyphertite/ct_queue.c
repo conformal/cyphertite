@@ -862,7 +862,7 @@ ct_compute_sha(void *vctx)
 			break;
 		case TR_S_WRITTEN:
 		case TR_S_EXISTS:
-			if (ct_debug) {
+			if (clog_mask_is_set(CT_LOG_SHA)) {
 				ct_sha1_encode(trans->tr_sha, shat);
 				CNDBG(CT_LOG_SHA,
 				    "entering sha into db %" PRIu64 " %s",
@@ -889,7 +889,7 @@ ct_compute_sha(void *vctx)
 
 		state->ct_stats->st_bytes_sha += trans->tr_size[slot];
 
-		if (ct_debug) {
+		if (clog_mask_is_set(CT_LOG_SHA)) {
 			ct_sha1_encode(trans->tr_sha, shat);
 			CNDBG(CT_LOG_SHA,
 			    "block tr_id %" PRIu64 " sha %s sz %d",
@@ -928,7 +928,7 @@ ct_compute_csha(void *vctx)
 
 		state->ct_stats->st_bytes_csha += trans->tr_size[slot];
 
-		if (ct_debug) {
+		if (clog_mask_is_set(CT_LOG_SHA)) {
 			ct_sha1_encode(trans->tr_sha, shat);
 			CNDBG(CT_LOG_SHA, "block tr_id %" PRIu64 " sha %s",
 			    trans->tr_trans_id, shat);
@@ -1348,7 +1348,7 @@ ct_handle_read_reply(struct ct_global_state *state, struct ct_trans *trans,
 		}
 	}
 
-	if (ct_debug) {
+	if (clog_mask_is_set(CT_LOG_NET)) {
 		ct_sha1_encode(trans->tr_sha, shat);
 		CNDBG(CT_LOG_NET, "chunk received for %s len %u flags %u", shat,
 		    hdr->c_size, hdr->c_flags);
