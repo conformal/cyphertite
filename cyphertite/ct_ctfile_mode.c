@@ -1167,8 +1167,9 @@ ct_cull_fetch_all_ctfiles(struct ct_op *op)
 			CNDBG(CT_LOG_CTFILE, "getting %s to %s", file->mlf_name,
 			    cachename);
 			cca = e_calloc(1, sizeof(*cca));
-			cca->cca_localname = cachename;
-			cca->cca_remotename = e_strdup(file->mlf_name);
+			cca->cca_localname =  e_strdup(file->mlf_name);
+			cca->cca_remotename = cca->cca_localname;
+			cca->cca_tdir = ctfile_cachedir;
 			cca->cca_ctfile = 1;
 			ct_add_operation_after(op, ctfile_extract,
 			    ct_cull_extract_cleanup, cca);
@@ -1185,7 +1186,6 @@ ct_cull_extract_cleanup(struct ct_op *op)
 	struct ct_ctfileop_args *cca = op->op_args;
 
 	e_free(&cca->cca_localname);
-	e_free(&cca->cca_remotename);
 	e_free(&cca);
 }
 
