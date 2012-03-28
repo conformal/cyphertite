@@ -1,3 +1,13 @@
+cyphertite (1.1.1-1) unstable; urgency=low
+
+  * Add pthreads support to provide a performance boost over previous
+    releases of cyphertite
+  * Fix extract error when extracting to another directory ie '-C'
+  * Update Copyrights for 2012
+  * Packaging fixes for FreeBSD
+
+ -- Conformal Systems <package-discuss@conformal.com>  Wed, 28 Mar 2012 15:54:23 -0500
+
 cyphertite (1.1.0-1) unstable; urgency=low
 
   * Fix major error in cull processing

@@ -3,6 +3,13 @@ User visible changes for cyphertite
   A high-security scalable solution for online backups
 ============================================================================
 
+Changes in 1.1.1 (Wed Mar 28 2012)
+  - Add pthreads support to provide a performance boost over previous
+    releases of cyphertite
+  - Fix extract error when extracting to another directory ie '-C'
+  - Update Copyrights for 2012
+  - Packaging fixes for FreeBSD
+
 Changes in 1.1.0 (Fri Mar 23 2012)
   - Fix major error in cull processing
   - Implement a major security enhancement on most systems by using

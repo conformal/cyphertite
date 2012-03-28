@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.1.0
+%define version		1.1.1
 %define release		1
 
 Name: 		%{name}
@@ -51,6 +51,12 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Wed Mar 28 2012 - drahn 1.1.1-1
+- Add pthreads support to provide a performance boost over previous
+  releases of cyphertite
+- Fix extract error when extracting to another directory ie '-C'
+- Update Copyrights for 2012
+- Packaging fixes for FreeBSD
 * Fri Mar 23 2012 - drahn 1.1.0-1
 - Fix major error in cull processing
 - Implement a major security enhancement on most systems by using
