@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include <exude.h>
 #include <clog.h>
