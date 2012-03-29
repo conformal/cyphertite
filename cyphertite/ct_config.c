@@ -109,44 +109,6 @@ struct ct_settings	settings[] = {
 	{ NULL, 0, NULL, NULL, NULL,  NULL }
 };
 
-char *
-ct_system_config(void)
-{
-	char			*conf;
-
-	e_asprintf(&conf, "%s", "/etc/cyphertite/cyphertite.conf");
-
-	return (conf);
-}
-
-char *
-ct_user_config(void)
-{
-	char			*conf;
-	struct			passwd *pwd;
-
-	pwd = getpwuid(getuid());
-	if (pwd == NULL)
-		CFATALX("invalid user %d", getuid());
-
-	e_asprintf(&conf, "%s/.cyphertite/cyphertite.conf", pwd->pw_dir);
-	return (conf);
-}
-
-char *
-ct_user_config_old(void)
-{
-	char			*conf;
-	struct			passwd *pwd;
-
-	pwd = getpwuid(getuid());
-	if (pwd == NULL)
-		CFATALX("invalid user %d", getuid());
-
-	e_asprintf(&conf, "%s/.cyphertite.conf", pwd->pw_dir);
-	return (conf);
-}
-
 int
 ct_get_answer(char *prompt, char *a1, char *a2, char *default_val,
     char *answer, size_t answer_len, int secret)
