@@ -44,10 +44,10 @@
 #include "ct_ext.h"
 
 
-SLIST_HEAD(ctfile_list, ctfile_list_file);
+SIMPLEQ_HEAD(ctfile_list, ctfile_list_file);
 
 struct ctfile_list			ctfile_list_files =
-				     SLIST_HEAD_INITIALIZER(&ctfile_list_files);
+				     SIMPLEQ_HEAD_INITIALIZER(ctfile_list_files);
 
 void ct_cull_send_shas(struct ct_op *);
 void ct_cull_setup(struct ct_op *);
@@ -653,14 +653,14 @@ ctfile_list_complete(int matchmode, char **flist, char **excludelist,
 	struct ct_match		*match, *ex_match = NULL;
 	struct ctfile_list_file	*file;
 
-	if (SLIST_EMPTY(&ctfile_list_files))
+	if (SIMPLEQ_EMPTY(&ctfile_list_files))
 		return;
 
 	match = ct_match_compile(matchmode, flist);
 	if (excludelist)
 		ex_match = ct_match_compile(matchmode, excludelist);
-	while ((file = SLIST_FIRST(&ctfile_list_files)) != NULL) {
-		SLIST_REMOVE_HEAD(&ctfile_list_files, mlf_link);
+	while ((file = SIMPLEQ_FIRST(&ctfile_list_files)) != NULL) {
+		SIMPLEQ_REMOVE_HEAD(&ctfile_list_files, mlf_link);
 		if (ct_match(match, file->mlf_name) == 0 && (ex_match == NULL ||
 		    ct_match(ex_match, file->mlf_name) == 1)) {
 			RB_INSERT(ctfile_list_tree, results, file);
@@ -809,7 +809,7 @@ ct_handle_xml_reply(struct ct_trans *trans, struct ct_header *hdr,
 				    &errstr);
 				if (errstr != NULL)
 					CFATAL("can't parse mtime: %s", errstr);
-				SLIST_INSERT_HEAD(&ctfile_list_files, file,
+				SIMPLEQ_INSERT_HEAD(&ctfile_list_files, file,
 				    mlf_link);
 			}
 		}

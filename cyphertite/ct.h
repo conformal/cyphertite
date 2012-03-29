@@ -275,7 +275,7 @@ RB_PROTOTYPE(ctfile_list_tree, ctfile_list_file, next, ct_cmp_ctfile);
 struct ctfile_list_file {
 	union {
 		RB_ENTRY(ctfile_list_file)	nxt;
-		SLIST_ENTRY(ctfile_list_file)	lnk;
+		SIMPLEQ_ENTRY(ctfile_list_file)	lnk;
 	}					mlf_entries;
 #define mlf_next	mlf_entries.nxt
 #define mlf_link	mlf_entries.lnk
