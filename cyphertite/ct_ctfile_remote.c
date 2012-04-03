@@ -503,8 +503,9 @@ ct_check_secrets_extract(struct ct_op *op)
 	struct ct_ctfileop_args	*cca;
 
 	if (!ct_file_on_server("crypto.secrets"))
-		CFATALX("upload_crypto_secrets set but not secrets file on"
-		    "server, please use cyphertitectl secrets_upload");
+		CFATALX("secrets_upload is set but no secrets file "
+		    "exists on the server.  Please use cyphertitectl "
+		    "secrets upload to correct this.");
 
 	cca = e_calloc(1, sizeof(*cca));
 	/* XXX temporary name? */
@@ -523,8 +524,8 @@ ct_compare_secrets(struct ct_op *op)
 {
 	struct ct_ctfileop_args		*cca = op->op_args;
 	FILE				*f, *tf;
-	char		 		 temp_path[PATH_MAX];
-	struct stat	 		 sb, tsb;
+	char				 temp_path[PATH_MAX];
+	struct stat			 sb, tsb;
 	char				 buf[1024], tbuf[1024];
 	size_t				 rsz;
 	off_t				 sz;
