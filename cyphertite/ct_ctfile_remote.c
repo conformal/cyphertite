@@ -503,7 +503,7 @@ ct_check_secrets_extract(struct ct_op *op)
 	struct ct_ctfileop_args	*cca;
 
 	if (!ct_file_on_server("crypto.secrets"))
-		CFATALX("secrets_upload is set but no secrets file "
+		CFATALX("upload_crypto_secrets is set but no secrets file "
 		    "exists on the server.  Please use cyphertitectl "
 		    "secrets upload to correct this.");
 
