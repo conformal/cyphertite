@@ -42,14 +42,14 @@ endif
 
 # Compiler and linker flags.
 CPPFLAGS += -DNEED_LIBCLENS
-INCFLAGS += -I../ctutil -I$(INCDIR)/clens
+INCFLAGS += -I../ctutil -I$(INCDIR)/clens -I.
 CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(DEBUG)
 CFLAGS += $(CTHREAD)
 LDFLAGS+= $(LDTHREAD)
 LDLIBS += -L../ctutil/obj -L../ctutil -lctutil -lassl -lclog -levent -lexude
 LDLIBS += -lshrink -lxmlsd -lexpat -lsqlite3 -llzma -llzo2 -lclens
 LDLIBS += ${LIB.LINKSTATIC} -lssl -lcrypto ${LIB.LINKDYNAMIC} -ldl
-LDLIBS += -ledit -lncurses -lz 
+LDLIBS += -ledit -lncurses -lz
 
 BIN.NAME = cyphertite
 BIN.LINKS = ct cyphertitectl ctctl cyphertitefb ctfb
