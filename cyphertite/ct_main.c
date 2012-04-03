@@ -41,7 +41,7 @@
 #include "ct_crypto.h"
 #include "ct_ctl.h"
 #include "ct_fb.h"
-#include "ct_ext.h"
+#include <ct_ext.h>
 
 #ifndef nitems
 #define nitems(_a)      (sizeof((_a)) / sizeof((_a)[0]))

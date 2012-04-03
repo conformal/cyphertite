@@ -36,7 +36,7 @@
 #include <exude.h>
 
 #include "ct.h"
-#include "ct_ext.h"
+#include <ct_ext.h>
 
 int			ct_max_trans = 100;
 int			ct_max_block_size = 256 * 1024;

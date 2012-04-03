@@ -39,8 +39,8 @@
 #include "ct_crypto.h"
 #include "ct_ctl.h"
 #include "ct_xml.h"
+#include <ct_ext.h>
 
-#include "ct_ext.h"
 
 void cull(struct ct_cli_cmd *, int , char **);
 void cpasswd(struct ct_cli_cmd *, int , char **);

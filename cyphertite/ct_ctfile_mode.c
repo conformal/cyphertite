@@ -41,7 +41,7 @@
 
 #include "ct.h"
 #include "ct_crypto.h"
-#include "ct_ext.h"
+#include <ct_ext.h>
 
 
 SIMPLEQ_HEAD(ctfile_list, ctfile_list_file);
