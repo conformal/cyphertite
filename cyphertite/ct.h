@@ -261,7 +261,7 @@ extern int		ct_action;
 #define CT_A_JUSTDL	(5)	/* fake option for ctfb */
 
 /* assl */
-struct ct_assl_io_ctx	*ct_assl_ctx;
+extern struct ct_assl_io_ctx	*ct_assl_ctx;
 
 struct ct_op;
 
@@ -553,7 +553,6 @@ struct ctfile_trailer {
 };
 
 int			ct_read_header(struct ctfile_header *hdr);
-struct ct_assl_io_ctx	*ct_assl_ctx;
 int			ct_basis_setup(const char *, char **, time_t *);
 
 /* ct_file.c: extract functions */
