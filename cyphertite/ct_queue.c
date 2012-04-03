@@ -88,6 +88,7 @@ ct_setup_state(struct ct_config *conf)
 	state->ct_tr_tag = 0;
 	state->ct_trans_free = 0;
 	state->ct_trans_alloc = 0;
+	state->ct_num_local_transactions = 0;
 	 /* default block size, modified on server negotiation */
 	state->ct_max_block_size = 256 * 1024;
 	/* default max trans, modified by negotiation */
@@ -489,16 +490,15 @@ skip_csha:
  * this number probably wants some careful tuning.
  */
 #define CT_MAX_LOCAL_TRANSACTIONS	(100)
-static int ct_num_local_transactions;
 static struct ct_trans *
 ct_trans_alloc_local(struct ct_global_state *state)
 {
 
 	struct ct_trans *trans;
 
-	if (ct_num_local_transactions >= CT_MAX_LOCAL_TRANSACTIONS)
+	if (state->ct_num_local_transactions >= CT_MAX_LOCAL_TRANSACTIONS)
 		return (NULL);
-	ct_num_local_transactions++;
+	state->ct_num_local_transactions++;
 
 	/*
 	 * This should come from preallocated shared memory
@@ -586,7 +586,7 @@ ct_trans_free(struct ct_global_state *state, struct ct_trans *trans)
 	/* This should come from preallocated shared memory freelist */
 	if (trans->tr_local) {
 		/* just chuck local trans for now. */
-		ct_num_local_transactions--;
+		state->ct_num_local_transactions--;
 		e_free(&trans);
 
 		return;
@@ -742,7 +742,6 @@ ct_reconnect(evutil_socket_t unused, short event, void *varg)
 		ct_wakeup_compress();
 		ct_wakeup_encrypt();
 		ct_wakeup_csha();
-// XXX - Remove		ct_wakeup_complete();
 		ct_wakeup_write();
 		ct_wakeup_complete();
 		ct_wakeup_file();

@@ -384,6 +384,7 @@ struct ct_global_state {
 	int				ct_max_trans;
 	int				ct_trans_alloc;
 	int				ct_trans_free;
+	int				ct_num_local_transactions;
 	int				ct_sha_state;
 	int				ct_csha_state;
 	int				ct_file_state;
