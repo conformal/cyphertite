@@ -504,7 +504,7 @@ ct_shutdown()
 {
 	ctdb_shutdown(ct_state->ct_db_state);
 	ct_state->ct_db_state = NULL;
-	event_loopbreak();
+	ct_event_loopbreak();
 }
 
 void print_time_scaled(FILE *, char *s, struct timeval *t);

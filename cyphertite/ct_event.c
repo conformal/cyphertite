@@ -278,6 +278,18 @@ ct_event_dispatch(void)
 	return event_dispatch();
 }
 
+int
+ct_event_loopbreak(void)
+{
+	return event_loopbreak();
+}
+
+void
+ct_event_cleanup(void)
+{
+	return;
+}
+
 struct event recon_ev;
 int recon_ev_inited = 0;
 

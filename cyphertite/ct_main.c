@@ -226,6 +226,7 @@ ct_cleanup_eventloop(void)
 	CT_LOCK_RELEASE(&ct_state->ct_write_lock);
 	CT_LOCK_RELEASE(&ct_state->ct_queued_lock);
 	CT_LOCK_RELEASE(&ct_state->ct_complete_lock);
+	ct_event_cleanup();
 }
 
 void

@@ -419,6 +419,8 @@ extern struct ct_global_state		*ct_state;
 
 void ct_event_init(void);
 int ct_event_dispatch(void);
+int ct_event_loopbreak(void);
+void ct_event_cleanup(void);
 void ct_wakeup_file(void);
 void ct_wakeup_sha(void);
 void ct_wakeup_compress(void);
