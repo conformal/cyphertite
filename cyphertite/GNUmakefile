@@ -45,8 +45,8 @@ endif
 CPPFLAGS += -DNEED_LIBCLENS
 INCFLAGS += -I../ctutil -I$(INCDIR)/clens -I.
 CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(OPTLEVEL) $(DEBUG)
-LDLIBS += -L../ctutil/obj -L../ctutil -lctutil -lassl -lclog -levent -lexude
-LDLIBS += -lshrink -lxmlsd -lexpat -lsqlite3 -llzma -llzo2 -lclens
+LDLIBS += -L../ctutil/obj -L../ctutil -lctutil -lassl -lclog -levent_core
+LDLIBS += -lexude -lshrink -lxmlsd -lexpat -lsqlite3 -llzma -llzo2 -lclens
 LDLIBS += ${LIB.LINKSTATIC} -lssl -lcrypto ${LIB.LINKDYNAMIC} -ldl
 LDLIBS += -ledit -lncurses -lz
 

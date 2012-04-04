@@ -19,7 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
-#include <event.h>
+#include <event2/event.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <inttypes.h>

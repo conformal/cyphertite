@@ -25,7 +25,7 @@
 #include <ct_socket.h>
 #include "ct_threads.h"
 
-#include <event.h>
+#include <event2/event.h>
 
 #ifndef evutil_socket_t
 #define evutil_socket_t int

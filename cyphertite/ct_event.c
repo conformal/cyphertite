@@ -19,7 +19,7 @@
 #include <string.h>
 #include <err.h>
 #include <fcntl.h>
-#include <event.h>
+#include <event2/event.h>
 #include <signal.h>
 #include <ct_threads.h>
 

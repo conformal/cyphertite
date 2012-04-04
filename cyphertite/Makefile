@@ -42,7 +42,7 @@ CPPFLAGS+= -DBUILDSTR=\"$(BUILDVERSION)\"
 .endif
 
 LDADD+= -L${LOCALBASE}/lib
-LDADD+=	-lassl -lclog -lcrypto -levent -lexpat -lexude -lshrink
+LDADD+=	-lassl -lclog -lcrypto -levent_core -lexpat -lexude -lshrink
 LDADD+=	-lsqlite3 -lssl -lutil -lxmlsd -lctutil -ledit -lncurses
 LDADD+= ${LDADDSSL}
 CLEANFILES= cyphertite.cat1 cyphertite.conf.cat5
