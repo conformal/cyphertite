@@ -48,6 +48,7 @@ struct ct_ctx {
 
 };
 
+struct event_base *ct_evt_base;
 struct ct_ctx ct_ctx_file;
 struct ct_ctx ct_ctx_sha;
 struct ct_ctx ct_ctx_compress;
@@ -93,8 +94,8 @@ ct_setup_wakeup_pipe(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb)
 	/* master side of pipe - no config */
 	/* client side of pipe */
 
-	event_set(&ctx->ctx_ev, (ctx->ctx_pipe)[0], EV_READ|EV_PERSIST,
-		ct_handle_wakeup, ctx);
+	event_assign(&ctx->ctx_ev, ct_evt_base, (ctx->ctx_pipe)[0],
+		EV_READ|EV_PERSIST, ct_handle_wakeup, ctx);
 	event_add(&ctx->ctx_ev, NULL);
 }
 
@@ -254,7 +255,7 @@ ct_pipe_sig(int fd, short event, void *vctx)
 void
 ct_event_init(void)
 {
-	event_init();
+	ct_evt_base = event_base_new();
 
 	/* cache siginfo */
 #if defined(SIGINFO) && SIGINFO != SIGUSR1
@@ -269,25 +270,24 @@ ct_event_init(void)
 	signal_set(&ct_ev_sig_pipe, SIGPIPE, ct_pipe_sig, NULL);
 	signal_add(&ct_ev_sig_pipe, NULL);
 #endif
-
 }
 
 int
 ct_event_dispatch(void)
 {
-	return event_dispatch();
+	return event_base_dispatch(ct_evt_base);
 }
 
 int
 ct_event_loopbreak(void)
 {
-	return event_loopbreak();
+	return event_base_loopbreak(ct_evt_base);
 }
 
 void
 ct_event_cleanup(void)
 {
-	return;
+	return event_base_free(ct_evt_base);
 }
 
 struct event recon_ev;
