@@ -186,9 +186,16 @@ int	ct_savecore(void);
 size_t	ct_str_repeat(char *dest, size_t buf_size, const char *src, int repeat);
 
 /* compression */
-int		ct_init_compression(uint16_t);
-int		ct_uncompress(uint8_t *, uint8_t *, size_t, size_t *);
-int		ct_compress(uint8_t *, uint8_t *, size_t, size_t *);
+struct ct_compress_ctx;
+struct ct_compress_ctx
+		*ct_init_compression(uint16_t);
+void		ct_cleanup_compression(struct ct_compress_ctx *);
+int		ct_uncompress(struct ct_compress_ctx *, uint8_t *, uint8_t *,
+		    size_t, size_t *);
+int		ct_compress(struct ct_compress_ctx *, uint8_t *, uint8_t *,
+		    size_t, size_t *);
+uint16_t	ct_compress_type(struct ct_compress_ctx *);
+size_t		ct_compress_bounds(struct ct_compress_ctx *, size_t);
 
 /* digest */
 void		ct_sha1(uint8_t *, uint8_t *, size_t);

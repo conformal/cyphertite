@@ -439,7 +439,7 @@ struct ct_global_state {
 
 	int				ct_verbose;
 
-	int				ct_cur_compress_mode;
+	struct ct_compress_ctx		*ct_compress_state;
 };
 
 extern struct event_base *ct_evt_base;

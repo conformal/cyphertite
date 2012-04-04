@@ -95,12 +95,15 @@ ct_setup_state(struct ct_config *conf)
 	state->ct_max_trans = conf->ct_max_trans;
 
 	if (conf->ct_compress) {
-		ct_init_compression(conf->ct_compress);
-		state->ct_cur_compress_mode = conf->ct_compress;
-		state->ct_alloc_block_size = s_compress_bounds(
+		state->ct_compress_state =
+		    ct_init_compression(conf->ct_compress);
+		if (state->ct_compress_state == NULL)
+			CFATALX("Can't initialise compression!");
+		state->ct_alloc_block_size =
+		    ct_compress_bounds(state->ct_compress_state,
 		    state->ct_max_block_size);
 	} else {
-		state->ct_cur_compress_mode = 0;
+		state->ct_compress_state = NULL;
 		state->ct_alloc_block_size = state->ct_max_block_size;
 	}
 
@@ -641,7 +644,6 @@ ct_reconnect_internal(struct ct_global_state *state)
 		CT_LOCK(&state->ct_write_lock);
 		TAILQ_FOREACH_SAFE(trans, &state->ct_write_queue, tr_next,
 		    ttrans) {
-			CT_UNLOCK(&state->ct_write_lock);
 			if ((trans->hdr.c_flags & C_HDR_F_METADATA) == 0)
 				continue;
 
@@ -667,11 +669,9 @@ ct_reconnect_internal(struct ct_global_state *state)
 					 * Don't try and close again,
 					 * complete it and stop worrying.
 					 */
-					CT_LOCK(&state->ct_write_lock);
 					TAILQ_REMOVE(&state->ct_write_queue,
 					    trans, tr_next);
 					state->ct_write_qlen--;
-					CT_UNLOCK(&state->ct_write_lock);
 					ct_queue_complete(state, trans);
 					break;
 				}
@@ -716,6 +716,7 @@ ct_reconnect_internal(struct ct_global_state *state)
 				break;
 			}
 		}
+		CT_UNLOCK(&state->ct_write_lock);
 	} else {
 		if (state->ct_disconnected == 2)
 			CWARNX("Lost connection to server will attempt "
@@ -1468,13 +1469,19 @@ ct_compute_compress(void *vctx)
 			    trans->tr_state);
 		}
 
-		if (state->ct_cur_compress_mode != ncompmode) {
+		if (state->ct_compress_state == NULL ||
+		    ct_compress_type(state->ct_compress_state) != ncompmode) {
 			/* initial or (change in the middle!) mode */
-			ct_init_compression(ncompmode);
-			state->ct_cur_compress_mode = ncompmode;
+			if (state->ct_compress_state != NULL)
+				ct_cleanup_compression(
+				    state->ct_compress_state);
+			if ((state->ct_compress_state =
+			    ct_init_compression(ncompmode)) == NULL)
+				CFATALX("can't init compression mode %d",
+				    ncompmode);
 		}
 
-		if (state->ct_cur_compress_mode == 0)
+		if (state->ct_compress_state == NULL)
 			CFATALX("compression mode 0?");
 
 		slot = trans->tr_dataslot;
@@ -1494,7 +1501,8 @@ ct_compute_compress(void *vctx)
 			 * the dest size, so check for newlen after.
 			 */
 			newlen = len;
-			rv = ct_compress(src, dst, len, &newlen);
+			rv = ct_compress(state->ct_compress_state, src, dst,
+			    len, &newlen);
 			if (newlen >= len) {
 				CNDBG(CT_LOG_TRANS,
 				    "use uncompressed buffer %d %lu", len,
@@ -1509,8 +1517,8 @@ ct_compute_compress(void *vctx)
 			    trans->tr_chsize;
 		} else {
 			newlen = state->ct_max_block_size;
-			rv = ct_uncompress(src, dst, len, &newlen);
-
+			rv = ct_uncompress(state->ct_compress_state, src, dst,
+			    len, &newlen);
 			if (rv)
 				CFATALX("failed to decompress block len %d",
 				    len);
