@@ -92,6 +92,7 @@ struct fnode {
 	int			fl_hardlink;
 	dev_t			fl_dev;
 	ino_t			fl_ino;
+	uint64_t		fl_idx;
 	dev_t			fl_rdev;
 	uint32_t		fl_uid;
 	uint32_t		fl_gid;
