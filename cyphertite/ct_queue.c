@@ -783,7 +783,6 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 {
 	struct ct_global_state	*state = ctx;
 	struct ct_trans		ltrans, *trans = NULL;
-	int			lookup_body = 0;
 
 	if (hdr == NULL) {
 		ct_handle_disconnect(state);
@@ -797,9 +796,7 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 	/* else */
 	    /* handle request */
 
-	if (hdr->c_opcode & 1)
-		lookup_body = 1;
-	if (lookup_body) {
+	if (hdr->c_opcode & 1) {
 		CNDBG(CT_LOG_NET,
 		    "handle message iotrans %u opcode %u status %u",
 		    hdr->c_tag, hdr->c_opcode, hdr->c_status);
