@@ -70,8 +70,8 @@ struct ct_io_ctx {
 	ct_ioctx_alloc_func		*io_ioctx_alloc;
 	ct_ioctx_free_func		*io_ioctx_free;
 	TAILQ_HEAD(, ct_io_queue)	io_o_q;
-	struct event			io_ev_rd;
-	struct event			io_ev_wr;
+	struct event			*io_ev_rd;
+	struct event			*io_ev_wr;
 	int				io_i_fd;
 	int				io_o_fd;
 	int				io_i_state;
@@ -155,7 +155,8 @@ int			ct_assl_writev_op(struct ct_assl_io_ctx *,
 			    struct ct_header *, struct ct_iovec *, int);
 int			ct_io_writev_op(struct ct_io_ctx *, struct ct_header *,
 			    struct ct_iovec *, int);
-int			ct_io_connect_fd_pair(struct ct_io_ctx *ctx, int, int);
+int			ct_io_connect_fd_pair(struct ct_io_ctx *ctx, int, int,
+			    struct event_base *);
 void			ct_io_disconnect(struct ct_io_ctx *);
 void			ct_assl_disconnect(struct ct_assl_io_ctx *);
 

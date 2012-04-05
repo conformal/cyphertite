@@ -34,7 +34,7 @@
 #endif
 
 struct ct_ctx {
-	struct event		ctx_ev;
+	struct event		*ctx_ev;
 	ct_func_cb		*ctx_fn;
 	void			(*ctx_wakeup)(struct ct_ctx *);
 	void			*ctx_varg;
@@ -56,9 +56,9 @@ struct ct_ctx ct_ctx_csha;
 struct ct_ctx ct_ctx_encrypt;
 struct ct_ctx ct_ctx_complete;
 struct ct_ctx ct_ctx_write;
-struct event ct_ev_sig_info;
-struct event ct_ev_sig_usr1;
-struct event ct_ev_sig_pipe;
+struct event *ct_ev_sig_info;
+struct event *ct_ev_sig_usr1;
+struct event *ct_ev_sig_pipe;
 
 void ct_handle_wakeup(int, short, void *);
 void ct_info_sig(int, short, void *);
@@ -74,6 +74,8 @@ void * ct_cb_thread(void *);
 
 /* XXX -global to cause threads to exit on next wakup.*/
 int ct_exiting;
+
+struct event *recon_ev = NULL;
 
 void
 ct_setup_wakeup_pipe(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb)
@@ -94,9 +96,9 @@ ct_setup_wakeup_pipe(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb)
 	/* master side of pipe - no config */
 	/* client side of pipe */
 
-	event_assign(&ctx->ctx_ev, ct_evt_base, (ctx->ctx_pipe)[0],
-		EV_READ|EV_PERSIST, ct_handle_wakeup, ctx);
-	event_add(&ctx->ctx_ev, NULL);
+	ctx->ctx_ev = event_new(ct_evt_base, (ctx->ctx_pipe)[0],
+	    EV_READ|EV_PERSIST, ct_handle_wakeup, ctx);
+	event_add(ctx->ctx_ev, NULL);
 }
 
 void
@@ -259,16 +261,16 @@ ct_event_init(void)
 
 	/* cache siginfo */
 #if defined(SIGINFO) && SIGINFO != SIGUSR1
-	signal_set(&ct_ev_sig_info, SIGINFO, ct_info_sig, NULL);
-	signal_add(&ct_ev_sig_info, NULL);
+	ct_ev_sig_info = evsignal_new(ct_evt_base, SIGINFO, ct_info_sig, NULL);
+	evsignal_add(ct_ev_sig_info, NULL);
 #endif
 #if defined(SIGUSR1)
-	signal_set(&ct_ev_sig_usr1, SIGUSR1, ct_info_sig, NULL);
-	signal_add(&ct_ev_sig_usr1, NULL);
+	ct_ev_sig_usr1 = evsignal_new(ct_evt_base, SIGUSR1, ct_info_sig, NULL);
+	evsignal_add(ct_ev_sig_usr1, NULL);
 #endif
 #if defined(SIGPIPE)
-	signal_set(&ct_ev_sig_pipe, SIGPIPE, ct_pipe_sig, NULL);
-	signal_add(&ct_ev_sig_pipe, NULL);
+	ct_ev_sig_pipe = evsignal_new(ct_evt_base, SIGPIPE, ct_pipe_sig, NULL);
+	evsignal_add(ct_ev_sig_pipe, NULL);
 #endif
 }
 
@@ -287,26 +289,47 @@ ct_event_loopbreak(void)
 void
 ct_event_cleanup(void)
 {
-	return event_base_free(ct_evt_base);
-}
+	event_free(ct_ctx_file.ctx_ev);
+	event_free(ct_ctx_complete.ctx_ev);
+	event_free(ct_ctx_write.ctx_ev);
+#ifndef CT_ENABLE_THREADS
+	event_free(ct_ctx_sha.ctx_ev);
+	event_free(ct_ctx_compress.ctx_ev);
+	event_free(ct_ctx_csha.ctx_ev);
+	event_free(ct_ctx_encrypt.ctx_ev);
+#endif
 
-struct event recon_ev;
-int recon_ev_inited = 0;
+#if defined(SIGINFO) && SIGINFO != SIGUSR1
+	event_free(ct_ev_sig_info);
+#endif
+#if defined(SIGUSR1)
+	event_free(ct_ev_sig_usr1);
+#endif
+#if defined(SIGPIPE)
+	event_free(ct_ev_sig_pipe);
+#endif
+
+	if (recon_ev != NULL)
+		event_free(recon_ev);
+
+	event_base_free(ct_evt_base);
+
+}
 
 void
 ct_set_reconnect_timeout(void (*cb)(int, short, void*), void *varg,
     int delay)
 {
 	struct timeval tv;
-	if (recon_ev_inited) {
-		evtimer_del(&recon_ev);
+	if (recon_ev == NULL) {
+		recon_ev = evtimer_new(ct_evt_base, cb, varg);
+		// XXX: NULL check
+	} else {
+		evtimer_del(recon_ev);
 	}
-	evtimer_set(&recon_ev, cb, varg);
-	recon_ev_inited = 1;
-
 	bzero(&tv, sizeof(tv));
 	tv.tv_sec = delay;
-	evtimer_add(&recon_ev, &tv);
+	evtimer_add(recon_ev, &tv);
 }
 
 #if CT_ENABLE_PTHREADS

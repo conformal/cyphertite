@@ -417,6 +417,7 @@ struct ct_global_state{
 };
 extern struct ct_global_state		*ct_state;
 
+extern struct event_base *ct_evt_base;
 void ct_event_init(void);
 int ct_event_dispatch(void);
 int ct_event_loopbreak(void);
@@ -630,6 +631,7 @@ void			 ct_match_insert_rb(struct ct_match *, char *);
 int			 ct_match_rb_is_empty(struct ct_match *);
 
 void			ct_ssl_init_bw_lim(struct ct_assl_io_ctx *);
+void			ct_ssl_cleanup_bw_lim();
 
 /* MD mode handling */
 #define CT_MDMODE_LOCAL		(0)

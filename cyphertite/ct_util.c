@@ -184,7 +184,7 @@ ct_ssl_connect(int nonfatal)
 
 	if (assl_event_connect(c, ct_host, ct_hostport,
 		ASSL_F_NONBLOCK|ASSL_F_KEEPALIVE|ASSL_F_THROUGHPUT,
-	    ct_event_assl_read, ct_event_assl_write, ctx)) {
+	    ct_evt_base, ct_event_assl_read, ct_event_assl_write, ctx)) {
 		if (nonfatal) {
 			/* XXX */
 			ct_assl_disconnect(ctx);
@@ -504,6 +504,7 @@ ct_shutdown()
 {
 	ctdb_shutdown(ct_state->ct_db_state);
 	ct_state->ct_db_state = NULL;
+	ct_ssl_cleanup_bw_lim();
 	ct_event_loopbreak();
 }
 

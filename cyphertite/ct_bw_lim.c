@@ -48,7 +48,7 @@ uint64_t	last_bw_total_trans;
 
 ct_assl_io_over_bw_check_func ct_ssl_over_bw_func;
 
-struct event	wakeuptimer_ev;
+struct event	*wakeuptimer_ev;
 
 void ct_ssl_over_bw_wakeup(evutil_socket_t, short, void *);
 
@@ -62,7 +62,9 @@ ct_ssl_init_bw_lim(struct ct_assl_io_ctx *ctx)
 	CNDBG(CT_LOG_NET, "packet_len %d",  packet_len);
 	ct_assl_io_ctx_set_maxtrans(ctx, packet_len);
 	ct_assl_io_ctx_set_over_bw_func(ctx, ct_ssl_over_bw_func);
-	evtimer_set(&wakeuptimer_ev, ct_ssl_over_bw_wakeup, ctx);
+	wakeuptimer_ev = evtimer_new(ct_evt_base, ct_ssl_over_bw_wakeup, ctx);
+	if (wakeuptimer_ev == NULL)
+		CABORT("unable to allocate bw limit timer");
 
 	single_slot_time.tv_sec = 0;
 	single_slot_time.tv_usec = BW_TIMESLOT;
@@ -70,6 +72,13 @@ ct_ssl_init_bw_lim(struct ct_assl_io_ctx *ctx)
 	slot_max =  ((ct_io_bw_limit * 1024) / (US_PER_SEC/BW_TIMESLOT));
 	CNDBG(CT_LOG_NET, "slottime %d max_bw_total %d",
 	    BW_TIMESLOT, slot_max);
+}
+
+void
+ct_ssl_cleanup_bw_lim(void)
+{
+	if (wakeuptimer_ev != NULL)
+		event_free(wakeuptimer_ev);
 }
 
 void
@@ -176,9 +185,9 @@ ct_ssl_over_bw_func(void *cbarg, struct ct_assl_io_ctx *ioctx)
 
 		assl_event_disable_write(ioctx->c);
 
-		if (!event_pending(&wakeuptimer_ev, EV_TIMEOUT, &sleep_tv))  {
+		if (!event_pending(wakeuptimer_ev, EV_TIMEOUT, &sleep_tv))  {
 			timersub(&nextslot, &now, &sleep_tv);
-			event_add(&wakeuptimer_ev, &sleep_tv);
+			event_add(wakeuptimer_ev, &sleep_tv);
 		}
 	}
 

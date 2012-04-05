@@ -460,7 +460,7 @@ write_next_iov:
 
 		CT_LOCK(&ioctx->io_lock);
 		if (TAILQ_EMPTY(&ioctx->io_o_q)) {
-			event_del(&ioctx->io_ev_wr);
+			event_del(ioctx->io_ev_wr);
 		}
 		CT_UNLOCK(&ioctx->io_lock);
 	}
@@ -656,7 +656,7 @@ ct_io_write_op(struct ct_io_ctx *ioctx, struct ct_header *hdr, void *data)
 	TAILQ_INSERT_TAIL(&ioctx->io_o_q, iob, io_next);
 
 	if (start_write) {
-		event_add(&ioctx->io_ev_wr, NULL);
+		event_add(ioctx->io_ev_wr, NULL);
 	}
 	CT_UNLOCK(&ioctx->io_lock);
 }
@@ -691,7 +691,7 @@ ct_io_writev_op(struct ct_io_ctx *ioctx, struct ct_header *hdr,
 	TAILQ_INSERT_TAIL(&ioctx->io_o_q, iob, io_next);
 
 	if (start_write) {
-		event_add(&ioctx->io_ev_wr, NULL);
+		event_add(ioctx->io_ev_wr, NULL);
 	}
 	CT_UNLOCK(&ioctx->io_lock);
 	return 0;
@@ -704,17 +704,18 @@ ct_io_writev_op(struct ct_io_ctx *ioctx, struct ct_header *hdr,
  *  non-zero on failure, errno will show reason that event_add failed
  */
 int
-ct_io_connect_fd_pair(struct ct_io_ctx *ctx, int infd, int outfd)
+ct_io_connect_fd_pair(struct ct_io_ctx *ctx, int infd, int outfd,
+    struct event_base *ev_base)
 {
 	ctx->io_i_fd    = infd;
 	ctx->io_o_fd    = outfd;
 
-	event_set(&ctx->io_ev_rd, infd, EV_READ|EV_PERSIST, ct_event_io_read,
-	    ctx);
-	event_set(&ctx->io_ev_wr, outfd, EV_WRITE|EV_PERSIST, ct_event_io_write,
-	    ctx);
+	ctx->io_ev_rd = event_new(ev_base, infd, EV_READ|EV_PERSIST,
+	    ct_event_io_read, ctx);
+	ctx->io_ev_wr = event_new(ev_base, outfd, EV_WRITE|EV_PERSIST,
+	    ct_event_io_write, ctx);
 
-	return event_add(&ctx->io_ev_rd, NULL);
+	return event_add(ctx->io_ev_rd, NULL);
 }
 
 /*
@@ -731,8 +732,15 @@ ct_io_disconnect(struct ct_io_ctx *ioctx)
 	struct ct_io_queue	*ioq;
 
 	CNDBG(CTUTIL_LOG_SOCKET, "disconnecting");
-	event_del(&ioctx->io_ev_rd);
-	event_del(&ioctx->io_ev_wr);
+	if (ioctx->io_ev_rd != NULL) {
+		event_free(ioctx->io_ev_rd);
+		ioctx->io_ev_rd = NULL;
+	}
+	if (ioctx->io_ev_wr != NULL) {
+		event_free(ioctx->io_ev_wr);
+		ioctx->io_ev_wr = NULL;
+	}
+
 	close(ioctx->io_i_fd);
 	close(ioctx->io_o_fd);
 
@@ -902,7 +910,7 @@ ct_io_resume_writes(struct ct_io_ctx *ctx)
 {
 	ctx->io_write_io_enabled = 1;
 	if (!TAILQ_EMPTY(&ctx->io_o_q))
-		event_add(&ctx->io_ev_wr, NULL);
+		event_add(ctx->io_ev_wr, NULL);
 }
 
 
