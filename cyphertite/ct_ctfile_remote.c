@@ -30,7 +30,6 @@
 #include <assl.h>
 #include <clog.h>
 #include <exude.h>
-#include <xmlsd.h>
 
 #include <ctutil.h>
 

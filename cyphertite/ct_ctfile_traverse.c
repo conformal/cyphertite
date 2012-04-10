@@ -31,11 +31,9 @@
 #include <assl.h>
 #include <clog.h>
 #include <exude.h>
-#include <xmlsd.h>
 #include <fts.h>
 
 #include <ctutil.h>
-#include "ct_xml.h"
 
 #include "ct.h"
 #include "ct_crypto.h"

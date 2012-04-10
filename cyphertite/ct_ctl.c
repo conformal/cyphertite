@@ -28,7 +28,6 @@
 #include <clog.h>
 #include <exude.h>
 #include <shrink.h>
-#include <xmlsd.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -38,7 +37,6 @@
 #include "ct.h"
 #include "ct_crypto.h"
 #include "ct_ctl.h"
-#include "ct_xml.h"
 #include <ct_ext.h>
 
 

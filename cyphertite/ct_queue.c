@@ -27,6 +27,7 @@
 
 #include "ct.h"
 #include "ct_crypto.h"
+#include "ct_proto.h"
 
 
 void ct_handle_exists_reply(struct ct_global_state *,  struct ct_trans *,
@@ -462,6 +463,8 @@ skip_csha:
 	case TR_S_XML_CLOSING:
 	case TR_S_XML_DELETE:
 	case TR_S_XML_CULL_SEND:
+	case TR_S_XML_CULL_SHA_SEND:
+	case TR_S_XML_CULL_COMPLETE_SEND:
 		ct_queue_write(state, trans);
 		break;
 	default:
@@ -864,23 +867,14 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 	case C_HDR_O_WRITE:
 	case C_HDR_O_READ:
 	case C_HDR_O_XML:
+		ct_cleanup_packet(hdr, vbody);
 		ct_insert_inflight(state, trans);
-		/* XXX no nice place to put this */
-		if (hdr->c_opcode == C_HDR_O_WRITE &&
-		    hdr->c_flags & C_HDR_F_METADATA) {
-			/* free iovec and footer data */
-			struct ct_iovec	*iov = vbody;
-
-			e_free(&iov[1].iov_base);
-			/* real body was in iov[0] and is part of the trans */
-			e_free(&iov);
-		}
-		/* no need to free body */
 		break;
 	default:
-		CWARNX("freeing body for hdr opcode %u tag %u trans %" PRIu64,
-		    hdr->c_opcode, hdr->c_tag, trans->tr_trans_id);
-		e_free(&vbody);
+		/* Should not happen */
+		CFATALX("unknown packet written for hdr opcode %u tag %u "
+		    "trans %" PRIu64, hdr->c_opcode, hdr->c_tag,
+		    trans->tr_trans_id);
 	}
 	return 0;
 }
@@ -1165,6 +1159,8 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 		release_fnode = 1;
 		break;
 	case TR_S_XML_CULL_SEND:
+	case TR_S_XML_CULL_SHA_SEND:
+	case TR_S_XML_CULL_COMPLETE_SEND:
 		slot = trans->tr_dataslot;
 		printf("message back state [%s]", (char *)trans->tr_data[slot]);
 
@@ -1211,7 +1207,7 @@ ct_process_write(void *vctx)
 	struct ct_trans		*trans;
 	struct ct_header	*hdr;
 	void			*data;
-	int			slot;
+	int			 nchunks;
 
 	/* did we idle out? */
 	if (state->ct_reconnect_pending) {
@@ -1227,52 +1223,52 @@ ct_process_write(void *vctx)
 		CNDBG(CT_LOG_NET, "wakeup write going");
 		hdr = &trans->hdr;
 
-		hdr->c_version = C_HDR_VERSION;
-
-		/* this extra assignment here allows exists to be fallthru */
-		data = trans->tr_sha;
-
+		nchunks = 0;
+		/* hdr->c_tag was set on transaction allocation */
 		switch(trans->tr_state) {
 		case TR_S_NEXISTS:
 		case TR_S_COMPRESSED:
 		case TR_S_ENCRYPTED: /* if dealing with metadata */
 		case TR_S_READ: /* if dealing with ctfile non-comp/non-crypt */
 			/* doesn't exist in backend, need to send chunk */
-			slot = trans->tr_dataslot;
-			data = trans->tr_data[slot];
-			hdr->c_opcode = C_HDR_O_WRITE;
-			hdr->c_size = trans->tr_size[slot];
-			state->ct_stats->st_bytes_sent += trans->tr_size[slot];
+			if (hdr->c_flags & C_HDR_F_METADATA)
+				ct_create_ctfile_write(hdr, &data, &nchunks,
+				    trans->tr_data[(int)trans->tr_dataslot],
+				    trans->tr_size[(int)trans->tr_dataslot],
+				    trans->tr_ctfile_chunkno);
+			else
+				ct_create_write(hdr, &data,
+				    trans->tr_data[(int)trans->tr_dataslot],
+				    trans->tr_size[(int)trans->tr_dataslot]);
+			state->ct_stats->st_bytes_sent +=
+			    trans->tr_size[(int)trans->tr_dataslot];
 			break;
 		case TR_S_COMPSHA_ED:
-			data = trans->tr_csha;
-			/* fallthru */
+			ct_create_exists(hdr, &data, trans->tr_csha,
+			    sizeof(trans->tr_csha));
+			break;
 		case TR_S_UNCOMPSHA_ED:
-			/* data = trans->tr_sha; - done above,allows fallthru */
-			hdr->c_opcode = C_HDR_O_EXISTS;
-			hdr->c_size = (sizeof trans->tr_sha);
+			ct_create_exists(hdr, &data, trans->tr_sha,
+			    sizeof(trans->tr_sha));
 			break;
 		case TR_S_EX_SHA:
-			hdr->c_opcode = C_HDR_O_READ;
-			hdr->c_size = sizeof(trans->tr_sha);
-			data = trans->tr_sha;
+			ct_create_read(hdr, &data, trans->tr_sha,
+			    sizeof(trans->tr_sha));
 			break;
 		case TR_S_XML_OPEN:
 		case TR_S_XML_CLOSING:
 		case TR_S_XML_LIST:
 		case TR_S_XML_DELETE:
 		case TR_S_XML_CULL_SEND:
-			hdr->c_opcode = C_HDR_O_XML;
-			hdr->c_flags = C_HDR_F_METADATA;
-			hdr->c_size = trans->tr_size[2];
+		case TR_S_XML_CULL_SHA_SEND:
+		case TR_S_XML_CULL_COMPLETE_SEND:
+			/* hdr populated previously */
 			data = trans->tr_data[2];
 			break;
 		default:
 			CFATALX("unexpected state in wakeup_write %d",
 			    trans->tr_state);
 		}
-		/* hdr->c_tag - set once when trans was originally created */
-		hdr->c_version = C_HDR_VERSION;
 
 		CNDBG(CT_LOG_NET, "queuing write of op %u trans %" PRIu64
 		    " iotrans %u tstate %d flags 0x%x",
@@ -1282,29 +1278,12 @@ ct_process_write(void *vctx)
 		/* move transaction to pending RB tree */
 		ct_queue_queued(state, trans);
 
-		/* XXX there really isn't a better place to do this */
-		if (hdr->c_opcode == C_HDR_O_WRITE &&
-		    (hdr->c_flags & C_HDR_F_METADATA) != 0) {
-			struct ct_metadata_footer	*cmf;
-			struct ct_iovec			*iov;
-
-			iov = e_calloc(2, sizeof(*iov));
-			cmf = e_calloc(1, sizeof(*cmf));
-			cmf->cmf_chunkno = htonl(trans->tr_ctfile_chunkno);
-			cmf->cmf_size = htonl(hdr->c_size);
-
-			iov[0].iov_base = data;
-			iov[0].iov_len = hdr->c_size;
-			iov[1].iov_base = cmf;
-			iov[1].iov_len = sizeof(*cmf);
-
-			hdr->c_size += sizeof(*cmf);
-
-			ct_assl_writev_op(state->ct_assl_ctx, hdr, iov, 2);
-			continue;
+		if (nchunks > 0) {
+			ct_assl_writev_op(state->ct_assl_ctx, hdr, data,
+			    nchunks);
+		} else {
+			ct_assl_write_op(state->ct_assl_ctx, hdr, data);
 		}
-
-		ct_assl_write_op(state->ct_assl_ctx, hdr, data);
 	}
 }
 
@@ -1312,30 +1291,22 @@ void
 ct_handle_exists_reply(struct ct_global_state *state, struct ct_trans *trans,
     struct ct_header *hdr, void *vbody)
 {
-	int slot;
+	int exists;
 
 	CNDBG(CT_LOG_NET, "exists_reply %" PRIu64 " status %u",
 	    trans->tr_trans_id, hdr->c_status);
-
-	switch(hdr->c_status) {
-	case C_HDR_S_FAIL:
-		CFATALX("server connection failed");
-	case C_HDR_S_EXISTS:
+	if (ct_parse_exists_reply(hdr, vbody, &exists) != 0)
+		CFATALX("invalid exists reply from server");
+	if (exists) {
 		/* enter shas into local db */
 		trans->tr_state = TR_S_EXISTS;
 		state->ct_stats->st_bytes_exists += trans->tr_chsize;
-		ct_queue_transfer(state, trans);
-		break;
-	case C_HDR_S_DOESNTEXIST:
+	} else {
 		trans->tr_state = TR_S_NEXISTS;
-		slot = trans->tr_dataslot;
-		trans->tr_fl_node->fl_comp_size += trans->tr_size[slot];
-		ct_queue_transfer(state, trans);
-		break;
-	default:
-		CFATALX("handle_exists_reply unexpected status %u",
-		    hdr->c_status);
+		trans->tr_fl_node->fl_comp_size +=
+		    trans->tr_size[(int)trans->tr_dataslot];
 	}
+	ct_queue_transfer(state, trans);
 
 	if (vbody != NULL) {
 		CWARNX("exists reply with body");
@@ -1353,60 +1324,38 @@ ct_handle_write_reply(struct ct_global_state *state, struct ct_trans *trans,
 	CNDBG(CT_LOG_NET, "hdr op %u status %u size %u",
 	    hdr->c_opcode, hdr->c_status, hdr->c_size);
 
-	if (hdr->c_status == C_HDR_S_OK) {
-		if (trans->hdr.c_flags & C_HDR_F_METADATA)
-			trans->tr_state = TR_S_WMD_READY; /* XXX */
-		else
-			trans->tr_state = TR_S_WRITTEN;
-		ct_queue_transfer(state, trans);
-		ct_header_free(NULL, hdr);
-	} else {
+	if (ct_parse_write_reply(hdr, vbody) != 0)
 		CFATALX("chunk write failed: %s", ct_header_strerror(hdr));
-	}
+
+	if (trans->hdr.c_flags & C_HDR_F_METADATA)
+		trans->tr_state = TR_S_WMD_READY; /* XXX */
+	else
+		trans->tr_state = TR_S_WRITTEN;
+	ct_queue_transfer(state, trans);
+	ct_header_free(NULL, hdr);
 }
 
 void
 ct_handle_read_reply(struct ct_global_state *state, struct ct_trans *trans,
     struct ct_header *hdr, void *vbody)
 {
-	struct ct_metadata_footer	*cmf;
 	char				 shat[SHA_DIGEST_STRING_LENGTH];
 	int				 slot;
 
 	/* data was written to the 'alternate slot' so switch it */
 	slot = trans->tr_dataslot = !(trans->tr_dataslot);
-	if (hdr->c_status == C_HDR_S_OK) {
+
+	if (ct_parse_read_reply(hdr, vbody) == 0) {
 		trans->tr_state = TR_S_EX_READ;
-		/*
-		 * Check the chunk number for sanity.
-		 * The server will only send ctfileproto version 1
-		 * (ex_status == 0) or v3 (ex_status == 2). v3 fixed a
-		 * byteswapping problem in v2, thus v2 will not be sent to any
-		 * client that understands v3.
-		 */
-		if (hdr->c_flags & C_HDR_F_METADATA &&
-		    ((hdr->c_ex_status != 0) && (hdr->c_ex_status != 2)))
-			CFATALX("invalid metadata prootcol (v%d)",
-			    hdr->c_ex_status + 1);
-
-		if (hdr->c_flags & C_HDR_F_METADATA &&
-		    hdr->c_ex_status == 2) {
-			cmf = (struct ct_metadata_footer *)
-			    (trans->tr_data[slot] + hdr->c_size - sizeof(*cmf));
-			cmf->cmf_size = ntohl(cmf->cmf_size);
-			cmf->cmf_chunkno = ntohl(cmf->cmf_chunkno);
-
-			if (cmf->cmf_size != hdr->c_size - sizeof(*cmf))
-				CFATALX("invalid chunkfile footer");
-			if (cmf->cmf_chunkno != trans->tr_ctfile_chunkno)
-				CFATALX("invalid chunkno %u %u",
-				    cmf->cmf_chunkno, trans->tr_ctfile_chunkno);
-			hdr->c_size -= sizeof(*cmf);
-		}
+		if ((hdr->c_flags & C_HDR_F_METADATA) &&
+		    ct_parse_read_ctfile_chunk_info(hdr, vbody,
+			trans->tr_ctfile_chunkno) != 0) 
+				CFATALX("invalid ctfile read packet");
+				/* XXX get a errstring out of parser */
 	} else {
 		CNDBG(CT_LOG_NET, "c_flags on reply %x", hdr->c_flags);
+		/* read failure for ctfiles just means eof */
 		if (hdr->c_flags & C_HDR_F_METADATA) {
-			/* FAIL on metadata read is 'eof' */
 			if (ct_get_file_state(state) != CT_S_FINISHED) {
 				ct_set_file_state(state, CT_S_FINISHED);
 				trans->tr_state = TR_S_EX_FILE_END;
@@ -1418,11 +1367,12 @@ ct_handle_read_reply(struct ct_global_state *state, struct ct_trans *trans,
 				trans->tr_state = TR_S_XML_CLOSED;
 			}
 		} else {
+			/* any other read failure is bad */
 			ct_sha1_encode(trans->tr_sha, shat);
 			CFATALX("Data missing on server return %u shat %s",
 			    hdr->c_status, shat);
 		}
-	}
+	} 
 
 	if (clog_mask_is_set(CT_LOG_NET)) {
 		ct_sha1_encode(trans->tr_sha, shat);

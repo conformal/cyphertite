@@ -34,13 +34,12 @@
 #include <assl.h>
 #include <clog.h>
 #include <exude.h>
-#include <xmlsd.h>
 
 #include <ctutil.h>
-#include "ct_xml.h"
 
 #include "ct.h"
 #include "ct_crypto.h"
+#include "ct_proto.h"
 #include <ct_ext.h>
 
 ct_op_cb ct_cull_send_shas;
@@ -51,24 +50,6 @@ ct_op_cb ct_cull_send_complete;
 ct_op_cb ct_cull_complete;
 ct_op_cb ct_cull_collect_ctfiles;
 ct_op_cb ct_cull_fetch_all_ctfiles;
-
-struct xmlsd_v_elements ct_xml_cmds[] = {
-	{ "ct_md_list", xe_ct_md_list },
-	{ "ct_md_open_read", xe_ct_md_open_read },
-	{ "ct_md_open_create", xe_ct_md_open_create },
-	{ "ct_md_delete", xe_ct_md_delete },
-	{ "ct_md_close", xe_ct_md_close },
-	{ "ct_cull_setup", xe_ct_cull_setup },
-	{ "ct_cull_shas", xe_ct_cull_shas },
-	{ "ct_cull_complete", xe_ct_cull_complete },
-	{ "ct_cull_setup_reply", xe_ct_cull_setup_reply },
-	{ "ct_cull_shas_reply", xe_ct_cull_shas_reply },
-	{ "ct_cull_complete_reply", xe_ct_cull_complete_reply },
-#ifdef CT_EXT_XML_CMDS
-	CT_EXT_XML_CMDS
-#endif
-	{ NULL, NULL }
-};
 
 /*
  * clean up after a ctfile archive/extract operation by freeing the remotename
@@ -276,40 +257,13 @@ void
 ct_xml_file_open(struct ct_global_state *state, struct ct_trans *trans,
     const char *file, int mode, uint32_t chunkno)
 {
-	struct xmlsd_element_list	 xl;
-	struct xmlsd_element		*xe;
-	char				 b64[CT_MAX_MD_FILENAME];
-	size_t				 sz;
-
 	trans->tr_state = TR_S_XML_OPEN;
 
-	CNDBG(CT_LOG_XML, "setting up XML");
-
-	if (ct_base64_encode(CT_B64_M_ENCODE, (uint8_t *)file, strlen(file),
-	    (uint8_t *)b64, sizeof(b64)))
-		CFATALX("cant base64 encode %s", file);
-
-	if (mode == MD_O_WRITE || mode == MD_O_APPEND) {
-		xe = xmlsd_create(&xl, "ct_md_open_create");
-		xmlsd_set_attr(xe, "version", CT_MD_OPEN_CREATE_VERSION);
-	} else {	/* mode == MD_O_READ */
-		xe = xmlsd_create(&xl, "ct_md_open_read");
-		xmlsd_set_attr(xe, "version", CT_MD_OPEN_READ_VERSION);
-	}
-
-	xe = xmlsd_add_element(&xl, xe, "file");
-	xmlsd_set_attr(xe, "name", b64);
-
-	if (mode == MD_O_APPEND || chunkno) {
-		xmlsd_set_attr_uint32(xe, "chunkno", chunkno);
-	}
-
-	if ((trans->tr_data[2] = (uint8_t *)xmlsd_generate(&xl,
-	    ct_body_alloc_xml, &sz, 1)) == NULL)
-		CFATALX("%s: Could not allocate xml body", __func__);
-	xmlsd_unwind(&xl);
+	if (ct_create_xml_open(&trans->hdr, (void **)&trans->tr_data[2],
+	    file, mode, chunkno) != 0)
+		CFATALX("can't create xml open packet");
 	trans->tr_dataslot = 2;
-	trans->tr_size[2] = sz;
+	trans->tr_size[2] = trans->hdr.c_size;
 
 	CNDBG(CT_LOG_XML, "open trans %"PRIu64, trans->tr_trans_id);
 	ct_queue_first(state, trans);
@@ -322,45 +276,18 @@ ct_xml_file_open_polled(struct ct_global_state *state, const char *file,
 {
 #define ASSL_TIMEOUT 20
 	struct ct_header	 hdr;
-
-	struct xmlsd_element_list xl;
-	struct xmlsd_element	*xe;
-	char			*body = NULL;
-	char			 b64[CT_MAX_MD_FILENAME];
+	void			*body;
 	size_t			 sz;
 	int			 rv = 1;
 
 	CNDBG(CT_LOG_XML, "setting up XML");
 
-	if (ct_base64_encode(CT_B64_M_ENCODE, (uint8_t *)file, strlen(file),
-	    (uint8_t *)b64, sizeof(b64)))
-		CFATALX("cant base64 encode %s", file);
+	if (ct_create_xml_open(&hdr, &body, file, mode, chunkno) != 0)
+		CFATALX("can't create ctfile open packet");
 
-	if (mode == MD_O_WRITE || mode == MD_O_APPEND) {
-		xe = xmlsd_create(&xl, "ct_md_open_create");
-		xmlsd_set_attr(xe, "version", CT_MD_OPEN_CREATE_VERSION);
-	} else {	/* mode == MD_O_READ */
-		xe = xmlsd_create(&xl, "ct_md_open_read");
-		xmlsd_set_attr(xe, "version", CT_MD_OPEN_READ_VERSION);
-	}
-
-	xe = xmlsd_add_element(&xl, xe, "file");
-	xmlsd_set_attr(xe, "name", b64);
-
-	if (mode == MD_O_APPEND || chunkno) {
-		xmlsd_set_attr_uint32(xe, "chunkno", chunkno);
-	}
-
-	body = xmlsd_generate(&xl, ct_body_alloc_xml, &sz, 1);
-	xmlsd_unwind(&xl);
-
-	hdr.c_version = C_HDR_VERSION;
-	hdr.c_opcode = C_HDR_O_XML;
-	hdr.c_flags = C_HDR_F_METADATA;
+	sz = hdr.c_size;
 	/* use previous packet id so it'll fit with the state machine */
 	hdr.c_tag = state->ct_packet_id - 1;
-	hdr.c_size = sz;
-
 	ct_wire_header(&hdr);
 	if (ct_assl_io_write_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
 	    ASSL_TIMEOUT) != sizeof hdr) {
@@ -403,10 +330,7 @@ done:
 void
 ct_xml_file_close(struct ct_global_state *state)
 {
-	struct xmlsd_element_list	 xl;
-	struct xmlsd_element		*xe;
 	struct ct_trans			*trans;
-	size_t				 sz;
 
 	trans = ct_trans_alloc(state);
 	if (trans == NULL) {
@@ -418,17 +342,10 @@ ct_xml_file_close(struct ct_global_state *state)
 
 	trans->tr_state = TR_S_XML_CLOSING;
 
-	CNDBG(CT_LOG_XML, "setting up XML");
-
-	xe = xmlsd_create(&xl, "ct_md_close");
-	xmlsd_set_attr(xe, "version", CT_MD_CLOSE_VERSION);
-
-	if ((trans->tr_data[2] = (uint8_t *)xmlsd_generate(&xl,
-	    ct_body_alloc_xml, &sz, 1)) == NULL)
-		CFATALX("%s: Could not allocate xml body", __func__);
-	xmlsd_unwind(&xl);
+	if (ct_create_xml_close(&trans->hdr, (void **)&trans->tr_data[2]) != 0)
+		CFATALX("Could not create xml close packet");
 	trans->tr_dataslot = 2;
-	trans->tr_size[2] = sz;
+	trans->tr_size[2] = trans->hdr.c_size;
 
 	ct_queue_first(state, trans);
 }
@@ -616,10 +533,7 @@ ct_complete_metadata(struct ct_global_state *state, struct ct_trans *trans)
 void
 ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 {
-	struct xmlsd_element_list	 xl;
-	struct xmlsd_element		*xe;
 	struct ct_trans			*trans;
-	size_t				 sz;
 
 	ct_set_file_state(state, CT_S_FINISHED);
 
@@ -627,17 +541,10 @@ ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 
 	trans->tr_state = TR_S_XML_LIST;
 
-	CNDBG(CT_LOG_XML, "setting up XML");
-
-	xe = xmlsd_create(&xl, "ct_md_list");
-	xmlsd_set_attr(xe, "version", CT_MD_LIST_VERSION);
-
-	if ((trans->tr_data[2] = (uint8_t *)xmlsd_generate(&xl,
-	    ct_body_alloc_xml, &sz, 1)) == NULL)
-		CFATALX("%s: Could not allocate xml body", __func__);
-	xmlsd_unwind(&xl);
+	if (ct_create_xml_list(&trans->hdr, (void **)&trans->tr_data[2]) != 0)
+		CFATALX("Could not create xml list packet");
 	trans->tr_dataslot = 2;
-	trans->tr_size[2] = sz;
+	trans->tr_size[2] = trans->hdr.c_size;
 
 	ct_queue_first(state, trans);
 }
@@ -680,35 +587,21 @@ RB_GENERATE(ctfile_list_tree, ctfile_list_file, mlf_next, ct_cmp_ctfile);
 void
 ctfile_delete(struct ct_global_state *state, struct ct_op *op)
 {
-	struct xmlsd_element_list	 xl;
-	struct xmlsd_element		*xe;
 	const char			*rname = op->op_args;
 	struct ct_trans			*trans;
-	char				 b64[CT_MAX_MD_FILENAME * 2];
-	size_t				 sz;
-
-	rname = ctfile_cook_name(rname);
-
-	if (ct_base64_encode(CT_B64_M_ENCODE, (uint8_t *)rname, strlen(rname),
-	    (uint8_t *)b64, sizeof(b64)))
-		CFATALX("cant base64 encode %s", rname);
-
-	xe = xmlsd_create(&xl, "ct_md_delete");
-	xmlsd_set_attr(xe, "version", CT_MD_DELETE_VERSION);
-	xe = xmlsd_add_element(&xl, xe, "file");
-	xmlsd_set_attr(xe, "name", b64);
-
-	e_free(&rname);
 
 	trans = ct_trans_alloc(state);
 	trans->tr_state = TR_S_XML_DELETE;
 
-	if ((trans->tr_data[2] = (uint8_t *)xmlsd_generate(&xl,
-	    ct_body_alloc_xml, &sz, 1)) == NULL)
-		CFATALX("%s: Could not allocate xml body", __func__);
-	xmlsd_unwind(&xl);
+	rname = ctfile_cook_name(rname);
+
+	if (ct_create_xml_delete(&trans->hdr, (void **)&trans->tr_data[2],
+	    rname) != 0)
+		CFATALX("Could not create xml delete packet for %s", rname);
 	trans->tr_dataslot = 2;
-	trans->tr_size[2] = sz;
+	trans->tr_size[2] = trans->hdr.c_size;
+
+	e_free(&rname);
 
 	ct_queue_first(state, trans);
 }
@@ -717,142 +610,70 @@ void
 ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
     struct ct_header *hdr, void *vbody)
 {
-	struct xmlsd_element_list xl;
-	struct xmlsd_attribute *xa;
-	struct xmlsd_element *xe;
-	char *body = vbody;
 	char *filename;
-	char b64[CT_MAX_MD_FILENAME * 2];
-	int r;
 
-	CNDBG(CT_LOG_XML, "xml [%s]", (char *)vbody);
-
-	/* Dispose of last parsed command. */
-	TAILQ_INIT(&xl);
-
-	r = xmlsd_parse_mem(body, hdr->c_size - 1, &xl);
-	if (r)
-		CFATALX("XML parse failed! (%d)", r);
-
-	TAILQ_FOREACH(xe, &xl, entry) {
-		CNDBG(CT_LOG_XML, "%d %s = %s (parent = %s)",
-		    xe->depth, xe->name, xe->value ? xe->value : "NOVAL",
-		    xe->parent ? xe->parent->name : "NOPARENT");
-		TAILQ_FOREACH(xa, &xe->attr_list, entry)
-			CNDBG(CT_LOG_XML, "\t%s = %s", xa->name, xa->value);
-	}
-
-	r = xmlsd_validate(&xl, ct_xml_cmds);
-	if (r)
-		CFATALX("XML validate of '%s' failed! (%d)", body, r);
-
-	if (TAILQ_EMPTY(&xl))
-		CFATALX("parse command: No XML");
-
-	xe = TAILQ_FIRST(&xl);
-	if (strncmp(xe->name, "ct_md_open", strlen("ct_md_open")) == 0) {
-		int die = 1;
-
-		TAILQ_FOREACH(xe, &xl, entry) {
-			if (strcmp(xe->name, "file") == 0) {
-				filename = xmlsd_get_attr(xe, "name");
-				if (filename && filename[0] != '\0') {
-					CNDBG(CT_LOG_FILE, "%s opened\n",
-					    filename);
-					die = 0;
-					ct_set_file_state(state, CT_S_RUNNING);
-					ct_wakeup_file(state->event_state);
-				}
-			}
-		}
-		if (die)
+	switch (trans->tr_state) {
+	case TR_S_XML_OPEN:
+		if (ct_parse_xml_open_reply(hdr, vbody, &filename) != 0)
+			CFATALX("XXX");
+		if (filename == NULL)
 			CFATALX("couldn't open remote file");
+		CNDBG(CT_LOG_FILE, "%s opened\n",
+		    filename);
+		e_free(&filename);
+		ct_set_file_state(state, CT_S_RUNNING);
+		ct_wakeup_file(state->event_state);
 		trans->tr_state = TR_S_XML_OPENED;
-	} else if (strcmp(xe->name, "ct_md_close") == 0) {
+		break;
+	case TR_S_XML_CLOSING:
+		if (ct_parse_xml_close_reply(hdr, vbody) != 0)
+			CFATALX("XXX");
 		trans->tr_state = TR_S_DONE;
-	} else if (strcmp(xe->name, "ct_md_list") == 0) {
-		struct ctfile_list_file	*file;
-		const char		*errstr;
-		char			*tmp;
-
-		TAILQ_FOREACH(xe, &xl, entry) {
-			if (strcmp(xe->name, "file") == 0) {
-				file = e_malloc(sizeof(*file));
-				tmp = xmlsd_get_attr(xe, "name");
-				if (tmp == NULL) {
-					e_free(&file);
-					continue;
-				}
-
-				if (ct_base64_encode(CT_B64_M_DECODE,
-				    (uint8_t *)tmp, strlen(tmp),
-				    (uint8_t *)file->mlf_name,
-				    sizeof(file->mlf_name))) {
-					    e_free(&file);
-					    continue;
-				}
-
-				tmp = xmlsd_get_attr(xe, "size");
-				file->mlf_size = strtonum(tmp, 0, LLONG_MAX,
-				    &errstr);
-				if (errstr != NULL)
-					CFATAL("can't parse file size %s",
-					    errstr);
-
-				tmp = xmlsd_get_attr(xe, "mtime");
-				file->mlf_mtime = strtonum(tmp, 0, LLONG_MAX,
-				    &errstr);
-				if (errstr != NULL)
-					CFATAL("can't parse mtime: %s", errstr);
-				SIMPLEQ_INSERT_TAIL(&state->ctfile_list_files,
-				    file, mlf_link);
-			}
-		}
+		break;
+	case TR_S_XML_LIST:
+		if (ct_parse_xml_list_reply(hdr, vbody,
+		    &state->ctfile_list_files) != 0)
+			CFATALX("XXX");
 		trans->tr_state = TR_S_DONE;
-	} else  if (strcmp(xe->name, "ct_md_delete") == 0) {
-		TAILQ_FOREACH(xe, &xl, entry) {
-			if (strcmp(xe->name, "file") == 0) {
-				filename = xmlsd_get_attr(xe, "name");
-				if (filename == NULL || filename[0] == '\0')
-					printf("specified archive does not "
-					    "exist\n");
-				else {
-					if (ct_base64_encode(CT_B64_M_DECODE,
-					    (uint8_t *)filename, strlen(filename),
-					    (uint8_t *)b64, sizeof(b64))) {
-						CFATALX("cant base64 encode %s",
-						    filename);
-					}
-					printf("%s deleted\n", b64);
-				}
-			}
-		}
+		break;
+	case TR_S_XML_DELETE:
+		if (ct_parse_xml_delete_reply(hdr, vbody, &filename) != 0)
+			CFATALX("XXX");
+		if (filename == NULL)
+			printf("specified archive does not exist\n");
+		else
+			printf("%s deleted\n", filename);
 		trans->tr_state = TR_S_DONE;
-	} else  if (strcmp(xe->name, "ct_cull_setup_reply") == 0) {
-		CNDBG(CT_LOG_XML, "cull_setup_reply");
+		break;
+	case TR_S_XML_CULL_SEND:
+		/* XXX this is for both complete and setup */
+		if (ct_parse_xml_cull_setup_reply(hdr, vbody))
+			CFATALX("XXX");
 		trans->tr_state = TR_S_DONE;
-	} else  if (strcmp(xe->name, "ct_cull_shas_reply") == 0) {
-		CNDBG(CT_LOG_XML, "cull_shas_reply");
+		break;
+	case TR_S_XML_CULL_SHA_SEND:
+		if (ct_parse_xml_cull_shas_reply(hdr, vbody))
+			CFATALX("XXX");
 		if (trans->tr_eof == 1)
 			trans->tr_state = TR_S_DONE;
 		else
 			trans->tr_state = TR_S_XML_CULL_REPLIED;
-	} else  if (strcmp(xe->name, "ct_cull_complete_reply") == 0) {
-		CNDBG(CT_LOG_XML, "cull_complete_reply");
+		break;
+	case TR_S_XML_CULL_COMPLETE_SEND:
+		if (ct_parse_xml_cull_complete_reply(hdr, vbody))
+			CFATALX("XXX");
 		trans->tr_state = TR_S_DONE;
-#if defined(CT_EXT_XML_REPLY_VALID) && defined(CT_EXT_XML_REPLY_HANDLE)
-	} else if (CT_EXT_XML_REPLY_VALID(xe->name) == 0) {
-		CT_EXT_XML_REPLY_HANDLE(xe, &xl);
-		trans->tr_state = TR_S_DONE;
-#endif /* CT_EXT_HANDLE_XML_REPLY && CT_EXT_XML_REPLY_HANDLE */
-	} else {
-		CABORTX("unexpected XML returned [%s]", (char *)vbody);
+		break;
+	default:
+#if defined (CT_EXT_XML_REPLY_HANDLER)
+		CT_EXT_XML_REPLY_HANDLER(trans, hdr, vbody);
+#endif
+		CABORTX("unexpected transaction state %d", trans->tr_state);
 	}
 
 	ct_queue_transfer(state, trans);
 	ct_body_free(state, vbody, hdr);
 	ct_header_free(state, hdr);
-	xmlsd_unwind(&xl);
 }
 
 #if 0
@@ -918,15 +739,9 @@ ctfile_verify_name(char *ctfile)
  * to hold it due to the number of shas involved?
  */
 
-RB_HEAD(ct_sha_lookup, sha_entry) ct_sha_rb_head =
-     RB_INITIALIZER(&ct_sha_rb_head);
+struct ct_sha_lookup ct_sha_rb_head = RB_INITIALIZER(&ct_sha_rb_head);
 uint64_t shacnt;
 uint64_t sha_payload_sz;
-
-struct sha_entry {
-	RB_ENTRY(sha_entry)      s_rb;
-	uint8_t sha[SHA_DIGEST_LENGTH];
-};
 
 int ct_cmp_sha(struct sha_entry *, struct sha_entry *);
 
@@ -989,10 +804,7 @@ int sha_per_packet = 1000;
 void
 ct_cull_setup(struct ct_global_state *state, struct ct_op *op)
 {
-	struct xmlsd_element_list	xl;
-	struct xmlsd_element		*xp, *xe;
 	struct ct_trans			*trans;
-	size_t				sz;
 
 	arc4random_buf(&cull_uuid, sizeof(cull_uuid));
 
@@ -1006,20 +818,12 @@ ct_cull_setup(struct ct_global_state *state, struct ct_op *op)
 		return;
 	}
 
-	trans->tr_state = TR_S_XML_CULL_SEND;
-
-	xp = xmlsd_create(&xl, "ct_cull_setup");
-	xmlsd_set_attr(xp, "version", CT_CULL_SETUP_VERSION);
-	xe = xmlsd_add_element(&xl, xp, "cull");
-	xmlsd_set_attr(xe, "type", "precious");
-	xmlsd_set_attr_uint64(xe, "uuid", cull_uuid);
-
-	if ((trans->tr_data[2] = (uint8_t *)xmlsd_generate(&xl,
-	    ct_body_alloc_xml, &sz, 1)) == NULL)
-		CFATALX("%s: Could not allocate xml body", __func__);
-	xmlsd_unwind(&xl);
+	if (ct_create_xml_cull_setup(&trans->hdr, (void **)&trans->tr_data[2],
+	    cull_uuid, CT_CULL_PRECIOUS) != 0)
+		CFATALX("Could not create xml cull setup packet");
 	trans->tr_dataslot = 2;
-	trans->tr_size[2] = sz;
+	trans->tr_size[2] = trans->hdr.c_size;
+	trans->tr_state = TR_S_XML_CULL_SEND;
 
 	ct_queue_first(state, trans);
 }
@@ -1028,15 +832,11 @@ int sent_complete;
 void
 ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 {
-	struct xmlsd_element_list	xl;
-	struct xmlsd_element		*xp, *xe;
 	struct ct_trans			*trans;
-	size_t				sz;
 
 	if (sent_complete) {
 		return;
 	}
-	sent_complete = 1;
 
 	CNDBG(CT_LOG_TRANS, "send cull_complete");
 	trans = ct_trans_alloc(state);
@@ -1045,21 +845,14 @@ ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
+	sent_complete = 1;
 
-	trans->tr_state = TR_S_XML_CULL_SEND;
-
-	xp = xmlsd_create(&xl, "ct_cull_complete");
-	xmlsd_set_attr(xp, "version", CT_CULL_COMPLETE_VERSION);
-	xe = xmlsd_add_element(&xl, xp, "cull");
-	xmlsd_set_attr(xe, "type", "process");
-	xmlsd_set_attr_uint64(xe, "uuid", cull_uuid);
-
-	if ((trans->tr_data[2] = (uint8_t *)xmlsd_generate(&xl,
-	    ct_body_alloc_xml, &sz, 1)) == NULL)
-		CFATALX("%s: Could not allocate xml body", __func__);
-	xmlsd_unwind(&xl);
+	if (ct_create_xml_cull_complete(&trans->hdr,
+	    (void **)&trans->tr_data[2], cull_uuid, CT_CULL_PROCESS) != 0)
+		CFATALX("Could not create xml cull setup packet");
 	trans->tr_dataslot = 2;
-	trans->tr_size[2] = sz;
+	trans->tr_size[2] = trans->hdr.c_size;
+	trans->tr_state = TR_S_XML_CULL_COMPLETE_SEND;
 	ct_set_file_state(state, CT_S_FINISHED);
 
 	ct_queue_first(state, trans);
@@ -1069,17 +862,11 @@ ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 void
 ct_cull_send_shas(struct ct_global_state *state, struct ct_op *op)
 {
-	struct xmlsd_element_list	xl;
-	struct xmlsd_element		*xe, *xp;
 	struct ct_trans			*trans;
-	struct sha_entry		*node;
-	size_t				sz;
-	int				sha_add;
-	char				shat[SHA_DIGEST_STRING_LENGTH];
+	int				 sha_add;
 
 	CNDBG(CT_LOG_TRANS, "cull_send_shas");
-	node = RB_ROOT(&ct_sha_rb_head);
-	if (shacnt == 0 || node == NULL) {
+	if (shacnt == 0 || RB_EMPTY(&ct_sha_rb_head)) {
 		ct_set_file_state(state, CT_S_FINISHED);
 		return;
 	}
@@ -1092,46 +879,25 @@ ct_cull_send_shas(struct ct_global_state *state, struct ct_op *op)
 		return;
 	}
 
-	trans->tr_state = TR_S_XML_CULL_SEND;
-
-	xp = xmlsd_create(&xl, "ct_cull_shas");
-	xmlsd_set_attr(xp, "version", CT_CULL_SHA_VERSION);
-
-	xe = xmlsd_add_element(&xl, xp, "uuid");
-	xmlsd_set_attr_uint64(xe, "value", cull_uuid);
-
-	sha_add = 0;
-
-	while (node != NULL && sha_add < sha_per_packet) {
-		xe = xmlsd_add_element(&xl, xp, "sha");
-		ct_sha1_encode(node->sha, shat);
-		//CNDBG(CT_LOG_SHA, "adding sha %s\n", shat);
-		xmlsd_set_attr(xe, "sha", shat);
-		shacnt--;
-		sha_add++;
-		RB_REMOVE(ct_sha_lookup, &ct_sha_rb_head, node);
-		e_free(&node);
-
-		node = RB_ROOT(&ct_sha_rb_head);
-	}
-
-	if ((trans->tr_data[2] = (uint8_t *)xmlsd_generate(&xl,
-	    ct_body_alloc_xml, &sz, 1)) == NULL)
-		CFATALX("%s: Could not allocate xml body", __func__);
-	xmlsd_unwind(&xl);
+	trans->tr_state = TR_S_XML_CULL_SHA_SEND;
+	if (ct_create_xml_cull_shas(&trans->hdr, (void **)&trans->tr_data[2],
+	    cull_uuid, &ct_sha_rb_head, sha_per_packet, &sha_add) != 0)
+		CFATALX("can't create cull shas packet");
+	shacnt -= sha_add;
 	trans->tr_dataslot = 2;
-	trans->tr_size[2] = sz;
+	trans->tr_size[2] = trans->hdr.c_size;
 
 	CNDBG(CT_LOG_SHA, "sending shas [%s]", (char *)trans->tr_data[2]);
-	CNDBG(CT_LOG_SHA, "sending shas len %lu", (unsigned long) sz);
-	sha_payload_sz += sz;
-	ct_queue_first(state, trans);
+	CNDBG(CT_LOG_SHA, "sending shas len %lu",
+	    (unsigned long)trans->hdr.c_size);
+	sha_payload_sz += trans->hdr.c_size;
 
-	if (shacnt == 0 || node == NULL) {
+	if (shacnt == 0 || RB_EMPTY(&ct_sha_rb_head)) {
 		ct_set_file_state(state, CT_S_FINISHED);
 		trans->tr_eof = 1;
 		CNDBG(CT_LOG_SHA, "shacnt %" PRIu64, shacnt);
 	}
+	ct_queue_first(state, trans);
 }
 
 /*

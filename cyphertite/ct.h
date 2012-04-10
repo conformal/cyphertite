@@ -200,7 +200,9 @@ struct ct_trans {
 #define TR_S_XML_DELETE		(27)
 
 #define TR_S_XML_CULL_SEND	(28)
-#define TR_S_XML_CULL_REPLIED	(29)
+#define TR_S_XML_CULL_SHA_SEND	(29)
+#define TR_S_XML_CULL_COMPLETE_SEND	(30)
+#define TR_S_XML_CULL_REPLIED	(31)
 
 	char			tr_dataslot;
 	char			tr_eof;

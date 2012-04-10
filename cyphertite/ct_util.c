@@ -39,6 +39,7 @@
 
 #include "ct.h"
 #include "ct_socket.h"
+#include "ct_proto.h"
 #include "ct_db.h"
 
 #ifndef MIN
@@ -240,39 +241,26 @@ ct_header_free(void *vctx, struct ct_header *hdr)
 int
 ct_assl_negotiate_poll(struct ct_global_state *state)
 {
-	struct xmlsd_element		*xe;
-	struct xmlsd_element_list	 xl;
-	char				 b64_digest[128];
-	uint8_t				 pwd_digest[SHA512_DIGEST_LENGTH];
-	char				 *body;
+	void				 *body;
 	struct ct_header		 hdr;
-	size_t				 orig_size;
 	ssize_t				 sz;
 	int				 rv = 1;
-	int				 user_len, payload_sz;
+	int				 payload_sz;
 	uint8_t				 buf[20];
 
 	/* send server request */
-	hdr.c_version = C_HDR_VERSION;
-	hdr.c_opcode = C_HDR_O_NEG;
-	hdr.c_tag = state->ct_max_trans;		/* XXX - fix */
-	hdr.c_size = 8;
-	buf[0] = (state->ct_max_trans >>  0) & 0xff;
-	buf[1] = (state->ct_max_trans >>  8) & 0xff;
-	buf[2] = (state->ct_max_trans >> 16) & 0xff;
-	buf[3] = (state->ct_max_trans >> 24) & 0xff;
-	buf[4] = (state->ct_max_block_size >>  0) & 0xff;
-	buf[5] = (state->ct_max_block_size >>  8) & 0xff;
-	buf[6] = (state->ct_max_block_size >> 16) & 0xff;
-	buf[7] = (state->ct_max_block_size >> 24) & 0xff;
+	if (ct_create_neg(&hdr, &body, state->ct_max_trans,
+	    state->ct_max_block_size) != 0)
+		CFATALX("can't create neg packet");
+	payload_sz = hdr.c_size;
 	ct_wire_header(&hdr);
 	if (ct_assl_io_write_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
 	    ASSL_TIMEOUT) != sizeof hdr) {
 		CWARNX("could not write header");
 		goto done;
 	}
-	if (ct_assl_io_write_poll(state->ct_assl_ctx, buf, 8,
-	    ASSL_TIMEOUT) != 8) {
+	if (ct_assl_io_write_poll(state->ct_assl_ctx, body, payload_sz,
+	    ASSL_TIMEOUT) != payload_sz) {
 		CWARNX("could not write body");
 		goto done;
 	}
@@ -285,58 +273,32 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 		goto done;
 	}
 	ct_unwire_header(&hdr);
-
-	if (hdr.c_version == C_HDR_VERSION &&
-	    hdr.c_opcode == C_HDR_O_NEG_REPLY) {
-		if (hdr.c_size == 8) {
-			if (ct_assl_io_read_poll(state->ct_assl_ctx, buf,
-			    hdr.c_size, ASSL_TIMEOUT) != hdr.c_size) {
-				CWARNX("couldn't read neg parameters");
-				goto done;
-			}
-			state->ct_max_trans = buf[0] | (buf[1] << 8) |
-			    (buf[2] << 16) | (buf[3] << 24);
-			state->ct_max_block_size = buf[4] | (buf[5] << 8) |
-			    (buf[6] << 16) | (buf[7] << 24);
-		} else {
-			state->ct_max_trans =
-			    MIN(hdr.c_tag, state->ct_max_trans);
-			state->ct_max_block_size =
-			    MIN(hdr.c_size, state->ct_max_block_size);
-		}
-	} else {
-		CWARNX("invalid server reply");
+	/* negotiate reply is the same size as the request, so reuse the body */
+	if (hdr.c_size != payload_sz)  {
+		CWARNX("invalid negotiate reply size %d", hdr.c_size);
 		goto done;
 	}
+
+	if (ct_assl_io_read_poll(state->ct_assl_ctx, buf,
+		    hdr.c_size, ASSL_TIMEOUT) != hdr.c_size) {
+		CWARNX("couldn't read neg parameters");
+		goto done;
+	}
+
+	if (ct_parse_neg_reply(&hdr, buf, &state->ct_max_trans,
+	    &state->ct_max_block_size) != 0) {
+		CWARNX("couldn't parse negotiate reply: %s", "errno here");
+		goto done;
+	}
+	e_free(&body);
 
 	CNDBG(CT_LOG_NET, "negotiated queue depth: %u max chunk size: %u",
 	    state->ct_max_trans, state->ct_max_block_size);
 
-	ct_sha512((uint8_t *)state->ct_config->ct_password, pwd_digest,
-	    strlen(state->ct_config->ct_password));
-	if (ct_base64_encode(CT_B64_ENCODE, pwd_digest, sizeof pwd_digest,
-	    (uint8_t *)b64_digest, sizeof b64_digest)) {
-		CWARNX("can't base64 encode password");
+	if (ct_create_login(&hdr, &body, state->ct_config->ct_username,
+	    state->ct_config->ct_password) != 0)
 		goto done;
-	}
-
-	user_len = strlen(state->ct_config->ct_username);
-	payload_sz = user_len + 1 + strlen(b64_digest) + 1;
-
-	body = e_calloc(1, payload_sz);
-
-	strlcpy(body, state->ct_config->ct_username, payload_sz);
-	strlcpy(body + user_len + 1, b64_digest,
-	    payload_sz - user_len - 1);
-
-	/* login in polled mode */
-	bzero (&hdr, sizeof hdr);
-	hdr.c_version = C_HDR_VERSION;
-	hdr.c_opcode = C_HDR_O_LOGIN;
-	hdr.c_tag = 1;
-	hdr.c_size = payload_sz;
-	hdr.c_flags = state->ct_config->ct_compress;
-
+	payload_sz = hdr.c_size;
 	ct_wire_header(&hdr);
 	if (ct_assl_io_write_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
 	    ASSL_TIMEOUT) != sizeof hdr) {
@@ -359,32 +321,21 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 	e_free(&body);
 	ct_unwire_header(&hdr);
 
-	if (hdr.c_version == C_HDR_VERSION &&
-	    hdr.c_opcode == C_HDR_O_LOGIN_REPLY) {
-		if (hdr.c_status != C_HDR_S_OK) {
-			CFATALX("login failed: %s", ct_header_strerror(&hdr));
-		}
-	} else {
-		CWARNX("login: invalid server reply");
+	/* XXX need a way to get error crud out, right now the function warns
+	   for us. */
+	if (ct_parse_login_reply(&hdr, NULL) != 0)
 		goto done;
-	}
 
 	if (ct_skip_xml_negotiate)
 		goto out;
 
-	/* XML negotiation */
-	hdr.c_version = C_HDR_VERSION;
-	hdr.c_opcode = C_HDR_O_XML;
-	hdr.c_tag = 0;
+	if (ct_create_xml_negotiate(&hdr, &body,
+	    ctdb_get_genid(state->ct_db_state)) != 0) {
+		CWARNX("can't create xml negototiate packet");
+		goto done;
+	}
 
-	xe = xmlsd_create(&xl, "ct_negotiate");
-	xe = xmlsd_add_element(&xl, xe, "clientdbgenid");
-	xmlsd_set_attr_int32(xe, "value",
-	    ctdb_get_genid(state->ct_db_state));
-
-	body = xmlsd_generate(&xl, ct_body_alloc_xml, &orig_size, 1);
-	hdr.c_size = payload_sz = orig_size;
-
+	payload_sz = hdr.c_size;
 	ct_wire_header(&hdr);
 	if (ct_assl_io_write_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
 	    ASSL_TIMEOUT) != sizeof hdr) {
