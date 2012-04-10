@@ -238,6 +238,9 @@ ctctl_main(int argc, char *argv[])
 		cflags |= CLOG_F_DBGENABLE | CLOG_F_FILE | CLOG_F_FUNC |
 		    CLOG_F_LINE | CLOG_F_DTIME;
 		exude_enable(CT_LOG_EXUDE);
+#if CT_ENABLE_THREADS
+		exude_enable_threads();
+#endif
 		debug_mask |= ct_get_debugmask(debugstring);
 	}
 
@@ -261,6 +264,8 @@ ctctl_main(int argc, char *argv[])
 		ct_cli_usage(cmd_list, NULL);
 
 	ct_cli_execute(cc, &argc, &argv);
+
+	exude_cleanup();
 
 	return (0);
 }
