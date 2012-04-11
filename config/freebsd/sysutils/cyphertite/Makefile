@@ -19,12 +19,13 @@ BUILD_DEPENDS=  ${LOCALBASE}/lib/libclens.a:${PORTSDIR}/devel/clens
 LIB_DEPENDS+=	expat.6:${PORTSDIR}/textproc/expat2
 LIB_DEPENDS+=	event-1.4.4:${PORTSDIR}/devel/libevent
 LIB_DEPENDS+=	sqlite3.8:${PORTSDIR}/databases/sqlite3
-LIB_DEPENDS+=	exude.3:${PORTSDIR}/devel/libevent
-LIB_DEPENDS+=	xmlsd.2:${PORTSDIR}/textproc/libxmlsd
+LIB_DEPENDS+=	assl.3:${PORTSDIR}/security/assl
+LIB_DEPENDS+=	exude.3:${PORTSDIR}/devel/libexude
 LIB_DEPENDS+=	shrink.2:${PORTSDIR}/archivers/libshrink
+LIB_DEPENDS+=	xmlsd.2:${PORTSDIR}/textproc/libxmlsd
 LIB_DEPENDS+=	clog.2:${PORTSDIR}/devel/libclog
 
-LICENSE=        MIT
+LICENSE=        ISCL
 LICENSE_COMB=   single
 
 .include <bsd.port.mk>
