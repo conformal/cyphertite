@@ -122,8 +122,7 @@ ct_ssl_over_bw_wakeup(evutil_socket_t fd_unused, short reason, void *varg)
 	curdbg->bw_total = 0;
 	curdbg->sleeping = -1;
 
-	if (!TAILQ_EMPTY(&ctx->io_o_q))
-		assl_event_enable_write(ctx->c);
+	ct_assl_io_resume_writes(ctx);
 }
 
 void
@@ -202,7 +201,7 @@ ct_ssl_over_bw_func(void *cbarg, struct ct_assl_io_ctx *ioctx)
 #endif
 		curdbg->sleeping = 1;
 
-		assl_event_disable_write(ioctx->c);
+		ct_assl_io_block_writes(ioctx);
 
 		if (!event_pending(blc->wakeuptimer_ev, EV_TIMEOUT,
 		    &blc->sleep_tv))  {

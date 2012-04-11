@@ -189,7 +189,7 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 		CT_LOCK(&ioctx->io_lock);
 		if (!ctxgone && (TAILQ_EMPTY(&ioctx->io_o_q) ||
 		    (ioctx->io_write_io_enabled == 0))) {
-			assl_event_disable_write(c);
+			event_del(ioctx->io_ev_wr);
 		}
 		CT_UNLOCK(&ioctx->io_lock);
 	}
@@ -600,7 +600,7 @@ ct_assl_write_op(struct ct_assl_io_ctx *ioctx, struct ct_header *hdr,
 	CT_UNLOCK(&ioctx->io_lock);
 
 	if (start_write) {
-		assl_event_enable_write(ioctx->c);
+		event_add(ioctx->io_ev_wr, NULL);
 	}
 }
 
@@ -633,7 +633,7 @@ ct_assl_writev_op(struct ct_assl_io_ctx *ioctx, struct ct_header *hdr,
 	TAILQ_INSERT_TAIL(&ioctx->io_o_q, iob, io_next);
 
 	if (start_write) {
-		assl_event_enable_write(ioctx->c);
+		event_add(ioctx->io_ev_wr, NULL);
 	}
 	CT_UNLOCK(&ioctx->io_lock);
 
@@ -777,6 +777,32 @@ ct_io_disconnect(struct ct_io_ctx *ioctx)
 	CT_UNLOCK(&ioctx->io_lock);
 }
 
+int
+ct_assl_connect(struct ct_assl_io_ctx *ctx, const char *host, const char *port,
+   int flags, struct event_base *ev_base)
+{
+	int	rv;
+
+	if ((rv = assl_connect(ctx->c, host, port, flags)) != 0)
+		return (rv);
+
+	ctx->io_ev_rd = event_new(ev_base, ctx->c->as_sock, EV_READ|EV_PERSIST,
+	    ct_event_assl_read, ctx);
+	if (ctx->io_ev_rd == NULL) {
+		return (-1);
+	}
+
+	ctx->io_ev_wr = event_new(ev_base, ctx->c->as_sock, EV_WRITE|EV_PERSIST,
+	    ct_event_assl_write, ctx);
+	if (ctx->io_ev_wr == NULL) {
+		event_free(ctx->io_ev_rd);
+		ctx->io_ev_rd = NULL;
+		return (-1);
+	}
+
+	return event_add(ctx->io_ev_rd, NULL);
+}
+
 /*
  * ct_assl_disconnect
  *
@@ -790,7 +816,15 @@ ct_assl_disconnect(struct ct_assl_io_ctx *ioctx)
 	/* XXX -check state? */
 	struct ct_io_queue	*ioq;
 
-	assl_event_close(ioctx->c);
+	if (ioctx->io_ev_rd != NULL) {
+		event_free(ioctx->io_ev_rd);
+		ioctx->io_ev_rd = NULL;
+	}
+	if (ioctx->io_ev_wr != NULL) {
+		event_free(ioctx->io_ev_wr);
+		ioctx->io_ev_wr = NULL;
+	}
+	assl_close(ioctx->c);
 
 	if (ioctx->io_i_data != NULL)
 		ioctx->io_body_free(ioctx->io_cb_arg, ioctx->io_i_data,
@@ -907,7 +941,7 @@ ct_assl_io_resume_writes(struct ct_assl_io_ctx *ctx)
 {
 	ctx->io_write_io_enabled = 1;
 	if (!TAILQ_EMPTY(&ctx->io_o_q))
-		assl_event_enable_write(ctx->c);
+		event_add(ctx->io_ev_wr, NULL);
 }
 
 void

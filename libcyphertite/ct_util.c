@@ -539,11 +539,10 @@ ct_ssl_connect(struct ct_global_state *state)
 	    state, ct_header_alloc, ct_header_free, ct_body_alloc,
 	    ct_body_free, ct_ioctx_alloc, ct_ioctx_free);
 
-	if (assl_event_connect(c, state->ct_config->ct_host,
+	if (ct_assl_connect(ctx, state->ct_config->ct_host,
 	    state->ct_config->ct_hostport,
 	    ASSL_F_NONBLOCK|ASSL_F_KEEPALIVE|ASSL_F_THROUGHPUT,
-	    ct_event_get_base(state->event_state), ct_event_assl_read,
-	    ct_event_assl_write, ctx)) {
+	    ct_event_get_base(state->event_state))) {
 		ct_assl_disconnect(ctx);
 		e_free(&ctx);
 		ctx = NULL;
