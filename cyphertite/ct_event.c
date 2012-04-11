@@ -323,7 +323,8 @@ ct_set_reconnect_timeout(void (*cb)(int, short, void*), void *varg,
 	struct timeval tv;
 	if (recon_ev == NULL) {
 		recon_ev = evtimer_new(ct_evt_base, cb, varg);
-		// XXX: NULL check
+		if (recon_ev == NULL)
+			CABORT("unable to allocate reconnect timer");
 	} else {
 		evtimer_del(recon_ev);
 	}

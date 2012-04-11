@@ -712,8 +712,17 @@ ct_io_connect_fd_pair(struct ct_io_ctx *ctx, int infd, int outfd,
 
 	ctx->io_ev_rd = event_new(ev_base, infd, EV_READ|EV_PERSIST,
 	    ct_event_io_read, ctx);
+	if (ctx->io_ev_rd == NULL) {
+		return (-1);
+	}
+
 	ctx->io_ev_wr = event_new(ev_base, outfd, EV_WRITE|EV_PERSIST,
 	    ct_event_io_write, ctx);
+	if (ctx->io_ev_wr == NULL) {
+		event_free(ctx->io_ev_rd);
+		ctx->io_ev_rd = NULL;
+		return (-1);
+	}
 
 	return event_add(ctx->io_ev_rd, NULL);
 }
