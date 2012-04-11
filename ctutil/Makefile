@@ -18,7 +18,6 @@ HDRS= ctutil.h ct_socket.h ct_xml.h
 
 INCFLAGS+= -I${.CURDIR} -I${LOCALBASE}/include
 CFLAGS+=${INCFLAGS} ${WARNFLAGS}
-CFLAGS+=${CTHREAD}
 
 afterinstall:
 	mkdir -p  ${DESTDIR}${INCDIR}/cyphertite

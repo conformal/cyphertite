@@ -4,4 +4,5 @@ WARNFLAGS += -Wno-unused-parameter -Wno-missing-field-initializers
 WARNFLAGS += -Wno-sign-compare
 DEBUG += -g
 OPTLEVEL += -O2
+ENABLE_THREADS ?= 1
 INSTALL_STRIP=

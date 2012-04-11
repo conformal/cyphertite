@@ -21,9 +21,7 @@
 #include <fcntl.h>
 #include <event.h>
 #include <signal.h>
-#ifdef CT_ENABLE_PTHREADS
-#include <pthread.h>
-#endif
+#include <ct_threads.h>
 
 #include <clog.h>
 #include <exude.h>
@@ -40,7 +38,7 @@ struct ct_ctx {
 	ct_func_cb		*ctx_fn;
 	void			(*ctx_wakeup)(struct ct_ctx *);
 	void			*ctx_varg;
-#ifdef CT_ENABLE_PTHREADS
+#if CT_ENABLE_PTHREADS
 	pthread_mutex_t 	ctx_mtx;
 	pthread_cond_t 		ctx_cv;
 	pthread_t		ctx_thread;
@@ -65,7 +63,7 @@ void ct_handle_wakeup(int, short, void *);
 void ct_info_sig(int, short, void *);
 void ct_pipe_sig(int, short, void *);
 void ct_wakeup_x_pipe(struct ct_ctx *);
-#ifdef CT_ENABLE_PTHREADS
+#if CT_ENABLE_THREADS
 void ct_wakeup_x_cv(struct ct_ctx *);
 void ct_setup_wakeup_cv(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb);
 #endif
@@ -109,7 +107,7 @@ ct_setup_wakeup_file(void *vctx, ct_func_cb *func_cb)
 void
 ct_setup_wakeup_sha(void *vctx, ct_func_cb *func_cb)
 {
-#ifdef CT_ENABLE_THREADS
+#if CT_ENABLE_THREADS
 	ct_setup_wakeup_cv(&ct_ctx_sha, vctx, func_cb);
 #else
 	ct_setup_wakeup_pipe(&ct_ctx_sha, vctx, func_cb);
@@ -119,7 +117,7 @@ ct_setup_wakeup_sha(void *vctx, ct_func_cb *func_cb)
 void
 ct_setup_wakeup_compress(void *vctx, ct_func_cb *func_cb)
 {
-#ifdef CT_ENABLE_THREADS
+#if CT_ENABLE_THREADS
 	ct_setup_wakeup_cv(&ct_ctx_compress, vctx, func_cb);
 #else
 	ct_setup_wakeup_pipe(&ct_ctx_compress, vctx, func_cb);
@@ -129,7 +127,7 @@ ct_setup_wakeup_compress(void *vctx, ct_func_cb *func_cb)
 void
 ct_setup_wakeup_csha(void *vctx, ct_func_cb *func_cb)
 {
-#ifdef CT_ENABLE_THREADS
+#if CT_ENABLE_THREADS
 	ct_setup_wakeup_cv(&ct_ctx_csha, vctx, func_cb);
 #else
 	ct_setup_wakeup_pipe(&ct_ctx_csha, vctx, func_cb);
@@ -139,7 +137,7 @@ ct_setup_wakeup_csha(void *vctx, ct_func_cb *func_cb)
 void
 ct_setup_wakeup_encrypt(void *vctx, ct_func_cb *func_cb)
 {
-#ifdef CT_ENABLE_THREADS
+#if CT_ENABLE_THREADS
 	ct_setup_wakeup_cv(&ct_ctx_encrypt, vctx, func_cb);
 #else
 	ct_setup_wakeup_pipe(&ct_ctx_encrypt, vctx, func_cb);
@@ -299,7 +297,7 @@ ct_set_reconnect_timeout(void (*cb)(int, short, void*), void *varg,
 	evtimer_add(&recon_ev, &tv);
 }
 
-#ifdef CT_ENABLE_PTHREADS
+#if CT_ENABLE_PTHREADS
 void
 ct_wakeup_x_cv(struct ct_ctx *ctx)
 {

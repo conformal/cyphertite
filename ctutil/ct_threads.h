@@ -17,7 +17,15 @@
 #ifndef _CT_THREADS_H_
 #define _CT_THREADS_H_
 
-#ifdef CT_ENABLE_PTHREADS
+#ifdef _POSIX_THREADS
+#define CT_ENABLE_THREADS 1
+#define CT_ENABLE_PTHREADS 1
+#else
+#define CT_ENABLE_THREADS 0
+#define CT_ENABLE_PTHREADS 0
+#endif
+
+#if CT_ENABLE_PTHREADS
 #include <pthread.h>
 
 #ifndef CT_LOCK_STORE

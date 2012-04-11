@@ -41,8 +41,6 @@ CFLAGS+= ${INCFLAGS} ${WARNFLAGS}
 CPPFLAGS+= -DBUILDSTR=\"$(BUILDVERSION)\"
 .endif
 
-CFLAGS+=${CTHREAD}
-LDFLAGS+=${LDTHREAD}
 LDADD+= -L${LOCALBASE}/lib
 LDADD+=	-lassl -lclog -lcrypto -levent -lexpat -lexude -lshrink
 LDADD+=	-lsqlite3 -lssl -lutil -lxmlsd -lctutil -ledit -lncurses

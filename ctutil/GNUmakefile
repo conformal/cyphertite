@@ -33,11 +33,6 @@ RM ?= rm -f
 CPPFLAGS += -DNEED_LIBCLENS -D_PASSWORD_LEN=128
 INCFLAGS += -I. -I$(INCDIR)/clens -I$(LOCALBASE)/ssl/include
 CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(OPTLEVEL) $(DEBUG)
-CFLAGS += $(CTHREAD)
-LDFLAGS+= $(LDTHREAD)
-#LDFLAGS += -lclens -lbsd
-LDFLAGS += -lclens
-SHARED_OBJ_EXT ?= o
 
 LIB.NAME = ctutil
 LIB.SRCS  = ctutil.c ct_fileops.c ct_socket.c ct_core.c ct_compress.c ct_ssl.c

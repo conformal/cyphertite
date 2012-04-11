@@ -10,5 +10,7 @@ LDFLAGS+= -L${LOCALBASE}/ssl/lib
 LDADD+= -lclens
 LDADDSSL+= -Wl,-Bstatic -lssl -lcrypto -Wl,-Bdynamic
 
-CTHREAD=-pthread -DCT_ENABLE_THREADS -DCT_ENABLE_PTHREADS
-LDTHREAD=-pthread
+.if "${ENABLE_THREADS}" == "1"
+CFLAGS += -pthread
+LDFLAGS += -pthread
+.endif
