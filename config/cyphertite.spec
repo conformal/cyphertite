@@ -2,6 +2,12 @@
 %define version		1.1.1
 %define release		1
 
+%define libeventpkg	libevent
+%define is_fc14		%(test "%{?dist}" = ".fc14" && echo 1 || echo 0)
+%if %{is_fc14}
+%define libeventpkg	libevent2
+%endif
+
 Name: 		%{name}
 Summary: 	High-security scalable solution for online backups
 Version: 	%{version}
@@ -13,7 +19,7 @@ Source: 	%{name}-%{version}.tar.gz
 Buildroot:	%{_tmppath}/%{name}-%{version}-buildroot
 Prefix: 	/usr
 Requires:	assl >= 0.11.0, clog >= 0.4.0, exude >= 0.6.0, shrink >= 0.3.0
-Requires:	xmlsd >= 0.7.0, libbsd, libevent >= 1.4, sqlite >= 3.6.23
+Requires:	xmlsd >= 0.7.0, libbsd, %{libeventpkg} >= 2.0, sqlite >= 3.6.23
 Requires:	libedit >= 3.0
 
 %description
