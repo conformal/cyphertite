@@ -1,4 +1,5 @@
 
+.include "${.CURDIR}/../config/Makefile.common"
 SYSTEM != uname -s
 .if exists(${.CURDIR}/../config/Makefile.$(SYSTEM:L))
 .  include "${.CURDIR}/../config/Makefile.$(SYSTEM:L)"
@@ -34,8 +35,8 @@ LDADD+= -L${.OBJDIR}/../ctutil
 
 BUILDVERSION != sh "${.CURDIR}/../buildver.sh"
 
-COPT+= -O2
-CFLAGS+= -Wall -Werror -ggdb3
+INCFLAGS+= -I${.CURDIR}/../ctutil -I${LOCALBASE}/include
+CFLAGS+= ${INCFLAGS} ${WARNFLAGS}
 .if !${BUILDVERSION} == ""
 CPPFLAGS+= -DBUILDSTR=\"$(BUILDVERSION)\"
 .endif

@@ -1,3 +1,7 @@
 WARNFLAGS += -Wall -Werror
+WARNFLAGS += -Wshadow -Wextra -Wpointer-sign
+WARNFLAGS += -Wno-unused-parameter -Wno-missing-field-initializers
+WARNFLAGS += -Wno-sign-compare
 DEBUG += -g
-CFLAGS += -O2
+OPTLEVEL += -O2
+INSTALL_STRIP=

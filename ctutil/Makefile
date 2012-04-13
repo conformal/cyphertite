@@ -1,4 +1,5 @@
 
+.include "${.CURDIR}/../config/Makefile.common"
 SYSTEM != uname -s
 .if exists(${.CURDIR}/../config/Makefile.$(SYSTEM:L))
 .  include "${.CURDIR}/../config/Makefile.$(SYSTEM:L)"
@@ -15,10 +16,8 @@ SRCS= ctutil.c ct_fileops.c ct_socket.c ct_core.c ct_ssl.c ct_compress.c
 SRCS+= ct_xml.c
 HDRS= ctutil.h ct_socket.h ct_xml.h
 
-CFLAGS+=-I${.CURDIR}
-CFLAGS+= -O2
-CFLAGS+= -Wall -Werror
-CFLAGS+= -ggdb3
+INCFLAGS+= -I${.CURDIR} -I${LOCALBASE}/include
+CFLAGS+=${INCFLAGS} ${WARNFLAGS}
 CFLAGS+=${CTHREAD}
 
 afterinstall:

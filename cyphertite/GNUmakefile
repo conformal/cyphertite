@@ -1,10 +1,11 @@
 
+-include ../config/Makefile.common
+
 # Attempt to include platform specific makefile.
 # OSNAME may be passed in.
 OSNAME ?= $(shell uname -s)
 OSNAME := $(shell echo $(OSNAME) | tr A-Z a-z)
 -include ../config/Makefile.$(OSNAME)
--include ../config/Makefile.common
 
 # Default paths.
 DESTDIR ?=
@@ -43,7 +44,7 @@ endif
 # Compiler and linker flags.
 CPPFLAGS += -DNEED_LIBCLENS
 INCFLAGS += -I../ctutil -I$(INCDIR)/clens -I.
-CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(DEBUG)
+CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(OPTLEVEL) $(DEBUG)
 CFLAGS += $(CTHREAD)
 LDFLAGS+= $(LDTHREAD)
 LDLIBS += -L../ctutil/obj -L../ctutil -lctutil -lassl -lclog -levent -lexude
