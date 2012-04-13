@@ -223,12 +223,21 @@ ct_create_config(void)
 
 	/* help user create config file */
 	conf_buf = ct_user_config();
-	snprintf(prompt, sizeof prompt, "Target conf file [%s]: ", conf_buf);
+	snprintf(prompt, sizeof prompt, "Target config file [%s]: ", conf_buf);
 	ct_get_answer(prompt, NULL, NULL, conf_buf, answer, sizeof answer, 0);
 	if (conf_buf != NULL)
 		e_free(&conf_buf);
 	conf = e_strdup(answer);
 
+	if (stat(conf, &sb) == 0) {
+		strlcpy(prompt, "Target config file already exists.  Overwrite "
+		    "[no]: ", sizeof(prompt));
+		rv = ct_get_answer(prompt, "yes", "no", "no", answer,
+		    sizeof answer, 0);
+		if (rv == 2) {
+			exit(1);
+		}
+	}
 	/*
 	 * Make path and create conf file early so permission failures are
 	 * are caught before the user fills out all of the information.
