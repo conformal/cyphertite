@@ -230,8 +230,8 @@ ct_create_config(void)
 	conf = e_strdup(answer);
 
 	if (stat(conf, &sb) == 0) {
-		strlcpy(prompt, "Target config file already exists.  Overwrite "
-		    "[no]: ", sizeof(prompt));
+		strlcpy(prompt, "Target config file already exists.  "
+		    "Overwrite? [no]: ", sizeof(prompt));
 		rv = ct_get_answer(prompt, "yes", "no", "no", answer,
 		    sizeof answer, 0);
 		if (rv == 2) {
