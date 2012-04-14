@@ -56,9 +56,9 @@ struct ct_ctx ct_ctx_csha;
 struct ct_ctx ct_ctx_encrypt;
 struct ct_ctx ct_ctx_complete;
 struct ct_ctx ct_ctx_write;
-struct event *ct_ev_sig_info;
-struct event *ct_ev_sig_usr1;
-struct event *ct_ev_sig_pipe;
+struct event *ct_ev_sig_info = NULL;
+struct event *ct_ev_sig_usr1 = NULL;
+struct event *ct_ev_sig_pipe = NULL;
 
 void ct_handle_wakeup(int, short, void *);
 void ct_info_sig(int, short, void *);
@@ -289,31 +289,28 @@ ct_event_loopbreak(void)
 void
 ct_event_cleanup(void)
 {
-	event_free(ct_ctx_file.ctx_ev);
-	event_free(ct_ctx_complete.ctx_ev);
-	event_free(ct_ctx_write.ctx_ev);
-#ifndef CT_ENABLE_THREADS
-	event_free(ct_ctx_sha.ctx_ev);
-	event_free(ct_ctx_compress.ctx_ev);
-	event_free(ct_ctx_csha.ctx_ev);
-	event_free(ct_ctx_encrypt.ctx_ev);
-#endif
-
-#if defined(SIGINFO) && SIGINFO != SIGUSR1
-	event_free(ct_ev_sig_info);
-#endif
-#if defined(SIGUSR1)
-	event_free(ct_ev_sig_usr1);
-#endif
-#if defined(SIGPIPE)
-	event_free(ct_ev_sig_pipe);
-#endif
-
+	if (ct_ctx_complete.ctx_ev != NULL)
+		event_free(ct_ctx_complete.ctx_ev);
+	if (ct_ctx_write.ctx_ev != NULL)
+		event_free(ct_ctx_write.ctx_ev);
+	if (ct_ctx_sha.ctx_ev != NULL)
+		event_free(ct_ctx_sha.ctx_ev);
+	if (ct_ctx_compress.ctx_ev != NULL)
+		event_free(ct_ctx_compress.ctx_ev);
+	if (ct_ctx_csha.ctx_ev != NULL)
+		event_free(ct_ctx_csha.ctx_ev);
+	if (ct_ctx_encrypt.ctx_ev != NULL)
+		event_free(ct_ctx_encrypt.ctx_ev);
+	if (ct_ev_sig_info != NULL)
+		event_free(ct_ev_sig_info);
+	if (ct_ev_sig_usr1 != NULL)
+		event_free(ct_ev_sig_usr1);
+	if (ct_ev_sig_pipe != NULL)
+		event_free(ct_ev_sig_pipe);
 	if (recon_ev != NULL)
 		event_free(recon_ev);
-
-	event_base_free(ct_evt_base);
-
+	if (ct_evt_base != NULL)
+		event_base_free(ct_evt_base);
 }
 
 void
