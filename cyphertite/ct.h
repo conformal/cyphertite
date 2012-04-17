@@ -43,7 +43,7 @@
 				CT_STR(CT_VERSION_MINOR) "." \
 				CT_STR(CT_VERSION_PATCH)
 
-extern int		cflags;
+extern uint32_t		cflags;
 extern int		ct_debug;
 extern int		ct_compress_enabled;
 extern int		ct_multilevel_allfiles;

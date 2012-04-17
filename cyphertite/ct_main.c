@@ -72,7 +72,7 @@ char			*ct_configfile;
 int			ct_attr;
 
 /* runtime */
-int			cflags;
+uint32_t		cflags;
 unsigned char		ct_iv[CT_IV_LEN];
 unsigned char		ct_crypto_key[CT_KEY_LEN];
 char			*secrets_file_pattern[] =
