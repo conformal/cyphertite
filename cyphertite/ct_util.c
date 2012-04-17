@@ -380,7 +380,7 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *asslctx)
 	xmlsd_set_attr_int32(xe, "value",
 	    ctdb_get_genid(ct_state->ct_db_state));
 
-	body = xmlsd_generate(&xl, malloc, &orig_size, 1);
+	body = xmlsd_generate(&xl, ct_body_alloc_xml, &orig_size, 1);
 	hdr.c_size = payload_sz = orig_size;
 
 	ct_wire_header(&hdr);
@@ -394,7 +394,7 @@ ct_assl_negotiate_poll(struct ct_assl_io_ctx *asslctx)
 		CWARNX("could not write body");
 		goto done;
 	}
-	free(body); /* XXX - malloc allocated */
+	e_free(&body);
 
 	/* get server reply */
 	sz = ct_assl_io_read_poll(ct_assl_ctx, &hdr, sizeof hdr, ASSL_TIMEOUT);

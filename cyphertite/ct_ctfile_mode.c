@@ -357,7 +357,7 @@ ct_xml_file_open_polled(struct ct_assl_io_ctx *asslctx,
 		xmlsd_set_attr_uint32(xe, "chunkno", chunkno);
 	}
 
-	body = xmlsd_generate(&xl, malloc, &sz, 1);
+	body = xmlsd_generate(&xl, ct_body_alloc_xml, &sz, 1);
 	xmlsd_unwind(&xl);
 
 	hdr.c_version = C_HDR_VERSION;
@@ -377,7 +377,7 @@ ct_xml_file_open_polled(struct ct_assl_io_ctx *asslctx,
 		CWARNX("could not write body");
 		goto done;
 	}
-	free(body);
+	e_free(&body);
 
 	/* get server reply */
 	if (ct_assl_io_read_poll(asslctx, &hdr, sizeof hdr, ASSL_TIMEOUT)
