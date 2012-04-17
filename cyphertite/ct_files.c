@@ -421,7 +421,7 @@ void
 ct_cleanup_root_dir(void)
 {
 	if (ct_rootdir.d_name != NULL)
-		e_free(ct_rootdir.d_name);
+		e_free(&ct_rootdir.d_name);
 #ifndef CT_NO_OPENAT
 	struct dnode	*dnode;
 	/*
