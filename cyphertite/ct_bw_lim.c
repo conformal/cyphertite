@@ -18,8 +18,9 @@
 #include <inttypes.h>
 #include <clog.h>
 #include <assl.h>
-#include "ct.h"
+#include <exude.h>
 
+#include "ct.h"
 
 struct bw_debug {
 	struct timeval	io_time;
@@ -33,53 +34,61 @@ struct bw_debug {
 };
 
 #define BW_DEBUG_SLOTS	200
-struct bw_debug	trace[BW_DEBUG_SLOTS];
-int traceslot = 0;
-int dump_debug = BW_DEBUG_SLOTS;
+struct bw_limit_ctx {
+	struct bw_debug	 trace[BW_DEBUG_SLOTS];
+	struct timeval	 curslottime;
+	struct timeval	 single_slot_time;
+	struct timeval	 sleep_tv;
+	struct event	*wakeuptimer_ev;
+	uint64_t	 last_bw_total_trans;
+	int		 traceslot /*= 0*/;
+	int		 bw_slot, slot_max;
+
+};
 void dump_bw_stats(void);
 
 #define US_PER_SEC 1000000
 #define SLOTS_PER_SEC 100
 #define BW_TIMESLOT	(US_PER_SEC/SLOTS_PER_SEC)
 
-int		bw_slot, slot_max;
-struct timeval	curslottime, single_slot_time, sleep_tv;
-uint64_t	last_bw_total_trans;
-
 ct_assl_io_over_bw_check_func ct_ssl_over_bw_func;
-
-struct event	*wakeuptimer_ev;
 
 void ct_ssl_over_bw_wakeup(evutil_socket_t, short, void *);
 
-void
+struct bw_limit_ctx *
 ct_ssl_init_bw_lim(struct event_base *base, struct ct_assl_io_ctx *ctx,
     int io_bw_limit)
 {
-	int packet_len;
+	struct bw_limit_ctx	*blc;
+	int			 packet_len;
 
+	blc = e_calloc(1, sizeof(*blc));
 	/* 1/4 of the number of bytes to send per timeslot */
 	packet_len = ((io_bw_limit * 1024) / (US_PER_SEC/BW_TIMESLOT))/4;
 	CNDBG(CT_LOG_NET, "packet_len %d",  packet_len);
 	ct_assl_io_ctx_set_maxtrans(ctx, packet_len);
 	ct_assl_io_ctx_set_over_bw_func(ctx, ct_ssl_over_bw_func);
-	wakeuptimer_ev = evtimer_new(base, ct_ssl_over_bw_wakeup, ctx);
-	if (wakeuptimer_ev == NULL)
+	blc->wakeuptimer_ev = evtimer_new(base, ct_ssl_over_bw_wakeup, ctx);
+	if (blc->wakeuptimer_ev == NULL)
 		CABORT("unable to allocate bw limit timer");
 
-	single_slot_time.tv_sec = 0;
-	single_slot_time.tv_usec = BW_TIMESLOT;
+	blc->single_slot_time.tv_sec = 0;
+	blc->single_slot_time.tv_usec = BW_TIMESLOT;
 
-	slot_max =  ((io_bw_limit * 1024) / (US_PER_SEC/BW_TIMESLOT));
+	blc->slot_max =  ((io_bw_limit * 1024) / (US_PER_SEC/BW_TIMESLOT));
 	CNDBG(CT_LOG_NET, "slottime %d max_bw_total %d",
-	    BW_TIMESLOT, slot_max);
+	    BW_TIMESLOT, blc->slot_max);
+	return (blc);
 }
 
 void
-ct_ssl_cleanup_bw_lim(void)
+ct_ssl_cleanup_bw_lim(struct bw_limit_ctx *blc)
 {
-	if (wakeuptimer_ev != NULL)
-		event_free(wakeuptimer_ev);
+	if (blc == NULL)
+		return;
+	if (blc->wakeuptimer_ev != NULL)
+		event_free(blc->wakeuptimer_ev);
+	e_free(&blc);
 }
 
 void
@@ -87,8 +96,11 @@ ct_ssl_over_bw_wakeup(evutil_socket_t fd_unused, short reason, void *varg)
 {
 	struct timeval		now;
 	struct ct_assl_io_ctx	*ctx = varg;
-	struct bw_debug		*curdbg = &trace[traceslot];
-	traceslot = (traceslot +1) % BW_DEBUG_SLOTS;
+	struct ct_global_state	*state = ctx->io_cb_arg;
+	struct bw_limit_ctx	*blc = state->bw_limit;
+	struct bw_debug		*curdbg = &blc->trace[blc->traceslot];
+
+	blc->traceslot = (blc->traceslot + 1) % BW_DEBUG_SLOTS;
 
 	curdbg->op = 'W';
 
@@ -97,7 +109,7 @@ ct_ssl_over_bw_wakeup(evutil_socket_t fd_unused, short reason, void *varg)
 		return;
 	}
 	curdbg->io_time = now;
-	curdbg->prev_time = sleep_tv;
+	curdbg->prev_time = blc->sleep_tv;
 	curdbg->tot_trans = 0;
 	curdbg->this_trans = 0;
 	curdbg->bw_curslot = 0;
@@ -118,11 +130,13 @@ ct_trunc_slot_time(struct timeval *tv)
 void
 ct_ssl_over_bw_func(void *cbarg, struct ct_assl_io_ctx *ioctx)
 {
-	struct timeval		now, diff, nextslot;
-	uint64_t		newbytes;
-	struct bw_debug		*curdbg = &trace[traceslot];
+	struct ct_global_state	*state = ioctx->io_cb_arg;
+	struct bw_limit_ctx	*blc = state->bw_limit;
+	struct timeval		 now, diff, nextslot;
+	uint64_t		 newbytes;
+	struct bw_debug		*curdbg = &blc->trace[blc->traceslot];
 
-	traceslot = (traceslot +1) % BW_DEBUG_SLOTS;
+	blc->traceslot = (blc->traceslot +1) % BW_DEBUG_SLOTS;
 
 	curdbg->op = 'O';
 
@@ -140,39 +154,39 @@ ct_ssl_over_bw_func(void *cbarg, struct ct_assl_io_ctx *ioctx)
 	 * the beginning of the next 1/100th of a second.
 	 */
 
-	if (gettimeofday(&now,NULL)) {
+	if (gettimeofday(&now, NULL)) {
 		CWARN("gettimeofday failed in over_bw_lim");
 		return;
 	}
 
 	curdbg->io_time = now;
-	curdbg->prev_time = curslottime;
+	curdbg->prev_time = blc->curslottime;
 
-	timersub(&now, &curslottime, &diff);
+	timersub(&now, &blc->curslottime, &diff);
 
-	newbytes = ioctx->io_write_bytes - last_bw_total_trans;
-	last_bw_total_trans = ioctx->io_write_bytes;
+	newbytes = ioctx->io_write_bytes - blc->last_bw_total_trans;
+	blc->last_bw_total_trans = ioctx->io_write_bytes;
 
 	/* truncate time to beginning of slot */
-	timeradd(&curslottime, &single_slot_time, &nextslot);
+	timeradd(&blc->curslottime, &blc->single_slot_time, &nextslot);
 
 	if (timercmp(&now, &nextslot, >)) {
-		bw_slot = 0;
-		curslottime = now;
-		ct_trunc_slot_time(&curslottime);
+		blc->bw_slot = 0;
+		blc->curslottime = now;
+		ct_trunc_slot_time(&blc->curslottime);
 	}
 
 	curdbg->tot_trans = ioctx->io_write_bytes;
 	curdbg->this_trans = newbytes;
 
-	bw_slot += newbytes;
+	blc->bw_slot += newbytes;
 
-	curdbg->bw_curslot = bw_slot;
+	curdbg->bw_curslot = blc->bw_slot;
 	curdbg->bw_total = 0;
 
 	curdbg->sleeping = 0;
 
-	if (bw_slot >= slot_max) {
+	if (blc->bw_slot >= blc->slot_max) {
 #if 0
 		CINFO("cnt %d max %d newbytes %" PRIu64 "last %" PRIu64,
 		    cur_bw_total, ((ct_io_bw_limit*1024) / slots_per_sec),
@@ -186,14 +200,15 @@ ct_ssl_over_bw_func(void *cbarg, struct ct_assl_io_ctx *ioctx)
 
 		assl_event_disable_write(ioctx->c);
 
-		if (!event_pending(wakeuptimer_ev, EV_TIMEOUT, &sleep_tv))  {
-			timersub(&nextslot, &now, &sleep_tv);
-			event_add(wakeuptimer_ev, &sleep_tv);
+		if (!event_pending(blc->wakeuptimer_ev, EV_TIMEOUT,
+		    &blc->sleep_tv))  {
+			timersub(&nextslot, &now, &blc->sleep_tv);
+			event_add(blc->wakeuptimer_ev, &blc->sleep_tv);
 		}
 	}
 
 	CNDBG(CT_LOG_NET, "cbarg bytes %" PRIu64, ioctx->io_write_bytes);
-	if (traceslot == 0 || traceslot == 0) {
+	if (blc->traceslot == 0) {
 		dump_bw_stats();
 	}
 }

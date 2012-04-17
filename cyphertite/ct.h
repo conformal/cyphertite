@@ -441,6 +441,7 @@ struct ct_global_state {
 
 	struct ct_compress_ctx		*ct_compress_state;
 	struct ct_event_state		*event_state;
+	struct bw_limit_ctx		*bw_limit;
 };
 
 struct ct_event_state;
@@ -665,7 +666,8 @@ struct ct_statistics {
 
 void			ct_dump_stats(struct ct_global_state *, FILE *);
 struct ct_assl_io_ctx	*ct_ssl_connect(struct ct_global_state *, int);
-void			ct_ssl_cleanup(struct ct_assl_io_ctx *);
+void			ct_ssl_cleanup(struct ct_assl_io_ctx *,
+			    struct bw_limit_ctx *);
 void			ct_reconnect(evutil_socket_t, short, void *);
 int			ct_reconnect_internal(struct ct_global_state *);
 int			ct_assl_negotiate_poll(struct ct_global_state *);
@@ -686,9 +688,9 @@ void			 ct_match_unwind(struct ct_match *);
 void			 ct_match_insert_rb(struct ct_match *, char *);
 int			 ct_match_rb_is_empty(struct ct_match *);
 
-void			ct_ssl_init_bw_lim(struct event_base *,
+struct bw_limit_ctx	*ct_ssl_init_bw_lim(struct event_base *,
 			    struct ct_assl_io_ctx *, int);
-void			ct_ssl_cleanup_bw_lim();
+void			ct_ssl_cleanup_bw_lim(struct bw_limit_ctx *);
 
 /* MD mode handling */
 #define CT_MDMODE_LOCAL		(0)

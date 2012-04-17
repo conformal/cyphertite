@@ -194,8 +194,9 @@ ct_cleanup_eventloop(struct ct_global_state *state)
 {
 	ct_trans_cleanup(state);
 	if (state->ct_assl_ctx) {
-		ct_ssl_cleanup(state->ct_assl_ctx);
+		ct_ssl_cleanup(state->ct_assl_ctx, state->bw_limit);
 		state->ct_assl_ctx = NULL;
+		state->bw_limit = NULL;
 	}
 	ctdb_shutdown(state->ct_db_state);
 	state->ct_db_state = NULL;

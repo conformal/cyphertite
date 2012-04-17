@@ -382,8 +382,9 @@ ct_create_config(void)
 	 * XXX: It would make more sense to leave the connection open here, but
 	 * there are some corner cases that need to be handled if so.
 	 */
-	ct_ssl_cleanup(state->ct_assl_ctx);
+	ct_ssl_cleanup(state->ct_assl_ctx, state->bw_limit);
 	state->ct_assl_ctx = NULL;
+	state->bw_limit = NULL;
 	ct_event_cleanup(state->event_state);
 	state->event_state = NULL;
 

@@ -760,8 +760,9 @@ ct_handle_disconnect(struct ct_global_state *state)
 	int			 idle = 1;
 
 	state->ct_disconnected = 1;
-	ct_ssl_cleanup(state->ct_assl_ctx);
+	ct_ssl_cleanup(state->ct_assl_ctx, state->bw_limit);
 	state->ct_assl_ctx = NULL;
+	state->bw_limit = NULL;
 
 	while ((trans = ct_dequeue_inflight(state)) != NULL) {
 		CNDBG(CT_LOG_NET,

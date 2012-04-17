@@ -197,8 +197,10 @@ ct_ssl_connect(struct ct_global_state *state, int nonfatal)
 }
 
 void
-ct_ssl_cleanup(struct ct_assl_io_ctx *ctx)
+ct_ssl_cleanup(struct ct_assl_io_ctx *ctx, struct bw_limit_ctx *blc)
 {
+	if (blc != NULL)
+		ct_ssl_cleanup_bw_lim(blc);
 	if (ctx != NULL) {
 		ct_assl_disconnect(ctx);
 		e_free(&ctx);
@@ -502,7 +504,6 @@ ct_shutdown(struct ct_global_state *state)
 {
 	ctdb_shutdown(state->ct_db_state);
 	state->ct_db_state = NULL;
-	ct_ssl_cleanup_bw_lim();
 	ct_event_loopbreak(state->event_state);
 }
 
