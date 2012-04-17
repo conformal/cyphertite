@@ -373,7 +373,7 @@ ct_create_config(void)
 	/* Verify username and password are correct before continuing. */
 	state = ct_setup_state(&config);
 	assl_initialize();
-	ct_event_init(state);
+	state->event_state = ct_event_init(state, NULL);
 	state->ct_assl_ctx = ct_ssl_connect(state, 0);
 	if (ct_assl_negotiate_poll(state)) {
 		CFATALX("unable to connect to server");
@@ -384,6 +384,8 @@ ct_create_config(void)
 	 */
 	ct_ssl_cleanup(state->ct_assl_ctx);
 	state->ct_assl_ctx = NULL;
+	ct_event_cleanup(state->event_state);
+	state->event_state = NULL;
 
 	if (expert_mode) {
 		strlcpy(prompt,

@@ -48,17 +48,22 @@ struct ct_ctx {
 
 };
 
-struct event_base *ct_evt_base;
-struct ct_ctx ct_ctx_file;
-struct ct_ctx ct_ctx_sha;
-struct ct_ctx ct_ctx_compress;
-struct ct_ctx ct_ctx_csha;
-struct ct_ctx ct_ctx_encrypt;
-struct ct_ctx ct_ctx_complete;
-struct ct_ctx ct_ctx_write;
-struct event *ct_ev_sig_info = NULL;
-struct event *ct_ev_sig_usr1 = NULL;
-struct event *ct_ev_sig_pipe = NULL;
+
+struct ct_event_state {
+	struct event_base	*ct_evt_base;
+	struct ct_ctx		 ct_ctx_file;
+	struct ct_ctx		 ct_ctx_sha;
+	struct ct_ctx		 ct_ctx_compress;
+	struct ct_ctx		 ct_ctx_csha;
+	struct ct_ctx		 ct_ctx_encrypt;
+	struct ct_ctx		 ct_ctx_complete;
+	struct ct_ctx		 ct_ctx_write;
+	struct event		*ct_ev_sig_info;
+	struct event		*ct_ev_sig_usr1;
+	struct event		*ct_ev_sig_pipe;
+	struct event		*recon_ev;
+
+};
 
 void ct_handle_wakeup(int, short, void *);
 void ct_info_sig(int, short, void *);
@@ -68,17 +73,17 @@ void ct_wakeup_x_pipe(struct ct_ctx *);
 void ct_wakeup_x_cv(struct ct_ctx *);
 void ct_setup_wakeup_cv(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb);
 #endif
-void ct_setup_wakeup_pipe(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb);
+void ct_setup_wakeup_pipe(struct event_base *, struct ct_ctx *ctx, void *vctx,
+    ct_func_cb *func_cb);
 void * ct_cb_thread(void *);
 
 
 /* XXX -global to cause threads to exit on next wakup.*/
 int ct_exiting;
 
-struct event *recon_ev = NULL;
-
 void
-ct_setup_wakeup_pipe(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb)
+ct_setup_wakeup_pipe(struct event_base *base, struct ct_ctx *ctx, void *vctx,
+    ct_func_cb *func_cb)
 {
 	int i;
 	ctx->ctx_type = 0;
@@ -96,68 +101,75 @@ ct_setup_wakeup_pipe(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb)
 	/* master side of pipe - no config */
 	/* client side of pipe */
 
-	ctx->ctx_ev = event_new(ct_evt_base, (ctx->ctx_pipe)[0],
+	ctx->ctx_ev = event_new(base, (ctx->ctx_pipe)[0],
 	    EV_READ|EV_PERSIST, ct_handle_wakeup, ctx);
 	event_add(ctx->ctx_ev, NULL);
 }
 
 void
-ct_setup_wakeup_file(void *vctx, ct_func_cb *func_cb)
+ct_setup_wakeup_file(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
 {
-	ct_setup_wakeup_pipe(&ct_ctx_file, vctx, func_cb);
+	ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_file, vctx,
+	    func_cb);
 }
 
 void
-ct_setup_wakeup_sha(void *vctx, ct_func_cb *func_cb)
+ct_setup_wakeup_sha(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
 {
 #if CT_ENABLE_THREADS
-	ct_setup_wakeup_cv(&ct_ctx_sha, vctx, func_cb);
+	ct_setup_wakeup_cv(&ev_st->ct_ctx_sha, vctx, func_cb);
 #else
-	ct_setup_wakeup_pipe(&ct_ctx_sha, vctx, func_cb);
+	ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_sha, vctx,
+	    func_cb);
 #endif
 }
 
 void
-ct_setup_wakeup_compress(void *vctx, ct_func_cb *func_cb)
+ct_setup_wakeup_compress(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
 {
 #if CT_ENABLE_THREADS
-	ct_setup_wakeup_cv(&ct_ctx_compress, vctx, func_cb);
+	ct_setup_wakeup_cv(&ev_st->ct_ctx_compress, vctx, func_cb);
 #else
-	ct_setup_wakeup_pipe(&ct_ctx_compress, vctx, func_cb);
+	ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_compress,
+	    vctx, func_cb);
 #endif
 }
 
 void
-ct_setup_wakeup_csha(void *vctx, ct_func_cb *func_cb)
+ct_setup_wakeup_csha(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
 {
 #if CT_ENABLE_THREADS
-	ct_setup_wakeup_cv(&ct_ctx_csha, vctx, func_cb);
+	ct_setup_wakeup_cv(&ev_st->ct_ctx_csha, vctx, func_cb);
 #else
-	ct_setup_wakeup_pipe(&ct_ctx_csha, vctx, func_cb);
+	ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_csha, vctx,
+	    func_cb);
 #endif
 }
 
 void
-ct_setup_wakeup_encrypt(void *vctx, ct_func_cb *func_cb)
+ct_setup_wakeup_encrypt(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
 {
 #if CT_ENABLE_THREADS
-	ct_setup_wakeup_cv(&ct_ctx_encrypt, vctx, func_cb);
+	ct_setup_wakeup_cv(&ev_st->ct_ctx_encrypt, vctx, func_cb);
 #else
-	ct_setup_wakeup_pipe(&ct_ctx_encrypt, vctx, func_cb);
+	ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_encrypt, vctx,
+	    func_cb);
 #endif
 }
 
 void
-ct_setup_wakeup_complete(void *vctx, ct_func_cb *func_cb)
+ct_setup_wakeup_complete(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
 {
 	/* XXX - is this still pipe? */
-	ct_setup_wakeup_pipe(&ct_ctx_complete, vctx, func_cb);
+	ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_complete, vctx,
+	    func_cb);
 }
 
 void
-ct_setup_wakeup_write(void *vctx, ct_func_cb *func_cb)
+ct_setup_wakeup_write(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
 {
-	ct_setup_wakeup_pipe(&ct_ctx_write, vctx, func_cb);
+	ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_write, vctx,
+	    func_cb);
 }
 
 void
@@ -184,57 +196,57 @@ ct_wakeup_x_pipe(struct ct_ctx *ctx)
 }
 
 void
-ct_wakeup_file(void)
+ct_wakeup_file(struct ct_event_state *ev_st)
 {
-	struct ct_ctx *ctx = &ct_ctx_file;
+	struct ct_ctx *ctx = &ev_st->ct_ctx_file;
 
 	ctx->ctx_wakeup(ctx);
 }
 
 void
-ct_wakeup_sha(void)
+ct_wakeup_sha(struct ct_event_state *ev_st)
 {
-	struct ct_ctx *ctx = &ct_ctx_sha;
+	struct ct_ctx *ctx = &ev_st->ct_ctx_sha;
 
 	ctx->ctx_wakeup(ctx);
 }
 
 void
-ct_wakeup_compress(void)
+ct_wakeup_compress(struct ct_event_state *ev_st)
 {
-	struct ct_ctx *ctx = &ct_ctx_compress;
+	struct ct_ctx *ctx = &ev_st->ct_ctx_compress;
 
 	ctx->ctx_wakeup(ctx);
 }
 
 void
-ct_wakeup_csha(void)
+ct_wakeup_csha(struct ct_event_state *ev_st)
 {
-	struct ct_ctx *ctx = &ct_ctx_csha;
+	struct ct_ctx *ctx = &ev_st->ct_ctx_csha;
 
 	ctx->ctx_wakeup(ctx);
 }
 
 void
-ct_wakeup_encrypt(void)
+ct_wakeup_encrypt(struct ct_event_state *ev_st)
 {
-	struct ct_ctx *ctx = &ct_ctx_encrypt;
+	struct ct_ctx *ctx = &ev_st->ct_ctx_encrypt;
 
 	ctx->ctx_wakeup(ctx);
 }
 
 void
-ct_wakeup_complete()
+ct_wakeup_complete(struct ct_event_state *ev_st)
 {
-	struct ct_ctx *ctx = &ct_ctx_complete;
+	struct ct_ctx *ctx = &ev_st->ct_ctx_complete;
 
 	ctx->ctx_wakeup(ctx);
 }
 
 void
-ct_wakeup_write()
+ct_wakeup_write(struct ct_event_state *ev_st)
 {
-	struct ct_ctx *ctx = &ct_ctx_write;
+	struct ct_ctx *ctx = &ev_st->ct_ctx_write;
 
 	ctx->ctx_wakeup(ctx);
 }
@@ -255,80 +267,100 @@ ct_pipe_sig(int fd, short event, void *vctx)
 /*
  * wrap the event code in this file.
  */
-void
-ct_event_init(struct ct_global_state *state)
+struct ct_event_state *
+ct_event_init(struct ct_global_state *state,
+    void (*cb)(evutil_socket_t, short, void *))
 {
-	ct_evt_base = event_base_new();
+	struct ct_event_state	*ev_st;
+
+	ev_st = e_calloc(1, sizeof(*ev_st));
+
+	ev_st->ct_evt_base = event_base_new();
 
 	/* cache siginfo */
 #if defined(SIGINFO) && SIGINFO != SIGUSR1
-	ct_ev_sig_info = evsignal_new(ct_evt_base, SIGINFO, ct_info_sig, state);
-	evsignal_add(ct_ev_sig_info, NULL);
+	ev_st->ct_ev_sig_info = evsignal_new(ev_st->ct_evt_base, SIGINFO,
+	    ct_info_sig, state);
+	evsignal_add(ev_st->ct_ev_sig_info, NULL);
 #endif
 #if defined(SIGUSR1)
-	ct_ev_sig_usr1 = evsignal_new(ct_evt_base, SIGUSR1, ct_info_sig, state);
-	evsignal_add(ct_ev_sig_usr1, NULL);
+	ev_st->ct_ev_sig_usr1 = evsignal_new(ev_st->ct_evt_base, SIGUSR1,
+	    ct_info_sig, state);
+	evsignal_add(ev_st->ct_ev_sig_usr1, NULL);
 #endif
 #if defined(SIGPIPE)
-	ct_ev_sig_pipe = evsignal_new(ct_evt_base, SIGPIPE, ct_pipe_sig, state);
-	evsignal_add(ct_ev_sig_pipe, NULL);
+	ev_st->ct_ev_sig_pipe = evsignal_new(ev_st->ct_evt_base, SIGPIPE,
+	    ct_pipe_sig, state);
+	evsignal_add(ev_st->ct_ev_sig_pipe, NULL);
 #endif
+	ev_st->recon_ev = evtimer_new(ev_st->ct_evt_base, cb, state);
+	if (ev_st->recon_ev == NULL) {
+		ct_event_cleanup(ev_st);
+		return (NULL);
+	}
+
+	return (ev_st);
+}
+
+struct event_base *
+ct_event_get_base(struct ct_event_state *ev_st)
+{
+	return (ev_st->ct_evt_base);
 }
 
 int
-ct_event_dispatch(void)
+ct_event_dispatch(struct ct_event_state *ev_st)
 {
-	return event_base_dispatch(ct_evt_base);
+	return event_base_dispatch(ev_st->ct_evt_base);
 }
 
 int
-ct_event_loopbreak(void)
+ct_event_loopbreak(struct ct_event_state *ev_st)
 {
-	return event_base_loopbreak(ct_evt_base);
+	return event_base_loopbreak(ev_st->ct_evt_base);
 }
 
 void
-ct_event_cleanup(void)
+ct_event_cleanup(struct ct_event_state *ev_st)
 {
-	if (ct_ctx_complete.ctx_ev != NULL)
-		event_free(ct_ctx_complete.ctx_ev);
-	if (ct_ctx_write.ctx_ev != NULL)
-		event_free(ct_ctx_write.ctx_ev);
-	if (ct_ctx_sha.ctx_ev != NULL)
-		event_free(ct_ctx_sha.ctx_ev);
-	if (ct_ctx_compress.ctx_ev != NULL)
-		event_free(ct_ctx_compress.ctx_ev);
-	if (ct_ctx_csha.ctx_ev != NULL)
-		event_free(ct_ctx_csha.ctx_ev);
-	if (ct_ctx_encrypt.ctx_ev != NULL)
-		event_free(ct_ctx_encrypt.ctx_ev);
-	if (ct_ev_sig_info != NULL)
-		event_free(ct_ev_sig_info);
-	if (ct_ev_sig_usr1 != NULL)
-		event_free(ct_ev_sig_usr1);
-	if (ct_ev_sig_pipe != NULL)
-		event_free(ct_ev_sig_pipe);
-	if (recon_ev != NULL)
-		event_free(recon_ev);
-	if (ct_evt_base != NULL)
-		event_base_free(ct_evt_base);
+	if (ev_st == NULL)
+		return;
+
+	if (ev_st->ct_ctx_complete.ctx_ev != NULL)
+		event_free(ev_st->ct_ctx_complete.ctx_ev);
+	if (ev_st->ct_ctx_write.ctx_ev != NULL)
+		event_free(ev_st->ct_ctx_write.ctx_ev);
+	if (ev_st->ct_ctx_sha.ctx_ev != NULL)
+		event_free(ev_st->ct_ctx_sha.ctx_ev);
+	if (ev_st->ct_ctx_compress.ctx_ev != NULL)
+		event_free(ev_st->ct_ctx_compress.ctx_ev);
+	if (ev_st->ct_ctx_csha.ctx_ev != NULL)
+		event_free(ev_st->ct_ctx_csha.ctx_ev);
+	if (ev_st->ct_ctx_encrypt.ctx_ev != NULL)
+		event_free(ev_st->ct_ctx_encrypt.ctx_ev);
+	if (ev_st->ct_ev_sig_info != NULL)
+		event_free(ev_st->ct_ev_sig_info);
+	if (ev_st->ct_ev_sig_usr1 != NULL)
+		event_free(ev_st->ct_ev_sig_usr1);
+	if (ev_st->ct_ev_sig_pipe != NULL)
+		event_free(ev_st->ct_ev_sig_pipe);
+	if (ev_st->recon_ev != NULL)
+		event_free(ev_st->recon_ev);
+	if (ev_st->ct_evt_base != NULL)
+		event_base_free(ev_st->ct_evt_base);
+	e_free(&ev_st);
 }
 
 void
-ct_set_reconnect_timeout(void (*cb)(int, short, void*), void *varg,
-    int delay)
+ct_set_reconnect_timeout(struct ct_event_state *ev_st, int delay)
 {
 	struct timeval tv;
-	if (recon_ev == NULL) {
-		recon_ev = evtimer_new(ct_evt_base, cb, varg);
-		if (recon_ev == NULL)
-			CABORT("unable to allocate reconnect timer");
-	} else {
-		evtimer_del(recon_ev);
-	}
+
+	if (evtimer_pending(ev_st->recon_ev, NULL))
+		evtimer_del(ev_st->recon_ev);
 	bzero(&tv, sizeof(tv));
 	tv.tv_sec = delay;
-	evtimer_add(recon_ev, &tv);
+	evtimer_add(ev_st->recon_ev, &tv);
 }
 
 #if CT_ENABLE_PTHREADS

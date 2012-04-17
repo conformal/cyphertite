@@ -302,9 +302,9 @@ cull(struct ct_cli_cmd *c, int argc, char **argv)
 	state = ct_init(ctctl_config, need_secrets, 0);
 
 	ct_cull_kick(state);
-	ct_wakeup_file();
+	ct_wakeup_file(state->event_state);
 
-	ret = ct_event_dispatch();
+	ret = ct_event_dispatch(state->event_state);
 	if (ret != 0)
 		CWARNX("event_dispatch returned, %d %s", errno,
 		    strerror(errno));

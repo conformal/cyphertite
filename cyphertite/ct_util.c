@@ -98,8 +98,8 @@ ct_do_operation(struct ct_config *conf,  ct_op_cb *start, ct_op_cb *complete,
 
 	state = ct_init(conf, need_secrets, 0);
 	ct_add_operation(state, start, complete, args);
-	ct_wakeup_file();
-	if ((ret = ct_event_dispatch()) != 0)
+	ct_wakeup_file(state->event_state);
+	if ((ret = ct_event_dispatch(state->event_state)) != 0)
 		CWARN("event_dispatch returned failure");
 	ct_cleanup(state);
 }
@@ -137,7 +137,7 @@ ct_op_complete(struct ct_global_state *state)
 
 	/* set up for the next loop */
 	ct_set_file_state(state, CT_S_STARTING);
-	ct_wakeup_file();
+	ct_wakeup_file(state->event_state);
 	return (0);
 }
 
@@ -179,7 +179,8 @@ ct_ssl_connect(struct ct_global_state *state, int nonfatal)
 	if (assl_event_connect(c, state->ct_config->ct_host,
 	    state->ct_config->ct_hostport,
 	    ASSL_F_NONBLOCK|ASSL_F_KEEPALIVE|ASSL_F_THROUGHPUT,
-	    ct_evt_base, ct_event_assl_read, ct_event_assl_write, ctx)) {
+	    ct_event_get_base(state->event_state), ct_event_assl_read,
+	    ct_event_assl_write, ctx)) {
 		if (nonfatal) {
 			/* XXX */
 			ct_assl_disconnect(ctx);
@@ -189,7 +190,8 @@ ct_ssl_connect(struct ct_global_state *state, int nonfatal)
 			assl_fatalx("server connect failed");
 	}
 	if (state->ct_config->ct_io_bw_limit && ctx != NULL)
-		ct_ssl_init_bw_lim(ctx, state->ct_config->ct_io_bw_limit);
+		ct_ssl_init_bw_lim(ct_event_get_base(state->event_state),
+		    ctx, state->ct_config->ct_io_bw_limit);
 
 	return ctx;
 }
@@ -501,7 +503,7 @@ ct_shutdown(struct ct_global_state *state)
 	ctdb_shutdown(state->ct_db_state);
 	state->ct_db_state = NULL;
 	ct_ssl_cleanup_bw_lim();
-	ct_event_loopbreak();
+	ct_event_loopbreak(state->event_state);
 }
 
 void print_time_scaled(FILE *, char *s, struct timeval *t);

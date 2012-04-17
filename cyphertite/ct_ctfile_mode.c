@@ -602,7 +602,7 @@ ct_complete_metadata(struct ct_global_state *state, struct ct_trans *trans)
 		break;
 
 	case TR_S_XML_CULL_REPLIED:
-		ct_wakeup_file();
+		ct_wakeup_file(state->event_state);
 		break;
 	default:
 		CFATALX("unexpected tr state in %s %d", __func__,
@@ -761,7 +761,7 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 					    filename);
 					die = 0;
 					ct_set_file_state(state, CT_S_RUNNING);
-					ct_wakeup_file();
+					ct_wakeup_file(state->event_state);
 				}
 			}
 		}

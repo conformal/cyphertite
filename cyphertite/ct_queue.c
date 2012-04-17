@@ -160,7 +160,7 @@ ct_queue_sha(struct ct_global_state *state, struct ct_trans *trans)
 	CT_LOCK(&state->ct_sha_lock);
 	TAILQ_INSERT_TAIL(&state->ct_sha_queue, trans, tr_next);
 	state->ct_sha_qlen++;
-	ct_wakeup_sha();
+	ct_wakeup_sha(state->event_state);
 	CT_UNLOCK(&state->ct_sha_lock);
 }
 
@@ -185,7 +185,7 @@ ct_queue_compress(struct ct_global_state *state, struct ct_trans *trans)
 	CT_LOCK(&state->ct_comp_lock);
 	TAILQ_INSERT_TAIL(&state->ct_comp_queue, trans, tr_next);
 	state->ct_comp_qlen++;
-	ct_wakeup_compress();
+	ct_wakeup_compress(state->event_state);
 	CT_UNLOCK(&state->ct_comp_lock);
 }
 
@@ -210,7 +210,7 @@ ct_queue_encrypt(struct ct_global_state *state, struct ct_trans *trans)
 	CT_LOCK(&state->ct_crypt_lock);
 	TAILQ_INSERT_TAIL(&state->ct_crypt_queue, trans, tr_next);
 	state->ct_crypt_qlen++;
-	ct_wakeup_encrypt();
+	ct_wakeup_encrypt(state->event_state);
 	CT_UNLOCK(&state->ct_crypt_lock);
 }
 
@@ -235,7 +235,7 @@ ct_queue_csha(struct ct_global_state *state, struct ct_trans *trans)
 	CT_LOCK(&state->ct_csha_lock);
 	TAILQ_INSERT_TAIL(&state->ct_csha_queue, trans, tr_next);
 	state->ct_csha_qlen++;
-	ct_wakeup_csha();
+	ct_wakeup_csha(state->event_state);
 	CT_UNLOCK(&state->ct_csha_lock);
 }
 
@@ -260,7 +260,7 @@ ct_queue_write(struct ct_global_state *state, struct ct_trans *trans)
 	CT_LOCK(&state->ct_write_lock);
 	TAILQ_INSERT_TAIL(&state->ct_write_queue, trans, tr_next);
 	state->ct_write_qlen++;
-	ct_wakeup_write();
+	ct_wakeup_write(state->event_state);
 	CT_UNLOCK(&state->ct_write_lock);
 }
 
@@ -304,7 +304,7 @@ ct_queue_complete(struct ct_global_state *state, struct ct_trans *trans)
 	CT_LOCK(&state->ct_complete_lock);
 	RB_INSERT(ct_trans_lookup, &state->ct_complete, trans);
 	state->ct_complete_rblen++;
-	ct_wakeup_complete();
+	ct_wakeup_complete(state->event_state);
 	CT_UNLOCK(&state->ct_complete_lock);
 }
 
@@ -605,7 +605,7 @@ ct_trans_free(struct ct_global_state *state, struct ct_trans *trans)
 	/* XXX - should this wait for a low threshold? */
 	if (ct_get_file_state(state) == CT_S_WAITING_TRANS) {
 		CNDBG(CT_LOG_TRANS, "send wakeup");
-		ct_wakeup_file();
+		ct_wakeup_file(state->event_state);
 	}
 }
 
@@ -739,16 +739,16 @@ ct_reconnect(evutil_socket_t unused, short event, void *varg)
 	if (ct_reconnect_internal(state) == 0) {
 		state->ct_reconnect_timeout = CT_RECONNECT_DEFAULT_TIMEOUT;
 		/* XXX - wakeup everyone */
-		ct_wakeup_sha();
-		ct_wakeup_compress();
-		ct_wakeup_encrypt();
-		ct_wakeup_csha();
-		ct_wakeup_write();
-		ct_wakeup_complete();
-		ct_wakeup_file();
+		ct_wakeup_sha(state->event_state);
+		ct_wakeup_compress(state->event_state);
+		ct_wakeup_encrypt(state->event_state);
+		ct_wakeup_csha(state->event_state);
+		ct_wakeup_write(state->event_state);
+		ct_wakeup_complete(state->event_state);
+		ct_wakeup_file(state->event_state);
 	} else {
-		ct_set_reconnect_timeout(ct_reconnect, state,
-		     state->ct_reconnect_timeout);
+		ct_set_reconnect_timeout(state->event_state,
+		    state->ct_reconnect_timeout);
 	}
 
 }
@@ -774,7 +774,7 @@ ct_handle_disconnect(struct ct_global_state *state)
 	if (idle) {
 		state->ct_reconnect_pending = 1;
 	} else {
-		ct_set_reconnect_timeout(ct_reconnect, state,
+		ct_set_reconnect_timeout(state->event_state,
 		    state->ct_reconnect_timeout);
 	}
 }
@@ -1199,7 +1199,7 @@ ct_process_completions(void *vctx)
 		 * we keep reading until we run out of chunks
 		 */
 		if (ct_get_file_state(state) != CT_S_FINISHED)
-			ct_wakeup_file();
+			ct_wakeup_file(state->event_state);
 	}
 }
 
@@ -1215,7 +1215,7 @@ ct_process_write(void *vctx)
 	/* did we idle out? */
 	if (state->ct_reconnect_pending) {
 		if (ct_reconnect_internal(state) != 0)
-			ct_set_reconnect_timeout(ct_reconnect, NULL,
+			ct_set_reconnect_timeout(state->event_state,
 			     state->ct_reconnect_timeout);
 		state->ct_reconnect_pending = 0;
 	}

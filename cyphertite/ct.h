@@ -440,41 +440,41 @@ struct ct_global_state {
 	int				ct_verbose;
 
 	struct ct_compress_ctx		*ct_compress_state;
+	struct ct_event_state		*event_state;
 };
 
-extern struct event_base *ct_evt_base;
-void ct_event_init(struct ct_global_state *);
-int ct_event_dispatch(void);
-int ct_event_loopbreak(void);
-void ct_event_cleanup(void);
-void ct_wakeup_file(void);
-void ct_wakeup_sha(void);
-void ct_wakeup_compress(void);
-void ct_wakeup_csha(void);
-void ct_wakeup_encrypt(void);
-void ct_wakeup_write(void);
-void ct_wakeup_decrypt(void);
-void ct_wakeup_uncompress(void);
-void ct_wakeup_filewrite(void);
-void ct_wakeup_complete(void);
+struct ct_event_state;
+struct ct_event_state	*ct_event_init(struct ct_global_state *,
+    void (*)(evutil_socket_t, short, void *));
+int ct_event_dispatch(struct ct_event_state *);
+int ct_event_loopbreak(struct ct_event_state *);
+struct event_base	*ct_event_get_base(struct ct_event_state *);
+void ct_event_cleanup(struct ct_event_state *);
+void ct_wakeup_file(struct ct_event_state *);
+void ct_wakeup_sha(struct ct_event_state *);
+void ct_wakeup_compress(struct ct_event_state *);
+void ct_wakeup_csha(struct ct_event_state *);
+void ct_wakeup_encrypt(struct ct_event_state *);
+void ct_wakeup_write(struct ct_event_state *);
+void ct_wakeup_decrypt(struct ct_event_state *);
+void ct_wakeup_uncompress(struct ct_event_state *);
+void ct_wakeup_filewrite(struct ct_event_state *);
+void ct_wakeup_complete(struct ct_event_state *);
+
+typedef void (ct_func_cb)(void *);
+void ct_setup_wakeup_file(struct ct_event_state *, void *, ct_func_cb *);
+void ct_setup_wakeup_sha(struct ct_event_state *, void *, ct_func_cb *);
+void ct_setup_wakeup_compress(struct ct_event_state *, void *, ct_func_cb *);
+void ct_setup_wakeup_csha(struct ct_event_state *, void *, ct_func_cb *);
+void ct_setup_wakeup_encrypt(struct ct_event_state *, void *, ct_func_cb *);
+void ct_setup_wakeup_write(struct ct_event_state *, void *, ct_func_cb *);
+void ct_setup_wakeup_complete(struct ct_event_state *, void *, ct_func_cb *);
+void ct_set_reconnect_timeout(struct ct_event_state *, int);
 
 void ct_display_queues(struct ct_global_state *);
 void ct_display_assl_stats(struct ct_global_state *, FILE *);
 
-typedef void (ct_func_cb)(void *);
-
-struct ct_ctx;
-
 struct ct_global_state *ct_setup_state(struct ct_config *);
-void ct_setup_wakeup_file(void *, ct_func_cb *);
-void ct_setup_wakeup_sha(void *, ct_func_cb *);
-void ct_setup_wakeup_compress(void *, ct_func_cb *);
-void ct_setup_wakeup_csha(void *, ct_func_cb *);
-void ct_setup_wakeup_encrypt(void *, ct_func_cb *);
-void ct_setup_wakeup_write(void *, ct_func_cb *);
-void ct_setup_wakeup_complete(void *, ct_func_cb *);
-void ct_set_reconnect_timeout(void (*)(evutil_socket_t, short, void*), void *,
-    int);
 
 msgdeliver_ty			ct_handle_msg;
 msgcomplete_ty			ct_write_done;
@@ -686,7 +686,8 @@ void			 ct_match_unwind(struct ct_match *);
 void			 ct_match_insert_rb(struct ct_match *, char *);
 int			 ct_match_rb_is_empty(struct ct_match *);
 
-void			ct_ssl_init_bw_lim(struct ct_assl_io_ctx *, int);
+void			ct_ssl_init_bw_lim(struct event_base *,
+			    struct ct_assl_io_ctx *, int);
 void			ct_ssl_cleanup_bw_lim();
 
 /* MD mode handling */

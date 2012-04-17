@@ -335,8 +335,8 @@ ctfb_main(int argc, char *argv[])
 	if (conf->ct_ctfile_mode == CT_MDMODE_REMOTE) {
 		ctfile_find_for_operation(state, ctfile,
 		    ctfile_nextop_justdl, &ct_fb_filename, 1, 0);
-		ct_wakeup_file();
-		if ((ret = ct_event_dispatch()) != 0) {
+		ct_wakeup_file(ctfb_state->event_state);
+		if ((ret = ct_event_dispatch(ctfb_state->event_state)) != 0) {
 			CWARNX("event loop returned error %d, exiting", ret);
 			return (ret);
 

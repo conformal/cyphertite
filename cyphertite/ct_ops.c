@@ -536,7 +536,7 @@ skip:
 				    &ex_priv->xdr_ctx, state->ct_verbose);
 
 				/* poke file into action */
-				ct_wakeup_file();
+				ct_wakeup_file(state->event_state);
 			} else {
 				/*
 				 * If rb tree and it is still has entries,

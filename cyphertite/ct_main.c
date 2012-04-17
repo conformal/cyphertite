@@ -115,6 +115,7 @@ struct ct_global_state *
 ct_init(struct ct_config *conf, int need_secrets, int verbose)
 {
 	struct ct_global_state *state;
+	extern void		ct_reconnect(evutil_socket_t, short, void *);
 	struct stat		sb;
 
 	/* Run with restricted umask as we create numerous sensitive files. */
@@ -128,7 +129,7 @@ ct_init(struct ct_config *conf, int need_secrets, int verbose)
 	state = ct_setup_state(conf);
 	state->ct_verbose = verbose;
 
-	ct_event_init(state);
+	state->event_state = ct_event_init(state, ct_reconnect);
 
 	if (need_secrets != 0 && conf->ct_crypto_secrets != NULL) {
 		if (stat(conf->ct_crypto_secrets, &sb) == -1) {
@@ -177,13 +178,15 @@ ct_init_eventloop(struct ct_global_state *state)
 	CT_LOCK_INIT(&state->ct_queued_lock);
 	CT_LOCK_INIT(&state->ct_complete_lock);
 
-	ct_setup_wakeup_file(state, ct_nextop);
-	ct_setup_wakeup_sha(state, ct_compute_sha);
-	ct_setup_wakeup_compress(state, ct_compute_compress);
-	ct_setup_wakeup_csha(state, ct_compute_csha);
-	ct_setup_wakeup_encrypt(state, ct_compute_encrypt);
-	ct_setup_wakeup_write(state, ct_process_write);
-	ct_setup_wakeup_complete(state, ct_process_completions);
+	ct_setup_wakeup_file(state->event_state, state, ct_nextop);
+	ct_setup_wakeup_sha(state->event_state, state, ct_compute_sha);
+	ct_setup_wakeup_compress(state->event_state, state,
+	    ct_compute_compress);
+	ct_setup_wakeup_csha(state->event_state, state, ct_compute_csha);
+	ct_setup_wakeup_encrypt(state->event_state, state, ct_compute_encrypt);
+	ct_setup_wakeup_write(state->event_state, state, ct_process_write);
+	ct_setup_wakeup_complete(state->event_state, state,
+	    ct_process_completions);
 }
 
 void
@@ -205,13 +208,13 @@ ct_cleanup_eventloop(struct ct_global_state *state)
 	CT_LOCK_RELEASE(&state->ct_write_lock);
 	CT_LOCK_RELEASE(&state->ct_queued_lock);
 	CT_LOCK_RELEASE(&state->ct_complete_lock);
-	ct_event_cleanup();
 }
 
 void
 ct_cleanup(struct ct_global_state *state)
 {
 	ct_cleanup_eventloop(state);
+	ct_event_cleanup(state->event_state);
 }
 
 uint64_t
@@ -600,9 +603,9 @@ ct_main(int argc, char **argv)
 		}
 	}
 
-	ct_wakeup_file();
+	ct_wakeup_file(state->event_state);
 
-	ret = ct_event_dispatch();
+	ret = ct_event_dispatch(state->event_state);
 	if (ret != 0)
 		CWARNX("event_dispatch returned, %d %s", errno,
 		    strerror(errno));

@@ -53,7 +53,8 @@ struct event	*wakeuptimer_ev;
 void ct_ssl_over_bw_wakeup(evutil_socket_t, short, void *);
 
 void
-ct_ssl_init_bw_lim(struct ct_assl_io_ctx *ctx, int io_bw_limit)
+ct_ssl_init_bw_lim(struct event_base *base, struct ct_assl_io_ctx *ctx,
+    int io_bw_limit)
 {
 	int packet_len;
 
@@ -62,7 +63,7 @@ ct_ssl_init_bw_lim(struct ct_assl_io_ctx *ctx, int io_bw_limit)
 	CNDBG(CT_LOG_NET, "packet_len %d",  packet_len);
 	ct_assl_io_ctx_set_maxtrans(ctx, packet_len);
 	ct_assl_io_ctx_set_over_bw_func(ctx, ct_ssl_over_bw_func);
-	wakeuptimer_ev = evtimer_new(ct_evt_base, ct_ssl_over_bw_wakeup, ctx);
+	wakeuptimer_ev = evtimer_new(base, ct_ssl_over_bw_wakeup, ctx);
 	if (wakeuptimer_ev == NULL)
 		CABORT("unable to allocate bw limit timer");
 

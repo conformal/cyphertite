@@ -636,8 +636,8 @@ ctfb_get(int argc, const char **argv)
 	}
 
 	if (count > 0) {
-		ct_wakeup_file();
-		if ((ret = ct_event_dispatch()) != 0) {
+		ct_wakeup_file(ctfb_state->event_state);
+		if ((ret = ct_event_dispatch(ctfb_state->event_state)) != 0) {
 			CWARNX("event loop returned error %d, exiting", ret);
 			goto out;
 		}
