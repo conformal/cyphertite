@@ -396,7 +396,7 @@ crypto_passphrase:
 		    ct_iv, sizeof (ct_iv))) {
 			CWARNX("password incorrect, try again");
 			bzero(ct_crypto_passphrase,
-			    sizeof ct_crypto_passphrase);
+			    strlen(ct_crypto_passphrase));
 			e_free(&ct_crypto_passphrase);
 		}
 	}
