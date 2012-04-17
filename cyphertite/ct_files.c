@@ -675,7 +675,7 @@ loop:
 				}
 			}
 		}
-		ct_trans->tr_ctfile = cap->cap_cws;;
+		ct_trans->tr_ctfile = cap->cap_cws;
 		ct_trans->tr_fl_node = cap->cap_curnode;
 		cap->cap_curnode->fl_state = CT_FILE_FINISHED;
 		cap->cap_curnode->fl_size = 0;
@@ -738,7 +738,7 @@ loop:
 		cap->cap_curnode->fl_mtime = sb.st_mtime;
 		cap->cap_curnode->fl_size = sb.st_size;
 
-		ct_trans->tr_ctfile = cap->cap_cws;;
+		ct_trans->tr_ctfile = cap->cap_cws;
 		ct_trans->tr_fl_node = cap->cap_curnode;
 		ct_trans->tr_state = TR_S_FILE_START;
 		ct_trans->tr_type = TR_T_WRITE_HEADER;
@@ -795,7 +795,7 @@ loop:
 	if (rlen > 0)
 		ct_stats->st_bytes_read += rlen;
 
-	ct_trans->tr_ctfile = cap->cap_cws;;
+	ct_trans->tr_ctfile = cap->cap_cws;
 	ct_trans->tr_fl_node = cap->cap_curnode;
 	ct_trans->tr_size[0] = rlen;
 	ct_trans->tr_chsize = rlen;
@@ -870,7 +870,7 @@ done:
 		ct_set_file_state(CT_S_WAITING_TRANS);
 		return;
 	}
-	ct_trans->tr_ctfile = cap->cap_cws;;
+	ct_trans->tr_ctfile = cap->cap_cws;
 	ct_trans->tr_fl_node = NULL;
 	ct_trans->tr_state = TR_S_DONE;
 	ct_trans->tr_eof = 0;
