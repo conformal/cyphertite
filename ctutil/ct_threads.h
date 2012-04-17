@@ -17,7 +17,7 @@
 #ifndef _CT_THREADS_H_
 #define _CT_THREADS_H_
 
-#ifdef _POSIX_THREADS
+#if defined(_POSIX_THREADS) || defined(_REENTRANT)
 #define CT_ENABLE_THREADS 1
 #define CT_ENABLE_PTHREADS 1
 #else
