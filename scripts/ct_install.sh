@@ -60,7 +60,8 @@ check_utils()
 check_external_libs()
 {
 	OS=$(uname)
-	EXTERNAL_LIBS="ssl crypto expat z lzo2 lzma sqlite3 event edit ncurses"
+	EXTERNAL_LIBS="ssl crypto expat z lzo2 lzma sqlite3 event_core edit"
+	EXTERNAL_LIBS="$EXTERNAL_LIBS ncurses"
 
 	# standard lib dirs - override below if needed
 	LIB_DIRS="/usr/lib /usr/local/lib"

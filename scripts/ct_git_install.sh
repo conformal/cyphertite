@@ -73,7 +73,7 @@ check_utils()
 
 check_external_libs()
 {
-	EXTERNAL_LIBS="expat z lzo2 lzma sqlite3 event edit ncurses"
+	EXTERNAL_LIBS="expat z lzo2 lzma sqlite3 event_core edit ncurses"
 
 	# standard lib dirs - override below if needed
 	LIB_DIRS="/usr/lib /usr/lib64 /usr/local/lib /usr/local/lib64"
