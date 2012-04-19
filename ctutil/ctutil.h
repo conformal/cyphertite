@@ -265,6 +265,9 @@ __dead void		ct_cli_usage(struct ct_cli_cmd *, struct ct_cli_cmd *);
 struct ct_cli_cmd	*ct_cli_validate(struct ct_cli_cmd *, int *, char ***);
 void			ct_cli_execute(struct ct_cli_cmd *, int *, char ***);
 
+/* cert bundle */
+int			ct_get_cert_bundle(char *, char *, void **, size_t *);
+
 /* Debug log levels */
 #define CTUTIL_LOG_SOCKET	(0x1)
 #define CTUTIL_LOG_CONFIG	(0x2)
