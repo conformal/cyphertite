@@ -544,9 +544,9 @@ ct_compare_secrets(struct ct_op *op)
 		    "(%" PRId64 " vs %" PRId64 "), please confirm that local "
 		    "secrets file is the correct one", (int64_t)tsb.st_size, (int64_t)sb.st_size);
 
-	if ((f = fopen(ct_crypto_secrets, "r")) == NULL)
+	if ((f = fopen(ct_crypto_secrets, "rb")) == NULL)
 		CFATAL("can't open secrets file");
-	if ((tf = fopen(temp_path, "r")) == NULL)
+	if ((tf = fopen(temp_path, "rb")) == NULL)
 		CFATAL("can't open temporary secrets file");
 	/* read then throw away */
 	unlink(temp_path);

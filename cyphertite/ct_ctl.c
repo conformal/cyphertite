@@ -317,7 +317,7 @@ secrets_generate(struct ct_cli_cmd *c, int argc, char **argv)
 	if (stat(ct_crypto_secrets, &sb) != -1)
 		CFATALX("A crypto secrets file already exists!\n"
 		    "Please check if it is valid before deleting.");
-	CWARNX("Generating crypto secrets file");
+	CWARNX("Generating crypto secrets file...");
 	if (ct_create_secrets(ct_crypto_passphrase, ct_crypto_secrets,
 	    NULL, NULL))
 		CFATALX("can't create secrets");

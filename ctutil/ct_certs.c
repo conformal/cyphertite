@@ -145,7 +145,7 @@ ct_get_cert_bundle(const char *user, const char *pass, char **xml,
 		e_free(&chunk.memory);
 		chunk.size = 0;
 	}
-	CDBG("login -> rc = %ld -> %s\n",rc, ru);
+	CDBG("login -> rc = %ld -> %s\n", rc, ru);
 	if (strcmp(ru, URL ACCOUNT)) {
 		rv = CT_CERT_BUNDLE_LOGIN_FAILED;
 		goto done;
@@ -170,7 +170,7 @@ ct_get_cert_bundle(const char *user, const char *pass, char **xml,
 		rv = -23;
 		goto done;
 	}
-	CDBG("get certs: rc = %ld sz = %ld-> %s\n", rc, chunk.size, ru);
+	CDBG("get certs: rc = %ld sz = %ld-> %s\n", rc, (long) chunk.size, ru);
 	if (!(rc == 200 && ru == NULL)) {
 		rv = -24;
 		goto done;
