@@ -23,7 +23,7 @@
 
 #include <ctutil.h>
 #include <ct_socket.h>
-#include "ct_threads.h"
+#include <ct_threads.h>
 
 #include <event2/event.h>
 
