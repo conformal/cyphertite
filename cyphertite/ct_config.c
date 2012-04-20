@@ -334,8 +334,8 @@ ct_create_config(void)
 	char			answer[1024], answer2[1024];
 	uint8_t			ad[SHA512_DIGEST_LENGTH];
 	char			b64d[128];
-	char			*conf_buf = NULL;
-	char			*conf = NULL, *dir = NULL;
+	char			*conf_buf = NULL, *conf = NULL;
+	char			*conf_tmp = NULL, *dir = NULL;
 	char			*mode = NULL;
 	int			rv, fd;
 	int			save_password = 0, save_crypto_passphrase = 0;
@@ -390,13 +390,17 @@ ct_create_config(void)
 	 */
 	conf_buf = e_strdup(conf);
 	if (ct_make_full_path(conf_buf, 0700))
-		CFATAL("unable to create directory %s", conf_buf);
+		CFATAL("unable to create path %s", conf_buf);
+	dir = dirname(conf_buf);
+	if (e_asprintf(&conf_tmp, "%s/%s", dir,
+	    "cyphertite.conf.XXXXXXXXXX") == -1)
+		CFATAL("unable to allocate conf template");
 	e_free(&conf_buf);
 
-	if ((fd = open(conf, O_RDWR | O_CREAT | O_TRUNC, 0600)) == -1)
-		CFATAL("unable to open file for writing %s", conf);
+	if ((fd = mkstemp(conf_tmp)) == -1)
+		CFATAL("unable to open temp file for writing");
 	if ((f = fdopen(fd, "r+")) == NULL)
-		CFATAL("unable to open file %s", conf);
+		CFATAL("unable to open file %s", conf_tmp);
 
 	while (ct_username == NULL) {
 		strlcpy(prompt, "login username: ", sizeof(prompt));
@@ -434,8 +438,8 @@ ct_create_config(void)
 	}
 
 	/* download certs if needed */
-	if (stat(ct_cert , &sb) != 0 || stat(ct_ca_cert , &sb) != 0 ||
-	    stat(ct_key, &sb) != 0) {
+	if ((stat(ct_cert, &sb) != 0) || (stat(ct_ca_cert , &sb) != 0) ||
+	    (stat(ct_key, &sb) != 0)) {
 		CWARNX("Downloading certificates...");
 		ct_download_decode_and_save_certs(ct_username, ct_password);
 	}
@@ -667,8 +671,20 @@ crypto_passphrase:
 		    "safe\n");
 	}
 
+	if (f)
+		fclose(f);
+
+	if (rename(conf_tmp, conf) == -1) {
+		unlink(conf_tmp);
+		CFATAL("unable to move config file into place");
+	}
+
 	if (conf_buf)
 		e_free(&conf_buf);
+	if (conf_tmp)
+		e_free(&conf_tmp);
+	if (conf)
+		e_free(&conf);
 	if (ct_username)
 		e_free(&ct_username);
 	if (ct_password) {
@@ -685,8 +701,6 @@ crypto_passphrase:
 		e_free(&mode);
 	if (ctfile_cachedir)
 		e_free(&ctfile_cachedir);
-	if (f)
-		fclose(f);
 }
 
 int
