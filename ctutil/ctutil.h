@@ -266,7 +266,9 @@ struct ct_cli_cmd	*ct_cli_validate(struct ct_cli_cmd *, int *, char ***);
 void			ct_cli_execute(struct ct_cli_cmd *, int *, char ***);
 
 /* cert bundle */
-int			ct_get_cert_bundle(char *, char *, void **, size_t *);
+#define CT_CERT_BUNDLE_LOGIN_FAILED	(-1000)
+int			ct_get_cert_bundle(const char *, const char *, char **,
+			    size_t *);
 
 /* Debug log levels */
 #define CTUTIL_LOG_SOCKET	(0x1)

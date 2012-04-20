@@ -23,12 +23,13 @@
 #include <exude.h>
 #include <clog.h>
 #include <curl/curl.h>
+#include <ctutil.h>
 
 #define URL		"https://www.cyphertite.com/"
 #define LOGIN		"login.php"
 #define LOGIN_LOGOUT	"?do=logout"
 #define ACCOUNT		"account.php"
-#define ACCOUNT_CERT	"?do=certs"
+#define ACCOUNT_CERT	"?do=xml-certs"
 #define INDEX		"index.php"
 
 struct memdesc {
@@ -51,7 +52,8 @@ write_mem_cb(void *contents, size_t size, size_t nmemb, void *userp)
 }
 
 int
-ct_get_cert_bundle(char *user, char *pass, void **xml, size_t *xml_sz)
+ct_get_cert_bundle(const char *user, const char *pass, char **xml,
+    size_t *xml_sz)
 {
 	CURL		*c = NULL;
 	int		rv = -1;
@@ -77,10 +79,6 @@ ct_get_cert_bundle(char *user, char *pass, void **xml, size_t *xml_sz)
 	/* debug */
 	if (curl_easy_setopt(c, CURLOPT_VERBOSE, 1L)) {
 		rv = -2;
-		goto done;
-	}
-	if (curl_easy_setopt(c, CURLOPT_HEADER, 1L)) {
-		rv = -3;
 		goto done;
 	}
 #endif
@@ -149,7 +147,7 @@ ct_get_cert_bundle(char *user, char *pass, void **xml, size_t *xml_sz)
 	}
 	CDBG("login -> rc = %ld -> %s\n",rc, ru);
 	if (strcmp(ru, URL ACCOUNT)) {
-		rv = -17;
+		rv = CT_CERT_BUNDLE_LOGIN_FAILED;
 		goto done;
 	}
 

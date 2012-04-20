@@ -36,7 +36,7 @@ CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(OPTLEVEL) $(DEBUG)
 
 LIB.NAME = ctutil
 LIB.SRCS  = ctutil.c ct_fileops.c ct_socket.c ct_core.c ct_compress.c ct_ssl.c
-LIB.SRCS += ct_xml.c
+LIB.SRCS += ct_xml.c ct_certs.c
 LIB.HEADERS = ctutil.h ct_socket.h ct_xml.h
 LIB.OBJS = $(addprefix $(OBJPREFIX), $(LIB.SRCS:.c=.o))
 LIB.DEPS = $(addsuffix .depend, $(LIB.OBJS))

@@ -34,6 +34,7 @@
 #include <assl.h>
 #include <clog.h>
 #include <exude.h>
+#include <xmlsd.h>
 
 #include "ct.h"
 #include <ct_ext.h>
@@ -194,6 +195,137 @@ ct_prompt_password(char *prompt, char *answer, size_t answer_len,
 	}
 	return (0);
 }
+
+void
+ct_download_decode_and_save_certs(const char *username, const char *password)
+{
+	int			 rv, fd;
+	uint8_t			 pwd_digest[SHA512_DIGEST_LENGTH];
+	char			 b64[2048];
+	char			*xml, *xml_val;
+	char			*dir_buf, *dir;
+	size_t			 xml_size;
+	struct			 xmlsd_element_list xel;
+	char			*ca_cert, *user_cert, *user_key;
+	FILE			*f = NULL;
+	struct stat		sb;
+
+	ct_sha512((uint8_t *)password, pwd_digest, strlen(password));
+	if (ct_base64_encode(CT_B64_ENCODE, pwd_digest, sizeof pwd_digest,
+	    (uint8_t *)b64, sizeof b64)) {
+		CFATALX("can't base64 encode password");
+	}
+
+	if ((rv = ct_get_cert_bundle(username, b64, &xml, &xml_size))) {
+		if (rv == CT_CERT_BUNDLE_LOGIN_FAILED)
+			CFATALX("Invalid login credentials.  Please check "
+			    "your username and password.");
+		else
+			CFATALX("unable to get cert bundle, rv %d", rv);
+	}
+
+	TAILQ_INIT(&xel);
+	if ((rv = xmlsd_parse_mem(xml, xml_size, &xel))) {
+		CFATALX("unable to parse cert bundle xml, rv %d", rv);
+	}
+
+	/* ca cert */
+	if (stat(ct_ca_cert , &sb) != 0) {
+		xml_val = xmlsd_get_value(&xel, "ca_cert", NULL);
+		if (xml_val == NULL) {
+			CFATALX("unable to get ca cert xml");
+		}
+		bzero(b64, sizeof b64);
+		if (ct_base64_encode(CT_B64_M_DECODE, (uint8_t *)xml_val,
+		    strlen(xml_val), (uint8_t *)b64, sizeof b64)) {
+			CFATALX("failed to decode ca cert xml");
+		}
+		e_asprintf(&ca_cert, "%s", b64);
+		if (ct_make_full_path(ct_ca_cert, 0700)) {
+			dir_buf = e_strdup(ct_ca_cert);
+			dir = dirname(dir_buf);
+			CFATAL("unabled to create directory %s", dir);
+		}
+		if ((fd = open(ct_ca_cert, O_RDWR | O_CREAT | O_TRUNC,
+				    0644)) == -1) {
+			CFATAL("unable to open file for writing %s",
+			    ct_ca_cert);
+		}
+		if ((f = fdopen(fd, "r+")) == NULL) {
+			CFATAL("unable to open file %s", ct_ca_cert);
+		}
+		fprintf(f, "%s", ca_cert);
+		fclose(f);
+		if (ca_cert != NULL) {
+			e_free(&ca_cert);
+		}
+	}
+
+	/* user cert */
+	if (stat(ct_cert , &sb) != 0) {
+		xml_val = xmlsd_get_value(&xel, "user_cert", NULL);
+		if (xml_val == NULL) {
+			CFATALX("unable to get user cert xml");
+		}
+		bzero(b64, sizeof b64);
+		if (ct_base64_encode(CT_B64_M_DECODE, (uint8_t *)xml_val,
+		    strlen(xml_val), (uint8_t *)b64, sizeof b64)) {
+			CFATALX("failed to decode user cert xml");
+		}
+		e_asprintf(&user_cert, "%s", b64);
+		if (ct_make_full_path(ct_cert, 0700)) {
+			dir_buf = e_strdup(ct_cert);
+			dir = dirname(dir_buf);
+			CFATAL("unabled to create directory %s", dir);
+		}
+		if ((fd = open(ct_cert, O_RDWR | O_CREAT | O_TRUNC,
+				    0644)) == -1) {
+			CFATAL("unable to open file for writing %s", ct_cert);
+		}
+		if ((f = fdopen(fd, "r+")) == NULL) {
+			CFATAL("unable to open file %s", ct_cert);
+		}
+		fprintf(f, "%s", user_cert);
+		fclose(f);
+		if (user_cert != NULL) {
+			e_free(&user_cert);
+		}
+	}
+
+	/* user key */
+	if (stat(ct_key, &sb) != 0) {
+		xml_val = xmlsd_get_value(&xel, "user_key", NULL);
+		if (xml_val == NULL) {
+			CFATALX("unable to get user key xml");
+		}
+		bzero(b64, sizeof b64);
+		if (ct_base64_encode(CT_B64_M_DECODE, (uint8_t *)xml_val,
+		    strlen(xml_val), (uint8_t *)b64, sizeof b64)) {
+			CFATALX("failed to decode user key xml");
+		}
+		e_asprintf(&user_key, "%s", b64);
+		if (ct_make_full_path(ct_key, 0700)) {
+			dir_buf = e_strdup(ct_key);
+			dir = dirname(dir_buf);
+			CFATAL("unabled to create directory %s", dir);
+		}
+		if ((fd = open(ct_key, O_RDWR | O_CREAT | O_TRUNC,
+				    0600)) == -1) {
+			CFATAL("unable to open file for writing %s", ct_key);
+		}
+		if ((f = fdopen(fd, "r+")) == NULL) {
+			CFATAL("unable to open file %s", ct_key);
+		}
+		fprintf(f, "%s", user_key);
+		fclose(f);
+		if (user_key != NULL) {
+			e_free(&user_key);
+		}
+	}
+
+	xmlsd_unwind(&xel);
+}
+
 
 void
 ct_create_config(void)
