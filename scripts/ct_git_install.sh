@@ -175,7 +175,7 @@ ct_get_source()
 
 ct_build_and_install()
 {
-	# build and install openssl source with ECDSA base system package
+	# build and install openssl source with ECDSA if base system package
 	# doesn't have it.
 	pkg="$OPENSSL_PKG"
 	if ! openssl ciphers | grep ECDSA >/dev/null 2>&1; then
