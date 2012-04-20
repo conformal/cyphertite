@@ -166,11 +166,9 @@ struct ct_assl_io_ctx    *ct_ssl_ctx;
 struct ct_assl_io_ctx *
 ct_ssl_connect(int nonfatal)
 {
-	struct ct_assl_io_ctx    *ctx;
 	struct assl_context *c;
 
-	ctx = e_calloc(1, sizeof (*ctx));
-	ct_ssl_ctx = ctx;
+	ct_ssl_ctx = e_calloc(1, sizeof (*ct_ssl_ctx));
 
 	c = assl_alloc_context(ASSL_M_TLSV1_CLIENT, 0);
 	if (c == NULL)
@@ -178,24 +176,24 @@ ct_ssl_connect(int nonfatal)
 
 	ct_load_certs(c);
 
-	ct_assl_io_ctx_init(ctx, c, ct_handle_msg, ct_write_done,
-	    ctx, ct_header_alloc, ct_header_free, ct_body_alloc,
+	ct_assl_io_ctx_init(ct_ssl_ctx, c, ct_handle_msg, ct_write_done,
+	    ct_ssl_ctx, ct_header_alloc, ct_header_free, ct_body_alloc,
 	    ct_body_free, ct_ioctx_alloc, ct_ioctx_free);
 
 	if (assl_event_connect(c, ct_host, ct_hostport,
 		ASSL_F_NONBLOCK|ASSL_F_KEEPALIVE|ASSL_F_THROUGHPUT,
-	    ct_evt_base, ct_event_assl_read, ct_event_assl_write, ctx)) {
+	    ct_evt_base, ct_event_assl_read, ct_event_assl_write, ct_ssl_ctx)) {
 		if (nonfatal) {
 			/* XXX */
-			ct_assl_disconnect(ctx);
-			ctx = NULL;
+			ct_assl_disconnect(ct_ssl_ctx);
+			e_free(&ct_ssl_ctx);
 		} else
 			assl_fatalx("server connect failed");
 	}
-	if (ct_io_bw_limit && ctx != NULL)
-		ct_ssl_init_bw_lim(ctx);
+	if (ct_io_bw_limit && ct_ssl_ctx != NULL)
+		ct_ssl_init_bw_lim(ct_ssl_ctx);
 
-	return ctx;
+	return ct_ssl_ctx;
 }
 
 void
