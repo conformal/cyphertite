@@ -14,8 +14,8 @@ PERMIT_PACKAGE_FTP=	Yes
 PERMIT_DISTFILES_CDROM= Yes
 PERMIT_DISTFILES_FTP=	Yes
 
-WANTLIB =		assl>=3 c clog>=2 crypto edit event expat exude>=3 \
-			ncurses shrink>=2 sqlite3 ssl util xmlsd>=2
+WANTLIB =		assl>=3 c clog>=2 crypto curl edit event_core expat \
+			exude>=3 ncurses shrink>=2 sqlite3 ssl util xmlsd>=2
 
 MASTER_SITES =		http://opensource.conformal.com/snapshots/cyphertite/
 
@@ -23,6 +23,8 @@ LIB_DEPENDS =		archivers/libshrink>=0.3.0	\
 			databases/sqlite3		\
 			devel/libclog>=0.4.0		\
 			devel/libexude>=0.6.0		\
+			devel/libevent2			\
+			net/curl			\
 			security/assl>=0.12.0		\
 			textproc/libxmlsd>=0.7.0
 
