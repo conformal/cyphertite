@@ -643,13 +643,19 @@ ct_have_remote_secrets_file(void)
 void
 ct_download_secrets_file(void)
 {
+	char 		dirpath[PATH_MAX], *dirp;
+
 	struct ct_ctfileop_args	 cca;
 
 	CWARNX("Downloading secrets file from server...");
 
-	cca.cca_localname = ct_crypto_secrets;
+	strlcpy(dirpath, ct_crypto_secrets, sizeof(dirpath));
+	if ((dirp = dirname(dirpath)) == NULL)
+		CFATALX("can't get dirname of %s", ct_crypto_secrets);
+
+	cca.cca_localname = basename(ct_crypto_secrets);
 	cca.cca_remotename = "crypto.secrets";
-	cca.cca_tdir = NULL;
+	cca.cca_tdir = dirp;
 	cca.cca_encrypted = 0;
 	cca.cca_ctfile = 0;
 
