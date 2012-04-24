@@ -20,9 +20,12 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <curl/curl.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
 #include <exude.h>
 #include <clog.h>
-#include <curl/curl.h>
 #include <ctutil.h>
 
 #define URL		"https://www.cyphertite.com/"
@@ -36,6 +39,53 @@ struct memdesc {
 	char		*memory;
 	size_t		size;
 };
+
+static CURLcode
+sslctx_cb(CURL *c, void *ssl_ctx, void *parm)
+{
+	unsigned long	 ssl_err;
+	int rv;
+	X509_STORE 	*cert_store;
+	X509		*cert = NULL;
+	BIO		*bio;
+	/* ValiCert Class 1 CA */
+	char		*root_ca_cert =
+	"-----BEGIN CERTIFICATE-----\n"\
+	"MIIC5zCCAlACAQEwDQYJKoZIhvcNAQEFBQAwgbsxJDAiBgNVBAcTG1ZhbGlDZXJ0\n"\
+	"IFZhbGlkYXRpb24gTmV0d29yazEXMBUGA1UEChMOVmFsaUNlcnQsIEluYy4xNTAz\n"\
+	"BgNVBAsTLFZhbGlDZXJ0IENsYXNzIDIgUG9saWN5IFZhbGlkYXRpb24gQXV0aG9y\n"\
+	"aXR5MSEwHwYDVQQDExhodHRwOi8vd3d3LnZhbGljZXJ0LmNvbS8xIDAeBgkqhkiG\n"\
+	"9w0BCQEWEWluZm9AdmFsaWNlcnQuY29tMB4XDTk5MDYyNjAwMTk1NFoXDTE5MDYy\n"\
+	"NjAwMTk1NFowgbsxJDAiBgNVBAcTG1ZhbGlDZXJ0IFZhbGlkYXRpb24gTmV0d29y\n"\
+	"azEXMBUGA1UEChMOVmFsaUNlcnQsIEluYy4xNTAzBgNVBAsTLFZhbGlDZXJ0IENs\n"\
+	"YXNzIDIgUG9saWN5IFZhbGlkYXRpb24gQXV0aG9yaXR5MSEwHwYDVQQDExhodHRw\n"\
+	"Oi8vd3d3LnZhbGljZXJ0LmNvbS8xIDAeBgkqhkiG9w0BCQEWEWluZm9AdmFsaWNl\n"\
+	"cnQuY29tMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDOOnHK5avIWZJV16vY\n"\
+	"dA757tn2VUdZZUcOBVXc65g2PFxTXdMwzzjsvUGJ7SVCCSRrCl6zfN1SLUzm1NZ9\n"\
+	"WlmpZdRJEy0kTRxQb7XBhVQ7/nHk01xC+YDgkRoKWzk2Z/M/VXwbP7RfZHM047QS\n"\
+	"v4dk+NoS/zcnwbNDu+97bi5p9wIDAQABMA0GCSqGSIb3DQEBBQUAA4GBADt/UG9v\n"\
+	"UJSZSWI4OB9L+KXIPqeCgfYrx+jFzug6EILLGACOTb2oWH+heQC1u+mNr0HZDzTu\n"\
+	"IYEZoDJJKPTEjlbVUjP9UNV+mWwD5MlM/Mtsq2azSiGM5bUMMj4QssxsodyamEwC\n"\
+	"W/POuZ6lcg5Ktz885hZo+L7tdEy8W9ViH0Pd\n"\
+	"-----END CERTIFICATE-----\n";
+
+	bio = BIO_new_mem_buf(root_ca_cert, -1);
+	PEM_read_bio_X509(bio, &cert, 0, NULL);
+	if (cert == NULL) {
+		return CURLE_PEER_FAILED_VERIFICATION;
+	}
+
+	cert_store = SSL_CTX_get_cert_store((SSL_CTX *) ssl_ctx);
+	if ((rv = X509_STORE_add_cert(cert_store, cert)) == 0) {
+		ssl_err = ERR_get_error();
+		if (ERR_GET_REASON(ssl_err) !=
+		    X509_R_CERT_ALREADY_IN_HASH_TABLE) {
+			return CURLE_PEER_FAILED_VERIFICATION;
+		}
+	}
+
+	return CURLE_OK ;
+}
 
 static size_t
 write_mem_cb(void *contents, size_t size, size_t nmemb, void *userp)
@@ -89,6 +139,7 @@ ct_get_cert_bundle(const char *user, const char *pass, char **xml,
 	}
 
 	/* verify cert */
+	curl_easy_setopt(c, CURLOPT_SSL_CTX_FUNCTION, sslctx_cb);
 	if (curl_easy_setopt(c, CURLOPT_SSL_VERIFYPEER, 1L)) {
 		rv = -5;
 		goto done;
