@@ -480,7 +480,7 @@ ct_validate_xml_negotiate_xml(struct ct_header *hdr, char *xml_body)
 
 	if (attrval_i != -1 && attrval_i !=
 	    ctdb_get_genid(ct_state->ct_db_state)) {
-		CINFO("need to recreate localdb");
+		CNDBG(CT_LOG_DB, "need to recreate localdb");
 		ctdb_reopendb(ct_state->ct_db_state, attrval_i);
 	}
 

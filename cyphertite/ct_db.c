@@ -276,7 +276,7 @@ do_retry:
 	rc = sqlite3_open_v2(state->ctdb_dbfile, &state->ctdb_db,
 	    SQLITE_OPEN_READWRITE, NULL);
 	if (rc == SQLITE_CANTOPEN) {
-		CWARNX("db file doesn't exist, creating it");
+		CNDBG(CT_LOG_DB, "db file doesn't exist, creating it");
 		rc = ctdb_create(state);
 		if (rc != SQLITE_OK)
 			return 1;
@@ -285,7 +285,7 @@ do_retry:
 		if (retry) {
 			retry = 0;
 			/* db is in incorrect mode, delete it and try again */
-			CWARNX("db file wrong mode, removing it");
+			CNDBG(CT_LOG_DB, "db file wrong mode, removing it");
 			sqlite3_close(state->ctdb_db);
 			unlink(state->ctdb_dbfile);
 			goto do_retry;
