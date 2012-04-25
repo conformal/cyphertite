@@ -1540,16 +1540,22 @@ ct_compute_encrypt(void *vctx)
 		ivlen = sizeof trans->tr_iv;
 
 		if (encr) {
-			/* encr the chunk, if metadata, iv is alread valid */
+			/* encr the chunk. */
 			if ((trans->hdr.c_flags & C_HDR_F_METADATA) == 0) {
 				if (ct_create_iv(state->ct_iv,
 				    sizeof(state->ct_iv), src, len, iv, ivlen))
 					CFATALX("can't create iv");
+			} else {
+				if (ct_create_iv_ctfile(
+				    trans->tr_ctfile_chunkno, iv, ivlen))
+					CFATALX("can't create iv for ctfile %d",
+					    trans->tr_ctfile_chunkno);
 			}
 
 			newlen = ct_encrypt(key, keysz, iv, ivlen, src,
 			    len, dst, state->ct_alloc_block_size);
 		} else {
+			/* iv was taken from ctfile or other information. */
 			newlen = ct_decrypt(key, keysz, iv, ivlen,
 			    src, len, dst, state->ct_alloc_block_size);
 		}

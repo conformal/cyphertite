@@ -198,23 +198,9 @@ loop:
 	ct_trans->hdr.c_flags = C_HDR_F_METADATA;
 	ct_trans->hdr.c_flags |= cca->cca_encrypted ? C_HDR_F_ENCRYPTED : 0;
 	ct_trans->hdr.c_ex_status = 2; /* we handle new metadata protocol */
+	/* Set chunkno for restart and for iv generation */
 	ct_trans->tr_ctfile_chunkno = cas->cas_block_no;
 	ct_trans->tr_ctfile_name = rname;
-
-	/*
-	 * init iv to something that can be recreated, used if hdr->c_flags
-	 * has C_HDR_F_METADATA set.
-	 */
-	bzero(ct_trans->tr_iv, sizeof(ct_trans->tr_iv));
-	ct_trans->tr_iv[0] = (cas->cas_block_no >>  0) & 0xff;
-	ct_trans->tr_iv[1] = (cas->cas_block_no >>  8) & 0xff;
-	ct_trans->tr_iv[2] = (cas->cas_block_no >> 16) & 0xff;
-	ct_trans->tr_iv[3] = (cas->cas_block_no >> 24) & 0xff;
-	ct_trans->tr_iv[4] = (cas->cas_block_no >>  0) & 0xff;
-	ct_trans->tr_iv[5] = (cas->cas_block_no >>  8) & 0xff;
-	ct_trans->tr_iv[6] = (cas->cas_block_no >> 16) & 0xff;
-	ct_trans->tr_iv[7] = (cas->cas_block_no >> 24) & 0xff;
-	/* XXX - leaves the rest of the iv with 0 */
 
 	cas->cas_block_no++;
 
@@ -441,15 +427,10 @@ again:
 	trans->tr_sha[1] = (ces->ces_block_no >>  8) & 0xff;
 	trans->tr_sha[2] = (ces->ces_block_no >> 16) & 0xff;
 	trans->tr_sha[3] = (ces->ces_block_no >> 24) & 0xff;
-	bzero(trans->tr_iv, sizeof(trans->tr_iv));
-	trans->tr_iv[0] = (ces->ces_block_no >>  0) & 0xff;
-	trans->tr_iv[1] = (ces->ces_block_no >>  8) & 0xff;
-	trans->tr_iv[2] = (ces->ces_block_no >> 16) & 0xff;
-	trans->tr_iv[3] = (ces->ces_block_no >> 24) & 0xff;
-	trans->tr_iv[4] = (ces->ces_block_no >>  0) & 0xff;
-	trans->tr_iv[5] = (ces->ces_block_no >>  8) & 0xff;
-	trans->tr_iv[6] = (ces->ces_block_no >> 16) & 0xff;
-	trans->tr_iv[7] = (ces->ces_block_no >> 24) & 0xff;
+	if (ct_create_iv_ctfile(ces->ces_block_no, trans->tr_iv,
+	    sizeof(trans->tr_iv)))
+		CFATALX("can't create iv for ctfile block no %d",
+		    ces->ces_block_no);
 
 	ces->ces_block_no++; /* next chunk on next pass */
 

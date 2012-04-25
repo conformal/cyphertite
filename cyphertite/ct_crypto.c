@@ -223,6 +223,27 @@ ct_create_iv(uint8_t *key, size_t keylen, uint8_t *src, size_t srclen,
 }
 
 int
+ct_create_iv_ctfile(uint32_t chunkno, uint8_t *iv, size_t ivlen)
+{
+	if (ivlen != SHA256_DIGEST_LENGTH) {
+		CNDBG(CT_LOG_CRYPTO, "invalid iv length");
+		return (1);
+	}
+
+	bzero(iv, ivlen);
+	iv[0] = (chunkno >>  0) & 0xff;
+	iv[1] = (chunkno >>  8) & 0xff;
+	iv[2] = (chunkno >> 16) & 0xff;
+	iv[3] = (chunkno >> 24) & 0xff;
+	iv[4] = (chunkno >>  0) & 0xff;
+	iv[5] = (chunkno >>  8) & 0xff;
+	iv[6] = (chunkno >> 16) & 0xff;
+	iv[7] = (chunkno >> 24) & 0xff;
+	/* XXX leaves the rest of the iv with 0 */
+
+	return (0);
+}
+int
 ct_encrypt(uint8_t *key, size_t keylen, uint8_t *iv, size_t ivlen,
     uint8_t *src, size_t srclen, uint8_t *dst, size_t dstlen)
 {
