@@ -228,7 +228,7 @@ ct_get_cert_bundle(const char *user, const char *pass, char **xml,
 	}
 	xs = chunk.size;
 	x = e_malloc(xs + 1); /* + nul */
-	*(x + xs + 1) = '\0';
+	x[xs] = '\0';
 	bcopy(chunk.memory, x, xs);
 
 	/* logout */
