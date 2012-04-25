@@ -415,25 +415,17 @@ again:
 	trans->tr_state = TR_S_EX_SHA;
 	trans->tr_type = TR_T_READ_CHUNK;
 	trans->tr_eof = 0;
-	trans->tr_ctfile_chunkno = ces->ces_block_no;
+	trans->tr_ctfile_chunkno = ces->ces_block_no++;
 	trans->tr_ctfile_name = rname;
 
 	hdr = &trans->hdr;
 	hdr->c_ex_status = 2;
 	hdr->c_flags |= C_HDR_F_METADATA;
 
-	bzero(trans->tr_sha, sizeof(trans->tr_sha));
-	trans->tr_sha[0] = (ces->ces_block_no >>  0) & 0xff;
-	trans->tr_sha[1] = (ces->ces_block_no >>  8) & 0xff;
-	trans->tr_sha[2] = (ces->ces_block_no >> 16) & 0xff;
-	trans->tr_sha[3] = (ces->ces_block_no >> 24) & 0xff;
-	if (ct_create_iv_ctfile(ces->ces_block_no, trans->tr_iv,
+	if (ct_create_iv_ctfile(trans->tr_ctfile_chunkno, trans->tr_iv,
 	    sizeof(trans->tr_iv)))
 		CFATALX("can't create iv for ctfile block no %d",
-		    ces->ces_block_no);
-
-	ces->ces_block_no++; /* next chunk on next pass */
-
+		    trans->tr_ctfile_chunkno);
 	ct_queue_first(state, trans);
 }
 
