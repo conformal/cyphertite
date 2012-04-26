@@ -1,43 +1,14 @@
 cyphertite (1.2.0-1) unstable; urgency=low
 
-  * Add root CA for cyphertite.com SSL verification
-  * Implement easy/expert mode in config generation
-  * Add cert autoretrieval based on curl
-  * Include <ct_threads.h> not "ct_threads.h" as it is not in same dir
-  * Remove use of a temporary pointer in ct_ssl_connect and fix a leak
-  * Update install scripts to look for event_core
-  * Enable threads when _REENTRANT is defined
-  * No openat() on openbsd before 5.0
-  * Consistently use ct_body_alloc_xml() with xmlsd_generate()
-  * Fix several occurances of double semicolons at end of line
-  * Fix an incorrect usage of e_free
-  * Clog flags must be uint32_t, or CLOG_F_DBGENABLE sets the sign bit
-  * Avoid using sizeof on a pointer with bzero
-  * Free event globals based on allocation state
-  * Update RPM package control spec for libevent2
-  * Handle a few event_new allocation failures
-  * Update to use libevent2 API
-  * Abstract event loop break and cleanup logic
-  * Turn on exude threads if both are on
-  * Use better if condition checks for ENABLE_THREADS
-  * Rework and cleanup thread handling
-  * Consolidate common Makefile bits and cleanup
-  * Move the ctutil linking logic into the cyphertite makefiles
-  * Prompt user to overwrite existing cyphertite.conf
-  * Fix overwrite of existing cypherite.conf file
-  * Some FreeBSD package fixes were dropped on the initial commit
-  * Add another var to struct fnode that will be needed in future
-  * Move ct_populate_fnode and ct_normalize_path to a more appropriate place
-  * Add current directory to inc path for extensions
-  * Use include path for extension scaffolding
-  * Secrets_upload -> upload_crypto_secrets spello
-  * Fix a spello, spaces and some grammar
-  * Ct_assl_ctx shouldn't be a common (global) variable
-  * Use a SIMPLEQ instead of an SLIST for the ctfile_list
-  * Scaffolding for extensions to cyphertite
-  * Allow for XML commands, settings and ctcl commands from 3rd parties
-  * Need to include inttypes.h for exude header
-  * Split config path handling out into a seperate file
+  * Automatically retrieve certificate bundle during configuration
+    file generation
+  * Simplify default configuration file generation
+  * Add an expert mode to provide the previous configurability
+  * Configuration file generation now creates a temporary file and
+    renames it instead of writing directly
+  * Move to libevent2
+  * Cleanup thread handling and use updated thread safe libraries
+  * Compensate for lack of openat on OpenBSD prior to 5.0
   * Other minor cleanup and bug fixes
 
  -- Conformal Systems <package-discuss@conformal.com>  Tue, 24 Apr 2012 17:36:31 -0500
