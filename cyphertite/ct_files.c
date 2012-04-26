@@ -450,7 +450,6 @@ ct_sched_backup_file(struct stat *sb, char *filename, int forcedir,
 	struct flist		*flnode_exists;
 	struct dnode		dsearch, *dfound;
 	struct dnode		*dnode = NULL, *e_dnode;
-	char			fname_buf[PATH_MAX];
 
 	/* compute 'safe' name */
 	safe = ct_name_to_safename(filename);
@@ -485,15 +484,13 @@ ct_sched_backup_file(struct stat *sb, char *filename, int forcedir,
 	flnode->fl_ino = sb->st_ino;
 	flnode->fl_parent_dir = NULL;
 
-	strlcpy(fname_buf, filename, sizeof(fname_buf));
-	dsearch.d_name = dirname(fname_buf);
+	dsearch.d_name = ct_dirname(filename);
 	dfound = RB_FIND(d_name_tree, &ct_dname_head, &dsearch);
 	if (dfound != NULL) {
 		flnode->fl_parent_dir = dfound;
 		CNDBG(CT_LOG_CTFILE, "parent of %s is %s", filename,
 		    dfound->d_name);
-		strlcpy(fname_buf, filename, sizeof(fname_buf));
-		flnode->fl_fname = e_strdup(basename(fname_buf));
+		flnode->fl_fname = ct_basename(filename);
 		CNDBG(CT_LOG_CTFILE, "setting name of %s as %s", filename,
 		    flnode->fl_fname);
 	} else {
@@ -502,6 +499,7 @@ ct_sched_backup_file(struct stat *sb, char *filename, int forcedir,
 		CNDBG(CT_LOG_CTFILE, "parent of %s is not found [%s]",
 		    flnode->fl_fname, dsearch.d_name);
 	}
+	e_free(&dsearch.d_name);
 
 	if (closedir) {
 		flnode->fl_flags |= C_FF_CLOSEDIR;
@@ -2065,7 +2063,7 @@ ct_normalize_path(char *path)
 }
 
 char *
-ct_dirname_alloc(const char *orig_path)
+ct_dirname(const char *orig_path)
 {
 	char		*path_buf = NULL;
 	size_t		 end;
@@ -2101,7 +2099,7 @@ ct_dirname_alloc(const char *orig_path)
 }
 
 char *
-ct_basename_alloc(const char *orig_path)
+ct_basename(const char *orig_path)
 {
 	char		*path_buf = NULL;
 	size_t		 start, end, len;

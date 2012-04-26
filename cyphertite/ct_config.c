@@ -203,7 +203,6 @@ ct_download_decode_and_save_certs(const char *username, const char *password)
 	uint8_t			 pwd_digest[SHA512_DIGEST_LENGTH];
 	char			 b64[2048];
 	char			*xml, *xml_val;
-	char			*dir_buf, *dir;
 	size_t			 xml_size;
 	struct			 xmlsd_element_list xel;
 	char			*ca_cert, *user_cert, *user_key;
@@ -242,9 +241,7 @@ ct_download_decode_and_save_certs(const char *username, const char *password)
 		}
 		e_asprintf(&ca_cert, "%s", b64);
 		if (ct_make_full_path(ct_ca_cert, 0700)) {
-			dir_buf = e_strdup(ct_ca_cert);
-			dir = dirname(dir_buf);
-			CFATAL("unabled to create directory %s", dir);
+			CFATAL("failed to make path to %s", ct_ca_cert);
 		}
 		if ((fd = open(ct_ca_cert, O_RDWR | O_CREAT | O_TRUNC,
 				    0644)) == -1) {
@@ -274,9 +271,7 @@ ct_download_decode_and_save_certs(const char *username, const char *password)
 		}
 		e_asprintf(&user_cert, "%s", b64);
 		if (ct_make_full_path(ct_cert, 0700)) {
-			dir_buf = e_strdup(ct_cert);
-			dir = dirname(dir_buf);
-			CFATAL("unabled to create directory %s", dir);
+			CFATAL("failed to make path to %s", ct_cert);
 		}
 		if ((fd = open(ct_cert, O_RDWR | O_CREAT | O_TRUNC,
 				    0644)) == -1) {
@@ -305,9 +300,7 @@ ct_download_decode_and_save_certs(const char *username, const char *password)
 		}
 		e_asprintf(&user_key, "%s", b64);
 		if (ct_make_full_path(ct_key, 0700)) {
-			dir_buf = e_strdup(ct_key);
-			dir = dirname(dir_buf);
-			CFATAL("unabled to create directory %s", dir);
+			CFATAL("failed to make path to %s", ct_key);
 		}
 		if ((fd = open(ct_key, O_RDWR | O_CREAT | O_TRUNC,
 				    0600)) == -1) {
@@ -368,12 +361,12 @@ ct_create_config(void)
 		    "Target config file [%s]: ", conf_buf);
 		ct_get_answer(prompt, NULL, NULL, conf_buf, answer,
 		    sizeof answer, 0);
-		if (conf_buf != NULL)
+		if (conf_buf)
 			e_free(&conf_buf);
 		conf = e_strdup(answer);
-
-	} else
-		conf = e_strdup(conf_buf);
+	} else {
+		conf = conf_buf;
+	}
 
 	if (stat(conf, &sb) == 0) {
 		strlcpy(prompt, "Target config file already exists.  "
@@ -388,10 +381,10 @@ ct_create_config(void)
 	 * Make path and create conf file early so permission failures are
 	 * are caught before the user fills out all of the information.
 	 */
+	dir = ct_dirname(conf);
 	conf_buf = e_strdup(conf);
 	if (ct_make_full_path(conf_buf, 0700))
 		CFATAL("unable to create path %s", conf_buf);
-	dir = dirname(conf_buf);
 	if (e_asprintf(&conf_tmp, "%s/%s", dir,
 	    "cyphertite.conf.XXXXXXXXXX") == -1)
 		CFATAL("unable to allocate conf template");
@@ -418,8 +411,6 @@ ct_create_config(void)
 	}
 
 
-	conf_buf = e_strdup(conf);
-	dir = dirname(conf_buf);
 	e_asprintf(&ctfile_cachedir, "%s/ct_cachedir", dir);
 	e_asprintf(&ct_crypto_secrets, "%s/ct_crypto", dir);
 	e_asprintf(&ct_cert, "%s/ct_certs/ct_%s.crt", dir, ct_username);
@@ -679,8 +670,8 @@ crypto_passphrase:
 		CFATAL("unable to move config file into place");
 	}
 
-	if (conf_buf)
-		e_free(&conf_buf);
+	if (dir)
+		e_free(&dir);
 	if (conf_tmp)
 		e_free(&conf_tmp);
 	if (conf)

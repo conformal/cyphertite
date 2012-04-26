@@ -64,13 +64,13 @@ ctfile_cook_name(const char *path)
 {
 	char	*bname;
 
-	bname = basename((char *)path);
+	bname = ct_basename(path);
 	if (bname == NULL)
 		CFATAL("can't basename metadata path");
 	if (bname[0] == '/')
 		CFATALX("invalid metadata filename");
 
-	return (e_strdup(bname));
+	return (bname);
 }
 
 /*
@@ -643,23 +643,27 @@ ct_have_remote_secrets_file(void)
 void
 ct_download_secrets_file(void)
 {
-	char 		dirpath[PATH_MAX], *dirp;
+	char		*dirpath, *fname;
 
 	struct ct_ctfileop_args	 cca;
 
 	CWARNX("Downloading secrets file from server...");
 
-	strlcpy(dirpath, ct_crypto_secrets, sizeof(dirpath));
-	if ((dirp = dirname(dirpath)) == NULL)
+	if ((dirpath = ct_dirname(ct_crypto_secrets)) == NULL)
 		CFATALX("can't get dirname of %s", ct_crypto_secrets);
+	if ((fname = ct_basename(ct_crypto_secrets)) == NULL)
+		CFATALX("can't get basename of %s", ct_crypto_secrets);
 
-	cca.cca_localname = basename(ct_crypto_secrets);
+	cca.cca_localname = fname;
 	cca.cca_remotename = "crypto.secrets";
-	cca.cca_tdir = dirp;
+	cca.cca_tdir = dirpath;
 	cca.cca_encrypted = 0;
 	cca.cca_ctfile = 0;
 
 	ct_do_operation(ctfile_extract, NULL, &cca, 0, 1);
+
+	e_free(&dirpath);
+	e_free(&fname);
 }
 
 void
