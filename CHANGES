@@ -3,6 +3,12 @@ User visible changes for cyphertite
   A high-security scalable solution for online backups
 ============================================================================
 
+Changes in 1.2.1 (Thu Apr 26 2012)
+  - Fix a bug in automatic certificate retrieval
+  - Improve handling of path splitting
+  - Correct some package dependencies
+  - Other minor code cleanup
+
 Changes in 1.2.0 (Tue Apr 24 2012)
   - Automatically retrieve certificate bundle during configuration
     file generation

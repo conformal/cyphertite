@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.2.0
+%define version		1.2.1
 %define release		1
 
 %define libeventpkg	libevent
@@ -57,6 +57,11 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Thu Apr 26 2012 - davec 1.2.1-1
+- Fix a bug in automatic certificate retrieval
+- Improve handling of path splitting
+- Correct some package dependencies
+- Other minor code cleanup
 * Tue Apr 24 2012 - drahn 1.2.0-1
 - Automatically retrieve certificate bundle during configuration
   file generation

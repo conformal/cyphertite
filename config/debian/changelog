@@ -1,3 +1,12 @@
+cyphertite (1.2.1-1) unstable; urgency=low
+
+  * Fix a bug in automatic certificate retrieval
+  * Improve handling of path splitting
+  * Correct some package dependencies
+  * Other minor code cleanup
+
+ -- Conformal Systems <package-discuss@conformal.com>  Thu, 26 Apr 2012 13:32:26 -0500
+
 cyphertite (1.2.0-1) unstable; urgency=low
 
   * Automatically retrieve certificate bundle during configuration
