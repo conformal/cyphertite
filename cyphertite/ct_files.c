@@ -2064,3 +2064,68 @@ ct_normalize_path(char *path)
 	return path;
 }
 
+char *
+ct_dirname_alloc(const char *orig_path)
+{
+	char		*path_buf = NULL;
+	size_t		 end;
+
+	if (orig_path == NULL || *orig_path == '\0') {
+		return (e_strdup("."));
+	}
+
+	end = strlen(orig_path) - 1;
+	while (end > 0 && orig_path[end] == '/')
+		end--;
+
+	while (end > 0 && orig_path[end] != '/')
+		end--;
+
+	if (end == 0) {
+		if (orig_path[end] == '/')
+			return (e_strdup("/"));
+		else
+			return (e_strdup("."));
+	} else {
+		while (end > 0 && orig_path[end] == '/') {
+			end--;
+		}
+	}
+
+	end++;
+	path_buf = e_malloc(end + 1); /* will fatal if fails */
+
+	memcpy(path_buf, orig_path, end);
+	path_buf[end] = '\0';
+	return (path_buf);
+}
+
+char *
+ct_basename_alloc(const char *orig_path)
+{
+	char		*path_buf = NULL;
+	size_t		 start, end, len;
+
+	if (orig_path == NULL || *orig_path == '\0') {
+		return (e_strdup("."));
+	}
+
+	end = strlen(orig_path) - 1;
+	while (end > 0 && orig_path[end] == '/')
+		end--;
+
+	if (end == 0 && orig_path[end] == '/') {
+		return (e_strdup("/"));
+	}
+
+	start = end;
+	while (start > 0 && orig_path[start - 1] != '/')
+		start--;
+
+	len = end - start + 1;
+	path_buf = e_malloc(len + 1); /* will fatal if fails */
+
+	memcpy(path_buf, &orig_path[start], len);
+	path_buf[len] = '\0';
+	return (path_buf);
+}

@@ -572,6 +572,10 @@ char *ct_system_config(void);
 char *ct_user_config(void);
 char *ct_user_config_old(void);
 
+/* ct_files.c: path functions */
+char	*ct_dirname_alloc(const char *);
+char	*ct_basename_alloc(const char *);
+
 /* ct_ctl.c */
 void			secrets_generate(struct ct_cli_cmd *, int, char **);
 
