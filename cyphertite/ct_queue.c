@@ -784,13 +784,12 @@ void
 ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 {
 	struct ct_global_state	*state = ctx;
-	struct ct_trans		ltrans, *trans = NULL;
+	struct ct_trans		*trans = NULL;
 
 	if (hdr == NULL) {
 		ct_handle_disconnect(state);
 		return;
 	}
-	ltrans.hdr.c_tag = hdr->c_tag;
 
 	/* if a reply, lookup transaction */
 	    /* update state */
