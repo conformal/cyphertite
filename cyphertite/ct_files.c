@@ -1854,7 +1854,7 @@ ct_stat(struct fnode *fnode, struct stat *sb, int follow_symlinks,
 		    sizeof(path));
 	} else {
 		snprintf(path, sizeof(path), "%s/%s", ces ?
-		    ces->ces_rootdir->d_name : cas->cas_rootdir->d_name,
+		    ces->ces_rootdir->d_name : cas->cas_rootdir.d_name,
 		    ces ? fnode->fl_sname : fnode->fl_fname);
 	}
 	if (follow_symlinks)
