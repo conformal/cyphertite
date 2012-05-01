@@ -827,7 +827,7 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 	}
 }
 
-void
+int
 ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 {
 	struct ct_global_state	*state = vctx;
@@ -836,7 +836,7 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 
 	if (hdr == NULL) {
 		ct_handle_disconnect(state);
-		return;
+		return 1;
 	}
 
 	if (cnt != 0 && (hdr->c_opcode != C_HDR_O_WRITE ||
@@ -856,7 +856,7 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 		CNDBG(CT_LOG_NET, "moving trans %" PRIu64" back to write queue",
 		    trans->tr_trans_id);
 		ct_queue_write(state, trans);
-		return;
+		return 0;
 	}
 
 	switch (hdr->c_opcode) {
@@ -882,6 +882,7 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 		    hdr->c_opcode, hdr->c_tag, trans->tr_trans_id);
 		e_free(&vbody);
 	}
+	return 0;
 }
 
 void *

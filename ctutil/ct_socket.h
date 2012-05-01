@@ -29,7 +29,7 @@
 typedef void (eventcb_ty)(evutil_socket_t, short, void *);
 
 typedef void (msgdeliver_ty)(void *, struct ct_header *, void *);
-typedef void (msgcomplete_ty)(void *, struct ct_header *, void *, int);
+typedef int (msgcomplete_ty)(void *, struct ct_header *, void *, int);
 typedef void (limitio_ty)(void *, size_t);
 
 struct ct_assl_io_ctx;

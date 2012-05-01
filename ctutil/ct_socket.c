@@ -49,6 +49,7 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 	int			wlen;
 	int			write_complete = 0;
 	int			s_errno;
+	int			ctxgone;
 
 	c = ioctx->c;
 	CT_LOCK(&ioctx->io_lock);
@@ -180,14 +181,14 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 		TAILQ_REMOVE(&ioctx->io_o_q, iob, io_next);
 		CT_UNLOCK(&ioctx->io_lock);
 
-		ioctx->io_wrcomplete_cb(ioctx->io_cb_arg, hdr, iob->io_data,
-		    iob->iovcnt);
+		ctxgone = ioctx->io_wrcomplete_cb(ioctx->io_cb_arg, hdr,
+		    iob->io_data, iob->iovcnt);
 
 		ioctx->io_ioctx_free(iob);
 
 		CT_LOCK(&ioctx->io_lock);
-		if (TAILQ_EMPTY(&ioctx->io_o_q) ||
-		    (ioctx->io_write_io_enabled == 0)) {
+		if (!ctxgone && (TAILQ_EMPTY(&ioctx->io_o_q) ||
+		    (ioctx->io_write_io_enabled == 0))) {
 			assl_event_disable_write(c);
 		}
 		CT_UNLOCK(&ioctx->io_lock);
@@ -324,6 +325,7 @@ ct_event_io_write(evutil_socket_t fd, short events, void *arg)
 	int			wlen;
 	int			write_complete = 0;
 	int			s_errno;
+	int			ctxgone;
 
 	CT_LOCK(&ioctx->io_lock);
 	iob = TAILQ_FIRST(&ioctx->io_o_q);
@@ -453,13 +455,13 @@ write_next_iov:
 		TAILQ_REMOVE(&ioctx->io_o_q, iob, io_next);
 		CT_UNLOCK(&ioctx->io_lock);
 
-		ioctx->io_wrcomplete_cb(ioctx->io_cb_arg, hdr, iob->io_data,
-		    iob->iovcnt);
+		ctxgone = ioctx->io_wrcomplete_cb(ioctx->io_cb_arg, hdr,
+		    iob->io_data, iob->iovcnt);
 
 		ioctx->io_ioctx_free(iob);
 
 		CT_LOCK(&ioctx->io_lock);
-		if (TAILQ_EMPTY(&ioctx->io_o_q)) {
+		if (!ctxgone && TAILQ_EMPTY(&ioctx->io_o_q)) {
 			event_del(ioctx->io_ev_wr);
 		}
 		CT_UNLOCK(&ioctx->io_lock);
