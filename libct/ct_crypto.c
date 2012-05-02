@@ -34,8 +34,8 @@
 
 #include <clog.h>
 
-#include "ct_crypto.h"
-#include "ct.h"
+#include <ct_crypto.h>
+#include <ct_types.h>
 
 
 #ifdef __linux__

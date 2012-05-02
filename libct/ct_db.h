@@ -13,15 +13,19 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+#ifndef CT_DB_H
+#define CT_DB_H
 
 /* localdb interface */
 struct ctdb_state;
 
 struct ctdb_state		*ctdb_setup(const char *, int);
 void				 ctdb_shutdown(struct ctdb_state *);
-int				 ctdb_exists(struct ctdb_state *,
-				     struct ct_trans *);
-int				 ctdb_insert(struct ctdb_state *,
-				     struct ct_trans *trans);
+int				 ctdb_insert_sha(struct ctdb_state *,
+				     uint8_t *, uint8_t *, uint8_t *);
+int				 ctdb_lookup_sha(struct ctdb_state *,
+				     uint8_t *, uint8_t *, uint8_t *);
 int				 ctdb_get_genid(struct ctdb_state *);
 void				 ctdb_reopendb(struct ctdb_state *, int);
+
+#endif /* ! CT_DB_H */

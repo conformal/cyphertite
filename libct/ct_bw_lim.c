@@ -20,7 +20,13 @@
 #include <assl.h>
 #include <exude.h>
 
-#include "ct.h"
+#include <sys/queue.h>
+
+#include <ctutil.h>
+#include <ct_socket.h>
+
+#include <ct_types.h>
+#include <ct_lib.h>
 
 struct bw_debug {
 	struct timeval	io_time;

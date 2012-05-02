@@ -33,7 +33,9 @@
 
 #include <ctutil.h>
 
-#include "ct.h"
+#include <ct_match.h>
+#include <ct_ctfile.h>
+#include <ct_lib.h>
 
 ct_op_cb	ctfile_find_for_extract;
 ct_op_cb	ctfile_find_for_extract_complete;
@@ -41,7 +43,6 @@ ct_op_cb	ctfile_extract_nextop;
 ct_op_cb	ctfile_download_next;
 ct_op_cb	ctfile_nextop_extract_cleanup;
 ct_op_cb	ctfile_nextop_archive_cleanup;
-int	ct_file_on_server(struct ct_global_state *, char *filename);
 
 char *
 ctfile_cook_name(const char *path)
@@ -564,25 +565,6 @@ ct_compare_secrets(struct ct_global_state *state, struct ct_op *op)
 	e_free(&cca);
 }
 
-void
-ct_check_secrets_upload(struct ct_global_state *state, struct ct_op *op)
-{
-	struct ct_ctfileop_args	*cca = op->op_args;
-	char			 answer[1024];
-
-	/* Check to see if we already have a secrets file on the server */
-	if (ct_file_on_server(state, cca->cca_remotename)) {
-		if (ct_get_answer("There is already a crypto secrets file on "
-		    "the server, would you like to replace it? [no]: ",
-		    "yes", "no", "no", answer, sizeof answer, 0) != 1)
-			CFATALX("not uploading secrets file");
-		op = ct_add_operation_after(state, op, ctfile_delete, NULL,
-		    cca->cca_remotename);
-	}
-
-	ct_add_operation_after(state, op, ctfile_archive, NULL, cca);
-
-}
 
 /*
  * return boolean whether or not the last ctfile_list contained
@@ -631,45 +613,4 @@ ct_have_remote_secrets_file(struct ct_config *conf)
 	    &have, 0);
 
 	return (have);
-}
-void
-ct_download_secrets_file(struct ct_config *conf)
-{
-	struct ct_ctfileop_args	 cca;
-	char			*dirpath, *fname;
-
-	CWARNX("Downloading secrets file from server...");
-
-	if ((dirpath = ct_dirname(conf->ct_crypto_secrets)) == NULL)
-		CFATALX("can't get dirname of %s", conf->ct_crypto_secrets);
-	if ((fname = ct_basename(conf->ct_crypto_secrets)) == NULL)
-		CFATALX("can't get basename of %s", conf->ct_crypto_secrets);
-
-	cca.cca_localname = fname;
-	cca.cca_remotename = "crypto.secrets";
-	cca.cca_tdir = dirpath;
-	cca.cca_encrypted = 0;
-	cca.cca_ctfile = 0;
-
-	ct_do_operation(conf, ctfile_extract, NULL, &cca, 0);
-
-	e_free(&dirpath);
-	e_free(&fname);
-}
-
-void
-ct_upload_secrets_file(struct ct_config *conf)
-{
-	struct ct_ctfileop_args	 cca;
-
-	CWARNX("Uploading secrets file to server...");
-
-	cca.cca_localname = conf->ct_crypto_secrets;
-	cca.cca_remotename = "crypto.secrets";
-	cca.cca_tdir = NULL;
-	cca.cca_encrypted = 0;
-	cca.cca_ctfile = 0;
-
-	ct_do_operation(conf, ctfile_list_start, ct_check_secrets_upload,
-	    &cca, 0);
 }

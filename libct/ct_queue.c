@@ -25,9 +25,12 @@
 #include <clog.h>
 #include <exude.h>
 
-#include "ct.h"
-#include "ct_crypto.h"
-#include "ct_proto.h"
+#include <ct_crypto.h>
+#include <ct_proto.h>
+#include <ct_ctfile.h>
+#include <ct_lib.h>
+#include <ct_internal.h>
+
 
 
 void ct_handle_exists_reply(struct ct_global_state *,  struct ct_trans *,
@@ -68,7 +71,6 @@ ct_cmp_iotrans(struct ct_trans *c1, struct ct_trans *c2)
 /* structure to push data to next cache line - cache isolation */
 struct ct_global_state  ct_int_state;
 struct ct_statistics ct_int_stats;
-
 
 struct ct_global_state *ct_state = &ct_int_state;
 
@@ -921,21 +923,6 @@ ct_body_alloc(void *vctx, struct ct_header *hdr)
 	return body;
 }
 
-/*
- * For use with xmlsd_generate for allocating xml bodies.
- * The body alloc is done directly instead of in another path so as to
- * decouple xml size from chunk size.
- */
-void *
-ct_body_alloc_xml(size_t sz)
-{
-	struct ct_header	 hdr;
-
-	hdr.c_opcode = C_HDR_O_XML;
-	hdr.c_size = sz;
-	/* don't need state here because we're not using shm */
-	return (ct_body_alloc(NULL, &hdr));
-}
 
 void
 ct_body_free(void *vctx, void *body, struct ct_header *hdr)
@@ -978,7 +965,8 @@ ct_compute_sha(void *vctx)
 				    "entering sha into db %" PRIu64 " %s",
 				    trans->tr_trans_id, shat);
 			}
-			ctdb_insert(state->ct_db_state, trans);
+			ctdb_insert_sha(state->ct_db_state, trans->tr_sha,
+			    trans->tr_csha, trans->tr_iv);
 			trans->tr_state = TR_S_WMD_READY;
 			ct_queue_transfer(state, trans);
 			continue;
@@ -1004,7 +992,8 @@ ct_compute_sha(void *vctx)
 			    "block tr_id %" PRIu64 " sha %s sz %d",
 			    trans->tr_trans_id, shat, trans->tr_size[slot]);
 		}
-		if (ctdb_exists(state->ct_db_state, trans)) {
+		if (ctdb_lookup_sha(state->ct_db_state, trans->tr_sha,
+			    trans->tr_csha, trans->tr_iv)) {
 			state->ct_stats->st_bytes_exists += trans->tr_chsize;
 			trans->tr_state = TR_S_WMD_READY;
 		} else {
@@ -1579,45 +1568,4 @@ ct_compute_encrypt(void *vctx)
 			trans->tr_state = TR_S_EX_DECRYPTED;
 		ct_queue_transfer(state, trans);
 	}
-}
-
-void
-ct_display_queues(struct ct_global_state *state)
-{
-	if (state->ct_verbose > 1) {
-		CT_LOCK(&state->ct_sha_lock);
-		CT_LOCK(&state->ct_comp_lock);
-		CT_LOCK(&state->ct_crypt_lock);
-		CT_LOCK(&state->ct_csha_lock);
-		CT_LOCK(&state->ct_write_lock);
-		CT_LOCK(&state->ct_queued_lock);
-		CT_LOCK(&state->ct_complete_lock);
-		fprintf(stderr, "Sha      queue len %d\n",
-		    state->ct_sha_qlen);
-		CT_UNLOCK(&state->ct_sha_lock);
-		fprintf(stderr, "Comp     queue len %d\n",
-		    state->ct_comp_qlen);
-		CT_UNLOCK(&state->ct_comp_lock);
-		fprintf(stderr, "Crypt    queue len %d\n",
-		    state->ct_crypt_qlen);
-		CT_UNLOCK(&state->ct_crypt_lock);
-		fprintf(stderr, "Csha     queue len %d\n",
-		    state->ct_csha_qlen);
-		CT_UNLOCK(&state->ct_csha_lock);
-		fprintf(stderr, "Write    queue len %d\n",
-		    state->ct_write_qlen);
-		CT_UNLOCK(&state->ct_write_lock);
-		fprintf(stderr, "CRqueued queue len %d\n",
-		    state->ct_queued_qlen);
-		CT_UNLOCK(&state->ct_queued_lock);
-		// XXX: Add locks for inflight queue throughout?
-		fprintf(stderr, "Inflight queue len %d\n",
-		    state->ct_inflight_rblen);
-		fprintf(stderr, "Complete queue len %d\n",
-		    state->ct_complete_rblen);
-		CT_UNLOCK(&state->ct_complete_lock);
-		fprintf(stderr, "Free     queue len %d\n",
-		    state->ct_trans_free);
-	}
-	ct_dump_stats(state, stderr);
 }

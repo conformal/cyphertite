@@ -36,6 +36,7 @@
 #include <clog.h>
 #include <exude.h>
 
+#include <ct_lib.h>
 #include "ct.h"
 #include "ct_fb.h"
 
@@ -329,7 +330,7 @@ ctfb_main(int argc, char *argv[])
 	ct_prompt_for_login_password(conf);
 
 	/* We may have to download files later, always set up */
-	ctfb_state = state = ct_init(conf, 1, 0);
+	ctfb_state = state = ct_init(conf, 1, 0, ct_info_sig);
 
 	/* if we're in remote mode, try and grab the appropriate files */
 	if (conf->ct_ctfile_mode == CT_MDMODE_REMOTE) {

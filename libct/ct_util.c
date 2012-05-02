@@ -22,7 +22,8 @@
 #include <util.h>
 #endif
 
-
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +31,7 @@
 #include <pwd.h>
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #include <clog.h>
 #include <assl.h>
@@ -37,10 +39,14 @@
 #include <xmlsd.h>
 #include <sqlite3.h>
 
-#include "ct.h"
-#include "ct_socket.h"
-#include "ct_proto.h"
-#include "ct_db.h"
+#include <ctutil.h>
+#include <ct_socket.h>
+#include <ct_crypto.h>
+#include <ct_proto.h>
+#include <ct_db.h>
+#include <ct_ctfile.h>
+#include <ct_lib.h>
+#include <ct_internal.h>
 
 #ifndef MIN
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
@@ -54,6 +60,114 @@ void			ct_print_scaled_stat(FILE *, const char *, int64_t,
 int			ct_validate_xml_negotiate_xml(struct ct_global_state *,
 			    struct ct_header *, char *);
 char			*ct_getloginbyuid(uid_t);
+
+
+struct ct_global_state *
+ct_init(struct ct_config *conf, int need_secrets, int verbose,
+    void (*info_cb)(evutil_socket_t, short, void *))
+{
+	struct ct_global_state *state;
+	extern void		ct_reconnect(evutil_socket_t, short, void *);
+	struct stat		sb;
+
+	/* Run with restricted umask as we create numerous sensitive files. */
+	umask(S_IRWXG|S_IRWXO);
+
+	/* XXX - scale bandwith limiting until the algorithm is improved */
+	if (conf->ct_io_bw_limit) {
+		conf->ct_io_bw_limit = conf->ct_io_bw_limit * 10 / 7;
+	}
+	state = ct_setup_state(conf);
+	state->ct_verbose = verbose;
+
+	state->event_state = ct_event_init(state, ct_reconnect, info_cb);
+
+	if (need_secrets != 0 && conf->ct_crypto_secrets != NULL) {
+		if (stat(conf->ct_crypto_secrets, &sb) == -1) {
+			CFATALX("No crypto secrets file, please run"
+			    "ctctl secrets generate or ctctl secrets download");
+		}
+		/* we got crypto */
+		if (ct_unlock_secrets(conf->ct_crypto_passphrase,
+		    conf->ct_crypto_secrets,
+		    state->ct_crypto_key, sizeof(state->ct_crypto_key),
+		    state->ct_iv, sizeof(state->ct_iv)))
+			CFATALX("can't unlock secrets file");
+	}
+
+	ct_init_eventloop(state);
+
+	return (state);
+}
+
+void
+ct_init_eventloop(struct ct_global_state *state)
+{
+
+#if defined(CT_EXT_INIT)
+	CT_EXT_INIT(state);
+#endif
+
+	state->ct_db_state = ctdb_setup(state->ct_config->ct_localdb,
+	    state->ct_config->ct_crypto_secrets != NULL);
+
+	gettimeofday(&state->ct_stats->st_time_start, NULL);
+	state->ct_assl_ctx = ct_ssl_connect(state, 0);
+	if (ct_assl_negotiate_poll(state))
+		CFATALX("negotiate failed");
+
+	CNDBG(CT_LOG_NET, "assl data: as bits %d, protocol [%s]",
+	    state->ct_assl_ctx->c->as_bits,
+	    state->ct_assl_ctx->c->as_protocol);
+
+	ct_set_file_state(state, CT_S_STARTING);
+	CT_LOCK_INIT(&state->ct_sha_lock);
+	CT_LOCK_INIT(&state->ct_comp_lock);
+	CT_LOCK_INIT(&state->ct_crypt_lock);
+	CT_LOCK_INIT(&state->ct_csha_lock);
+	CT_LOCK_INIT(&state->ct_write_lock);
+	CT_LOCK_INIT(&state->ct_queued_lock);
+	CT_LOCK_INIT(&state->ct_complete_lock);
+
+	ct_setup_wakeup_file(state->event_state, state, ct_nextop);
+	ct_setup_wakeup_sha(state->event_state, state, ct_compute_sha);
+	ct_setup_wakeup_compress(state->event_state, state,
+	    ct_compute_compress);
+	ct_setup_wakeup_csha(state->event_state, state, ct_compute_csha);
+	ct_setup_wakeup_encrypt(state->event_state, state, ct_compute_encrypt);
+	ct_setup_wakeup_write(state->event_state, state, ct_process_write);
+	ct_setup_wakeup_complete(state->event_state, state,
+	    ct_process_completions);
+}
+
+void
+ct_cleanup_eventloop(struct ct_global_state *state)
+{
+	ct_trans_cleanup(state);
+	if (state->ct_assl_ctx) {
+		ct_ssl_cleanup(state->ct_assl_ctx, state->bw_limit);
+		state->ct_assl_ctx = NULL;
+		state->bw_limit = NULL;
+	}
+	ctdb_shutdown(state->ct_db_state);
+	state->ct_db_state = NULL;
+	ct_cleanup_login_cache();
+	// XXX: ct_lock_cleanup();
+	CT_LOCK_RELEASE(&state->ct_sha_lock);
+	CT_LOCK_RELEASE(&state->ct_comp_lock);
+	CT_LOCK_RELEASE(&state->ct_crypt_lock);
+	CT_LOCK_RELEASE(&state->ct_csha_lock);
+	CT_LOCK_RELEASE(&state->ct_write_lock);
+	CT_LOCK_RELEASE(&state->ct_queued_lock);
+	CT_LOCK_RELEASE(&state->ct_complete_lock);
+}
+
+void
+ct_cleanup(struct ct_global_state *state)
+{
+	ct_cleanup_eventloop(state);
+	ct_event_cleanup(state->event_state);
+}
 
 struct ct_op *
 ct_add_operation(struct ct_global_state *state, ct_op_cb *start,
@@ -97,7 +211,7 @@ ct_do_operation(struct ct_config *conf,  ct_op_cb *start, ct_op_cb *complete,
 
 	ct_prompt_for_login_password(conf);
 
-	state = ct_init(conf, need_secrets, 0);
+	state = ct_init(conf, need_secrets, 0, NULL);
 	ct_add_operation(state, start, complete, args);
 	ct_wakeup_file(state->event_state);
 	if ((ret = ct_event_dispatch(state->event_state)) != 0)
@@ -458,164 +572,6 @@ ct_shutdown(struct ct_global_state *state)
 	ct_event_loopbreak(state->event_state);
 }
 
-void print_time_scaled(FILE *, char *s, struct timeval *t);
-void
-print_time_scaled(FILE *outfh, char *s, struct timeval *t)
-{
-	int			f = 3;
-	double			te;
-	char			*scale = "us";
-
-	te = ((double)t->tv_sec * 1000000) + t->tv_usec;
-	if (te > 1000) {
-		te /= 1000;
-		scale = "ms";
-	}
-	if (te > 1000) {
-		te /= 1000;
-		scale = "s";
-	}
-
-	fprintf(outfh, "%s%12.*f%-2s\n", s, f, te, scale);
-}
-
-void
-ct_print_scaled_stat(FILE *outfh, const char *label, int64_t val,
-    int64_t sec, int newline)
-{
-	char rslt[FMT_SCALED_STRSIZE];
-
-	fprintf(outfh, "%s%12" PRId64, label, val);
-	if (val == 0 || sec == 0) {
-		if (newline)
-			fprintf(outfh, "\n");
-		return;
-	}
-
-	bzero(rslt, sizeof(rslt));
-	rslt[0] = '?';
-
-	fmt_scaled(val / sec, rslt);
-	fprintf(outfh, "\t(%s/sec)%s", rslt, newline ? "\n": "");
-}
-
-void
-ct_dump_stats(struct ct_global_state *state, FILE *outfh)
-{
-	struct timeval time_end, scan_delta, time_delta;
-	int64_t sec;
-	int64_t val;
-	char *sign;
-	uint64_t sent, total;
-
-	gettimeofday(&time_end, NULL);
-
-	timersub(&time_end, &state->ct_stats->st_time_start, &time_delta);
-	sec = (int64_t)time_delta.tv_sec;
-	timersub(&state->ct_stats->st_time_scan_end,
-	    &state->ct_stats->st_time_start, &scan_delta);
-
-	if (ct_action == CT_A_ARCHIVE) {
-		fprintf(outfh, "Files scanned\t\t\t%12" PRIu64 "\n",
-		    state->ct_stats->st_files_scanned);
-
-		ct_print_scaled_stat(outfh, "Total bytes\t\t\t",
-		    (int64_t)state->ct_stats->st_bytes_tot, sec, 1);
-	}
-
-	if (ct_action == CT_A_ARCHIVE &&
-	    state->ct_stats->st_bytes_tot != state->ct_stats->st_bytes_read)
-		ct_print_scaled_stat(outfh, "Bytes read\t\t\t",
-		    (int64_t)state->ct_stats->st_bytes_read, sec, 1);
-
-	if (ct_action == CT_A_EXTRACT)
-		ct_print_scaled_stat(outfh, "Bytes written\t\t\t",
-		    (int64_t)state->ct_stats->st_bytes_written, sec, 1);
-
-	if (ct_action == CT_A_ARCHIVE) {
-		ct_print_scaled_stat(outfh, "Bytes compressed\t\t",
-		    (int64_t)state->ct_stats->st_bytes_compressed, sec, 0);
-		fprintf(outfh, "\t(%" PRId64 "%%)\n",
-		    (state->ct_stats->st_bytes_uncompressed == 0) ? (int64_t)0 :
-		    (int64_t)(state->ct_stats->st_bytes_compressed * 100 /
-		    state->ct_stats->st_bytes_uncompressed));
-
-		fprintf(outfh,
-		    "Bytes exists\t\t\t%12" PRIu64 "\t(%" PRId64 "%%)\n",
-		    state->ct_stats->st_bytes_exists,
-		    (state->ct_stats->st_bytes_exists == 0) ? (int64_t)0 :
-		    (int64_t)(state->ct_stats->st_bytes_exists * 100 /
-		    state->ct_stats->st_bytes_tot));
-
-		fprintf(outfh, "Bytes sent\t\t\t%12" PRIu64 "\n",
-		    state->ct_stats->st_bytes_sent);
-
-		sign = " ";
-		if (state->ct_stats->st_bytes_tot != 0) {
-			total = state->ct_stats->st_bytes_tot;
-			sent = state->ct_stats->st_bytes_sent;
-
-			if (sent <= total) {
-				val = 100 * (total - sent) / total;
-			} else {
-				val = 100 * (sent - total) / sent;
-				if (val != 0)
-					sign = "-";
-			}
-		} else
-			val = 0;
-		fprintf(outfh, "Reduction ratio\t\t\t\t%s%" PRId64 "%%\n",
-		    sign, val);
-	}
-	print_time_scaled(outfh, "Total Time\t\t\t    ",  &time_delta);
-
-	if (state->ct_verbose > 2) {
-		fprintf(outfh, "Total chunks\t\t\t%12" PRIu64 "\n",
-		    state->ct_stats->st_chunks_tot);
-		fprintf(outfh, "Bytes crypted\t\t\t%12" PRIu64 "\n",
-		    state->ct_stats->st_bytes_crypted);
-
-		fprintf(outfh, "Bytes sha\t\t\t%12" PRIu64 "\n",
-		    state->ct_stats->st_bytes_sha);
-		fprintf(outfh, "Bytes crypt\t\t\t%12" PRIu64 "\n",
-		    state->ct_stats->st_bytes_crypt);
-		fprintf(outfh, "Bytes csha\t\t\t%12" PRIu64 "\n",
-		    state->ct_stats->st_bytes_csha);
-		fprintf(outfh, "Chunks completed\t\t%12" PRIu64 "\n",
-		    state->ct_stats->st_chunks_completed);
-		fprintf(outfh, "Files completed\t\t\t%12" PRIu64 "\n",
-		    state->ct_stats->st_files_completed);
-
-		if (ct_action == CT_A_ARCHIVE)
-			print_time_scaled(outfh, "Scan Time\t\t\t    ",
-			    &scan_delta);
-		ct_display_assl_stats(state, outfh);
-	}
-}
-
-void
-ct_display_assl_stats(struct ct_global_state *state, FILE *outfh)
-{
-	if (state->ct_assl_ctx == NULL)
-		return;
-
-	fprintf(outfh, "ssl bytes written %" PRIu64 "\n",
-	    state->ct_assl_ctx->io_write_bytes);
-	fprintf(outfh, "ssl writes        %" PRIu64 "\n",
-	    state->ct_assl_ctx->io_write_count);
-	fprintf(outfh, "avg write len     %" PRIu64 "\n",
-	    state->ct_assl_ctx->io_write_count == 0 ?  (int64_t)0 :
-	    state->ct_assl_ctx->io_write_bytes /
-	    state->ct_assl_ctx->io_write_count);
-	fprintf(outfh, "ssl bytes read    %" PRIu64 "\n",
-	    state->ct_assl_ctx->io_read_bytes);
-	fprintf(outfh, "ssl reads         %" PRIu64 "\n",
-	    state->ct_assl_ctx->io_read_count);
-	fprintf(outfh, "avg read len      %" PRIu64 "\n",
-	    state->ct_assl_ctx->io_read_count == 0 ?  (int64_t)0 :
-	    state->ct_assl_ctx->io_read_bytes /
-	    state->ct_assl_ctx->io_read_count);
-}
 
 void
 ct_pr_fmt_file(struct fnode *fnode, int verbose)
@@ -740,94 +696,6 @@ ct_print_ctfile_info(const char *filename, struct ctfile_gheader *gh)
 	printf("file: %s version: %d level: %d block size: %d created: %s",
 	    filename, gh->cmg_version, gh->cmg_cur_lvl, gh->cmg_chunk_size,
 	    ctime(&ltime));
-}
-
-#include "ct_fb.h"
-/*
- * 99% stolen from ct_pr_fmt_file, should amalgamate
- */
-void
-ct_fb_print_entry(char *name, struct ct_fb_key *key, int verbose)
-{
-	char *loginname;
-	struct group *group;
-	char *link_ty;
-	char filemode[11];
-	char uid[11];
-	char gid[11];
-	time_t ltime;
-	char lctime[26];
-	char *pchr;
-
-	if (verbose > 1) {
-		switch(key->cfb_type & C_TY_MASK) {
-		case C_TY_DIR:
-			filemode[0] = 'd'; break;
-		case C_TY_CHR:
-			filemode[0] = 'c'; break;
-		case C_TY_BLK:
-			filemode[0] = 'b'; break;
-		case C_TY_REG:
-			filemode[0] = '-'; break;
-		case C_TY_FIFO:
-			filemode[0] = 'f'; break;
-		case C_TY_LINK:
-			filemode[0] = 'l'; break;
-		case C_TY_SOCK:
-			filemode[0] = 's'; break;
-		default:
-			filemode[0] = '?';
-		}
-		filemode[1] = (key->cfb_mode & 0400) ? 'r' : '-';
-		filemode[2] = (key->cfb_mode & 0100) ? 'w' : '-';
-		filemode[3] = (key->cfb_mode & 0200) ? 'x' : '-';
-		filemode[4] = (key->cfb_mode & 0040) ? 'r' : '-';
-		filemode[5] = (key->cfb_mode & 0020) ? 'w' : '-';
-		filemode[6] = (key->cfb_mode & 0010) ? 'x' : '-';
-		filemode[7] = (key->cfb_mode & 0004) ? 'r' : '-';
-		filemode[8] = (key->cfb_mode & 0002) ? 'w' : '-';
-		filemode[9] = (key->cfb_mode & 0001) ? 'x' : '-';
-		filemode[10] = '\0';
-
-		loginname = ct_getloginbyuid(key->cfb_uid);
-		if (loginname && (strlen(loginname) < sizeof(uid)))
-			snprintf(uid, sizeof(uid), "%10s", loginname);
-		else
-			snprintf(uid, sizeof(uid), "%-10d", key->cfb_uid);
-		group = getgrgid(key->cfb_gid);
-
-
-		if (group && (strlen(group->gr_name) < sizeof(gid)))
-			snprintf(gid, sizeof(gid), "%10s", group->gr_name);
-		else
-			snprintf(gid, sizeof(gid), "%-10d", key->cfb_gid);
-		ltime = key->cfb_mtime;
-		ctime_r(&ltime, lctime);
-		pchr = strchr(lctime, '\n');
-		if (pchr != NULL)
-			*pchr = '\0'; /* stupid newline on ctime */
-
-		printf("%s %s %s %s ", filemode, uid, gid, lctime);
-	}
-	printf("%s", name);
-
-	if (verbose > 1) {
-
-		/* XXX - translate to guid name */
-		if (C_ISLINK(key->cfb_type))  {
-			struct ct_fb_link *lnk = (struct ct_fb_link *)key;
-
-			if (lnk->cfb_hardlink)  {
-				link_ty = "==";
-			} else {
-				link_ty = "->";
-			}
-			printf(" %s %s", link_ty, lnk->cfb_linkname);
-		} else if (C_ISREG(key->cfb_type)) {
-			if (verbose > 1) {
-			}
-		}
-	}
 }
 
 struct ct_login_cache {

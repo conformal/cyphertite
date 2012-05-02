@@ -31,7 +31,8 @@
 #include <clog.h>
 #include <exude.h>
 
-#include "ct.h"
+#include <ct_lib.h>
+#include <ct_ctfile.h>
 
 #ifdef __linux__
 #define xdr_u_int32_t	xdr_uint32_t
@@ -820,7 +821,7 @@ ctfile_write_header_entry(struct ctfile_write_state *ctx, char *filename,
 			    parent_dir->d_parent);
 		}
 		hdr.cmh_parent_dir = parent_dir->d_num;
-	} else if (base && ct_absolute_path(filename)) {
+	} else if (base && filename[0] == '/') {
 		/* this is a rooted directory element */
 		hdr.cmh_parent_dir = -2;
 	} else {

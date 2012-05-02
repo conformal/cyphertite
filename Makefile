@@ -1,5 +1,5 @@
 .include <bsd.own.mk>
 
-SUBDIR= ctutil cyphertite
+SUBDIR= ctutil libct cyphertite
 
 .include <bsd.subdir.mk>

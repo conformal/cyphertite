@@ -38,7 +38,10 @@
 #include <clog.h>
 #include <exude.h>
 
-#include "ct.h"
+#include <ct_ctfile.h>
+#include <ct_match.h>
+#include <ct_lib.h>
+#include <ct_internal.h>
 
 /*
  * flist is a structure that keeps track of the files that still need to be

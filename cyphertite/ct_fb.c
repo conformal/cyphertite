@@ -29,10 +29,12 @@
 #include <errno.h>
 #include <time.h>
 #include <unistd.h>
+#include <grp.h>
 
 #include <clog.h>
 #include <exude.h>
 
+#include <ct_lib.h>
 #include "ct.h"
 #include "ct_fb.h"
 
@@ -949,4 +951,91 @@ glob_ctfile(const char *pattern, int flags, int (*errfunc)(const char *, int),
 	pglob->gl_stat = ctfb_lstat;
 
 	return (glob(pattern, flags | GLOB_ALTDIRFUNC, errfunc, pglob));
+}
+
+/*
+ * 99% stolen from ct_pr_fmt_file, should amalgamate
+ */
+void
+ct_fb_print_entry(char *name, struct ct_fb_key *key, int verbose)
+{
+	char *loginname;
+	struct group *group;
+	char *link_ty;
+	char filemode[11];
+	char uid[11];
+	char gid[11];
+	time_t ltime;
+	char lctime[26];
+	char *pchr;
+
+	if (verbose > 1) {
+		switch(key->cfb_type & C_TY_MASK) {
+		case C_TY_DIR:
+			filemode[0] = 'd'; break;
+		case C_TY_CHR:
+			filemode[0] = 'c'; break;
+		case C_TY_BLK:
+			filemode[0] = 'b'; break;
+		case C_TY_REG:
+			filemode[0] = '-'; break;
+		case C_TY_FIFO:
+			filemode[0] = 'f'; break;
+		case C_TY_LINK:
+			filemode[0] = 'l'; break;
+		case C_TY_SOCK:
+			filemode[0] = 's'; break;
+		default:
+			filemode[0] = '?';
+		}
+		filemode[1] = (key->cfb_mode & 0400) ? 'r' : '-';
+		filemode[2] = (key->cfb_mode & 0100) ? 'w' : '-';
+		filemode[3] = (key->cfb_mode & 0200) ? 'x' : '-';
+		filemode[4] = (key->cfb_mode & 0040) ? 'r' : '-';
+		filemode[5] = (key->cfb_mode & 0020) ? 'w' : '-';
+		filemode[6] = (key->cfb_mode & 0010) ? 'x' : '-';
+		filemode[7] = (key->cfb_mode & 0004) ? 'r' : '-';
+		filemode[8] = (key->cfb_mode & 0002) ? 'w' : '-';
+		filemode[9] = (key->cfb_mode & 0001) ? 'x' : '-';
+		filemode[10] = '\0';
+
+		loginname = ct_getloginbyuid(key->cfb_uid);
+		if (loginname && (strlen(loginname) < sizeof(uid)))
+			snprintf(uid, sizeof(uid), "%10s", loginname);
+		else
+			snprintf(uid, sizeof(uid), "%-10d", key->cfb_uid);
+		group = getgrgid(key->cfb_gid);
+
+
+		if (group && (strlen(group->gr_name) < sizeof(gid)))
+			snprintf(gid, sizeof(gid), "%10s", group->gr_name);
+		else
+			snprintf(gid, sizeof(gid), "%-10d", key->cfb_gid);
+		ltime = key->cfb_mtime;
+		ctime_r(&ltime, lctime);
+		pchr = strchr(lctime, '\n');
+		if (pchr != NULL)
+			*pchr = '\0'; /* stupid newline on ctime */
+
+		printf("%s %s %s %s ", filemode, uid, gid, lctime);
+	}
+	printf("%s", name);
+
+	if (verbose > 1) {
+
+		/* XXX - translate to guid name */
+		if (C_ISLINK(key->cfb_type))  {
+			struct ct_fb_link *lnk = (struct ct_fb_link *)key;
+
+			if (lnk->cfb_hardlink)  {
+				link_ty = "==";
+			} else {
+				link_ty = "->";
+			}
+			printf(" %s %s", link_ty, lnk->cfb_linkname);
+		} else if (C_ISREG(key->cfb_type)) {
+			if (verbose > 1) {
+			}
+		}
+	}
 }

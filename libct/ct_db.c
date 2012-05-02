@@ -21,14 +21,12 @@
 #include <clog.h>
 #include <exude.h>
 #include <sqlite3.h>
-#include "ct.h"
+
+#include "ct_types.h"
+#include "ct_db.h"
 
 static int		 ctdb_open(struct ctdb_state *);
 static void		ctdb_cleanup(struct ctdb_state *);
-static int		ctdb_lookup_sha(struct ctdb_state *, uint8_t *,
-			    uint8_t *, uint8_t *);
-static int		ctdb_insert_sha(struct ctdb_state *, uint8_t *,
-			    uint8_t *, uint8_t *);
 static int		ctdb_create(struct ctdb_state *);
 static int		ctdb_check_db_mode(struct ctdb_state *);
 
@@ -76,29 +74,6 @@ ctdb_shutdown(struct ctdb_state *state)
 	if (state->ctdb_dbfile)
 		e_free(&state->ctdb_dbfile);
 	e_free(&state);
-}
-
-int
-ctdb_exists(struct ctdb_state *state, struct ct_trans *trans)
-{
-	int			rv;
-
-	if (state == NULL || state->ctdb_db == NULL)
-		return 0;
-
-	rv =  ctdb_lookup_sha(state, trans->tr_sha, trans->tr_csha,
-	    trans->tr_iv);
-	return rv;
-}
-
-int
-ctdb_insert(struct ctdb_state *state, struct ct_trans *trans)
-{
-	if (state == NULL || state->ctdb_db == NULL)
-		return 0;
-
-	return ctdb_insert_sha(state, trans->tr_sha,
-	    trans->tr_csha, trans->tr_iv);
 }
 
 int

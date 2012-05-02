@@ -35,8 +35,9 @@
 
 #include <ctutil.h>
 
-#include "ct.h"
-#include "ct_crypto.h"
+#include <ct_lib.h>
+#include <ct_types.h>
+#include <ct_crypto.h>
 
 /* Taken from OpenBSD ls */
 static void

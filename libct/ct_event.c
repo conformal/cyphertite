@@ -26,7 +26,7 @@
 #include <clog.h>
 #include <exude.h>
 
-#include "ct.h"
+#include <ct_lib.h>
 
 
 #ifdef __linux__
@@ -66,7 +66,6 @@ struct ct_event_state {
 };
 
 void ct_handle_wakeup(int, short, void *);
-void ct_info_sig(int, short, void *);
 void ct_pipe_sig(int, short, void *);
 void ct_wakeup_x_pipe(struct ct_ctx *);
 #if CT_ENABLE_THREADS
@@ -252,13 +251,6 @@ ct_wakeup_write(struct ct_event_state *ev_st)
 }
 
 void
-ct_info_sig(int fd, short event, void *vctx)
-{
-	struct ct_global_state	*state = vctx;
-	ct_display_queues(state);
-}
-
-void
 ct_pipe_sig(int fd, short event, void *vctx)
 {
 	/* nothing to do */
@@ -269,7 +261,8 @@ ct_pipe_sig(int fd, short event, void *vctx)
  */
 struct ct_event_state *
 ct_event_init(struct ct_global_state *state,
-    void (*cb)(evutil_socket_t, short, void *))
+    void (*cb)(evutil_socket_t, short, void *), void (*info_cb)(evutil_socket_t,
+    short, void *))
 {
 	struct ct_event_state	*ev_st;
 
@@ -278,16 +271,18 @@ ct_event_init(struct ct_global_state *state,
 	ev_st->ct_evt_base = event_base_new();
 
 	/* cache siginfo */
+	if (info_cb != NULL) {
 #if defined(SIGINFO) && SIGINFO != SIGUSR1
-	ev_st->ct_ev_sig_info = evsignal_new(ev_st->ct_evt_base, SIGINFO,
-	    ct_info_sig, state);
-	evsignal_add(ev_st->ct_ev_sig_info, NULL);
+		ev_st->ct_ev_sig_info = evsignal_new(ev_st->ct_evt_base,
+		    SIGINFO, info_cb, state);
+		evsignal_add(ev_st->ct_ev_sig_info, NULL);
 #endif
 #if defined(SIGUSR1)
-	ev_st->ct_ev_sig_usr1 = evsignal_new(ev_st->ct_evt_base, SIGUSR1,
-	    ct_info_sig, state);
-	evsignal_add(ev_st->ct_ev_sig_usr1, NULL);
+		ev_st->ct_ev_sig_usr1 = evsignal_new(ev_st->ct_evt_base,
+		    SIGUSR1, info_cb, state);
+		evsignal_add(ev_st->ct_ev_sig_usr1, NULL);
 #endif
+	}
 #if defined(SIGPIPE)
 	ev_st->ct_ev_sig_pipe = evsignal_new(ev_st->ct_evt_base, SIGPIPE,
 	    ct_pipe_sig, state);

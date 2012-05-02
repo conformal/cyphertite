@@ -18,6 +18,10 @@
 #include <clens.h>
 #endif
 
+#ifndef NO_UTIL_H
+#include <util.h>
+#endif
+
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -37,8 +41,9 @@
 
 #include <ctutil.h>
 
+#include <ct_crypto.h>
+#include <ct_lib.h>
 #include "ct.h"
-#include "ct_crypto.h"
 #include "ct_ctl.h"
 #include "ct_fb.h"
 #include <ct_ext.h>
@@ -61,6 +66,10 @@ extern char		*__progname;
 
 /* command line flags */
 int			ct_action = 0;
+void ct_display_queues(struct ct_global_state *);
+void ct_dump_stats(struct ct_global_state *state, FILE *outfh);
+void ct_info_sig(int, short, void *);
+
 
 void
 ct_usage(void)
@@ -109,112 +118,6 @@ show_version(void)
 	fprintf(stderr, fmt, "exude", exude_verstring());
 	fprintf(stderr, fmt, "shrink", shrink_verstring());
 	fprintf(stderr, fmt, "xmlsd", xmlsd_verstring());
-}
-
-struct ct_global_state *
-ct_init(struct ct_config *conf, int need_secrets, int verbose)
-{
-	struct ct_global_state *state;
-	extern void		ct_reconnect(evutil_socket_t, short, void *);
-	struct stat		sb;
-
-	/* Run with restricted umask as we create numerous sensitive files. */
-	umask(S_IRWXG|S_IRWXO);
-
-	/* XXX - scale bandwith limiting until the algorithm is improved */
-	if (conf->ct_io_bw_limit) {
-		conf->ct_io_bw_limit = conf->ct_io_bw_limit * 10 / 7;
-	}
-	state = ct_setup_state(conf);
-	state->ct_verbose = verbose;
-
-	state->event_state = ct_event_init(state, ct_reconnect);
-
-	if (need_secrets != 0 && conf->ct_crypto_secrets != NULL) {
-		if (stat(conf->ct_crypto_secrets, &sb) == -1) {
-			CFATALX("No crypto secrets file, please run"
-			    "ctctl secrets generate or ctctl secrets download");
-		}
-		/* we got crypto */
-		if (ct_unlock_secrets(conf->ct_crypto_passphrase,
-		    conf->ct_crypto_secrets,
-		    state->ct_crypto_key, sizeof(state->ct_crypto_key),
-		    state->ct_iv, sizeof(state->ct_iv)))
-			CFATALX("can't unlock secrets file");
-	}
-
-	ct_init_eventloop(state);
-
-	return (state);
-}
-
-void
-ct_init_eventloop(struct ct_global_state *state)
-{
-
-#if defined(CT_EXT_INIT)
-	CT_EXT_INIT(state);
-#endif
-
-	state->ct_db_state = ctdb_setup(state->ct_config->ct_localdb,
-	    state->ct_config->ct_crypto_secrets != NULL);
-
-	gettimeofday(&state->ct_stats->st_time_start, NULL);
-	state->ct_assl_ctx = ct_ssl_connect(state, 0);
-	if (ct_assl_negotiate_poll(state))
-		CFATALX("negotiate failed");
-
-	CNDBG(CT_LOG_NET, "assl data: as bits %d, protocol [%s]",
-	    state->ct_assl_ctx->c->as_bits,
-	    state->ct_assl_ctx->c->as_protocol);
-
-	ct_set_file_state(state, CT_S_STARTING);
-	CT_LOCK_INIT(&state->ct_sha_lock);
-	CT_LOCK_INIT(&state->ct_comp_lock);
-	CT_LOCK_INIT(&state->ct_crypt_lock);
-	CT_LOCK_INIT(&state->ct_csha_lock);
-	CT_LOCK_INIT(&state->ct_write_lock);
-	CT_LOCK_INIT(&state->ct_queued_lock);
-	CT_LOCK_INIT(&state->ct_complete_lock);
-
-	ct_setup_wakeup_file(state->event_state, state, ct_nextop);
-	ct_setup_wakeup_sha(state->event_state, state, ct_compute_sha);
-	ct_setup_wakeup_compress(state->event_state, state,
-	    ct_compute_compress);
-	ct_setup_wakeup_csha(state->event_state, state, ct_compute_csha);
-	ct_setup_wakeup_encrypt(state->event_state, state, ct_compute_encrypt);
-	ct_setup_wakeup_write(state->event_state, state, ct_process_write);
-	ct_setup_wakeup_complete(state->event_state, state,
-	    ct_process_completions);
-}
-
-void
-ct_cleanup_eventloop(struct ct_global_state *state)
-{
-	ct_trans_cleanup(state);
-	if (state->ct_assl_ctx) {
-		ct_ssl_cleanup(state->ct_assl_ctx, state->bw_limit);
-		state->ct_assl_ctx = NULL;
-		state->bw_limit = NULL;
-	}
-	ctdb_shutdown(state->ct_db_state);
-	state->ct_db_state = NULL;
-	ct_cleanup_login_cache();
-	// XXX: ct_lock_cleanup();
-	CT_LOCK_RELEASE(&state->ct_sha_lock);
-	CT_LOCK_RELEASE(&state->ct_comp_lock);
-	CT_LOCK_RELEASE(&state->ct_crypt_lock);
-	CT_LOCK_RELEASE(&state->ct_csha_lock);
-	CT_LOCK_RELEASE(&state->ct_write_lock);
-	CT_LOCK_RELEASE(&state->ct_queued_lock);
-	CT_LOCK_RELEASE(&state->ct_complete_lock);
-}
-
-void
-ct_cleanup(struct ct_global_state *state)
-{
-	ct_cleanup_eventloop(state);
-	ct_event_cleanup(state->event_state);
 }
 
 uint64_t
@@ -485,7 +388,7 @@ ct_main(int argc, char **argv)
 	    ct_action == CT_A_ARCHIVE || (ct_action == CT_A_LIST &&
 	    conf->ct_ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0));
 
-	state = ct_init(conf, need_secrets, verbose);
+	state = ct_init(conf, need_secrets, verbose, ct_info_sig);
 	if (conf->ct_crypto_passphrase != NULL &&
 	    conf->ct_secrets_upload != 0) {
 		ct_add_operation(state, ctfile_list_start,
@@ -665,4 +568,214 @@ main(int argc, char *argv[])
 
 	/* NOTREACHED */
 	return (0);
+}
+
+
+void
+ct_display_queues(struct ct_global_state *state)
+{
+	if (state->ct_verbose > 1) {
+		CT_LOCK(&state->ct_sha_lock);
+		CT_LOCK(&state->ct_comp_lock);
+		CT_LOCK(&state->ct_crypt_lock);
+		CT_LOCK(&state->ct_csha_lock);
+		CT_LOCK(&state->ct_write_lock);
+		CT_LOCK(&state->ct_queued_lock);
+		CT_LOCK(&state->ct_complete_lock);
+		fprintf(stderr, "Sha      queue len %d\n",
+		    state->ct_sha_qlen);
+		CT_UNLOCK(&state->ct_sha_lock);
+		fprintf(stderr, "Comp     queue len %d\n",
+		    state->ct_comp_qlen);
+		CT_UNLOCK(&state->ct_comp_lock);
+		fprintf(stderr, "Crypt    queue len %d\n",
+		    state->ct_crypt_qlen);
+		CT_UNLOCK(&state->ct_crypt_lock);
+		fprintf(stderr, "Csha     queue len %d\n",
+		    state->ct_csha_qlen);
+		CT_UNLOCK(&state->ct_csha_lock);
+		fprintf(stderr, "Write    queue len %d\n",
+		    state->ct_write_qlen);
+		CT_UNLOCK(&state->ct_write_lock);
+		fprintf(stderr, "CRqueued queue len %d\n",
+		    state->ct_queued_qlen);
+		CT_UNLOCK(&state->ct_queued_lock);
+		// XXX: Add locks for inflight queue throughout?
+		fprintf(stderr, "Inflight queue len %d\n",
+		    state->ct_inflight_rblen);
+		fprintf(stderr, "Complete queue len %d\n",
+		    state->ct_complete_rblen);
+		CT_UNLOCK(&state->ct_complete_lock);
+		fprintf(stderr, "Free     queue len %d\n",
+		    state->ct_trans_free);
+	}
+	ct_dump_stats(state, stderr);
+}
+
+void ct_display_assl_stats(struct ct_global_state *, FILE *);
+void print_time_scaled(FILE *, char *s, struct timeval *t);
+void
+print_time_scaled(FILE *outfh, char *s, struct timeval *t)
+{
+	int			f = 3;
+	double			te;
+	char			*scale = "us";
+
+	te = ((double)t->tv_sec * 1000000) + t->tv_usec;
+	if (te > 1000) {
+		te /= 1000;
+		scale = "ms";
+	}
+	if (te > 1000) {
+		te /= 1000;
+		scale = "s";
+	}
+
+	fprintf(outfh, "%s%12.*f%-2s\n", s, f, te, scale);
+}
+
+void
+ct_print_scaled_stat(FILE *outfh, const char *label, int64_t val,
+    int64_t sec, int newline)
+{
+	char rslt[FMT_SCALED_STRSIZE];
+
+	fprintf(outfh, "%s%12" PRId64, label, val);
+	if (val == 0 || sec == 0) {
+		if (newline)
+			fprintf(outfh, "\n");
+		return;
+	}
+
+	bzero(rslt, sizeof(rslt));
+	rslt[0] = '?';
+
+	fmt_scaled(val / sec, rslt);
+	fprintf(outfh, "\t(%s/sec)%s", rslt, newline ? "\n": "");
+}
+
+
+void
+ct_dump_stats(struct ct_global_state *state, FILE *outfh)
+{
+	struct timeval time_end, scan_delta, time_delta;
+	int64_t sec;
+	int64_t val;
+	char *sign;
+	uint64_t sent, total;
+
+	gettimeofday(&time_end, NULL);
+
+	timersub(&time_end, &state->ct_stats->st_time_start, &time_delta);
+	sec = (int64_t)time_delta.tv_sec;
+	timersub(&state->ct_stats->st_time_scan_end,
+	    &state->ct_stats->st_time_start, &scan_delta);
+
+	if (ct_action == CT_A_ARCHIVE) {
+		fprintf(outfh, "Files scanned\t\t\t%12" PRIu64 "\n",
+		    state->ct_stats->st_files_scanned);
+
+		ct_print_scaled_stat(outfh, "Total bytes\t\t\t",
+		    (int64_t)state->ct_stats->st_bytes_tot, sec, 1);
+	}
+
+	if (ct_action == CT_A_ARCHIVE &&
+	    state->ct_stats->st_bytes_tot != state->ct_stats->st_bytes_read)
+		ct_print_scaled_stat(outfh, "Bytes read\t\t\t",
+		    (int64_t)state->ct_stats->st_bytes_read, sec, 1);
+
+	if (ct_action == CT_A_EXTRACT)
+		ct_print_scaled_stat(outfh, "Bytes written\t\t\t",
+		    (int64_t)state->ct_stats->st_bytes_written, sec, 1);
+
+	if (ct_action == CT_A_ARCHIVE) {
+		ct_print_scaled_stat(outfh, "Bytes compressed\t\t",
+		    (int64_t)state->ct_stats->st_bytes_compressed, sec, 0);
+		fprintf(outfh, "\t(%" PRId64 "%%)\n",
+		    (state->ct_stats->st_bytes_uncompressed == 0) ? (int64_t)0 :
+		    (int64_t)(state->ct_stats->st_bytes_compressed * 100 /
+		    state->ct_stats->st_bytes_uncompressed));
+
+		fprintf(outfh,
+		    "Bytes exists\t\t\t%12" PRIu64 "\t(%" PRId64 "%%)\n",
+		    state->ct_stats->st_bytes_exists,
+		    (state->ct_stats->st_bytes_exists == 0) ? (int64_t)0 :
+		    (int64_t)(state->ct_stats->st_bytes_exists * 100 /
+		    state->ct_stats->st_bytes_tot));
+
+		fprintf(outfh, "Bytes sent\t\t\t%12" PRIu64 "\n",
+		    state->ct_stats->st_bytes_sent);
+
+		sign = " ";
+		if (state->ct_stats->st_bytes_tot != 0) {
+			total = state->ct_stats->st_bytes_tot;
+			sent = state->ct_stats->st_bytes_sent;
+
+			if (sent <= total) {
+				val = 100 * (total - sent) / total;
+			} else {
+				val = 100 * (sent - total) / sent;
+				if (val != 0)
+					sign = "-";
+			}
+		} else
+			val = 0;
+		fprintf(outfh, "Reduction ratio\t\t\t\t%s%" PRId64 "%%\n",
+		    sign, val);
+	}
+	print_time_scaled(outfh, "Total Time\t\t\t    ",  &time_delta);
+
+	if (state->ct_verbose > 2) {
+		fprintf(outfh, "Total chunks\t\t\t%12" PRIu64 "\n",
+		    state->ct_stats->st_chunks_tot);
+		fprintf(outfh, "Bytes crypted\t\t\t%12" PRIu64 "\n",
+		    state->ct_stats->st_bytes_crypted);
+
+		fprintf(outfh, "Bytes sha\t\t\t%12" PRIu64 "\n",
+		    state->ct_stats->st_bytes_sha);
+		fprintf(outfh, "Bytes crypt\t\t\t%12" PRIu64 "\n",
+		    state->ct_stats->st_bytes_crypt);
+		fprintf(outfh, "Bytes csha\t\t\t%12" PRIu64 "\n",
+		    state->ct_stats->st_bytes_csha);
+		fprintf(outfh, "Chunks completed\t\t%12" PRIu64 "\n",
+		    state->ct_stats->st_chunks_completed);
+		fprintf(outfh, "Files completed\t\t\t%12" PRIu64 "\n",
+		    state->ct_stats->st_files_completed);
+
+		if (ct_action == CT_A_ARCHIVE)
+			print_time_scaled(outfh, "Scan Time\t\t\t    ",
+			    &scan_delta);
+		ct_display_assl_stats(state, outfh);
+	}
+}
+
+void
+ct_display_assl_stats(struct ct_global_state *state, FILE *outfh)
+{
+	if (state->ct_assl_ctx == NULL)
+		return;
+
+	fprintf(outfh, "ssl bytes written %" PRIu64 "\n",
+	    state->ct_assl_ctx->io_write_bytes);
+	fprintf(outfh, "ssl writes        %" PRIu64 "\n",
+	    state->ct_assl_ctx->io_write_count);
+	fprintf(outfh, "avg write len     %" PRIu64 "\n",
+	    state->ct_assl_ctx->io_write_count == 0 ?  (int64_t)0 :
+	    state->ct_assl_ctx->io_write_bytes /
+	    state->ct_assl_ctx->io_write_count);
+	fprintf(outfh, "ssl bytes read    %" PRIu64 "\n",
+	    state->ct_assl_ctx->io_read_bytes);
+	fprintf(outfh, "ssl reads         %" PRIu64 "\n",
+	    state->ct_assl_ctx->io_read_count);
+	fprintf(outfh, "avg read len      %" PRIu64 "\n",
+	    state->ct_assl_ctx->io_read_count == 0 ?  (int64_t)0 :
+	    state->ct_assl_ctx->io_read_bytes /
+	    state->ct_assl_ctx->io_read_count);
+}
+
+void
+ct_info_sig(int fd, short event, void *vctx)
+{
+	struct ct_global_state	*state = vctx;
+	ct_display_queues(state);
 }

@@ -29,7 +29,7 @@
 #include <util.h>
 #endif
 
-#include "ct.h"
+#include "ct_match.h"
 
 
 struct ct_match_node {

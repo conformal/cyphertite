@@ -23,7 +23,9 @@
 #include <clog.h>
 #include <exude.h>
 
-#include "ct.h"
+#include <ct_ctfile.h>
+#include <ct_match.h>
+#include <ct_lib.h>
 
 int	ct_populate_fnode(struct ct_extract_state *,
 	    struct ctfile_parse_state *, struct fnode *, int *, int, int);
@@ -727,88 +729,3 @@ ct_extract_file_cleanup(struct ct_global_state *state, struct ct_op *op)
 	e_free(&cefa);
 }
 
-/*
- * Cull code.
- */
-int
-ct_cull_add_shafile(const char *file, const char *cachedir)
-{
-	struct ctfile_parse_state	xs_ctx;
-	char				*ct_next_filename;
-	char				*ct_filename_free = NULL;
-	char				*cachename;
-	int				ret;
-
-	CNDBG(CT_LOG_TRANS, "processing [%s]", file);
-
-	/*
-	 * XXX - should we keep a list of added files,
-	 * since we do files based on the list and 'referenced' files?
-	 * rather than operating on files multiple times?
-	 * might be useful for marking files at 'do not delete'
-	 * (depended on by other MD archives.
-	 */
-
-next_file:
-	ct_next_filename = NULL;
-
-	/* filename may be absolute, or in cache dir */
-	if (ct_absolute_path(file)) {
-		cachename = e_strdup(file);
-	} else {
-		e_asprintf(&cachename, "%s%s", cachedir, file);
-	}
-
-	ret = ctfile_parse_init(&xs_ctx, cachename, cachedir);
-	e_free(&cachename);
-	CNDBG(CT_LOG_CTFILE, "opening [%s]", file);
-
-	if (ret)
-		CFATALX("failed to open %s", file);
-
-	if (ct_filename_free) {
-		e_free(&ct_filename_free);
-	}
-
-	if (xs_ctx.xs_gh.cmg_prevlvl_filename) {
-		CNDBG(CT_LOG_CTFILE, "previous backup file %s\n",
-		    xs_ctx.xs_gh.cmg_prevlvl_filename);
-		ct_next_filename = e_strdup(xs_ctx.xs_gh.cmg_prevlvl_filename);
-		ct_filename_free = ct_next_filename;
-	}
-
-	do {
-		ret = ctfile_parse(&xs_ctx);
-		switch (ret) {
-		case XS_RET_FILE:
-			/* nothing to do, ct_populate_fnode2 is optional now */
-			break;
-		case XS_RET_FILE_END:
-			/* nothing to do */
-			break;
-		case XS_RET_SHA:
-			if (xs_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO)
-				ct_cull_sha_insert(xs_ctx.xs_csha);
-			else
-				ct_cull_sha_insert(xs_ctx.xs_sha);
-			break;
-		case XS_RET_EOF:
-			break;
-		case XS_RET_FAIL:
-			;
-		}
-
-	} while (ret != XS_RET_EOF && ret != XS_RET_FAIL);
-
-	ctfile_parse_close(&xs_ctx);
-
-	if (ret != XS_RET_EOF) {
-		CWARNX("end of archive not hit");
-	} else {
-		if (ct_next_filename) {
-			file = ct_next_filename;
-			goto next_file;
-		}
-	}
-	return (0);
-}

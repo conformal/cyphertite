@@ -26,11 +26,27 @@
 #include <exude.h>
 #include <xmlsd.h>
 
-#include "ct.h"
-#include "ct_db.h"
+#include <ctutil.h>
+#include <ct_socket.h>
 #include "ct_xml.h"
 #include "ct_proto.h"
 
+/*
+ * For use with xmlsd_generate for allocating xml bodies.
+ * The body alloc is done directly instead of in another path so as to
+ * decouple xml size from chunk size.
+ */
+void *
+ct_body_alloc_xml(size_t sz)
+{
+	struct ct_header	 hdr;
+
+	hdr.c_opcode = C_HDR_O_XML;
+	hdr.c_size = sz;
+	/* don't need state here because we're not using shm */
+//	return (ct_body_alloc(NULL, &hdr));
+	return (e_calloc(1, sz));
+}
 
 int
 ct_create_neg(struct ct_header *hdr, void **vbody, int max_trans,
