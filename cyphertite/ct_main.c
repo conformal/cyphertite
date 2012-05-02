@@ -154,7 +154,7 @@ ct_init_eventloop(struct ct_global_state *state)
 {
 
 #if defined(CT_EXT_INIT)
-	CT_EXT_INIT();
+	CT_EXT_INIT(state);
 #endif
 
 	state->ct_db_state = ctdb_setup(state->ct_config->ct_localdb,
