@@ -1175,6 +1175,7 @@ struct ct_extract_state {
 	int			 ces_attr;
 	int			 ces_verbose;
 	int			 ces_follow_symlinks;
+	int			 ces_allfiles;
 	struct dnode		*ces_rootdir;
 	struct dnode		*ces_prevdir;
 	struct dnode		**ces_prevdir_list;
@@ -1189,7 +1190,7 @@ void	ct_file_extract_opento(struct ct_extract_state *, struct dnode *,
 
 struct ct_extract_state *
 ct_file_extract_init(const char *tdir, int attr, int follow_symlinks,
-    int verbose)
+    int verbose, int allfiles)
 {
 	struct ct_extract_state	*ces;
 	char			 tpath[PATH_MAX];
@@ -1201,6 +1202,7 @@ ct_file_extract_init(const char *tdir, int attr, int follow_symlinks,
 	ces->ces_attr = attr;
 	ces->ces_follow_symlinks = follow_symlinks;
 	ces->ces_verbose = verbose;
+	ces->ces_allfiles = allfiles;
 	RB_INIT(&ces->ces_dname_head);
 
 	ces->ces_rootdir->d_num = -3;

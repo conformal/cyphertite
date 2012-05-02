@@ -460,7 +460,7 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 			cca->cca_remotename = (char *)rname;
 		}
 		state->extract_state = ct_file_extract_init(cca->cca_tdir,
-		    0, 0, state->ct_verbose);
+		    0, 0, state->ct_verbose, 0);
 		break;
 	case CT_S_WAITING_SERVER:
 		CNDBG(CT_LOG_FILE, "waiting on remote open");
