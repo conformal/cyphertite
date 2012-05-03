@@ -472,7 +472,11 @@ ct_create_config(void)
 		bzero(answer, sizeof answer);
 		bzero(answer2, sizeof answer2);
 	}
-	secrets_generate(NULL, 0, NULL);
+	CWARNX("Generating crypto secrets file...");
+	if (ct_create_secrets(config.ct_crypto_passphrase,
+	    config.ct_crypto_secrets, NULL, NULL))
+		CFATALX("can't create secrets");
+
 	secrets_generated = 1;
 
 crypto_passphrase:
