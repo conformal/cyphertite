@@ -773,6 +773,7 @@ ct_load_config(char **configfile)
 	config = e_calloc(1, sizeof(*config));
 
 	memcpy(config, &conf, sizeof(*config));
+	config->ct_config_file = e_strdup(*configfile);
 
 	return (config);
 }
@@ -781,6 +782,7 @@ void
 ct_unload_config(char *configfile, struct ct_config *config)
 {
 	e_free(&configfile);
+	e_free(&config->ct_config_file);
 }
 
 void

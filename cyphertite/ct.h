@@ -56,6 +56,7 @@ struct ct_config {
 	char	*ct_crypto_passphrase;
 	char	*ct_polltype;
 	char	*ct_ctfile_cachedir;
+	char	*ct_config_file;
 
 	int	ct_max_trans;
 	int	ct_compress;
