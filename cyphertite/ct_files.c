@@ -522,7 +522,7 @@ ct_sched_backup_file(struct ct_archive_state *cas, struct stat *sb,
 		    flnode->fl_fname);
 	} else {
 		flnode->fl_fname = e_strdup(filename);
-		flnode->fl_parent_dir = ct_archive_get_rootdir(cas);;
+		flnode->fl_parent_dir = ct_archive_get_rootdir(cas);
 		CNDBG(CT_LOG_CTFILE, "parent of %s is not found",
 		    flnode->fl_fname);
 	}
@@ -1198,7 +1198,7 @@ ct_file_extract_init(const char *tdir, int attr, int follow_symlinks,
 
 	ces = e_calloc(1, sizeof(*ces));
 	ces->ces_fd = -1;
-	ces->ces_rootdir = e_calloc(1, sizeof(*ces->ces_rootdir));;
+	ces->ces_rootdir = e_calloc(1, sizeof(*ces->ces_rootdir));
 	ces->ces_attr = attr;
 	ces->ces_follow_symlinks = follow_symlinks;
 	ces->ces_verbose = verbose;
