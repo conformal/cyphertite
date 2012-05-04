@@ -317,7 +317,7 @@ ctfb_follow_path(struct ct_fb_state *cfs, const char *path,
 	if (path == NULL || path[0] == '\0') {
 		CNDBG(CT_LOG_VERTREE, "should go back to /");
 		home = 1;
-	} else if (path[0] == '/') {
+	} else if (ct_absolute_path(path)) {
 		CNDBG(CT_LOG_VERTREE, "absolute path %s", path);
 		absolute = 1;
 	}

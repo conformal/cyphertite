@@ -753,7 +753,7 @@ next_file:
 	ct_next_filename = NULL;
 
 	/* filename may be absolute, or in cache dir */
-	if (file[0] == '/') {
+	if (ct_absolute_path(file)) {
 		cachename = e_strdup(file);
 	} else {
 		e_asprintf(&cachename, "%s%s", cachedir, file);

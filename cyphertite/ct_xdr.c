@@ -820,7 +820,7 @@ ctfile_write_header_entry(struct ctfile_write_state *ctx, char *filename,
 			    parent_dir->d_parent);
 		}
 		hdr.cmh_parent_dir = parent_dir->d_num;
-	} else if (base && filename[0] == '/') {
+	} else if (base && ct_absolute_path(filename)) {
 		/* this is a rooted directory element */
 		hdr.cmh_parent_dir = -2;
 	} else {

@@ -625,6 +625,7 @@ char *ct_user_config_old(void);
 /* ct_files.c: path functions */
 char	*ct_dirname(const char *);
 char	*ct_basename(const char *);
+int	 ct_absolute_path(const char *);
 
 /* ct_ctl.c */
 void			secrets_generate(struct ct_cli_cmd *, int, char **);
