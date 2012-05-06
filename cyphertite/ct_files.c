@@ -1899,7 +1899,7 @@ ct_mknod(struct ct_extract_state *ces, struct fnode *fnode)
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
 
-	if (ct_absolute_path(fnode->fl_sname) {
+	if (ct_absolute_path(fnode->fl_sname)) {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
 		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
