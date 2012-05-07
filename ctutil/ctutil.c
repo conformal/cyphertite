@@ -140,12 +140,12 @@ ct_header_strerror(struct ct_header *h)
 	/* at some future point, having 2d map table might be better. */
 	switch (h->c_opcode) {
 	case C_HDR_O_LOGIN_REPLY:
-		if (h->c_ex_status > nitems(*c_hdr_login_reply_ex_errstrs))
+		if (h->c_ex_status > nitems(c_hdr_login_reply_ex_errstrs))
 			break;
 		errstr = c_hdr_login_reply_ex_errstrs[h->c_ex_status];
 		break;
 	case C_HDR_O_WRITE_REPLY:
-		if (h->c_ex_status > nitems(*c_hdr_write_reply_ex_errstrs))
+		if (h->c_ex_status > nitems(c_hdr_write_reply_ex_errstrs))
 			break;
 		errstr = c_hdr_write_reply_ex_errstrs[h->c_ex_status];
 		break;
