@@ -584,6 +584,92 @@ struct ct_archive_priv {
 	int				 cap_fd;
 };
 
+int
+ct_archive_complete_special(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	state->ct_print_file_start(state->ct_print_state, trans->tr_fl_node);
+	state->ct_print_file_end(state->ct_print_state, trans->tr_fl_node,
+	    state->ct_max_block_size);
+	if (ctfile_write_special(trans->tr_ctfile, trans->tr_fl_node))
+		CWARNX("failed to write special entry for %s",
+		    trans->tr_fl_node->fl_sname);
+	ct_free_fnode(trans->tr_fl_node);
+	trans->tr_fl_node = NULL;
+
+	return (0);
+}
+
+int
+ct_archive_complete_file_start(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	if (ctfile_write_file_start(trans->tr_ctfile, trans->tr_fl_node))
+		CWARNX("header write failed");
+
+	state->ct_print_file_start(state->ct_print_state, trans->tr_fl_node);
+	/* Empty file, or allfiles backup */
+	if (trans->tr_eof == 1 || trans->tr_fl_node->fl_skip_file) {
+		if (ctfile_write_file_end(trans->tr_ctfile,
+		    trans->tr_fl_node))
+			CWARNX("failed to write trailer sha");
+		state->ct_print_file_end(state->ct_print_state,
+		    trans->tr_fl_node, state->ct_max_block_size);
+		state->ct_stats->st_files_completed++;
+		ct_free_fnode(trans->tr_fl_node);
+		trans->tr_fl_node = NULL;
+	}
+	return (0);
+}
+
+int
+ct_archive_complete_write_chunk(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	state->ct_stats->st_chunks_completed++;
+	if (trans->tr_eof < 2) {
+		CNDBG(CT_LOG_CTFILE, "XoX sha sz %d eof %d",
+		    trans->tr_size[(int)trans->tr_dataslot],
+		    trans->tr_eof);
+
+		if (ctfile_write_file_sha(trans->tr_ctfile,
+		    trans->tr_sha, trans->tr_csha, trans->tr_iv) != 0)
+			CWARNX("failed to write sha for %s",
+			    trans->tr_fl_node->fl_sname);
+	}
+
+	if (trans->tr_eof) {
+		if (trans->tr_eof == 2 && ctfile_write_file_pad(
+		    trans->tr_ctfile, trans->tr_fl_node) != 0)
+			CWARNX("failed to pad file for %s",
+			    trans->tr_fl_node->fl_sname);
+		if (ctfile_write_file_end(trans->tr_ctfile,
+		    trans->tr_fl_node) != 0)
+			CWARNX("failed to write trailer for %s",
+			    trans->tr_fl_node->fl_sname);
+		state->ct_print_file_end(state->ct_print_state,
+		    trans->tr_fl_node, state->ct_max_block_size);
+		ct_free_fnode(trans->tr_fl_node);
+		trans->tr_fl_node = NULL;
+	}
+
+	return (0);
+}
+
+int
+ct_archive_complete_done(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	if (trans->tr_ctfile) {
+		ctfile_write_close(trans->tr_ctfile);
+	}
+	if (state->archive_state) {
+		ct_archive_cleanup(state->archive_state);
+		state->archive_state = NULL;
+	}
+	return (1); /* operation is complete */
+}
+
 void
 ct_archive(struct ct_global_state *state, struct ct_op *op)
 {
@@ -723,6 +809,7 @@ loop:
 		cap->cap_curnode->fl_size = 0;
 		ct_trans->tr_state = TR_S_SPECIAL;
 		ct_trans->tr_type = TR_T_SPECIAL;
+		ct_trans->tr_complete = ct_archive_complete_special;
 		ct_trans->tr_eof = 0;
 		ct_queue_first(state, ct_trans);
 		goto next_file;
@@ -783,6 +870,7 @@ loop:
 		ct_trans->tr_fl_node = cap->cap_curnode;
 		ct_trans->tr_state = TR_S_FILE_START;
 		ct_trans->tr_type = TR_T_WRITE_HEADER;
+		ct_trans->tr_complete = ct_archive_complete_file_start;
 		if (cap->cap_curnode->fl_size == 0 ||
 		    cap->cap_curnode->fl_skip_file) {
 			close(cap->cap_fd);
@@ -841,6 +929,7 @@ loop:
 	ct_trans->tr_chsize = rlen;
 	ct_trans->tr_state = TR_S_READ;
 	ct_trans->tr_type = TR_T_WRITE_CHUNK;
+	ct_trans->tr_complete = ct_archive_complete_write_chunk;
 	ct_trans->tr_eof = 0;
 	ct_trans->hdr.c_flags = caa->caa_encrypted ? C_HDR_F_ENCRYPTED : 0;
 	/* update offset */
@@ -911,6 +1000,7 @@ done:
 	ct_trans->tr_ctfile = cap->cap_cws;
 	ct_trans->tr_fl_node = NULL;
 	ct_trans->tr_state = TR_S_DONE;
+	ct_trans->tr_complete = ct_archive_complete_done;
 	ct_trans->tr_eof = 0;
 
 	/* We're done, cleanup local state. */
@@ -919,7 +1009,6 @@ done:
 	if (cap->cap_exclude)
 		ct_match_unwind(cap->cap_exclude);
 	ct_flnode_cleanup(&cap->cap_flist);
-	//ct_cleanup_root_dir();
 	/* cws is cleaned up by the completion handler */
 	e_free(&cap);
 

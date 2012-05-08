@@ -147,6 +147,94 @@ ct_extract_cleanup_queue(struct ct_extract_head *extract_head)
 	}
 }
 
+int
+ct_extract_complete_special(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	ct_file_extract_special(state->extract_state,
+	    trans->tr_fl_node);
+	state->ct_print_file_start(state->ct_print_state,
+	    trans->tr_fl_node);
+	state->ct_print_file_end(state->ct_print_state,
+	    trans->tr_fl_node, state->ct_max_block_size);
+	ct_free_fnode(trans->tr_fl_node);
+	trans->tr_fl_node = NULL;
+
+	return (0);
+}
+
+int
+ct_extract_complete_file_start(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	ct_sha1_setup(&trans->tr_fl_node->fl_shactx);
+	if (ct_file_extract_open(state->extract_state,
+	    trans->tr_fl_node) == 0) {
+		state->ct_print_file_start(state->ct_print_state,
+		    trans->tr_fl_node);
+	} else {
+		CWARN("unable to open file for writing %s",
+		    trans->tr_fl_node->fl_sname);
+		trans->tr_fl_node->fl_skip_file = 1;
+	}
+
+	return (0);
+}
+
+int
+ct_extract_complete_file_read(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	int slot;
+
+	state->ct_stats->st_chunks_completed++;
+	if (trans->tr_fl_node->fl_skip_file == 0) {
+		slot = trans->tr_dataslot;
+		ct_sha1_add(trans->tr_data[slot],
+		    &trans->tr_fl_node->fl_shactx,
+		    trans->tr_size[slot]);
+		ct_file_extract_write(state->extract_state,
+		    trans->tr_fl_node, trans->tr_data[slot],
+		    trans->tr_size[slot]);
+		state->ct_stats->st_bytes_written +=
+		    trans->tr_size[slot];
+	}
+
+	return (0);
+}
+
+int
+ct_extract_complete_file_end(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	if (trans->tr_fl_node->fl_skip_file == 0) {
+		ct_sha1_final(trans->tr_csha,
+		    &trans->tr_fl_node->fl_shactx);
+		if (bcmp(trans->tr_csha, trans->tr_sha,
+		    sizeof(trans->tr_sha)) != 0)
+			CWARNX("extract sha mismatch on %s",
+			    trans->tr_fl_node->fl_sname);
+		ct_file_extract_close(state->extract_state,
+		    trans->tr_fl_node);
+	}
+	ct_free_fnode(trans->tr_fl_node);
+	trans->tr_fl_node = NULL;
+	state->ct_stats->st_files_completed++;
+
+	return (0);
+}
+
+int
+ct_extract_complete_done(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	if (state->extract_state) {
+		ct_file_extract_cleanup(state->extract_state);	
+		state->extract_state = NULL;
+	}
+	return (1);
+}
+
 struct ct_extract_priv {
 	struct ct_extract_head		 extract_head;
 	struct ctfile_parse_state	 xdr_ctx;
@@ -248,6 +336,13 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			ct_populate_fnode(state->extract_state,
 			    &ex_priv->xdr_ctx, fnode, &trans->tr_state,
 			    ex_priv->allfiles, cea->cea_strip_slash);
+			if (trans->tr_state == TR_S_EX_SPECIAL) {
+				trans->tr_complete =
+				    ct_extract_complete_special;
+			} else {
+				trans->tr_complete =
+				    ct_extract_complete_file_start;
+			}
 
 			ex_priv->doextract = !ct_match(ex_priv->inc_match,
 			    fnode->fl_sname);
@@ -321,6 +416,7 @@ skip:
 				CNDBG(CT_LOG_SHA, "extracting sha %s", shat);
 			}
 			trans->tr_state = TR_S_EX_SHA;
+			trans->tr_complete = ct_extract_complete_file_read;
 			trans->tr_dataslot = 0;
 			ct_queue_first(state, trans);
 			break;
@@ -336,6 +432,7 @@ skip:
 			bcopy(ex_priv->xdr_ctx.xs_trl.cmt_sha, trans->tr_sha,
 			    sizeof(trans->tr_sha));
 			trans->tr_state = TR_S_EX_FILE_END;
+			trans->tr_complete = ct_extract_complete_file_end;
 			trans->tr_fl_node->fl_size =
 			    ex_priv->xdr_ctx.xs_trl.cmt_orig_size;
 			ct_queue_first(state, trans);
@@ -405,6 +502,7 @@ we_re_done_here:
 				e_free(&ex_priv);
 				op->op_priv = NULL;
 				trans->tr_state = TR_S_DONE;
+				trans->tr_complete = ct_extract_complete_done;
 				/*
 				 * Technically this should be a local
 				 * transaction. However, since we are done
@@ -480,6 +578,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			ctfile_parse_close(&ex_priv->xdr_ctx);
 			e_free(&ex_priv);
 			trans->tr_state = TR_S_DONE;
+			trans->tr_complete = ct_extract_complete_done;
 			ct_queue_first(state, trans);
 			CNDBG(CT_LOG_TRANS, "extract finished");
 			ct_set_file_state(state, CT_S_FINISHED);
@@ -509,6 +608,13 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			ct_populate_fnode(state->extract_state,
 			    &ex_priv->xdr_ctx, trans->tr_fl_node,
 			    &trans->tr_state, 0, 1);
+			if (trans->tr_state == TR_S_EX_SPECIAL) {
+				trans->tr_complete =
+				    ct_extract_complete_special;
+			} else {
+				trans->tr_complete =
+				    ct_extract_complete_file_start;
+			}
 
 			/* XXX Check filename matches what we expect */
 			e_free(&trans->tr_fl_node->fl_sname);
@@ -542,6 +648,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 				CNDBG(CT_LOG_SHA, "extracting sha %s", shat);
 			}
 			trans->tr_state = TR_S_EX_SHA;
+			trans->tr_complete = ct_extract_complete_file_read;
 			trans->tr_dataslot = 0;
 			break;
 		case XS_RET_FILE_END:
@@ -552,6 +659,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			bcopy(ex_priv->xdr_ctx.xs_trl.cmt_sha, trans->tr_sha,
 			    sizeof(trans->tr_sha));
 			trans->tr_state = TR_S_EX_FILE_END;
+			trans->tr_complete = ct_extract_complete_file_end;
 			trans->tr_fl_node->fl_size =
 			    ex_priv->xdr_ctx.xs_trl.cmt_orig_size;
 			/* Done now, don't parse further. */

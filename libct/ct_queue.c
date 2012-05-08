@@ -1180,10 +1180,10 @@ ct_process_completions(void *vctx)
 		CNDBG(CT_LOG_TRANS,
 		    "completing trans %" PRIu64 " pkt id: %" PRIu64"",
 		    trans->tr_trans_id, state->ct_packet_id);
-		if (trans->hdr.c_flags & C_HDR_F_METADATA) {
-			ct_complete_metadata(state, trans);
-		} else {
-			ct_complete_normal(state, trans);
+		if (trans->tr_complete(state, trans) != 0) {
+			/* do we have more operations queued up? */
+			if (ct_op_complete(state) != 0)
+				ct_shutdown(state);
 		}
 		ct_trans_free(state, trans);
 
@@ -1353,16 +1353,8 @@ ct_handle_read_reply(struct ct_global_state *state, struct ct_trans *trans,
 		CNDBG(CT_LOG_NET, "c_flags on reply %x", hdr->c_flags);
 		/* read failure for ctfiles just means eof */
 		if (hdr->c_flags & C_HDR_F_METADATA) {
-			if (ct_get_file_state(state) != CT_S_FINISHED) {
-				ct_set_file_state(state, CT_S_FINISHED);
-				trans->tr_state = TR_S_EX_FILE_END;
-			} else {
-				/*
-				 * We had two ios in flight when we hit eof.
-				 * We're already closing so just carry on
-				 */
-				trans->tr_state = TR_S_XML_CLOSED;
-			}
+			ctfile_extract_handle_eof(state, trans);
+			goto out;
 		} else {
 			/* any other read failure is bad */
 			ct_sha1_encode(trans->tr_sha, shat);
@@ -1379,6 +1371,8 @@ ct_handle_read_reply(struct ct_global_state *state, struct ct_trans *trans,
 	trans->tr_size[slot] = trans->hdr.c_size = hdr->c_size;
 	trans->hdr.c_flags = hdr->c_flags;
 	state->ct_stats->st_bytes_read += trans->tr_size[slot];
+
+out:
 
 	ct_queue_transfer(state, trans);
 	ct_header_free(NULL, hdr);

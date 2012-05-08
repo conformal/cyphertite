@@ -51,4 +51,6 @@ void ct_setup_wakeup_write(struct ct_event_state *, void *, ct_func_cb *);
 void ct_setup_wakeup_complete(struct ct_event_state *, void *, ct_func_cb *);
 void ct_set_reconnect_timeout(struct ct_event_state *, int);
 
+void ctfile_extract_handle_eof(struct ct_global_state *, struct ct_trans *);
+
 #endif /* ! CT_INTERNAL_H */

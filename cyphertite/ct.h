@@ -42,7 +42,6 @@
 extern char		*__progname;
 extern int		ct_skip_xml_negotiate;
 
-
 /* what are we doing? */
 extern int		ct_action;
 #define CT_A_ARCHIVE	(1)

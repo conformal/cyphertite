@@ -1096,6 +1096,13 @@ ct_cmp_logincache(struct ct_login_cache *f1, struct ct_login_cache *f2)
 /*
  * MD content listing code.
  */
+int
+ct_list_complete_done(struct ct_global_state *state, struct ct_trans *trans)
+{
+	/* nothing to clean up, this is a fake */
+	return (1);
+}
+
 void
 ct_list_op(struct ct_global_state *state, struct ct_op *op)
 {
@@ -1119,6 +1126,7 @@ ct_list_op(struct ct_global_state *state, struct ct_op *op)
 		return;
 	}
 	trans->tr_state = TR_S_DONE;
+	trans->tr_complete = ct_list_complete_done;
 	ct_queue_first(state, trans);
 	ct_set_file_state(state, CT_S_FINISHED);
 }

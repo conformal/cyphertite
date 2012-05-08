@@ -65,6 +65,30 @@ ctfile_op_cleanup(struct ct_global_state *state, struct ct_op *op)
 	e_free(&cca->cca_remotename);
 }
 
+int
+ctfile_complete_noop(struct ct_global_state *state, struct ct_trans *trans)
+{
+	return (0);
+}
+
+int
+ctfile_complete_noop_final(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	return (1);
+}
+
+int
+ctfile_archive_complete_write(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	if (trans->tr_eof != 0) {
+		ct_free_fnode(trans->tr_fl_node);
+		trans->tr_fl_node = NULL;
+	}
+	return (0);
+}
+
 struct ctfile_archive_state {
 	FILE		*cas_handle;
 	struct fnode	*cas_fnode;
@@ -166,6 +190,7 @@ loop:
 
 		ct_trans->tr_fl_node = NULL;
 		ct_trans->tr_state = TR_S_XML_CLOSE;
+		ct_trans->tr_complete = ctfile_complete_noop_final;
 		ct_trans->tr_eof = 1;
 		ct_trans->hdr.c_flags = C_HDR_F_METADATA;
 		ct_trans->tr_ctfile_name = rname;
@@ -197,6 +222,7 @@ loop:
 	ct_trans->tr_fl_node = cas->cas_fnode;
 	ct_trans->tr_chsize = ct_trans->tr_size[0] = rlen;
 	ct_trans->tr_state = TR_S_READ;
+	ct_trans->tr_complete = ctfile_archive_complete_write;
 	ct_trans->tr_type = TR_T_WRITE_CHUNK;
 	ct_trans->tr_eof = 0;
 	ct_trans->hdr.c_flags = C_HDR_F_METADATA;
@@ -248,6 +274,7 @@ ct_xml_file_open(struct ct_global_state *state, struct ct_trans *trans,
     const char *file, int mode, uint32_t chunkno)
 {
 	trans->tr_state = TR_S_XML_OPEN;
+	trans->tr_complete = ctfile_complete_noop;
 
 	if (ct_create_xml_open(&trans->hdr, (void **)&trans->tr_data[2],
 	    file, mode, chunkno) != 0)
@@ -331,6 +358,7 @@ ct_xml_file_close(struct ct_global_state *state)
 	}
 
 	trans->tr_state = TR_S_XML_CLOSING;
+	trans->tr_complete = ctfile_complete_noop;
 
 	if (ct_create_xml_close(&trans->hdr, (void **)&trans->tr_data[2]) != 0)
 		CFATALX("Could not create xml close packet");
@@ -338,6 +366,29 @@ ct_xml_file_close(struct ct_global_state *state)
 	trans->tr_size[2] = trans->hdr.c_size;
 
 	ct_queue_first(state, trans);
+}
+
+int
+ctfile_extract_complete_open(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	if (ct_file_extract_open(state->extract_state, trans->tr_fl_node) != 0)
+		CFATALX("unable to open file %s", trans->tr_fl_node->fl_name);
+	return (0);
+}
+
+int
+ctfile_extract_complete_read(struct ct_global_state *state, struct ct_trans
+*trans)
+{
+	CNDBG(CT_LOG_FILE, "writing packet sz %d",
+	    trans->tr_size[(int)trans->tr_dataslot]);
+	ct_file_extract_write(state->extract_state,
+	    trans->tr_fl_node, trans->tr_data[(int)trans->tr_dataslot],
+	    trans->tr_size[(int)trans->tr_dataslot]);
+	/* XXX failure? */
+
+	return (0);
 }
 
 struct ctfile_extract_state {
@@ -394,6 +445,7 @@ again:
 		ct_set_file_state(state, CT_S_WAITING_SERVER);
 		return;
 	} else if (ces->ces_is_open == 0) {
+		/* XXX merge mostly into completion of xml open? */
 		ces->ces_is_open = 1;
 		ces->ces_fnode = e_calloc(1, sizeof(*ces->ces_fnode));
 		ces->ces_fnode->fl_type = C_TY_REG;
@@ -410,6 +462,7 @@ again:
 		trans = ct_trans_realloc_local(state, trans);
 		trans->tr_fl_node = ces->ces_fnode;
 		trans->tr_state = TR_S_EX_FILE_START;
+		trans->tr_complete = ctfile_extract_complete_open;
 		trans->hdr.c_flags |= C_HDR_F_METADATA;
 		ct_queue_first(state, trans);
 		goto again;
@@ -417,6 +470,7 @@ again:
 
 	trans->tr_fl_node = ces->ces_fnode;
 	trans->tr_state = TR_S_EX_SHA;
+	trans->tr_complete = ctfile_extract_complete_read;
 	trans->tr_type = TR_T_READ_CHUNK;
 	trans->tr_eof = 0;
 	trans->tr_ctfile_chunkno = ces->ces_block_no++;
@@ -433,78 +487,50 @@ again:
 	ct_queue_first(state, trans);
 }
 
-void
-ct_complete_metadata(struct ct_global_state *state, struct ct_trans *trans)
+int
+ctfile_extract_complete_eof(struct ct_global_state *state,
+    struct ct_trans *trans)
 {
-	int			slot, done = 0, release_fnode = 0;
+	ct_file_extract_close(state->extract_state,
+	    trans->tr_fl_node);
+	ct_file_extract_cleanup(state->extract_state);
+	state->extract_state = NULL;
+	ct_free_fnode(trans->tr_fl_node);
 
-	switch(trans->tr_state) {
-	case TR_S_EX_FILE_START:
-		/* XXX can we recover from this? */
-		if (ct_file_extract_open(state->extract_state,
-		    trans->tr_fl_node) != 0)
-			CFATALX("unable to open file %s",
-			    trans->tr_fl_node->fl_name);
-		break;
-	case TR_S_EX_READ:
-	case TR_S_EX_DECRYPTED:
-	case TR_S_EX_UNCOMPRESSED:
-		if (trans->hdr.c_status == C_HDR_S_OK) {
-			slot = trans->tr_dataslot;
-			CNDBG(CT_LOG_FILE, "writing packet sz %d",
-			    trans->tr_size[slot]);
-			ct_file_extract_write(state->extract_state,
-			    trans->tr_fl_node, trans->tr_data[slot],
-			    trans->tr_size[slot]);
-		} else {
-			ct_set_file_state(state, CT_S_FINISHED);
-		}
-		break;
+	return (1); /* we are done here */
+}
 
-	case TR_S_DONE:
-		/* More operations to be done? */
-		if (ct_op_complete(state))
-			done = 1;
+/*
+ * deal with the oddities of the ctfile extract protocol. Called from the
+ * read handler for ctfile when the server returns an error.
+ */
+void
+ctfile_extract_handle_eof(struct ct_global_state *state, struct ct_trans *trans)
+{
+	if (ct_get_file_state(state) != CT_S_FINISHED) {
+		ct_set_file_state(state, CT_S_FINISHED);
+		trans->tr_state = TR_S_XML_CLOSING;
+		trans->tr_complete = ctfile_extract_complete_eof;
 
-		/* Clean up reconnect name, shared between all trans */
-		if (trans->tr_ctfile_name != NULL)
-			e_free(&trans->tr_ctfile_name);
-
-		if (!done)
-			return;
-		ct_shutdown(state);
-		break;
-	case TR_S_WMD_READY:
-		if (trans->tr_eof != 0)
-			release_fnode = 1;
-	case TR_S_XML_OPEN:
-	case TR_S_XML_CLOSING:
-	case TR_S_XML_CLOSED:
-	case TR_S_XML_OPENED:
-	case TR_S_READ:
-		break;
-	case TR_S_EX_FILE_END:
-		ct_file_extract_close(state->extract_state,
-		    trans->tr_fl_node);
-		ct_file_extract_cleanup(state->extract_state);
-		state->extract_state = NULL;
-		release_fnode = 1;
-		/* FALLTHROUGH */
-	case TR_S_XML_CLOSE:
-		CNDBG(CT_LOG_FILE, "eof reached, closing file");
-		ct_xml_file_close(state);
-		break;
-
-	case TR_S_XML_CULL_REPLIED:
-		ct_wakeup_file(state->event_state);
-		break;
-	default:
-		CABORTX("unexpected tr state in %s %d", __func__,
-		    trans->tr_state);
+		if (ct_create_xml_close(&trans->hdr,
+		    (void **)&trans->tr_data[2]) != 0)
+			CFATALX("Could not create xml close packet");
+		trans->tr_dataslot = 2;
+		trans->tr_size[2] = trans->hdr.c_size;
+	} else {
+		trans->tr_complete = ctfile_complete_noop;
+		/*
+		 * We had > 1 ios in flight when we hit eof.
+		 * We're already closing so just carry on and complete/free
+		 * these when we're done.
+		 * luckily since server requests complete in order these will
+		 * all complete *before* the xml close above, despite having a
+		 * higher sequence number. Therefore when we complete and
+		 * free the transactions these trans will not be leaked.
+		 */
+		trans->tr_state = TR_S_XML_CLOSED;
 	}
-
-	if (release_fnode != 0)
-		ct_free_fnode(trans->tr_fl_node);
+	/* queuing is handled by the caller. */
 }
 
 void
@@ -521,6 +547,7 @@ ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 	if (ct_create_xml_list(&trans->hdr, (void **)&trans->tr_data[2]) != 0)
 		CFATALX("Could not create xml list packet");
 	trans->tr_dataslot = 2;
+	trans->tr_complete = ctfile_complete_noop_final;
 	trans->tr_size[2] = trans->hdr.c_size;
 
 	ct_queue_first(state, trans);
@@ -568,6 +595,7 @@ ctfile_delete(struct ct_global_state *state, struct ct_op *op)
 	    rname) != 0)
 		CFATALX("Could not create xml delete packet for %s", rname);
 	trans->tr_dataslot = 2;
+	trans->tr_complete = ctfile_complete_noop_final;
 	trans->tr_size[2] = trans->hdr.c_size;
 
 	e_free(&rname);
@@ -592,6 +620,7 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 		CNDBG(CT_LOG_FILE, "%s opened\n",
 		    filename);
 		e_free(&filename);
+		/* XXX move this to the completion handler? */
 		ct_set_file_state(state, CT_S_RUNNING);
 		ct_wakeup_file(state->event_state);
 		trans->tr_state = TR_S_XML_OPENED;
@@ -723,6 +752,15 @@ int
 ct_cmp_sha(struct sha_entry *d1, struct sha_entry *d2)
 {
 	return bcmp(d1->sha, d2->sha, sizeof (d1->sha));
+}
+
+int
+ct_cull_handle_complete(struct ct_global_state *state, struct ct_trans *trans)
+{
+	if (trans->tr_eof == 0)
+		ct_wakeup_file(state->event_state);
+
+	return (trans->tr_eof != 0);
 }
 
 void
@@ -878,6 +916,7 @@ ct_cull_setup(struct ct_global_state *state, struct ct_op *op)
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = trans->hdr.c_size;
 	trans->tr_state = TR_S_XML_CULL_SEND;
+	trans->tr_complete = ct_cull_handle_complete;
 
 	ct_queue_first(state, trans);
 
@@ -909,6 +948,7 @@ ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = trans->hdr.c_size;
 	trans->tr_state = TR_S_XML_CULL_COMPLETE_SEND;
+	trans->tr_complete = ct_cull_handle_complete;
 	ct_set_file_state(state, CT_S_FINISHED);
 
 	ct_queue_first(state, trans);
@@ -942,6 +982,7 @@ ct_cull_send_shas(struct ct_global_state *state, struct ct_op *op)
 	shacnt -= sha_add;
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = trans->hdr.c_size;
+	trans->tr_complete = ct_cull_handle_complete;
 
 	CNDBG(CT_LOG_SHA, "sending shas [%s]", (char *)trans->tr_data[2]);
 	CNDBG(CT_LOG_SHA, "sending shas len %lu",
