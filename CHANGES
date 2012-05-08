@@ -3,6 +3,11 @@ User visible changes for cyphertite
   A high-security scalable solution for online backups
 ============================================================================
 
+Changes in 1.2.2 (Tue May 08 2012)
+  - Fix bug to prevent crash after disconnect
+  - Massive internal restructuring in preparation for additional changes
+  - Other minor cleanup and bug fixes
+
 Changes in 1.2.1 (Thu Apr 26 2012)
   - Fix a bug in automatic certificate retrieval
   - Improve handling of path splitting
