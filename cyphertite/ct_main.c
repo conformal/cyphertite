@@ -125,7 +125,6 @@ ct_init(struct ct_config *conf, int need_secrets, int verbose)
 	if (conf->ct_io_bw_limit) {
 		conf->ct_io_bw_limit = conf->ct_io_bw_limit * 10 / 7;
 	}
-	assl_initialize();
 	state = ct_setup_state(conf);
 	state->ct_verbose = verbose;
 
@@ -644,6 +643,8 @@ main(int argc, char *argv[])
 	clog_init(1);
 	if (clog_set_flags(CLOG_F_ENABLE | CLOG_F_STDERR))
 		errx(1, "illegal clog flags");
+
+	assl_initialize();
 
 	executablepath = strdup(argv[0]);
 	executablename = basename(executablepath);

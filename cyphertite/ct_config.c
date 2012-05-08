@@ -372,7 +372,6 @@ ct_create_config(void)
 
 	/* Verify username and password are correct before continuing. */
 	state = ct_setup_state(&config);
-	assl_initialize();
 	state->event_state = ct_event_init(state, NULL);
 	state->ct_assl_ctx = ct_ssl_connect(state, 0);
 	if (ct_assl_negotiate_poll(state)) {
