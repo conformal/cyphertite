@@ -31,7 +31,7 @@ RM ?= rm -f
 
 # Compiler and linker flags.
 CPPFLAGS += -DNEED_LIBCLENS -D_PASSWORD_LEN=128
-INCFLAGS += -I. -I$(INCDIR)/clens -I$(LOCALBASE)/ssl/include
+INCFLAGS += -I. -I../ctutil -I$(INCDIR)/clens -I$(LOCALBASE)/ssl/include
 CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(OPTLEVEL) $(DEBUG)
 
 LIB.NAME = ct
