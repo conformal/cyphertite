@@ -43,20 +43,16 @@ endif
 
 # Compiler and linker flags.
 CPPFLAGS += -DNEED_LIBCLENS
-INCFLAGS += -I../ctutil -I$(INCDIR)/clens -I.
+INCFLAGS += -I../ctutil -I../libct -I$(INCDIR)/clens -I.
 CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(OPTLEVEL) $(DEBUG)
-LDLIBS += -L../ctutil/obj -L../ctutil -lctutil -lcurl -lassl -lclog -levent_core
-LDLIBS += -lexude -lshrink -lxmlsd -lexpat -lsqlite3 -llzma -llzo2 -lclens
-LDLIBS += ${LIB.LINKSTATIC} -lssl -lcrypto ${LIB.LINKDYNAMIC} -ldl
-LDLIBS += -ledit -lncurses -lz
+LDLIBS += -L../ctutil/obj -L../ctutil -L../libct/obj -L../libct -lcurl -lassl
+LDLIBS += -lclog -levent_core -lexude -lshrink -lxmlsd -lexpat -lsqlite3 -llzma
+LDLIBS += -llzo2 -lclens ${LIB.LINKSTATIC} -lssl -lcrypto ${LIB.LINKDYNAMIC}
+LDLIBS += -ldl -ledit -lncurses -lz -lct -lctutil
 
 BIN.NAME = cyphertite
 BIN.LINKS = ct cyphertitectl ctctl cyphertitefb ctfb
-BIN.SRCS = ct_main.c ct_ctfile_mode.c ct_files.c ct_util.c ct_queue.c
-BIN.SRCS +=  ct_event.c ct_aes_xts.c ct_crypto.c ct_match.c
-BIN.SRCS += ct_db.c ct_xdr.c ct_bw_lim.c ct_ctl.c ct_ops.c
-BIN.SRCS += ct_config.c ct_config_paths.c ct_ctfile_traverse.c
-BIN.SRCS += ct_fb.c ct_fb_ops.c ct_ctfile_remote.c
+BIN.SRCS = ct_main.c ct_xml.c ct_ctl.c ct_fb.c ct_fb_ops.c $(CT_EXT_SRC)
 BIN.MANPAGES = cyphertite.1 cyphertite.conf.5 cyphertitefb.1 cyphertitectl.1
 BIN.MLINKS  = cyphertite.1 ct.1
 BIN.MLINKS += cyphertitefb.1 ctfb.1
