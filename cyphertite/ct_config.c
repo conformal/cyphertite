@@ -810,7 +810,8 @@ ct_write_config(struct ct_config *config, FILE *f, int save_password,
 		fprintf(f, "#crypto_passphrase\t\t\t=\n");
 
 	if (config->ct_localdb)
-		fprintf(f, "cache_db\t\t\t\t= %s/ct_db\n", config->ct_localdb);
+		fprintf(f, "cache_db\t\t\t\t= %s%cct_db\n", config->ct_localdb,
+		    CT_PATHSEP);
 	else
 		fprintf(f, "#cache_db\t\t\t\t=\n");
 	fprintf(f, "session_compression\t\t\t= lzo\n");
