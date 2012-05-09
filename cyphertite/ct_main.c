@@ -68,8 +68,6 @@ extern char		*__progname;
 int			ct_action = 0;
 void ct_display_queues(struct ct_global_state *);
 void ct_dump_stats(struct ct_global_state *state, FILE *outfh);
-void ct_info_sig(int, short, void *);
-
 
 void
 ct_usage(void)
