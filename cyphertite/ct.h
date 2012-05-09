@@ -61,4 +61,4 @@ extern int		ct_action;
 #define CT_A_JUSTDL	(5)	/* fake option for ctfb */
 
 uint64_t 	ct_get_debugmask(char *);
-void		ct_info_sig(int fd, short event, void *vctx);
+void		ct_info_sig(evutil_socket_t fd, short event, void *vctx);

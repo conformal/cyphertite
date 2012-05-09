@@ -774,7 +774,7 @@ ct_display_assl_stats(struct ct_global_state *state, FILE *outfh)
 }
 
 void
-ct_info_sig(int fd, short event, void *vctx)
+ct_info_sig(evutil_socket_t fd, short event, void *vctx)
 {
 	struct ct_global_state	*state = vctx;
 	ct_display_queues(state);
