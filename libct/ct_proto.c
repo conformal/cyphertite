@@ -40,12 +40,6 @@
 void *
 ct_body_alloc_xml(size_t sz)
 {
-	struct ct_header	 hdr;
-
-	hdr.c_opcode = C_HDR_O_XML;
-	hdr.c_size = sz;
-	/* don't need state here because we're not using shm */
-//	return (ct_body_alloc(NULL, &hdr));
 	return (e_calloc(1, sz));
 }
 
