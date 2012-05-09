@@ -52,7 +52,7 @@ LDLIBS += -ldl -ledit -lncurses -lz -lct -lctutil
 
 BIN.NAME = cyphertite
 BIN.LINKS = ct cyphertitectl ctctl cyphertitefb ctfb
-BIN.SRCS = ct_main.c ct_xml.c ct_ctl.c ct_fb.c ct_fb_ops.c $(CT_EXT_SRC)
+BIN.SRCS = ct_main.c ct_ctl.c ct_fb.c ct_fb_ops.c $(CT_EXT_SRC)
 BIN.MANPAGES = cyphertite.1 cyphertite.conf.5 cyphertitefb.1 cyphertitectl.1
 BIN.MLINKS  = cyphertite.1 ct.1
 BIN.MLINKS += cyphertitefb.1 ctfb.1

@@ -18,7 +18,7 @@ INCDIR?=${LOCALBASE}/include
 .PATH: ${.CURDIR}/../ctutil
 
 PROG= cyphertite
-SRCS= ct_main.c ct_xml.c ct_ctl.c ct_fb.c ct_fb_ops.c $(CT_EXT_SRC)
+SRCS= ct_main.c ct_ctl.c ct_fb.c ct_fb_ops.c $(CT_EXT_SRC)
 MAN= cyphertitectl.1 cyphertite.1 cyphertite.conf.5 cyphertitefb.1
 
 .if ${.CURDIR} == ${.OBJDIR}
