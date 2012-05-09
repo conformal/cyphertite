@@ -19,6 +19,7 @@
 
 #include <inttypes.h>
 #include <unistd.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <dirent.h>
 #include <libgen.h>
