@@ -13,6 +13,11 @@ CFLAGS+=--analyze
 CC=clang
 .endif
 
+LOCALBASE?=/usr/local
+BINDIR?=${LOCALBASE}/bin
+INCDIR?=${LOCALBASE}/include
+.PATH: ${.CURDIR}/../ctutil
+
 LIB=	ct
 SRCS=	ct_match.c ct_proto.c ct_xdr.c ct_db.c ct_trees.c ct_crypto.c
 SRCS+=	ct_aes_xts.c
@@ -26,9 +31,10 @@ INCS+=	ct_proto.h ct_types.h
 
 NOPIC=	nopic
 
-LOCALBASE?=/usr/local
-
 INCFLAGS+= -I${.CURDIR}/../ctutil -I${LOCALBASE}/include -I${.CURDIR}
 CFLAGS+= ${INCFLAGS} ${WARNFLAGS}
+
+analyze: all
+clang: all
 
 .include <bsd.lib.mk>
