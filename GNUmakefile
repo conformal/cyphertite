@@ -1,4 +1,4 @@
-SUBDIRS = ctutil cyphertite
+SUBDIRS = ctutil libct cyphertite
 TARGETS = clean obj install uninstall depend
 
 all: $(SUBDIRS)
