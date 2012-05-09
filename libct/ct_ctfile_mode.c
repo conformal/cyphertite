@@ -23,8 +23,6 @@
 #include <dirent.h>
 #include <libgen.h>
 #include <fcntl.h>
-#include <fnmatch.h>
-#include <regex.h>
 #include <errno.h>
 
 #ifdef NEED_LIBCLENS
