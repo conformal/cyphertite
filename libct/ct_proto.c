@@ -246,8 +246,10 @@ ct_create_exists(struct ct_header *hdr, void **vbody, uint8_t *sha,
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_EXISTS;
 	hdr->c_size = shasz;
-	hdr->c_flags = 0; /* no valid flags for this question */
-
+	/*
+	 * Do not zero out flags, caller often is using this header
+	 * to keep track whether data is currently encrypted etc.
+	 */
 	*vbody = sha;
 
 	return (0);
