@@ -616,6 +616,7 @@ config_generate(struct ct_cli_cmd *c, int argc, char **argv)
 		bzero(answer, sizeof answer);
 		bzero(answer2, sizeof answer2);
 	}
+	ctctl_config = &config;
 	secrets_generate(NULL, 0, NULL);
 	secrets_generated = 1;
 
