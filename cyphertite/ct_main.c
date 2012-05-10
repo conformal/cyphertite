@@ -426,7 +426,7 @@ ct_main(int argc, char **argv)
 			caa.caa_no_cross_mounts = no_cross_mounts;
 			caa.caa_strip_slash = strip_slash;
 			caa.caa_follow_root_symlink = follow_root_symlink;
-			cea.cea_follow_symlinks = follow_symlinks;
+			caa.caa_follow_symlinks = follow_symlinks;
 			caa.caa_max_differentials = conf->ct_max_differentials;
 			if (conf->ct_auto_differential)
 				/*
