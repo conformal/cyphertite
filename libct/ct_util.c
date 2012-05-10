@@ -48,6 +48,7 @@
 #include <ct_ctfile.h>
 #include <ct_lib.h>
 #include <ct_internal.h>
+#include <ct_ext.h>
 
 #ifndef MIN
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
