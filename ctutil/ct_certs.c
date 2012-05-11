@@ -114,13 +114,20 @@ ct_get_cert_bundle(const char *user, const char *pass, char **xml,
 	struct memdesc	chunk;
 	char		*x = NULL;
 	size_t		xs = 0;
+	long		flags;
 
 	/* init mem structure */
 	chunk.memory = NULL;
 	chunk.size = 0;
 
-	/* note that per curl doco this function is not thread safe */
-	curl_global_init(CURL_GLOBAL_ALL);
+	/*
+	 * Per the curl documentation, this function is not thread safe as it
+	 * calls initialization routines of other libraries; This most notably
+	 * causes issues with OpenSSL, so we rely on it having been initalized
+	 * before hand [assl].
+	 */
+	flags = CURL_GLOBAL_ALL & (~CURL_GLOBAL_SSL);
+	curl_global_init(flags);
 
 	c = curl_easy_init();
 	if (c == NULL)
