@@ -591,7 +591,7 @@ ctfb_get(int argc, const char **argv)
 
 	ct_init_eventloop(ctfb_state);
 
-	if (stat(argv[2], &sb) == 0 && (S_ISDIR(sb.st_mode)))
+	if (argc == 3 && stat(argv[2], &sb) == 0 && (S_ISDIR(sb.st_mode)))
 		isdir = 1;
 
 	if (g.gl_matchc > 1 && argc == 3 && isdir == 0) {
