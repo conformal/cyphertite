@@ -46,8 +46,8 @@ CPPFLAGS += -DNEED_LIBCLENS
 INCFLAGS += -I../ctutil -I../libct -I$(INCDIR)/clens -I.
 CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(OPTLEVEL) $(DEBUG)
 LDLIBS += -L../ctutil/obj -L../ctutil -L../libct/obj -L../libct -lct -lctutil
-LDLIBS += -lassl -lexude -lclog -lshrink -lxmlsd -lclens -lexpat -lcurl
-LDLIBS += -lsqlite3 -llzma -llzo2 ${LIB.LINKSTATIC} -lssl -lcrypto
+LDLIBS += -lassl -lexude -lclog -lshrink -lxmlsd -lclens -levent_core -lexpat
+LDLIBS += -lcurl -lsqlite3 -llzma -llzo2 ${LIB.LINKSTATIC} -lssl -lcrypto
 LDLIBS += ${LIB.LINKDYNAMIC} -ldl -ledit -lncurses -lz
 
 BIN.NAME = cyphertite
