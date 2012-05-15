@@ -20,8 +20,6 @@
 #include "ct_types.h"
 #include "ct_db.h"
 
-void	*ct_body_alloc_xml(size_t);
-
 int	ct_create_neg(struct ct_header *, void **, int, int);
 int	ct_parse_neg_reply(struct ct_header *, void *, int *, int *);
 int	ct_create_login(struct ct_header *, void **, const char *, const char *);

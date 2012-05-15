@@ -32,6 +32,8 @@
 #include "ct_xml.h"
 #include "ct_proto.h"
 
+void	*ct_body_alloc_xml(size_t);
+
 /*
  * For use with xmlsd_generate for allocating xml bodies.
  * The body alloc is done directly instead of in another path so as to
