@@ -515,7 +515,8 @@ void			 ct_file_extract_cleanup(struct ct_extract_state *);
 struct ct_archive_state;
 struct ct_archive_state	*ct_archive_init(const char *);
 struct dnode		*ct_archive_get_rootdir(struct ct_archive_state *);
-struct dnode		*ct_archive_insert_dir(struct ct_archive_state *, struct dnode *);
+struct dnode		*ct_archive_insert_dir(struct ct_archive_state *,
+			     struct dnode *);
 struct dnode		*ct_archive_lookup_dir(struct ct_archive_state *,
 			     const char *);
 void			 ct_archive_cleanup(struct ct_archive_state *);
