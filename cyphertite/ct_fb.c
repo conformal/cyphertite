@@ -58,6 +58,8 @@ struct ct_fb_entry	*ctfb_follow_path(struct ct_fb_state *, const char *,
 int			 glob_ctfile(const char *, int,
 			     int (*)(const char *, int), glob_t *, int);
 
+extern char		*ct_getloginbyuid(uid_t);
+
 static inline int
 ct_cmp_entry(struct ct_fb_entry *a, struct ct_fb_entry *b)
 {

@@ -223,7 +223,6 @@ struct ct_global_state	*ct_init(struct ct_config *, int, int,
 void			ct_init_eventloop(struct ct_global_state *);
 void			ct_cleanup(struct ct_global_state *);
 void			ct_cleanup_eventloop(struct ct_global_state *);
-void			ct_cleanup_login_cache(void);
 
 void			ct_compute_sha(void *);
 void			ct_compute_compress(void *);
@@ -427,9 +426,6 @@ void		 ct_nextop(void *);
 int		 ct_op_complete(struct ct_global_state *state);
 ct_op_cb	 ct_archive;
 ct_op_cb	 ct_extract;
-int		 ct_list(const char *, char **, char **, int, const char *,
-		     int, int);
-ct_op_cb	 ct_list_op;
 ct_op_cb	 ctfile_archive;
 ct_op_cb	 ctfile_extract;
 ct_op_cb	 ctfile_op_cleanup;
@@ -465,7 +461,6 @@ void		 ctfile_find_for_operation(struct ct_global_state *, char *,
 		    ctfile_find_callback *, void *, int, int);
 
 ctfile_find_callback	 ctfile_nextop_extract;
-ctfile_find_callback	 ctfile_nextop_list;
 ctfile_find_callback	 ctfile_nextop_archive;
 ctfile_find_callback	 ctfile_nextop_justdl;
 		
@@ -500,6 +495,9 @@ void			 ct_file_extract_close(struct ct_extract_state *,
 void			 ct_file_extract_special(struct ct_extract_state *,
 			     struct fnode *fnode);
 void			 ct_file_extract_cleanup(struct ct_extract_state *);
+int			 ct_populate_fnode(struct ct_extract_state *,
+			     struct ctfile_parse_state *, struct fnode *,
+			     int *, int, int);
 
 /* archive state functions: */
 struct ct_archive_state;
@@ -514,8 +512,6 @@ void			 ct_archive_cleanup(struct ct_archive_state *);
 
 /* length of a ctfile tag's time string */
 #define			TIMEDATA_LEN	17	/* including NUL */
-
-
 
 int			ct_get_answer(char *, char *, char *, char *, char *,
 			    size_t, int);
@@ -532,8 +528,6 @@ struct ctfile_gheader;
 void			ct_print_ctfile_info(const char *,
 			    struct ctfile_gheader *);
 
-/* Probably doesn't belong here */
-char			*ct_getloginbyuid(uid_t);
 
 /* FreeBSD 7 doesn't have openat() */
 #if defined(__FreeBSD__) &&  (__FreeBSD_version < 800000)

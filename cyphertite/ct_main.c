@@ -29,6 +29,7 @@
 #include <errno.h>
 #include <locale.h>
 #include <libgen.h>
+#include <pwd.h>
 
 #include <assl.h>
 #include <clog.h>
@@ -69,6 +70,13 @@ extern char		*__progname;
 int			ct_action = 0;
 void ct_display_queues(struct ct_global_state *);
 void ct_dump_stats(struct ct_global_state *state, FILE *outfh);
+
+char			*ct_getloginbyuid(uid_t);
+void			ct_cleanup_login_cache(void);
+int		 ct_list(const char *, char **, char **, int, const char *,
+		     int, int);
+ct_op_cb	 ct_list_op;
+ctfile_find_callback	 ctfile_nextop_list;
 
 void
 ct_usage(void)
@@ -521,6 +529,7 @@ ct_main(int argc, char **argv)
 
 	if (verbose_ratios)
 		ct_dump_stats(state, stdout);
+	ct_cleanup_login_cache();
 	ct_cleanup(state);
 out:
 	if (includelist && freeincludes == 1)
@@ -785,3 +794,249 @@ ct_info_sig(evutil_socket_t fd, short event, void *vctx)
 	struct ct_global_state	*state = vctx;
 	ct_display_queues(state);
 }
+
+struct ct_login_cache {
+	RB_ENTRY(ct_login_cache)	 lc_next;
+	uid_t				 lc_uid;
+	char				*lc_name;
+};
+
+
+int ct_cmp_logincache(struct ct_login_cache *, struct ct_login_cache *);
+
+RB_HEAD(ct_login_cache_tree, ct_login_cache) ct_login_cache =
+     RB_INITIALIZER(&login_cache);
+
+#define MAX_LC_CACHE_SIZE 100
+int ct_login_cache_size;
+
+RB_PROTOTYPE(ct_login_cache_tree, ct_login_cache, lc_next, ct_cmp_logincache);
+RB_GENERATE(ct_login_cache_tree, ct_login_cache, lc_next, ct_cmp_logincache);
+
+void
+ct_cleanup_login_cache(void)
+{
+	struct ct_login_cache *tmp;
+
+	while ((tmp = RB_ROOT(&ct_login_cache)) != NULL) {
+		RB_REMOVE(ct_login_cache_tree, &ct_login_cache, tmp);
+		e_free(&tmp->lc_name);
+		e_free(&tmp);
+	}
+	ct_login_cache_size  = 0;
+}
+
+char *
+ct_getloginbyuid(uid_t uid)
+{
+	struct passwd *passwd;
+	struct ct_login_cache *entry, search;
+
+	search.lc_uid = uid;
+
+	entry = RB_FIND(ct_login_cache_tree, &ct_login_cache, &search);
+
+	if (entry != NULL) {
+		return entry->lc_name;
+	}
+
+	/* if the cache gets too big, dump all entries and refill. */
+	if (ct_login_cache_size > MAX_LC_CACHE_SIZE) {
+		ct_cleanup_login_cache();
+	}
+
+	/* yes, this even caches negative entries */
+	ct_login_cache_size++;
+
+	entry = e_calloc(1, sizeof(*entry));
+	entry->lc_uid = uid;
+
+	passwd = getpwuid(uid);
+	if (passwd)
+		entry->lc_name = e_strdup(passwd->pw_name);
+	else
+		entry->lc_name = NULL; /* entry not found cache NULL */
+
+	RB_INSERT(ct_login_cache_tree, &ct_login_cache, entry);
+
+	return entry->lc_name;
+}
+
+int
+ct_cmp_logincache(struct ct_login_cache *f1, struct ct_login_cache *f2)
+{
+	return ((f1->lc_uid < f2->lc_uid) ? -1 :
+	    (f1->lc_uid == f2->lc_uid ? 0 : 1));
+}
+
+/*
+ * MD content listing code.
+ */
+void
+ct_list_op(struct ct_global_state *state, struct ct_op *op)
+{
+	struct ct_extract_args	*cea = op->op_args;
+	struct ct_trans		*trans;
+
+	ct_list(cea->cea_local_ctfile, cea->cea_filelist, cea->cea_excllist,
+	    cea->cea_matchmode, cea->cea_ctfile_basedir, cea->cea_strip_slash,
+	    state->ct_verbose);
+	/*
+	 * Technicaly should be a local transaction.
+	 * However, since this is just so that list can fit into the normal
+	 * state machine for async operations and there should be none
+	 * others allocated it doesn't really matter.
+	 */
+	trans = ct_trans_alloc(state);
+	if (trans == NULL) {
+		/* system busy, return (should never happen) */
+		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
+		ct_set_file_state(state, CT_S_WAITING_TRANS);
+		return;
+	}
+	trans->tr_state = TR_S_DONE;
+	ct_queue_first(state, trans);
+	ct_set_file_state(state, CT_S_FINISHED);
+}
+
+int
+ct_list(const char *file, char **flist, char **excludelist, int match_mode,
+    const char *ctfile_basedir, int strip_slash, int verbose)
+{
+	struct ct_extract_state		*ces;
+	struct ctfile_parse_state	 xs_ctx;
+	struct fnode			 fnodestore;
+	uint64_t			 reduction;
+	struct fnode			*fnode = &fnodestore;
+	struct ct_match			*match, *ex_match = NULL;
+	char				*ct_next_filename;
+	char				*sign;
+	int				 state;
+	int				 doprint = 0;
+	int				 ret;
+	char				 shat[SHA_DIGEST_STRING_LENGTH];
+
+	ces = ct_file_extract_init(NULL, 1, 1, verbose, 0);
+	match = ct_match_compile(match_mode, flist);
+	if (excludelist != NULL)
+		ex_match = ct_match_compile(match_mode, excludelist);
+
+	verbose++;	/* by default print something. */
+
+	ct_next_filename = NULL;
+next_file:
+	ret = ctfile_parse_init(&xs_ctx, file, ctfile_basedir);
+	if (ret)
+		CFATALX("failed to open %s", file);
+	ct_print_ctfile_info(file, &xs_ctx.xs_gh);
+
+	if (ct_next_filename)
+		e_free(&ct_next_filename);
+
+	if (xs_ctx.xs_gh.cmg_prevlvl_filename) {
+		CNDBG(CT_LOG_CTFILE, "previous backup file %s\n",
+		    xs_ctx.xs_gh.cmg_prevlvl_filename);
+		ct_next_filename = e_strdup(xs_ctx.xs_gh.cmg_prevlvl_filename);
+	}
+	bzero(&fnodestore, sizeof(fnodestore));
+
+	do {
+		ret = ctfile_parse(&xs_ctx);
+		switch (ret) {
+		case XS_RET_FILE:
+			ct_populate_fnode(ces, &xs_ctx, fnode, &state,
+			    xs_ctx.xs_gh.cmg_flags & CT_MD_MLB_ALLFILES,
+			    strip_slash);
+			doprint = !ct_match(match, fnode->fl_sname);
+			if (doprint && ex_match != NULL &&
+			    !ct_match(ex_match, fnode->fl_sname))
+				doprint = 0;
+			if (doprint) {
+				ct_pr_fmt_file(fnode, verbose);
+				if (!C_ISREG(xs_ctx.xs_hdr.cmh_type) ||
+				    verbose > 2)
+					printf("\n");
+			}
+			if (fnode->fl_hlname)
+				e_free(&fnode->fl_hlname);
+			if (fnode->fl_sname)
+				e_free(&fnode->fl_sname);
+			break;
+		case XS_RET_FILE_END:
+			sign = " ";
+			if (xs_ctx.xs_trl.cmt_comp_size == 0)
+				reduction = 100;
+			else {
+				uint64_t orig, comp;
+				orig = xs_ctx.xs_trl.cmt_orig_size;
+				comp = xs_ctx.xs_trl.cmt_comp_size;
+
+				if (comp <= orig) {
+					reduction = 100 * (orig - comp) / orig;
+				} else  {
+					reduction = 100 * (comp - orig) / orig;
+					if (reduction != 0)
+						sign = "-";
+				}
+			}
+			if (doprint && verbose > 1)
+				printf(" sz: %" PRIu64 " shas: %" PRIu64
+				    " reduction: %s%" PRIu64 "%%\n",
+				    xs_ctx.xs_trl.cmt_orig_size,
+				    xs_ctx.xs_hdr.cmh_nr_shas,
+				    sign, reduction);
+			else if (doprint)
+				printf("\n");
+			break;
+		case XS_RET_SHA:
+			if (!(doprint && verbose > 2)) {
+				if (ctfile_parse_seek(&xs_ctx)) {
+					CFATALX("seek failed");
+				}
+			} else {
+				ct_sha1_encode(xs_ctx.xs_sha, shat);
+				printf(" sha %s\n", shat);
+			}
+			break;
+		case XS_RET_EOF:
+			break;
+		case XS_RET_FAIL:
+			;
+		}
+
+	} while (ret != XS_RET_EOF && ret != XS_RET_FAIL);
+
+	ctfile_parse_close(&xs_ctx);
+
+	if (ret != XS_RET_EOF) {
+		CWARNX("end of archive not hit");
+	} else {
+		if (ct_next_filename) {
+			file = ct_next_filename;
+			goto next_file;
+		}
+	}
+	ct_match_unwind(match);
+	ct_file_extract_cleanup(ces);
+	return (0);
+}
+
+ct_op_cb ctfile_nextop_list_cleanup;
+void
+ctfile_nextop_list(struct ct_global_state *state, char *ctfile, void *args)
+{
+	struct ct_extract_args	*cea = args;
+
+	cea->cea_local_ctfile = ctfile;
+	ct_add_operation(state, ct_list_op, ctfile_nextop_list_cleanup, cea);
+}
+
+void
+ctfile_nextop_list_cleanup(struct ct_global_state *state, struct ct_op *op)
+{
+	struct ct_extract_args	*cea = op->op_args;
+
+	if (cea->cea_local_ctfile)
+		e_free(&cea->cea_local_ctfile);
+}
+

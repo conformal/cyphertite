@@ -397,15 +397,6 @@ ctfile_nextop_extract(struct ct_global_state *state, char *ctfile, void *args)
 }
 
 void
-ctfile_nextop_list(struct ct_global_state *state, char *ctfile, void *args)
-{
-	struct ct_extract_args	*cea = args;
-
-	cea->cea_local_ctfile = ctfile;
-	ct_add_operation(state, ct_list_op, ctfile_nextop_extract_cleanup, cea);
-}
-
-void
 ctfile_nextop_extract_cleanup(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_extract_args	*cea = op->op_args;

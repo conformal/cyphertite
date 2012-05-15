@@ -44,6 +44,8 @@
 #define nitems(_a)      (sizeof((_a)) / sizeof((_a)[0]))
 #endif /* !nitems */
 
+extern void		ct_cleanup_login_cache(void);
+
 /* completion code */
 unsigned char		 complete(EditLine *el, int cb);
 unsigned char		 complete_file(EditLine *, const char *, int,
@@ -390,6 +392,7 @@ ctfb_main(int argc, char *argv[])
 	tok_end(tokenizer);
 	history_end(hist);
 	el_end(el);
+	ct_cleanup_login_cache();
 
 	ct_unload_config(config_file, conf);
 

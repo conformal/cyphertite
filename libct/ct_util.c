@@ -153,7 +153,6 @@ ct_cleanup_eventloop(struct ct_global_state *state)
 	}
 	ctdb_shutdown(state->ct_db_state);
 	state->ct_db_state = NULL;
-	ct_cleanup_login_cache();
 	// XXX: ct_lock_cleanup();
 	CT_LOCK_RELEASE(&state->ct_sha_lock);
 	CT_LOCK_RELEASE(&state->ct_comp_lock);
@@ -699,80 +698,6 @@ ct_print_ctfile_info(const char *filename, struct ctfile_gheader *gh)
 	printf("file: %s version: %d level: %d block size: %d created: %s",
 	    filename, gh->cmg_version, gh->cmg_cur_lvl, gh->cmg_chunk_size,
 	    ctime(&ltime));
-}
-
-struct ct_login_cache {
-	RB_ENTRY(ct_login_cache)	 lc_next;
-	uid_t				 lc_uid;
-	char				*lc_name;
-};
-
-
-int ct_cmp_logincache(struct ct_login_cache *, struct ct_login_cache *);
-
-RB_HEAD(ct_login_cache_tree, ct_login_cache) ct_login_cache =
-     RB_INITIALIZER(&login_cache);
-
-#define MAX_LC_CACHE_SIZE 100
-int ct_login_cache_size;
-
-RB_PROTOTYPE(ct_login_cache_tree, ct_login_cache, lc_next, ct_cmp_logincache);
-RB_GENERATE(ct_login_cache_tree, ct_login_cache, lc_next, ct_cmp_logincache);
-
-void
-ct_cleanup_login_cache(void)
-{
-	struct ct_login_cache *tmp;
-
-	while ((tmp = RB_ROOT(&ct_login_cache)) != NULL) {
-		RB_REMOVE(ct_login_cache_tree, &ct_login_cache, tmp);
-		e_free(&tmp->lc_name);
-		e_free(&tmp);
-	}
-	ct_login_cache_size  = 0;
-}
-
-char *
-ct_getloginbyuid(uid_t uid)
-{
-	struct passwd *passwd;
-	struct ct_login_cache *entry, search;
-
-	search.lc_uid = uid;
-
-	entry = RB_FIND(ct_login_cache_tree, &ct_login_cache, &search);
-
-	if (entry != NULL) {
-		return entry->lc_name;
-	}
-
-	/* if the cache gets too big, dump all entries and refill. */
-	if (ct_login_cache_size > MAX_LC_CACHE_SIZE) {
-		ct_cleanup_login_cache();
-	}
-
-	/* yes, this even caches negative entries */
-	ct_login_cache_size++;
-
-	entry = e_calloc(1, sizeof(*entry));
-	entry->lc_uid = uid;
-
-	passwd = getpwuid(uid);
-	if (passwd)
-		entry->lc_name = e_strdup(passwd->pw_name);
-	else
-		entry->lc_name = NULL; /* entry not found cache NULL */
-
-	RB_INSERT(ct_login_cache_tree, &ct_login_cache, entry);
-
-	return entry->lc_name;
-}
-
-int
-ct_cmp_logincache(struct ct_login_cache *f1, struct ct_login_cache *f2)
-{
-	return ((f1->lc_uid < f2->lc_uid) ? -1 :
-	    (f1->lc_uid == f2->lc_uid ? 0 : 1));
 }
 
 void
