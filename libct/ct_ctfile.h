@@ -18,7 +18,7 @@
 
 #include "ct_types.h"
 
-/* XDR for metadata global hader */
+/* XDR for metadata global header */
 struct ctfile_gheader {
 	int			cmg_beacon;	/* magic marker */
 #define CT_MD_BEACON		(0x43595048)
