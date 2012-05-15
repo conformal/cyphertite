@@ -253,16 +253,6 @@ void ct_wakeup_uncompress(struct ct_event_state *);
 void ct_wakeup_filewrite(struct ct_event_state *);
 void ct_wakeup_complete(struct ct_event_state *);
 
-typedef void (ct_func_cb)(void *);
-void ct_setup_wakeup_file(struct ct_event_state *, void *, ct_func_cb *);
-void ct_setup_wakeup_sha(struct ct_event_state *, void *, ct_func_cb *);
-void ct_setup_wakeup_compress(struct ct_event_state *, void *, ct_func_cb *);
-void ct_setup_wakeup_csha(struct ct_event_state *, void *, ct_func_cb *);
-void ct_setup_wakeup_encrypt(struct ct_event_state *, void *, ct_func_cb *);
-void ct_setup_wakeup_write(struct ct_event_state *, void *, ct_func_cb *);
-void ct_setup_wakeup_complete(struct ct_event_state *, void *, ct_func_cb *);
-void ct_set_reconnect_timeout(struct ct_event_state *, int);
-
 /* break out of event loop */
 void	ct_shutdown(struct ct_global_state *state);
 

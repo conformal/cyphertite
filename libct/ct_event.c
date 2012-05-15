@@ -27,6 +27,7 @@
 #include <exude.h>
 
 #include <ct_lib.h>
+#include <ct_internal.h>
 
 
 #ifdef __linux__
