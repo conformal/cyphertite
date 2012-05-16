@@ -36,7 +36,6 @@ struct ctdb_state {
 	char			*ctdb_dbfile;
 	sqlite3_stmt		*ctdb_stmt_lookup;
 	sqlite3_stmt		*ctdb_stmt_insert;
-	int			 ctdb_verbose;
 	int			 ctdb_crypt;
 	int			 ctdb_genid;
 	int			 ctdb_in_transaction;
@@ -53,7 +52,6 @@ ctdb_setup(const char *path, int crypt_enabled)
 		return (NULL);
 	state = e_calloc(1, sizeof(*state));
 
-	state->ctdb_verbose = 1;
 	state->ctdb_genid = -1;
 	state->ctdb_crypt = crypt_enabled;
 	state->ctdb_dbfile = e_strdup(path);
@@ -103,8 +101,7 @@ ctdb_create(struct ctdb_state *state)
 		    " PRIMARY KEY UNIQUE);",
 		    SHA_DIGEST_LENGTH);
 
-	if (state->ctdb_verbose)
-		CNDBG(CT_LOG_DB, "sql: %s", sql);
+	CNDBG(CT_LOG_DB, "sql: %s", sql);
 	rc = sqlite3_exec(state->ctdb_db, sql, NULL, 0, &errmsg);
 	if (rc) {
 		CWARNX("create failed: %s", errmsg);
@@ -348,7 +345,7 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 		state->ctdb_trans_commit_rem = OPS_PER_TRANSACTION;
 	}
 
-	if (state->ctdb_verbose) {
+	if (clog_mask_is_set(CT_LOG_DB)) {
 		ct_sha1_encode(sha_k, shat);
 		CNDBG(CT_LOG_DB, "looking for bin %s", shat);
 	}
@@ -358,33 +355,32 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 
 	rc = sqlite3_step(stmt);
 	if (rc == SQLITE_DONE) {
-		if (state->ctdb_verbose)
-			CNDBG(CT_LOG_DB, "not found");
+		CNDBG(CT_LOG_DB, "not found");
 		sqlite3_reset(stmt);
 		return rv;
-	} else if (rc != SQLITE_ROW)
+	} else if (rc != SQLITE_ROW) {
 		CFATALX("could not step(%d) %d %d %s",
 		    __LINE__,
 		    rc,
 		    sqlite3_extended_errcode(state->ctdb_db),
 		    sqlite3_errmsg(state->ctdb_db));
+	}
 
-	if (state->ctdb_verbose)
-		CNDBG(CT_LOG_DB, "found");
+	CNDBG(CT_LOG_DB, "found");
 
 	p = (uint8_t *)sqlite3_column_blob(stmt, 0);
 	if (p) {
 		if (sqlite3_column_bytes(stmt, 0) !=
 		    SHA_DIGEST_LENGTH)
 			CFATALX("invalid blob size");
-		if (state->ctdb_verbose) {
+		if (clog_mask_is_set(CT_LOG_DB)) {
 			ct_sha1_encode(p, shat);
 			CNDBG(CT_LOG_DB, "found bin %s", shat);
 		}
 
 		rv = 1;
 		bcopy (p, sha_v, SHA_DIGEST_LENGTH);
-	} else if (state->ctdb_verbose) {
+	} else {
 		CNDBG(CT_LOG_DB, "no bin found");
 	}
 	if (state->ctdb_crypt) {
@@ -393,13 +389,13 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 			if (sqlite3_column_bytes(stmt, 1) !=
 			    CT_IV_LEN)
 				CFATALX("invalid blob size");
-			if (state->ctdb_verbose) {
+			if (clog_mask_is_set(CT_LOG_DB)) {
 				ct_sha1_encode(p, shat);
 				CNDBG(CT_LOG_DB, "found iv (prefix) %s", shat);
 			}
 
 			bcopy (p, iv, CT_IV_LEN);
-		} else if (state->ctdb_verbose) {
+		} else {
 			CNDBG(CT_LOG_DB, "no iv found");
 			rv = 0;
 		}
@@ -458,7 +454,7 @@ ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v, uint8_
 		state->ctdb_trans_commit_rem = OPS_PER_TRANSACTION;
 	}
 
-	if (state->ctdb_verbose) {
+	if (clog_mask_is_set(CT_LOG_DB)) {
 		ct_sha1_encode(sha_k, shatk);
 		if (sha_v == NULL)
 			shatv[0] = '\0';
@@ -483,17 +479,17 @@ ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v, uint8_
 
 	rc = sqlite3_step(stmt);
 	if (rc == SQLITE_DONE) {
-		if (state->ctdb_verbose)
-			CNDBG(CT_LOG_DB, "insert completed");
+		CNDBG(CT_LOG_DB, "insert completed");
 		sqlite3_reset(stmt);
 		rv = 1;
 		return rv;
-	} else if (rc != SQLITE_CONSTRAINT)
+	} else if (rc != SQLITE_CONSTRAINT) { 
 		CWARNX("insert failed %d %d [%s]", rc,
 		    sqlite3_extended_errcode(state->ctdb_db),
 		    sqlite3_errmsg(state->ctdb_db));
-	else if (state->ctdb_verbose)
+	} else  {
 		CNDBG(CT_LOG_DB, "sha already exists");
+	}
 
 	sqlite3_reset(stmt);
 
