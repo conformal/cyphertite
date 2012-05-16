@@ -64,8 +64,46 @@ int			ct_validate_xml_negotiate_xml(struct ct_global_state *,
 char			*ct_getloginbyuid(uid_t);
 
 
+ct_log_ctfile_info_fn		ct_log_ctfile_info_default;
+ct_log_file_start_fn		ct_log_file_start_default;
+ct_log_file_end_fn		ct_log_file_end_default;
+ct_log_file_skip_fn		ct_log_file_skip_default;
+ct_log_traverse_start_fn	ct_log_traverse_start_default;
+ct_log_traverse_end_fn		ct_log_traverse_end_default;
+
+void
+ct_log_ctfile_info_default(void *state, const char *file,
+    struct ctfile_gheader *hdr)
+{
+}
+
+void
+ct_log_file_start_default(void *state, struct fnode *fnode)
+{
+}
+
+void
+ct_log_file_end_default(void *state, struct fnode *fnode, int blocksize)
+{
+}
+
+void
+ct_log_file_skip_default(void *state, struct fnode *fnode)
+{
+}
+
+void
+ct_log_traverse_start_default(void *state, char **filelist)
+{
+}
+
+void
+ct_log_traverse_end_default(void *state, char **filelist)
+{
+}
+
 struct ct_global_state *
-ct_init(struct ct_config *conf, int need_secrets, int verbose,
+ct_init(struct ct_config *conf, int need_secrets,
     void (*info_cb)(evutil_socket_t, short, void *))
 {
 	struct ct_global_state *state;
@@ -80,7 +118,8 @@ ct_init(struct ct_config *conf, int need_secrets, int verbose,
 		conf->ct_io_bw_limit = conf->ct_io_bw_limit * 10 / 7;
 	}
 	state = ct_setup_state(conf);
-	state->ct_verbose = verbose;
+	/* set defaults */
+	ct_set_log_fns(state, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 	state->event_state = ct_event_init(state, ct_reconnect, info_cb);
 
@@ -101,6 +140,49 @@ ct_init(struct ct_config *conf, int need_secrets, int verbose,
 
 	return (state);
 }
+
+int
+ct_set_log_fns(struct ct_global_state *state, void *logst,
+    ct_log_ctfile_info_fn *ctfile_info, ct_log_file_start_fn *log_start,
+    ct_log_file_end_fn *log_end, ct_log_file_skip_fn *log_skip,
+    ct_log_traverse_start_fn *log_traverse_start,
+    ct_log_traverse_end_fn *log_traverse_end)
+{
+	state->ct_print_state = logst;
+
+	if (ctfile_info != NULL)
+		state->ct_print_ctfile_info = ctfile_info;
+	else
+		state->ct_print_ctfile_info = ct_log_ctfile_info_default;
+
+	if (log_start != NULL)
+		state->ct_print_file_start = log_start;
+	else
+		state->ct_print_file_start = ct_log_file_start_default;
+
+	if (log_end != NULL)
+		state->ct_print_file_end = log_end;
+	else
+		state->ct_print_file_end = ct_log_file_end_default;
+
+	if (log_skip != NULL)
+		state->ct_print_file_skip = log_skip;
+	else
+		state->ct_print_file_skip = ct_log_file_skip_default;
+		
+	if (log_traverse_start != NULL) 
+		state->ct_print_traverse_start = log_traverse_start;
+	else
+		state->ct_print_traverse_start = ct_log_traverse_start_default;
+
+	if (log_traverse_end != NULL)
+		state->ct_print_traverse_end = log_traverse_end;
+	else
+		state->ct_print_traverse_end = ct_log_traverse_end_default;
+
+	return (0);
+}
+
 
 void
 ct_init_eventloop(struct ct_global_state *state)
@@ -212,7 +294,7 @@ ct_do_operation(struct ct_config *conf,  ct_op_cb *start, ct_op_cb *complete,
 
 	ct_prompt_for_login_password(conf);
 
-	state = ct_init(conf, need_secrets, 0, NULL);
+	state = ct_init(conf, need_secrets, NULL);
 	ct_add_operation(state, start, complete, args);
 	ct_wakeup_file(state->event_state);
 	if ((ret = ct_event_dispatch(state->event_state)) != 0)
@@ -572,132 +654,6 @@ ct_shutdown(struct ct_global_state *state)
 	ctdb_shutdown(state->ct_db_state);
 	state->ct_db_state = NULL;
 	ct_event_loopbreak(state->event_state);
-}
-
-
-void
-ct_pr_fmt_file(struct fnode *fnode, int verbose)
-{
-	char *loginname;
-	struct group *group;
-	char *link_ty;
-	char filemode[11];
-	char uid[11];
-	char gid[11];
-	time_t ltime;
-	char lctime[26];
-	char *pchr;
-
-	if (verbose == 0)
-		return;
-
-	if (verbose > 1) {
-		switch(fnode->fl_type & C_TY_MASK) {
-		case C_TY_DIR:
-			filemode[0] = 'd'; break;
-		case C_TY_CHR:
-			filemode[0] = 'c'; break;
-		case C_TY_BLK:
-			filemode[0] = 'b'; break;
-		case C_TY_REG:
-			filemode[0] = '-'; break;
-		case C_TY_FIFO:
-			filemode[0] = 'f'; break;
-		case C_TY_LINK:
-			filemode[0] = 'l'; break;
-		case C_TY_SOCK:
-			filemode[0] = 's'; break;
-		default:
-			filemode[0] = '?';
-		}
-		filemode[1] = (fnode->fl_mode & 0400) ? 'r' : '-';
-		filemode[2] = (fnode->fl_mode & 0100) ? 'w' : '-';
-		filemode[3] = (fnode->fl_mode & 0200) ? 'x' : '-';
-		filemode[4] = (fnode->fl_mode & 0040) ? 'r' : '-';
-		filemode[5] = (fnode->fl_mode & 0020) ? 'w' : '-';
-		filemode[6] = (fnode->fl_mode & 0010) ? 'x' : '-';
-		filemode[7] = (fnode->fl_mode & 0004) ? 'r' : '-';
-		filemode[8] = (fnode->fl_mode & 0002) ? 'w' : '-';
-		filemode[9] = (fnode->fl_mode & 0001) ? 'x' : '-';
-		filemode[10] = '\0';
-
-		loginname = ct_getloginbyuid(fnode->fl_uid);
-		if (loginname && (strlen(loginname) < sizeof(uid)))
-			snprintf(uid, sizeof(uid), "%10s", loginname);
-		else
-			snprintf(uid, sizeof(uid), "%-10d", fnode->fl_uid);
-		group = getgrgid(fnode->fl_gid);
-		if (group && (strlen(group->gr_name) < sizeof(gid)))
-			snprintf(gid, sizeof(gid), "%10s", group->gr_name);
-		else
-			snprintf(gid, sizeof(gid), "%-10d", fnode->fl_gid);
-		ltime = fnode->fl_mtime;
-		ctime_r(&ltime, lctime);
-		pchr = strchr(lctime, '\n');
-		if (pchr != NULL)
-			*pchr = '\0'; /* stupid newline on ctime */
-
-		printf("%s %s %s %s ", filemode, uid, gid, lctime);
-	}
-	printf("%s", fnode->fl_sname);
-
-	if (verbose > 1) {
-		/* XXX - translate to guid name */
-		if (C_ISLINK(fnode->fl_type))  {
-			if (fnode->fl_hardlink)  {
-				link_ty = "==";
-			} else {
-				link_ty = "->";
-			}
-			printf(" %s %s", link_ty, fnode->fl_hlname);
-		} else if (C_ISREG(fnode->fl_type)) {
-		}
-	}
-}
-
-void
-ct_print_file_start(struct fnode *fnode, int verbose)
-{
-	if (verbose) {
-		printf("%s\n", fnode->fl_sname);
-		fflush(stdout);
-	}
-}
-
-void
-ct_print_file_end(struct fnode *fnode, int verbose, int block_size)
-{
-	int			compression;
-	int			nrshas;
-
-	if (verbose > 1) {
-		if (fnode->fl_size == 0)
-			compression = 0;
-		else
-			compression = 100 * (fnode->fl_size -
-			    fnode->fl_comp_size) / fnode->fl_size;
-		if (verbose > 2) {
-			nrshas = fnode->fl_size / block_size;
-			if (fnode->fl_size % block_size)
-				nrshas++;
-
-			printf(" shas %d", nrshas);
-		}
-		printf(" (%d%%)\n", compression);
-	} else if (verbose)
-		printf("\n");
-
-}
-
-void
-ct_print_ctfile_info(const char *filename, struct ctfile_gheader *gh)
-{
-	time_t ltime;
-	
-	ltime = gh->cmg_created;
-	printf("file: %s version: %d level: %d block size: %d created: %s",
-	    filename, gh->cmg_version, gh->cmg_cur_lvl, gh->cmg_chunk_size,
-	    ctime(&ltime));
 }
 
 void

@@ -33,6 +33,7 @@
 
 #include <ct_lib.h>
 #include <ct_ctfile.h>
+#include <ct_internal.h>
 
 #ifdef __linux__
 #define xdr_u_int32_t	xdr_uint32_t
@@ -297,7 +298,7 @@ ctfile_cleanup_gheader(struct ctfile_gheader *gh)
 
 int
 ct_basis_setup(const char *basisbackup, char **filelist, int max_differentials,
-    time_t *prev_backup, int verbose)
+    time_t *prev_backup)
 {
 	struct ctfile_parse_state	 xs_ctx;
 	char				 cwd[PATH_MAX], **fptr;
@@ -335,17 +336,11 @@ ct_basis_setup(const char *basisbackup, char **filelist, int max_differentials,
 				rooted = 0;
 		}
 		if (i < xs_ctx.xs_gh.cmg_num_paths || *fptr != NULL) {
-			if (verbose == 0) {
-				CFATALX("list of directories provided does not"
-				    " match list of directories in basis");
-			} else {
 				CWARNX("list of directories provided does not"
 				    " match list of directories in basis:");
 				for (i = 0; i < xs_ctx.xs_gh.cmg_num_paths; i++)
 					CWARNX("%s", xs_ctx.xs_gh.cmg_paths[i]);
 				exit(1);
-			}
-
 		}
 
 		if (rooted == 0 && strcmp(cwd, xs_ctx.xs_gh.cmg_cwd) != 0)

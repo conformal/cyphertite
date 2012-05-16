@@ -128,7 +128,7 @@ main(int argc, char **argv)
 
 	ct_prompt_for_login_password(conf);
 
-	state = ct_init(conf, 0, 0, ct_info_sig);
+	state = ct_init(conf, 0, ct_info_sig);
 
 	char **search;
 	char **exclude;

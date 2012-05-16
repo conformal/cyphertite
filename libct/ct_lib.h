@@ -92,6 +92,16 @@ RB_HEAD(ct_trans_lookup, ct_trans);
 RB_PROTOTYPE(ct_trans_lookup, ct_trans, tr_trans_id, ct_cmp_trans);
 
 
+struct ctfile_gheader;
+typedef		void	(ct_log_ctfile_info_fn)(void *, const char *,
+			    struct ctfile_gheader *);
+typedef		void	(ct_log_file_start_fn)(void *, struct fnode *);
+typedef		void	(ct_log_file_end_fn)(void *, struct fnode *, int);
+typedef		void	(ct_log_file_skip_fn)(void *, struct fnode *);
+typedef		void	(ct_log_traverse_start_fn)(void *, char **);
+typedef		void	(ct_log_traverse_end_fn)(void *, char **);
+typedef		void	(ct_log_chown_failed_fn)(void *, struct fnode *,
+			    struct dnode *);
 
 struct ct_global_state {
 	/* PADs? */
@@ -163,11 +173,18 @@ struct ct_global_state {
 	unsigned char			ct_iv[CT_IV_LEN];
 	unsigned char			ct_crypto_key[CT_KEY_LEN];
 
-	int				ct_verbose;
-
 	struct ct_compress_ctx		*ct_compress_state;
 	struct ct_event_state		*event_state;
 	struct bw_limit_ctx		*bw_limit;
+
+
+	void				*ct_print_state;
+	ct_log_ctfile_info_fn		*ct_print_ctfile_info;
+	ct_log_file_start_fn		*ct_print_file_start;
+	ct_log_file_end_fn		*ct_print_file_end;
+	ct_log_file_skip_fn		*ct_print_file_skip;
+	ct_log_traverse_start_fn	*ct_print_traverse_start;
+	ct_log_traverse_start_fn	*ct_print_traverse_end;
 };
 
 struct ct_global_state *ct_setup_state(struct ct_config *);
@@ -218,8 +235,13 @@ void			ct_reconnect(evutil_socket_t, short, void *);
 int			ct_reconnect_internal(struct ct_global_state *);
 int			ct_assl_negotiate_poll(struct ct_global_state *);
 
-struct ct_global_state	*ct_init(struct ct_config *, int, int,
+struct ct_global_state	*ct_init(struct ct_config *, int,
 			     void (*info_cb)(evutil_socket_t, short, void *));
+int			 ct_set_log_fns(struct ct_global_state *, void *,
+			    ct_log_ctfile_info_fn *, 
+			     ct_log_file_start_fn *, ct_log_file_end_fn *,
+			     ct_log_file_skip_fn *, ct_log_traverse_start_fn *,
+			     ct_log_traverse_end_fn *);
 void			ct_init_eventloop(struct ct_global_state *);
 void			ct_cleanup(struct ct_global_state *);
 void			ct_cleanup_eventloop(struct ct_global_state *);
@@ -375,6 +397,9 @@ struct ct_extract_args {
 	int			 cea_strip_slash;
 	int			 cea_attr;
 	int			 cea_follow_symlinks;
+	void			*cea_log_state;
+	ct_log_chown_failed_fn	*cea_log_chown_failed;
+
 };
 
 struct ct_archive_args {
@@ -474,13 +499,14 @@ struct ct_extract_stack   {
 struct ctfile_parse_state;
 
 void	ct_extract_setup(struct ct_extract_head *, struct ctfile_parse_state *,
-	    const char *, const char *, int *, int);
+	    const char *, const char *, int *);
 void	ct_extract_open_next(struct ct_extract_head *,
-	    struct ctfile_parse_state *, int);
+	    struct ctfile_parse_state *);
 void	ct_extract_cleanup_queue(struct ct_extract_head *);
 
 struct ct_extract_state;
-struct ct_extract_state	*ct_file_extract_init(const char *, int, int, int, int);
+struct ct_extract_state	*ct_file_extract_init(const char *, int, int, int,
+			     void *, ct_log_chown_failed_fn *);
 struct dnode		*ct_file_extract_get_rootdir(struct ct_extract_state *);
 struct dnode		*ct_file_extract_insert_dir(struct ct_extract_state *,
 			     struct dnode *);
@@ -520,13 +546,6 @@ int			ct_prompt_password(char *, char *, size_t, char *,
 
 
 
-/* print file data nicely  this wants to be a callback, really */
-void			ct_pr_fmt_file(struct fnode *fnode, int);
-void			ct_print_file_start(struct fnode *, int);
-void			ct_print_file_end(struct fnode *, int, int);
-struct ctfile_gheader;
-void			ct_print_ctfile_info(const char *,
-			    struct ctfile_gheader *);
 
 
 /* FreeBSD 7 doesn't have openat() */

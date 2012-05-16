@@ -143,8 +143,7 @@ main(int argc, char **argv)
 
 	ct_prompt_for_login_password(conf);
 
-	state = ct_init(conf, 0, 0, ct_info_sig);
-	state->ct_verbose = 2;
+	state = ct_init(conf, 0, ct_info_sig);
 
 	argv++; /* eat program name */
 	ctfile = argv[0]; /* first arg is tag */

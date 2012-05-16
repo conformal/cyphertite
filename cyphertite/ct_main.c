@@ -30,6 +30,7 @@
 #include <locale.h>
 #include <libgen.h>
 #include <pwd.h>
+#include <grp.h>
 
 #include <assl.h>
 #include <clog.h>
@@ -68,9 +69,20 @@ extern char		*__progname;
 
 /* command line flags */
 int			ct_action = 0;
+int			ct_verbose = 0;
+
 void ct_display_queues(struct ct_global_state *);
 void ct_dump_stats(struct ct_global_state *state, FILE *outfh);
 
+ct_log_file_start_fn		ct_pr_fmt_file;
+ct_log_file_end_fn		ct_pr_fmt_file_end;
+ct_log_file_start_fn		ct_print_file_start;
+ct_log_file_end_fn		ct_print_file_end;
+ct_log_file_skip_fn		ct_print_file_skip;
+ct_log_ctfile_info_fn		ct_print_ctfile_info;
+ct_log_traverse_start_fn	ct_print_traverse_start;
+ct_log_traverse_end_fn		ct_print_traverse_end;
+ct_log_chown_failed_fn		ct_print_extract_chown_failed;
 char			*ct_getloginbyuid(uid_t);
 void			ct_cleanup_login_cache(void);
 int		 ct_list(const char *, char **, char **, int, const char *,
@@ -225,7 +237,6 @@ ct_main(int argc, char **argv)
 	int				 follow_root_symlink = 0;
 	int				 follow_symlinks = 0;
 	int				 attr = 0;
-	int				 verbose = 0;
 	int				 verbose_ratios = 0;
 
 	while ((c = getopt(argc, argv,
@@ -303,8 +314,8 @@ ct_main(int argc, char **argv)
 				CFATALX("cannot mix operations, -c -e -t -x");
 			ct_action = CT_A_LIST;
 			break;
-		case 'v':	/* verbose */
-			verbose++;
+		case 'v':
+			ct_verbose++;
 			break;
 		case 'x':
 			if (ct_action)
@@ -392,7 +403,7 @@ ct_main(int argc, char **argv)
 	    conf->ct_ctfile_mode == CT_MDMODE_LOCAL &&
 	    ct_metadata == 0 ) {
 		ret = ct_list(ctfile, includelist, excludelist,
-		    ct_match_mode, NULL, strip_slash, verbose);
+		    ct_match_mode, NULL, strip_slash, ct_verbose);
 		goto out;
 	}
 
@@ -402,12 +413,21 @@ ct_main(int argc, char **argv)
 	    ct_action == CT_A_ARCHIVE || (ct_action == CT_A_LIST &&
 	    conf->ct_ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0));
 
-	state = ct_init(conf, need_secrets, verbose, ct_info_sig);
+	state = ct_init(conf, need_secrets, ct_info_sig);
 	if (conf->ct_crypto_passphrase != NULL &&
 	    conf->ct_secrets_upload != 0) {
 		ct_add_operation(state, ctfile_list_start,
 		    ct_check_secrets_extract, conf->ct_crypto_secrets);
 	}
+
+	if (ct_action == CT_A_EXTRACT)
+		ct_set_log_fns(state, &ct_verbose, ct_print_ctfile_info,
+		    ct_print_file_start, ct_print_file_end, ct_print_file_skip,
+		    ct_print_traverse_start, ct_print_traverse_end);
+	else if (ct_action == CT_A_ARCHIVE)
+		ct_set_log_fns(state, &ct_verbose, ct_print_ctfile_info,
+		    ct_pr_fmt_file, ct_pr_fmt_file_end, ct_print_file_skip,
+		    ct_print_traverse_start, ct_print_traverse_end);
 
 	if (conf->ct_ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
 		switch (ct_action) {
@@ -422,6 +442,9 @@ ct_main(int argc, char **argv)
 			cea.cea_strip_slash = strip_slash;
 			cea.cea_attr = attr;
 			cea.cea_follow_symlinks = follow_symlinks;
+			cea.cea_log_state = &ct_verbose;
+			cea.cea_log_chown_failed =
+			    ct_print_extract_chown_failed;
 			ctfile_find_for_operation(state, ctfile,
 			    ((ct_action == CT_A_EXTRACT)  ?
 			    ctfile_nextop_extract : ctfile_nextop_list),
@@ -512,6 +535,9 @@ ct_main(int argc, char **argv)
 			cea.cea_strip_slash = strip_slash;
 			cea.cea_attr = attr;
 			cea.cea_follow_symlinks = follow_symlinks;
+			cea.cea_log_state = &ct_verbose;
+			cea.cea_log_chown_failed =
+			    ct_print_extract_chown_failed;
 			ct_add_operation(state, ct_extract, NULL, &cea);
 		} else {
 			CWARNX("must specify action");
@@ -589,7 +615,7 @@ main(int argc, char *argv[])
 void
 ct_display_queues(struct ct_global_state *state)
 {
-	if (state->ct_verbose > 1) {
+	if (ct_verbose > 1) {
 		CT_LOCK(&state->ct_sha_lock);
 		CT_LOCK(&state->ct_comp_lock);
 		CT_LOCK(&state->ct_crypt_lock);
@@ -740,7 +766,7 @@ ct_dump_stats(struct ct_global_state *state, FILE *outfh)
 	}
 	print_time_scaled(outfh, "Total Time\t\t\t    ",  &time_delta);
 
-	if (state->ct_verbose > 2) {
+	if (ct_verbose > 2) {
 		fprintf(outfh, "Total chunks\t\t\t%12" PRIu64 "\n",
 		    state->ct_stats->st_chunks_tot);
 		fprintf(outfh, "Bytes crypted\t\t\t%12" PRIu64 "\n",
@@ -793,6 +819,195 @@ ct_info_sig(evutil_socket_t fd, short event, void *vctx)
 {
 	struct ct_global_state	*state = vctx;
 	ct_display_queues(state);
+}
+
+
+/* Printing functions */
+void
+ct_pr_fmt_file(void *state, struct fnode *fnode)
+{
+	int		*verbose = state;
+	char		*loginname;
+	struct group	*group;
+	char		*link_ty, *pchr;
+	char		 filemode[11], uid[11], gid[11], lctime[26];
+	time_t		 ltime;
+
+	if (*verbose == 0)
+		return;
+
+	if (*verbose > 1) {
+		switch(fnode->fl_type & C_TY_MASK) {
+		case C_TY_DIR:
+			filemode[0] = 'd'; break;
+		case C_TY_CHR:
+			filemode[0] = 'c'; break;
+		case C_TY_BLK:
+			filemode[0] = 'b'; break;
+		case C_TY_REG:
+			filemode[0] = '-'; break;
+		case C_TY_FIFO:
+			filemode[0] = 'f'; break;
+		case C_TY_LINK:
+			filemode[0] = 'l'; break;
+		case C_TY_SOCK:
+			filemode[0] = 's'; break;
+		default:
+			filemode[0] = '?';
+		}
+		filemode[1] = (fnode->fl_mode & 0400) ? 'r' : '-';
+		filemode[2] = (fnode->fl_mode & 0100) ? 'w' : '-';
+		filemode[3] = (fnode->fl_mode & 0200) ? 'x' : '-';
+		filemode[4] = (fnode->fl_mode & 0040) ? 'r' : '-';
+		filemode[5] = (fnode->fl_mode & 0020) ? 'w' : '-';
+		filemode[6] = (fnode->fl_mode & 0010) ? 'x' : '-';
+		filemode[7] = (fnode->fl_mode & 0004) ? 'r' : '-';
+		filemode[8] = (fnode->fl_mode & 0002) ? 'w' : '-';
+		filemode[9] = (fnode->fl_mode & 0001) ? 'x' : '-';
+		filemode[10] = '\0';
+
+		loginname = ct_getloginbyuid(fnode->fl_uid);
+		if (loginname && (strlen(loginname) < sizeof(uid)))
+			snprintf(uid, sizeof(uid), "%10s", loginname);
+		else
+			snprintf(uid, sizeof(uid), "%-10d", fnode->fl_uid);
+		group = getgrgid(fnode->fl_gid);
+		if (group && (strlen(group->gr_name) < sizeof(gid)))
+			snprintf(gid, sizeof(gid), "%10s", group->gr_name);
+		else
+			snprintf(gid, sizeof(gid), "%-10d", fnode->fl_gid);
+		ltime = fnode->fl_mtime;
+		ctime_r(&ltime, lctime);
+		pchr = strchr(lctime, '\n');
+		if (pchr != NULL)
+			*pchr = '\0'; /* stupid newline on ctime */
+
+		printf("%s %s %s %s ", filemode, uid, gid, lctime);
+	}
+	printf("%s", fnode->fl_sname);
+
+	if (*verbose > 1) {
+		/* XXX - translate to guid name */
+		if (C_ISLINK(fnode->fl_type))  {
+			if (fnode->fl_hardlink)  {
+				link_ty = "==";
+			} else {
+				link_ty = "->";
+			}
+			printf(" %s %s", link_ty, fnode->fl_hlname);
+		} else if (C_ISREG(fnode->fl_type)) {
+		}
+	}
+}
+
+void
+ct_pr_fmt_file_end(void *state, struct fnode *fnode, int block_size)
+{
+	int	*verbose = state;
+
+	if (*verbose)
+		printf("\n");
+}
+
+void
+ct_print_file_start(void *state, struct fnode *fnode)
+{
+	int	*verbose = state;
+
+	if (*verbose) {
+		printf("%s", fnode->fl_sname);
+		fflush(stdout);
+	}
+}
+
+void
+ct_print_file_end(void *state, struct fnode *fnode, int block_size)
+{
+	int			*verbose = state;
+	int			 compression, nrshas;
+
+	if (*verbose > 1) {
+		if (fnode->fl_size == 0)
+			compression = 0;
+		else
+			compression = 100 * (fnode->fl_size -
+			    fnode->fl_comp_size) / fnode->fl_size;
+		if (*verbose > 2) {
+			nrshas = fnode->fl_size / block_size;
+			if (fnode->fl_size % block_size)
+				nrshas++;
+
+			printf(" shas %d", nrshas);
+		}
+		printf(" (%d%%)\n", compression);
+	} else if (*verbose)
+		printf("\n");
+
+}
+
+void
+ct_print_file_skip(void *state, struct fnode *fnode)
+{
+	int	*verbose = state;
+
+	if (*verbose)
+		CINFO("skipping file based on mtime %s", fnode->fl_sname);
+}
+
+void
+ct_print_ctfile_info(void *state, const char *filename,
+    struct ctfile_gheader *gh)
+{
+	int	*verbose = state;
+	time_t ltime;
+	
+	if (*verbose) {
+		ltime = gh->cmg_created;
+		printf("file: %s version: %d level: %d block size: %d "
+		    "created: %s", filename, gh->cmg_version, gh->cmg_cur_lvl,
+		    gh->cmg_chunk_size, ctime(&ltime));
+	}
+}
+
+void
+ct_print_traverse_start(void *state, char **filelist)
+{
+	int	*verbose = state;
+
+	if (*verbose)
+		CINFO("Generating filelist, this may take a few minutes...");
+}
+
+void
+ct_print_traverse_end(void *state, char **filelist)
+{
+	int	*verbose = state;
+
+	if (*verbose)
+		CINFO("Done! Initiating backup...");
+}
+
+void
+ct_print_extract_chown_failed(void *state, struct fnode *fnode,
+    struct dnode *dnode)
+{
+	int		*verbose = state;
+	const char	*name;
+	const char	*dir = "";
+
+	if (fnode != NULL) {
+		name = fnode->fl_sname;
+	} else {
+		name = dnode->d_name;
+		dir = "directory ";
+	}
+
+	if (errno == EPERM && geteuid() != 0) {
+		if (*verbose)
+			CWARN("can't chown %s\"%s\"", dir, name);
+	} else {
+		CFATAL("can't chown %s\"%s\"", dir, name);
+	}
 }
 
 struct ct_login_cache {
@@ -880,7 +1095,7 @@ ct_list_op(struct ct_global_state *state, struct ct_op *op)
 
 	ct_list(cea->cea_local_ctfile, cea->cea_filelist, cea->cea_excllist,
 	    cea->cea_matchmode, cea->cea_ctfile_basedir, cea->cea_strip_slash,
-	    state->ct_verbose);
+	    ct_verbose);
 	/*
 	 * Technicaly should be a local transaction.
 	 * However, since this is just so that list can fit into the normal
@@ -916,7 +1131,7 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode,
 	int				 ret;
 	char				 shat[SHA_DIGEST_STRING_LENGTH];
 
-	ces = ct_file_extract_init(NULL, 1, 1, verbose, 0);
+	ces = ct_file_extract_init(NULL, 1, 1, 0, NULL, NULL);
 	match = ct_match_compile(match_mode, flist);
 	if (excludelist != NULL)
 		ex_match = ct_match_compile(match_mode, excludelist);
@@ -928,7 +1143,7 @@ next_file:
 	ret = ctfile_parse_init(&xs_ctx, file, ctfile_basedir);
 	if (ret)
 		CFATALX("failed to open %s", file);
-	ct_print_ctfile_info(file, &xs_ctx.xs_gh);
+	ct_print_ctfile_info(&verbose, file, &xs_ctx.xs_gh);
 
 	if (ct_next_filename)
 		e_free(&ct_next_filename);
@@ -952,7 +1167,7 @@ next_file:
 			    !ct_match(ex_match, fnode->fl_sname))
 				doprint = 0;
 			if (doprint) {
-				ct_pr_fmt_file(fnode, verbose);
+				ct_pr_fmt_file(&verbose, fnode);
 				if (!C_ISREG(xs_ctx.xs_hdr.cmh_type) ||
 				    verbose > 2)
 					printf("\n");

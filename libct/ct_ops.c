@@ -27,21 +27,18 @@
 #include <ct_match.h>
 #include <ct_lib.h>
 
-int	ct_populate_fnode(struct ct_extract_state *,
-	    struct ctfile_parse_state *, struct fnode *, int *, int, int);
-
 const uint8_t	 zerosha[SHA_DIGEST_LENGTH];
 
 /*
  * Code for extract.
  */
 static void	ct_extract_setup_queue(struct ct_extract_head *,
-	    struct ctfile_parse_state *, const char *, const char *, int, int);
+	    struct ctfile_parse_state *, const char *, const char *, int);
 
 void
 ct_extract_setup(struct ct_extract_head *extract_head,
     struct ctfile_parse_state *ctx, const char *file,
-    const char *ctfile_basedir, int *is_allfiles, int print)
+    const char *ctfile_basedir, int *is_allfiles)
 {
 	struct ct_extract_stack	*nfile;
 	char			*prevlvl;
@@ -61,24 +58,22 @@ ct_extract_setup(struct ct_extract_head *extract_head,
 
 		ctfile_parse_close(ctx);
 		ct_extract_setup_queue(extract_head, ctx, prevlvl,
-		    ctfile_basedir, *is_allfiles, print);
+		    ctfile_basedir, *is_allfiles);
 
 		e_free(&prevlvl);
 
 		if (*is_allfiles) {
 			ctfile_parse_close(ctx);
 			/* reopen first file */
-			ct_extract_open_next(extract_head, ctx, print);
+			ct_extract_open_next(extract_head, ctx);
 		}
-	} else if (print) {
-		ct_print_ctfile_info(file, &ctx->xs_gh);
 	}
 }
 
 static void
 ct_extract_setup_queue(struct ct_extract_head *extract_head,
     struct ctfile_parse_state *ctx, const char *file,
-    const char *ctfile_basedir, int is_allfiles, int print)
+    const char *ctfile_basedir, int is_allfiles)
 {
 	char			*prevlvl;
 	struct ct_extract_stack	*nfile;
@@ -101,7 +96,7 @@ ct_extract_setup_queue(struct ct_extract_head *extract_head,
 		ctfile_parse_close(ctx);
 
 		ct_extract_setup_queue(extract_head, ctx, prevlvl,
-		    ctfile_basedir, is_allfiles, print);
+		    ctfile_basedir, is_allfiles);
 		e_free(&prevlvl);
 
 	} else if (is_allfiles) {
@@ -113,13 +108,11 @@ ct_extract_setup_queue(struct ct_extract_head *extract_head,
 		nfile = e_malloc(sizeof(*nfile));
 		nfile->filename = e_strdup(file);
 		TAILQ_INSERT_TAIL(extract_head, nfile, next);
-	} else if (print)
-		ct_print_ctfile_info(file, &ctx->xs_gh);
-		
+	}
 }
 
 void
-ct_extract_open_next(struct ct_extract_head *extract_head, struct ctfile_parse_state *ctx, int print)
+ct_extract_open_next(struct ct_extract_head *extract_head, struct ctfile_parse_state *ctx)
 {
 	struct ct_extract_stack *next;
 
@@ -132,8 +125,6 @@ ct_extract_open_next(struct ct_extract_head *extract_head, struct ctfile_parse_s
 		/* Basedir not needed here because we are done with prevlvl */
 		if (ctfile_parse_init(ctx, next->filename, NULL))
 			CFATALX("failed to open %s", next->filename);
-		if (print)
-			ct_print_ctfile_info(next->filename, &ctx->xs_gh);
 
 		if (next->filename)
 			e_free(&next->filename);
@@ -198,10 +189,14 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 		}
 		ct_extract_setup(&ex_priv->extract_head,
 		    &ex_priv->xdr_ctx, ctfile, cea->cea_ctfile_basedir,
-		    &ex_priv->allfiles, state->ct_verbose);
+		    &ex_priv->allfiles);
+		state->ct_print_ctfile_info(state->ct_print_state,
+		    ex_priv->xdr_ctx.xs_filename, &ex_priv->xdr_ctx.xs_gh);
+		
 		state->extract_state = ct_file_extract_init(cea->cea_tdir,
 		    cea->cea_attr,  cea->cea_follow_symlinks,
-		    state->ct_verbose, ex_priv->allfiles);
+		    ex_priv->allfiles, cea->cea_log_state,
+		    cea->cea_log_chown_failed);
 		if (state->ct_max_block_size <
 		    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size)
 			CFATALX("block size negotiated with server %d is "
@@ -321,7 +316,7 @@ skip:
 				bcopy(ex_priv->xdr_ctx.xs_sha, trans->tr_sha,
 				    sizeof(trans->tr_sha));
 			}
-			if (state->ct_verbose) {
+			if (clog_mask_is_set(CT_LOG_SHA)) {
 				ct_sha1_encode(trans->tr_sha, shat);
 				CNDBG(CT_LOG_SHA, "extracting sha %s", shat);
 			}
@@ -383,7 +378,11 @@ skip:
 				ct_trans_free(state, trans);
 				/* reinits ex_priv->xdr_ctx */
 				ct_extract_open_next(&ex_priv->extract_head,
-				    &ex_priv->xdr_ctx, state->ct_verbose);
+				    &ex_priv->xdr_ctx);
+				state->ct_print_ctfile_info(
+				    state->ct_print_state,
+				    ex_priv->xdr_ctx.xs_filename,
+				    &ex_priv->xdr_ctx.xs_gh);
 
 				/* poke file into action */
 				ct_wakeup_file(state->event_state);
@@ -459,7 +458,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			    state->ct_max_block_size,
 			    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size);
 		state->extract_state = ct_file_extract_init(NULL,
-		    0, 0, state->ct_verbose, 0);
+		    0, 0, 0, NULL, NULL);
 		break;
 	case CT_S_FINISHED:
 		return;
@@ -537,7 +536,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 				bcopy(ex_priv->xdr_ctx.xs_sha, trans->tr_sha,
 				    sizeof(trans->tr_sha));
 			}
-			if (state->ct_verbose) {
+			if (clog_mask_is_set(CT_LOG_SHA)) {
 				ct_sha1_encode(trans->tr_sha, shat);
 				CNDBG(CT_LOG_SHA, "extracting sha %s", shat);
 			}

@@ -37,7 +37,7 @@ int			ct_xml_file_open_polled(
 void			ct_xml_file_close(struct ct_global_state *);
 
 int			ct_basis_setup(const char *, char **, int,
-			    time_t *, int);
+			    time_t *);
 void		 	ct_complete_metadata(struct ct_global_state *,
 			    struct ct_trans *);
 

@@ -72,7 +72,7 @@ RB_GENERATE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 
 /* Directory traversal and transformation of generated data */
 static void		 ct_traverse(struct ct_archive_state *, char **,
-			     struct flist_head *, int, int, int, int, int,
+			     struct flist_head *, int, int, int, int,
 			     struct ct_statistics *);
 static int		 ct_sched_backup_file(struct ct_archive_state *,
 			     struct stat *, char *, int, int, int,
@@ -623,7 +623,7 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		if (basisbackup != NULL &&
 		    (nextlvl = ct_basis_setup(basisbackup, filelist,
 		        caa->caa_max_differentials,
-		        &cap->cap_prev_backup_time, state->ct_verbose)) == 0)
+		        &cap->cap_prev_backup_time)) == 0)
 			e_free(&basisbackup);
 
 		if (getcwd(cwd, PATH_MAX) == NULL)
@@ -632,10 +632,12 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		state->archive_state = ct_archive_init(caa->caa_tdir);
 		if (caa->caa_tdir && chdir(caa->caa_tdir) != 0)
 			CFATALX("can't chdir to %s", caa->caa_tdir);
+		state->ct_print_traverse_start(state->ct_print_state, filelist);
 		ct_traverse(state->archive_state, filelist, &cap->cap_flist,
 		    caa->caa_no_cross_mounts, caa->caa_strip_slash,
 		    caa->caa_follow_root_symlink, caa->caa_follow_symlinks,
-		    state->ct_verbose, state->ct_stats);
+		    state->ct_stats);
+		state->ct_print_traverse_end(state->ct_print_state, filelist);
 		if (caa->caa_tdir && chdir(caa->caa_tdir) != 0)
 			CFATALX("can't chdir back to %s", cwd);
 		/*
@@ -752,9 +754,8 @@ loop:
 			    cap->cap_curnode->fl_sname);
 		} else {
 			if (sb.st_mtime < cap->cap_prev_backup_time) {
-				if (state->ct_verbose > 1)
-					CINFO("skipping file based on mtime %s",
-					    cap->cap_curnode->fl_sname);
+				state->ct_print_file_skip(state->ct_print_state,
+				    cap->cap_curnode);
 				cap->cap_curnode->fl_skip_file = 1;
 			}
 		}
@@ -928,8 +929,8 @@ done:
 static void
 ct_traverse(struct ct_archive_state *cas, char **paths,
     struct flist_head *files, int no_cross_mounts, int strip_slash,
-    int follow_root_symlink, int follow_symlinks, int verbose, struct
-    ct_statistics *ct_stats)
+    int follow_root_symlink, int follow_symlinks,
+    struct ct_statistics *ct_stats)
 {
 	FTS			*ftsp;
 	FTSENT			*fe;
@@ -950,12 +951,10 @@ ct_traverse(struct ct_archive_state *cas, char **paths,
 	}
 	if (no_cross_mounts)
 		fts_options |= FTS_XDEV;
+	CWARNX("options =  %d", fts_options);
 	ftsp = fts_open(paths, fts_options, NULL);
 	if (ftsp == NULL)
 		CFATAL("fts_open failed");
-
-	if (verbose)
-		CINFO("Generating filelist, this may take a few minutes...");
 
 	cnt = 0;
 	while ((fe = fts_read(ftsp)) != NULL) {
@@ -1016,8 +1015,6 @@ sched:
 	if (fts_close(ftsp))
 		CFATAL("fts_close failed");
 	gettimeofday(&ct_stats->st_time_scan_end, NULL);
-	if (verbose)
-		CINFO("Done! Initiating backup...");
 }
 
 static char *
@@ -1176,13 +1173,14 @@ s_to_e_type(int mode)
 struct ct_extract_state {
 	int			 ces_fd;
 	int			 ces_attr;
-	int			 ces_verbose;
 	int			 ces_follow_symlinks;
 	int			 ces_allfiles;
 	struct dnode		*ces_rootdir;
 	struct dnode		*ces_prevdir;
 	struct dnode		**ces_prevdir_list;
 	struct d_name_tree	 ces_dname_head;
+	void			*ces_log_state;
+	ct_log_chown_failed_fn	*ces_log_chown_failed;
 };
 
 void	ct_file_extract_nextdir(struct ct_extract_state *, struct fnode *);
@@ -1191,9 +1189,16 @@ void	ct_file_extract_closefrom(struct ct_extract_state *, struct dnode *,
 void	ct_file_extract_opento(struct ct_extract_state *, struct dnode *,
 	    struct dnode *);
 
+void
+ct_file_extract_log_default(void *state, struct fnode *fnode,
+    struct dnode *dnode)
+{
+}
+
 struct ct_extract_state *
 ct_file_extract_init(const char *tdir, int attr, int follow_symlinks,
-    int verbose, int allfiles)
+    int allfiles, void *log_state,
+    ct_log_chown_failed_fn *log_chown_failed)
 {
 	struct ct_extract_state	*ces;
 	char			 tpath[PATH_MAX];
@@ -1204,8 +1209,13 @@ ct_file_extract_init(const char *tdir, int attr, int follow_symlinks,
 	ces->ces_rootdir = e_calloc(1, sizeof(*ces->ces_rootdir));
 	ces->ces_attr = attr;
 	ces->ces_follow_symlinks = follow_symlinks;
-	ces->ces_verbose = verbose;
 	ces->ces_allfiles = allfiles;
+	if (log_chown_failed != NULL) {
+		ces->ces_log_state = log_state;
+		ces->ces_log_chown_failed = log_chown_failed;
+	} else {
+		ces->ces_log_chown_failed = ct_file_extract_log_default;
+	}
 	RB_INIT(&ces->ces_dname_head);
 
 	ces->ces_rootdir->d_num = -3;
@@ -1420,13 +1430,8 @@ ct_file_extract_close(struct ct_extract_state *ces, struct fnode *fnode)
 	safe_mode = S_IRWXU | S_IRWXG | S_IRWXO;
 	if (ces->ces_attr) {
 		if (fchown(ces->ces_fd, fnode->fl_uid, fnode->fl_gid) == -1) {
-			if (errno == EPERM && geteuid() != 0) {
-				if (ces->ces_verbose)
-					CWARN("chown failed: %s",
-					    fnode->fl_sname);
-			} else {
-				CFATAL("chown failed %s", fnode->fl_sname);
-			}
+			ces->ces_log_chown_failed(ces->ces_log_state,
+			    fnode, NULL);
 		} else
 			safe_mode = ~0;
 	}
@@ -1559,15 +1564,8 @@ link_out:
 			if (ces->ces_attr) {
 				/* set the link's ownership */
 				if (ct_chown(ces, fnode, 0) != 0) {
-					if (errno == EPERM && geteuid() != 0) {
-						if (ces->ces_verbose)
-							CWARN("lchown failed:"
-							    " %s",
-							    fnode->fl_sname);
-					} else {
-						CFATAL("lchown failed %s",
-						    fnode->fl_sname);
-					}
+					ces->ces_log_chown_failed(
+					    ces->ces_log_state, fnode, NULL);
 				}
 			}
 		} else  {
@@ -1579,14 +1577,8 @@ link_out:
 		if (ces->ces_attr) {
 			/* XXX should this depend on follow_symlinks? */
 			if (ct_chown(ces, fnode, 1) != 0) {
-				if (errno == EPERM && geteuid() != 0) {
-					if (ces->ces_verbose)
-						CWARN("chown failed: %s",
-						    fnode->fl_sname);
-				} else {
-					CFATAL("chown failed %s",
-					    fnode->fl_sname);
-				}
+				ces->ces_log_chown_failed(ces->ces_log_state,
+				    fnode, NULL);
 			} else
 				safe_mode = ~0;
 		}
@@ -1679,14 +1671,8 @@ ct_file_extract_closefrom(struct ct_extract_state *ces, struct dnode *parent,
 	    child->d_name);
 	if (ces->ces_attr) {
 		if (chown(path, child->d_uid, child->d_gid) == -1) {
-			if (errno == EPERM && geteuid() != 0) {
-				if (ces->ces_verbose)
-					CWARN("can't chown directory: %s",
-					    child->d_name);
-			} else {
-				CFATAL("can't chown directory \"%s\"",
-				    child->d_name);
-			}
+			ces->ces_log_chown_failed(ces->ces_log_state,
+			    NULL, child);
 		} else {
 			safe_mode = ~0;
 		}
@@ -1704,14 +1690,8 @@ ct_file_extract_closefrom(struct ct_extract_state *ces, struct dnode *parent,
 #else
 	if (ces->ces_attr) {
 		if (fchown(child->d_fd, child->d_uid, child->d_gid) == -1) {
-			if (errno == EPERM && geteuid() != 0) {
-				if (ces->ces_verbose)
-					CWARN("can't chown directory: %s",
-					    child->d_name);
-			} else {
-				CFATAL("can't chown directory \"%s\"",
-				    child->d_name);
-			}
+			ces->ces_log_chown_failed(ces->ces_log_state,
+			    NULL, child);
 		} else {
 			safe_mode = ~0;
 		}

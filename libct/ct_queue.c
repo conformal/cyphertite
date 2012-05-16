@@ -1056,7 +1056,9 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 		ct_shutdown(state);
 		break;
 	case TR_S_SPECIAL:
-		ct_print_file_start(fnode, state->ct_verbose);
+		state->ct_print_file_start(state->ct_print_state, fnode);
+		state->ct_print_file_end(state->ct_print_state, fnode,
+		    state->ct_max_block_size);
 		ctfile_write_special(trans->tr_ctfile, fnode);
 		release_fnode = 1;
 		break;
@@ -1064,13 +1066,13 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 		if (ctfile_write_file_start(trans->tr_ctfile, fnode))
 			CWARNX("header write failed");
 
-		ct_print_file_start(fnode, state->ct_verbose);
+		state->ct_print_file_start(state->ct_print_state, fnode);
 		if (trans->tr_eof == 1 || fnode->fl_skip_file) {
 			if (ctfile_write_file_end(trans->tr_ctfile,
 			    trans->tr_fl_node))
 				CWARNX("failed to write trailer sha");
-			ct_print_file_end(fnode, state->ct_verbose,
-			    state->ct_max_block_size);
+			state->ct_print_file_end(state->ct_print_state,
+			    fnode, state->ct_max_block_size);
 			state->ct_stats->st_files_completed++;
 			release_fnode = 1;
 		}
@@ -1092,6 +1094,8 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 				    trans->tr_fl_node);
 			ctfile_write_file_end(trans->tr_ctfile,
 			    trans->tr_fl_node);
+			state->ct_print_file_end(state->ct_print_state,
+			    fnode, state->ct_max_block_size);
 			release_fnode = 1;
 		}
 		break;
@@ -1099,16 +1103,15 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 		ct_sha1_setup(&trans->tr_fl_node->fl_shactx);
 		if (ct_file_extract_open(state->extract_state,
 		    trans->tr_fl_node) == 0) {
-			if (state->ct_verbose) {
-				ct_pr_fmt_file(trans->tr_fl_node,
-				    state->ct_verbose);
-				printf("\n");
-			}
+			state->ct_print_file_start(state->ct_print_state,
+			    trans->tr_fl_node);
 		} else {
 			trans->tr_fl_node->fl_skip_file = 1;
 		}
 		break;
 	case TR_S_EX_FILE_END:
+		state->ct_print_file_end(state->ct_print_state,
+		    trans->tr_fl_node, state->ct_max_block_size);
 		if (trans->tr_fl_node->fl_skip_file == 0) {
 			ct_sha1_final(trans->tr_csha,
 			    &trans->tr_fl_node->fl_shactx);
@@ -1141,10 +1144,10 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 	case TR_S_EX_SPECIAL:
 		ct_file_extract_special(state->extract_state,
 		    trans->tr_fl_node);
-		if (state->ct_verbose) {
-			ct_pr_fmt_file(trans->tr_fl_node, state->ct_verbose);
-			printf("\n");
-		}
+		state->ct_print_file_start(state->ct_print_state,
+		    trans->tr_fl_node);
+		state->ct_print_file_end(state->ct_print_state,
+		    trans->tr_fl_node, state->ct_max_block_size);
 		release_fnode = 1;
 		break;
 	case TR_S_XML_CULL_SEND:
