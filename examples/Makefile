@@ -1,5 +1,7 @@
 .include <bsd.own.mk>
 
-SUBDIR= ctutil libct cyphertite examples
+.if !target(install)
+SUBDIR= remotelist
+.endif
 
 .include <bsd.subdir.mk>
