@@ -16,6 +16,7 @@ CC=clang
 LOCALBASE?=/usr/local
 BINDIR?=${LOCALBASE}/bin
 INCDIR?=${LOCALBASE}/include
+LIBDIR?=${LOCALBASE}/lib
 .PATH: ${.CURDIR}/../ctutil
 
 LIB=	ct
