@@ -23,13 +23,19 @@ MAN= cyphertitectl.1 cyphertite.1 cyphertite.conf.5 cyphertitefb.1
 
 .if ${.CURDIR} == ${.OBJDIR}
 LDADD+= -L${.CURDIR}/../ctutil
+DPADD+= ${.CURDIR}/../ctutil/libctutil.a
 LDADD+= -L${.CURDIR}/../libct
+DPADD+= ${.CURDIR}/../libct/libct.a
 .elif ${.CURDIR}/obj == ${.OBJDIR}
 LDADD+= -L${.CURDIR}/../ctutil/obj
+DPADD+= ${.CURDIR}/../ctutil/obj/libctutil.a
 LDADD+= -L${.CURDIR}/../libct/obj
+DPADD+= ${.CURDIR}/../libct/obj/libct.a
 .else
 LDADD+= -L${.OBJDIR}/../ctutil
+DPADD+= ${.OBJDIR}/../ctutil/libctutil.a
 LDADD+= -L${.OBJDIR}/../libct
+DPADD+= ${.OBJDIR}/../libct/libct.a
 .endif
 
 BUILDVERSION != sh "${.CURDIR}/../buildver.sh"
