@@ -886,8 +886,8 @@ ct_create_xml_cull_complete(struct ct_header *hdr, void **vbody,
 		return (1);
 	};
 
-	xp = xmlsd_create(&xl, "ct_cull_setup");
-	xmlsd_set_attr(xp, "version", CT_CULL_SETUP_VERSION);
+	xp = xmlsd_create(&xl, "ct_cull_complete");
+	xmlsd_set_attr(xp, "version", CT_CULL_COMPLETE_VERSION);
 	xe = xmlsd_add_element(&xl, xp, "cull");
 	xmlsd_set_attr(xe, "type", type);
 	xmlsd_set_attr_uint64(xe, "uuid", cull_uuid);
