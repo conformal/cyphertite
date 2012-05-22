@@ -13,6 +13,8 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+#ifndef CT_LIB_H
+#define CT_LIB_H
 
 #include <ct_types.h>
 #include <ct_socket.h>
@@ -540,3 +542,4 @@ char			*ct_getloginbyuid(uid_t);
 #define CT_NO_OPENAT
 #endif
 
+#endif /* ! CT_LIB_H */

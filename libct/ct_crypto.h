@@ -13,6 +13,8 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+#ifndef CT_CRYPTO_H
+#define CT_CRYPTO_H
 
 #include <openssl/evp.h>
 
@@ -35,3 +37,5 @@ int			ct_unlock_secrets(const char *, const char *, uint8_t *, size_t,
 void			ct_crypt_create_iv(uint8_t *iv, size_t, uint8_t *,
 			    size_t);
 int			ct_crypto_blocksz(void);
+
+#endif /* ! CT_CRYPTO_H */
