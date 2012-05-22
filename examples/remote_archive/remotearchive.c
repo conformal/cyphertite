@@ -81,7 +81,7 @@ remotelist_print(struct ct_global_state *state, struct ct_op *op)
 
 int ct_setup(int flags, int cflags, int debug_mask);
 int 
-ct_do_archive(struct ct_global_state *state, char *ctfile, char **flist,
+ct_do_remoterchive(struct ct_global_state *state, char *ctfile, char **flist,
     char *tdir, char **excludelist, char *includefile, int match_mode,
     int no_cross_mounts, int strip_slash, int follow_root_symlink,
     int follow_symlinks, struct ct_config *conf);
@@ -114,7 +114,7 @@ ct_setup(int flags, int cflags, int debug_mask)
 
 int 
 	
-ct_do_archive(struct ct_global_state *state, char *ctfile, char **flist,
+ct_do_remoterchive(struct ct_global_state *state, char *ctfile, char **flist,
     char *tdir, char **excludelist, char *includefile, int match_mode,
     int no_cross_mounts, int strip_slash, int follow_root_symlink,
     int follow_symlinks, struct ct_config *conf)
@@ -209,7 +209,7 @@ main(int argc, char **argv)
 	argv++; /* skip tag*/
 	flist = argv;
 
-	ct_do_archive(state, ctfile, flist, tdir, excludelist, includefile,
+	ct_do_remoterchive(state, ctfile, flist, tdir, excludelist, includefile,
 	    match_mode, no_cross_mounts, strip_slash, follow_root_symlink,
 	    follow_symlinks, conf);
 
