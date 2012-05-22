@@ -445,7 +445,7 @@ config_generate(struct ct_cli_cmd *c, int argc, char **argv)
 		rv = ct_get_answer(prompt, "yes", "no", "no", answer,
 		    sizeof answer, 0);
 		if (rv == 2) {
-			exit(1);
+			exit(0);
 		}
 	}
 	/*
