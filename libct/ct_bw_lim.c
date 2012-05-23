@@ -69,14 +69,16 @@ ct_ssl_init_bw_lim(struct event_base *base, struct ct_assl_io_ctx *ctx,
 	int			 packet_len;
 
 	blc = e_calloc(1, sizeof(*blc));
+	blc->wakeuptimer_ev = evtimer_new(base, ct_ssl_over_bw_wakeup, ctx);
+	if (blc->wakeuptimer_ev == NULL) {
+		e_free(&blc);
+		return (NULL);
+	}
 	/* 1/4 of the number of bytes to send per timeslot */
 	packet_len = ((io_bw_limit * 1024) / (US_PER_SEC/BW_TIMESLOT))/4;
 	CNDBG(CT_LOG_NET, "packet_len %d",  packet_len);
 	ct_assl_io_ctx_set_maxtrans(ctx, packet_len);
 	ct_assl_io_ctx_set_over_bw_func(ctx, ct_ssl_over_bw_func);
-	blc->wakeuptimer_ev = evtimer_new(base, ct_ssl_over_bw_wakeup, ctx);
-	if (blc->wakeuptimer_ev == NULL)
-		CABORT("unable to allocate bw limit timer");
 
 	blc->single_slot_time.tv_sec = 0;
 	blc->single_slot_time.tv_usec = BW_TIMESLOT;
