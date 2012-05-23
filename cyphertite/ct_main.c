@@ -38,6 +38,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
 
 #include <ctutil.h>
 
@@ -103,6 +104,7 @@ ct_usage(void)
 void
 show_version(void)
 {
+	struct utsname u;
 	const char *fmt = " %s: %s\n";
 
 	fprintf(stderr, "%s %s\n", __progname, vertag);
@@ -116,6 +118,12 @@ show_version(void)
 	fprintf(stderr, fmt, "exude", exude_verstring());
 	fprintf(stderr, fmt, "shrink", shrink_verstring());
 	fprintf(stderr, fmt, "xmlsd", xmlsd_verstring());
+
+	fprintf(stderr, "O/S identification: ");
+	if (uname(&u) == -1)
+		fprintf(stderr, "INVALID\n");
+	else
+		fprintf(stderr, "%s-%s-%s %s\n", u.sysname, u.machine, u.release, u.version);
 }
 
 uint64_t
