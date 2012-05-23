@@ -112,10 +112,8 @@ ct_ssl_over_bw_wakeup(evutil_socket_t fd_unused, short reason, void *varg)
 
 	curdbg->op = 'W';
 
-	if (gettimeofday(&now,NULL)) {
-		CWARN("gettimeofday failed in over_bw_wakeup");
-		return;
-	}
+	if (gettimeofday(&now,NULL))
+		CABORT("bw wakeup gettimeofday");
 	curdbg->io_time = now;
 	curdbg->prev_time = blc->sleep_tv;
 	curdbg->tot_trans = 0;
@@ -162,10 +160,8 @@ ct_ssl_over_bw_func(void *cbarg, struct ct_assl_io_ctx *ioctx)
 	 * the beginning of the next 1/100th of a second.
 	 */
 
-	if (gettimeofday(&now, NULL)) {
-		CWARN("gettimeofday failed in over_bw_lim");
-		return;
-	}
+	if (gettimeofday(&now, NULL))
+		CABORT("bw limit gettimeofday");
 
 	curdbg->io_time = now;
 	curdbg->prev_time = blc->curslottime;
