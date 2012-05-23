@@ -166,8 +166,7 @@ ctfile_trim_cache(const char *cachedir, long long max_size)
 		}
 	}
 
-	if (fts_close(ftsp))
-		CFATAL("close directory failed");
+	(void)fts_close(ftsp);
 
 	if (dirsize <= max_size)
 		return;
@@ -208,6 +207,5 @@ ctfile_trim_cache(const char *cachedir, long long max_size)
 			break;
 	}
 
-	if (fts_close(ftsp))
-		CFATAL("close directory failed");
+	(void)fts_close(ftsp);
 }
