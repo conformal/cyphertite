@@ -104,7 +104,7 @@ ctdb_create(struct ctdb_state *state)
 	CNDBG(CT_LOG_DB, "sql: %s", sql);
 	rc = sqlite3_exec(state->ctdb_db, sql, NULL, 0, &errmsg);
 	if (rc) {
-		CWARNX("create failed: %s", errmsg);
+		CNDBG(CT_LOG_DB, "create failed: %s", errmsg);
 		state->ctdb_db = NULL;
 		return (rc);
 	}
@@ -112,7 +112,7 @@ ctdb_create(struct ctdb_state *state)
 	    "CREATE TABLE mode (crypto TEXT, version INTEGER);");
 	rc = sqlite3_exec(state->ctdb_db, sql, NULL, 0, &errmsg);
 	if (rc) {
-		CWARNX("mode table creation failed");
+		CNDBG(CT_LOG_DB, "mode table creation failed");
 		sqlite3_close(state->ctdb_db);
 		state->ctdb_db = NULL;
 		return (rc);
@@ -122,7 +122,7 @@ ctdb_create(struct ctdb_state *state)
 		state->ctdb_crypt ? 'Y': 'N');
 	rc = sqlite3_exec(state->ctdb_db, sql, NULL, 0, &errmsg);
 	if (rc) {
-		CWARNX("mode table init failed");
+		CNDBG(CT_LOG_DB, "mode table init failed");
 		sqlite3_close(state->ctdb_db);
 		state->ctdb_db = NULL;
 		return (rc);
@@ -132,7 +132,7 @@ ctdb_create(struct ctdb_state *state)
 	    "CREATE TABLE genid (value INTEGER);");
 	rc = sqlite3_exec(state->ctdb_db, sql, NULL, 0, &errmsg);
 	if (rc) {
-		CWARNX("gendi table creation failed");
+		CNDBG(CT_LOG_DB, "gendi table creation failed");
 		sqlite3_close(state->ctdb_db);
 		state->ctdb_db = NULL;
 		return (rc);
@@ -141,7 +141,7 @@ ctdb_create(struct ctdb_state *state)
 	    "insert into genid (value) VALUES (%d);", state->ctdb_genid);
 	rc = sqlite3_exec(state->ctdb_db, sql, NULL, 0, &errmsg);
 	if (rc) {
-		CWARNX("mode table init failed");
+		CNDBG(CT_LOG_DB, "mode table init failed");
 		sqlite3_close(state->ctdb_db);
 		state->ctdb_db = NULL;
 		return (rc);
@@ -159,19 +159,20 @@ ctdb_check_db_mode(struct ctdb_state *state)
 
 	CNDBG(CT_LOG_DB, "ctdb mode %d\n", state->ctdb_crypt);
 	if (sqlite3_prepare_v2(state->ctdb_db, "SELECT crypto FROM mode",
-	    -1, &stmt, NULL))
-		CFATALX("can't prepare mode query statement");
+	    -1, &stmt, NULL)) {
+		CNDBG(CT_LOG_DB, "can't prepare mode query statement");
+		goto fail;
+	}
 	rc = sqlite3_step(stmt);
 	if (rc == SQLITE_DONE) {
 		CNDBG(CT_LOG_DB, "ctdb mode not found");
 		goto fail;
 	} else if (rc != SQLITE_ROW)
-		CFATALX("could not step(%d) %d %d %s",
-		    __LINE__,
-		    rc,
+		CNDBG(CT_LOG_DB, "could not step(%d) %d %d %s",
+		    __LINE__, rc,
 		    sqlite3_extended_errcode(state->ctdb_db),
 		    sqlite3_errmsg(state->ctdb_db));
-
+		goto fail;
 	p = (char *)sqlite3_column_text(stmt, 0);
 	if (p) {
 		wanted =  state->ctdb_crypt ? 'Y' : 'N';
@@ -191,19 +192,19 @@ ctdb_check_db_mode(struct ctdb_state *state)
 
 	if (sqlite3_prepare_v2(state->ctdb_db, "SELECT value FROM genid",
 	    -1, &stmt, NULL)) {
-		CWARNX("old format db detected, reseting db");
+		CNDBG(CT_LOG_DB, "old format db detected, reseting db");
 		goto fail;
 	}
 	rc = sqlite3_step(stmt);
 	if (rc == SQLITE_DONE) {
-		CINFO("ctdb genid not found");
+		CNDBG(CT_LOG_DB, "ctdb genid not found");
 		goto fail;
-	} else if (rc != SQLITE_ROW)
-		CFATALX("could not step(%d) %d %d %s",
-		    __LINE__,
-		    rc,
-		    sqlite3_extended_errcode(state->ctdb_db),
+	} else if (rc != SQLITE_ROW) {
+		CNDBG(CT_LOG_DB, "could not step(%d) %d %d %s", __LINE__,
+		    rc, sqlite3_extended_errcode(state->ctdb_db),
 		    sqlite3_errmsg(state->ctdb_db));
+		goto fail;
+	}
 	curgenid = sqlite3_column_int(stmt, 0);
 
 	if (state->ctdb_genid == -1 || state->ctdb_genid == curgenid) {
@@ -216,8 +217,9 @@ ctdb_check_db_mode(struct ctdb_state *state)
 
 	rv = 1;
 fail:
+	/* not much we can do if this fails */
 	if (sqlite3_finalize(stmt))
-		CFATALX("can't finalize verification lookup");
+		CNDBG(CT_LOG_DB, "can't finalize verification lookup");
 	return rv;
 }
 
@@ -277,9 +279,24 @@ do_retry:
 	}
 
 	if (sqlite3_prepare(state->ctdb_db, psql,
-	    -1, &state->ctdb_stmt_lookup, NULL))
-		CFATALX("can't prepare select statement");
+	    -1, &state->ctdb_stmt_lookup, NULL)) {
+		CNDBG(CT_LOG_DB, "can't prepare select statement");
+		ctdb_cleanup(state);
+		return 1;
+	}
 	CNDBG(CT_LOG_DB, "ctdb_stmt_lookup %p", state->ctdb_stmt_lookup);
+	if (state->ctdb_crypt) {
+		psql = "INSERT INTO digests(sha, csha, iv) values(?, ?, ?)";
+	} else {
+		psql = "INSERT INTO digests(sha) values(?)";
+	}
+	if (sqlite3_prepare_v2(state->ctdb_db, psql,
+	    -1, &state->ctdb_stmt_insert, NULL)) {
+		CNDBG(CT_LOG_DB, "can not prepare insert statement %s", psql);
+		ctdb_cleanup(state);
+		return 1;
+	}
+	CNDBG(CT_LOG_DB, "ctdb_stmt_insert %p", state->ctdb_stmt_insert);
 
 	return 0;
 }
@@ -293,15 +310,15 @@ ctdb_cleanup(struct ctdb_state *state)
 	if (state->ctdb_in_transaction) {
 		state->ctdb_in_transaction = 0;
 		if (sqlite3_exec(state->ctdb_db, "commit", NULL, 0, &errmsg))
-			CFATALX("can't commit %s", errmsg);
+			CNDBG(CT_LOG_DB, "can't commit %s", errmsg);
 	}
 	if (state->ctdb_stmt_lookup != NULL) {
 		if (sqlite3_finalize(state->ctdb_stmt_lookup))
-			CFATALX("can't finalize lookup");
+			CNDBG(CT_LOG_DB, "can't finalize lookup");
 	}
 	if (state->ctdb_stmt_insert != NULL) {
 		if (sqlite3_finalize(state->ctdb_stmt_insert))
-			CFATALX("can't finalize insert");
+			CNDBG(CT_LOG_DB, "can't finalize insert");
 	}
 
 	if (state->ctdb_db != NULL)
@@ -331,16 +348,16 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 	if (state == NULL)
 		return rv;
 
-	if (state->ctdb_stmt_lookup == NULL) {
-		CFATAL("ctdb incorrectly intialized\n");
-	} else
-		stmt = state->ctdb_stmt_lookup;
+	stmt = state->ctdb_stmt_lookup;
 
 	if (state->ctdb_in_transaction == 0) {
 		rc = sqlite3_exec(state->ctdb_db, "begin transaction", NULL,
 		     0, &errmsg);
-		if (rc)
-			CFATALX("can't begin %s", errmsg);
+		if (rc) {
+			CNDBG(CT_LOG_DB, "can't begin transaction: %s",
+			    errmsg);
+			return (rv);
+		}
 		state->ctdb_in_transaction = 1;
 		state->ctdb_trans_commit_rem = OPS_PER_TRANSACTION;
 	}
@@ -350,8 +367,10 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 		CNDBG(CT_LOG_DB, "looking for bin %s", shat);
 	}
 	if (sqlite3_bind_blob(stmt, 1, sha_k, SHA_DIGEST_LENGTH,
-	    SQLITE_STATIC))
-		CFATALX("could not bind");
+	    SQLITE_STATIC)) {
+		CNDBG(CT_LOG_DB, "could not sha");
+		return (rv);
+	}
 
 	rc = sqlite3_step(stmt);
 	if (rc == SQLITE_DONE) {
@@ -359,11 +378,12 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 		sqlite3_reset(stmt);
 		return rv;
 	} else if (rc != SQLITE_ROW) {
-		CFATALX("could not step(%d) %d %d %s",
-		    __LINE__,
-		    rc,
+		CNDBG(CT_LOG_DB, "could not step(%d) %d %d %s",
+		    __LINE__, rc,
 		    sqlite3_extended_errcode(state->ctdb_db),
 		    sqlite3_errmsg(state->ctdb_db));
+		sqlite3_reset(stmt);
+		return rv;
 	}
 
 	CNDBG(CT_LOG_DB, "found");
@@ -371,8 +391,12 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 	p = (uint8_t *)sqlite3_column_blob(stmt, 0);
 	if (p) {
 		if (sqlite3_column_bytes(stmt, 0) !=
-		    SHA_DIGEST_LENGTH)
-			CFATALX("invalid blob size");
+		    SHA_DIGEST_LENGTH) {
+			CNDBG(CT_LOG_DB, "invalid blob size");
+			sqlite3_reset(stmt);
+			return rv;
+		}
+
 		if (clog_mask_is_set(CT_LOG_DB)) {
 			ct_sha1_encode(p, shat);
 			CNDBG(CT_LOG_DB, "found bin %s", shat);
@@ -386,9 +410,12 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 	if (state->ctdb_crypt) {
 		p = (uint8_t *)sqlite3_column_blob(stmt, 1);
 		if (p) {
-			if (sqlite3_column_bytes(stmt, 1) !=
-			    CT_IV_LEN)
-				CFATALX("invalid blob size");
+			if (sqlite3_column_bytes(stmt, 1) != CT_IV_LEN) {
+				CNDBG(CT_LOG_DB, "invalid blob size");
+				sqlite3_reset(stmt);
+				rv = 0;
+				return rv;
+			}
 			if (clog_mask_is_set(CT_LOG_DB)) {
 				ct_sha1_encode(p, shat);
 				CNDBG(CT_LOG_DB, "found iv (prefix) %s", shat);
@@ -406,7 +433,7 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 	if (state->ctdb_trans_commit_rem <= 0) {
 		rc = sqlite3_exec(state->ctdb_db, "commit", NULL, 0, &errmsg);
 		if (rc)
-			CFATALX("can't commit %s", errmsg);
+			CNDBG(CT_LOG_DB, "can't commit %s", errmsg);
 		state->ctdb_in_transaction = 0;
 	}
 
@@ -432,13 +459,19 @@ ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v, uint8_
 			if (sqlite3_prepare_v2(state->ctdb_db,
 			    "insert into digests(sha, csha, iv)"
 			    " values(?, ?, ?)",
-			    -1, &stmt, NULL))
-				CFATALX("can't prepare insert statement");
+			    -1, &stmt, NULL)) {
+				CNDBG(CT_LOG_DB, "can not prepare insert "
+				    "statement");
+				return rv;
+			}
 		} else {
 			if (sqlite3_prepare_v2(state->ctdb_db,
 			    "insert into digests(sha) values(?)",
-			    -1, &stmt, NULL))
-				CFATALX("can't prepare insert statement");
+			    -1, &stmt, NULL)) {
+				CNDBG(CT_LOG_DB, "can not prepare insert "
+				    "statement");
+				return rv;
+			}
 		}
 		state->ctdb_stmt_insert = stmt;
 	} else
@@ -448,8 +481,11 @@ ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v, uint8_
 		CNDBG(CT_LOG_DB, "NEW transaction");
 		rc = sqlite3_exec(state->ctdb_db, "begin transaction", NULL,
 		    0, &errmsg);
-		if (rc)
-			CFATALX("can't begin %s", errmsg);
+		if (rc) {
+			CNDBG(CT_LOG_DB, "can not begin %s", errmsg);
+			return rv;
+		}
+
 		state->ctdb_in_transaction = 1;
 		state->ctdb_trans_commit_rem = OPS_PER_TRANSACTION;
 	}
@@ -463,28 +499,34 @@ ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v, uint8_
 		CNDBG(CT_LOG_DB, "inserting for bin %s, %s", shatk, shatv);
 	}
 	if (sqlite3_bind_blob(stmt, 1, sha_k, SHA_DIGEST_LENGTH,
-	    SQLITE_STATIC))
-		CFATALX("could not bind sha_k");
+	    SQLITE_STATIC)) {
+		CNDBG(CT_LOG_DB, "could not bind sha_k");
+		return rv;
+	}
 	if (state->ctdb_crypt) {
-		if (sha_v == NULL || iv == NULL) {
-			CFATALX("crypt mode, but no sha_v/iv");
-		}
+		if (sha_v == NULL || iv == NULL)
+			CABORTX("crypt mode, but no sha_v/iv");
 		if (sqlite3_bind_blob(stmt, 2, sha_v,
-		    SHA_DIGEST_LENGTH, SQLITE_STATIC))
-			CFATALX("could not bind sha_v");
+		    SHA_DIGEST_LENGTH, SQLITE_STATIC)) {
+			CNDBG(CT_LOG_DB, "could not bind sha_v");
+			sqlite3_reset(stmt);
+			return rv;
+		}
+
 		if (sqlite3_bind_blob(stmt, 3, iv,
-		    CT_IV_LEN, SQLITE_STATIC))
-			CFATALX("could not bind iv ");
+		    CT_IV_LEN, SQLITE_STATIC)) {
+			CNDBG(CT_LOG_DB, "could not bind iv ");
+			sqlite3_reset(stmt);
+			return rv;
+		}
 	}
 
 	rc = sqlite3_step(stmt);
 	if (rc == SQLITE_DONE) {
 		CNDBG(CT_LOG_DB, "insert completed");
-		sqlite3_reset(stmt);
 		rv = 1;
-		return rv;
 	} else if (rc != SQLITE_CONSTRAINT) { 
-		CWARNX("insert failed %d %d [%s]", rc,
+		CNDBG(CT_LOG_DB, "insert failed %d %d [%s]", rc,
 		    sqlite3_extended_errcode(state->ctdb_db),
 		    sqlite3_errmsg(state->ctdb_db));
 	} else  {
@@ -496,9 +538,10 @@ ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v, uint8_
 	/* inserts are more 'costly' than reads */
 	state->ctdb_trans_commit_rem -= 4;
 	if (state->ctdb_trans_commit_rem <= 0) {
-		rc = sqlite3_exec(state->ctdb_db, "commit", NULL, 0, &errmsg);
-		if (rc)
-			CFATALX("can't commit %s", errmsg);
+		if ((rc = sqlite3_exec(state->ctdb_db, "commit", NULL,
+		    0, &errmsg)) != 0)
+			CNDBG(CT_LOG_DB, "can't commit %s", errmsg);
+		/* ctdb is just a cache, succeed anyway */
 		state->ctdb_in_transaction = 0;
 	}
 
