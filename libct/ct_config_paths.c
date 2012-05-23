@@ -40,7 +40,7 @@ ct_user_config(void)
 
 	pwd = getpwuid(getuid());
 	if (pwd == NULL)
-		CFATALX("invalid user %d", getuid());
+		CABORTX("invalid user %d", getuid());
 
 	e_asprintf(&conf, "%s/.cyphertite/cyphertite.conf", pwd->pw_dir);
 	return (conf);
@@ -54,7 +54,7 @@ ct_user_config_old(void)
 
 	pwd = getpwuid(getuid());
 	if (pwd == NULL)
-		CFATALX("invalid user %d", getuid());
+		CABORTX("invalid user %d", getuid());
 
 	e_asprintf(&conf, "%s/.cyphertite.conf", pwd->pw_dir);
 	return (conf);
