@@ -498,7 +498,7 @@ ct_complete_metadata(struct ct_global_state *state, struct ct_trans *trans)
 		ct_wakeup_file(state->event_state);
 		break;
 	default:
-		CFATALX("unexpected tr state in %s %d", __func__,
+		CABORTX("unexpected tr state in %s %d", __func__,
 		    trans->tr_state);
 	}
 
