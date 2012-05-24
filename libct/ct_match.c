@@ -375,21 +375,6 @@ ct_matchlist_free(char **flist)
 	e_free(&flist);
 }
 
-struct ct_match *
-ct_match_fromfile(const char *file, int matchmode)
-{
-	struct ct_match	*match;
-	char		**flist;
-	int		 nentries;
-
-	if ((flist = ct_matchlist_fromfile(file, &nentries)) == NULL)
-		return (NULL);
-
-	match = ct_match_compile(matchmode, flist);
-
-	return (match);
-}
-
 #if 0
 int
 main(int argc, char *argv[])
