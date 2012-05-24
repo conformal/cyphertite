@@ -73,7 +73,7 @@ ct_do_remotelist(struct ct_global_state *state, char **search, char **exclude,
 
 int 
 ct_do_remotearchive(struct ct_global_state *state, char *ctfile, char **flist,
-    char *tdir, char **excludelist, char *includefile, int match_mode,
+    char *tdir, char **excludelist, char **includelist, int match_mode,
     int no_cross_mounts, int strip_slash, int follow_root_symlink,
     int follow_symlinks, struct ct_config *conf)
 {
@@ -85,7 +85,7 @@ ct_do_remotearchive(struct ct_global_state *state, char *ctfile, char **flist,
 	caa.caa_filelist = flist;
 	caa.caa_excllist = excludelist;
 	caa.caa_matchmode = match_mode;
-	caa.caa_includefile = includefile;
+	caa.caa_includelist = includelist;
 	caa.caa_tdir = tdir;
 	caa.caa_tag = ctfile; 
 	caa.caa_ctfile_basedir = conf->ct_ctfile_cachedir;

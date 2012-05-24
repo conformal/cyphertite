@@ -355,23 +355,22 @@ ct_main(int argc, char **argv)
 	if (basisfile)
 		ct_basisbackup = e_strdup(basisfile);
 
-	if ((ct_action == CT_A_LIST || ct_action == CT_A_EXTRACT)) {
-		if (ct_includefile != NULL) {
-			int nentries; 
+	if (ct_includefile != NULL) {
+		int nentries; 
 
-			if (argc != 0)
-				CFATALX("-I is invalid when a pattern is "
-				    "provided on the command line");
-			includelist = ct_matchlist_fromfile(ct_includefile,
-			    &nentries);
-			if (nentries == -1)
-				CFATAL("can't get includelist from %s",
-				    ct_includefile);
+		if ((ct_action == CT_A_LIST || ct_action == CT_A_EXTRACT) &&
+		    argc != 0)
+			CFATALX("-I is invalid when a pattern is "
+			    "provided on the command line");
+		includelist = ct_matchlist_fromfile(ct_includefile,
+		    &nentries);
+		if (nentries == -1)
+			CFATAL("can't get includelist from %s",
+			    ct_includefile);
 
-			freeincludes = 1;
-		} else {
-			includelist = argv;
-		}
+		freeincludes = 1;
+	} else if ((ct_action == CT_A_LIST || ct_action == CT_A_EXTRACT)) {
+		includelist = argv;
 	}
 	if (ct_excludefile != NULL) {
 		int	nentries;
@@ -466,7 +465,7 @@ ct_main(int argc, char **argv)
 			caa.caa_filelist = argv;
 			caa.caa_excllist = excludelist;
 			caa.caa_matchmode = ct_match_mode;
-			caa.caa_includefile = ct_includefile;
+			caa.caa_includelist = includelist;
 			caa.caa_tdir = ct_tdir;
 			caa.caa_tag = ctfile;
 			caa.caa_ctfile_basedir = conf->ct_ctfile_cachedir;
@@ -529,7 +528,7 @@ ct_main(int argc, char **argv)
 			caa.caa_filelist = argv;
 			caa.caa_excllist = excludelist;
 			caa.caa_matchmode = ct_match_mode;
-			caa.caa_includefile = ct_includefile;
+			caa.caa_includelist = includelist;
 			caa.caa_no_cross_mounts = no_cross_mounts;
 			caa.caa_strip_slash = strip_slash;
 			caa.caa_follow_root_symlink = follow_root_symlink;

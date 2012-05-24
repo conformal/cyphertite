@@ -612,10 +612,10 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		cap->cap_fd = -1;
 		TAILQ_INIT(&cap->cap_flist);
 		op->op_priv = cap;
-		if (caa->caa_includefile)
+		if (caa->caa_includelist)
 			cap->cap_include =
-			    ct_match_fromfile(caa->caa_includefile,
-			    caa->caa_matchmode);
+			    ct_match_compile(caa->caa_matchmode,
+			        caa->caa_includelist);
 		if (caa->caa_excllist)
 			cap->cap_exclude = ct_match_compile(caa->caa_matchmode,
 			    caa->caa_excllist);

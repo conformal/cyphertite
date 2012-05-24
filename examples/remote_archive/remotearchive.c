@@ -117,7 +117,7 @@ main(int argc, char **argv)
 
 	char **excludelist;
 	char **flist;
-	char  *includefile;
+	char **includelist;
 	char  *tdir;
 	char  *ctfile;
 	int    match_mode, no_cross_mounts, strip_slash;
@@ -125,7 +125,7 @@ main(int argc, char **argv)
 
 	/* setup arguments */
 	excludelist = NULL;
-	includefile = NULL;
+	includelist = NULL;
 	tdir = NULL;
 	ctfile = e_strdup("tagname");
 	match_mode = 0;
@@ -152,7 +152,7 @@ main(int argc, char **argv)
 	flist = argv;
 
 	ct_do_remotearchive(state, ctfile, flist, tdir, excludelist,
-	    includefile, match_mode, no_cross_mounts, strip_slash,
+	    includelist, match_mode, no_cross_mounts, strip_slash,
 	    follow_root_symlink, follow_symlinks, conf);
 
 	ct_cleanup(state);
