@@ -970,11 +970,12 @@ ctfile_write_file_end(struct ctfile_write_state *ctx, struct fnode *fnode)
 	return (ret == FALSE);
 }
 
-void
+int
 ctfile_write_close(struct ctfile_write_state *ctx)
 {
 	struct ctfile_header	hdr;
 	char			fake[1];
+	int			ret = 0;
 
 	/* Write EOF header on close */
 	bzero(&hdr, sizeof hdr);
@@ -982,9 +983,11 @@ ctfile_write_close(struct ctfile_write_state *ctx)
 	hdr.cmh_filename = fake;
 	hdr.cmh_beacon = CT_HDR_EOF;
 	if (ct_xdr_header(&ctx->cws_xdr, &hdr, ctx->cws_version) == FALSE)
-		CWARNX("Failed to write archive footer");
+		ret = 1;
 
 	ctfile_close(ctx->cws_f, &ctx->cws_xdr);
 
 	e_free(&ctx);
+
+	return (ret);
 }

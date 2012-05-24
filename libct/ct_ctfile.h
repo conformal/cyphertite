@@ -148,7 +148,7 @@ int	 ctfile_write_file_sha(struct ctfile_write_state *, uint8_t *,
 	     uint8_t *, uint8_t *);
 int	 ctfile_write_file_pad(struct ctfile_write_state *, struct fnode *);
 int	 ctfile_write_file_end(struct ctfile_write_state *, struct fnode *);
-void	 ctfile_write_close(struct ctfile_write_state *);
+int	 ctfile_write_close(struct ctfile_write_state *);
 
 char	*ctfile_get_previous(const char *);
 
