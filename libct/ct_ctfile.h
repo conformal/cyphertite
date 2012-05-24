@@ -142,7 +142,7 @@ struct ctfile_write_state;
 struct ctfile_write_state
 	*ctfile_write_init(const char *, const char *, int, const char *, int,
 	    char *, char **, int, int, int);
-void	 ctfile_write_special(struct ctfile_write_state *, struct fnode *);
+int	 ctfile_write_special(struct ctfile_write_state *, struct fnode *);
 int	 ctfile_write_file_start(struct ctfile_write_state *, struct fnode *);
 int	 ctfile_write_file_sha(struct ctfile_write_state *, uint8_t *,
 	     uint8_t *, uint8_t *);

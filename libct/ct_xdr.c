@@ -842,55 +842,64 @@ ctfile_write_header_entry(struct ctfile_write_state *ctx, char *filename,
 	return 0;
 }
 
-void
+int
 ctfile_write_special(struct ctfile_write_state *ctx, struct fnode *fnode)
 {
 	int type = fnode->fl_type;
 
 	if (C_ISDIR(type)) {
-		if (ctfile_write_header(ctx, fnode, fnode->fl_sname, 1))
-			CWARNX("header write failed");
+		if (ctfile_write_header(ctx, fnode, fnode->fl_sname, 1)) {
+			CNDBG(CT_LOG_CTFILE, "dir header write failed");
+			return (1);
+		}
 		CNDBG(CT_LOG_CTFILE, "record dir %s", fnode->fl_sname);
 	} else if (C_ISCHR(type) || C_ISBLK(type)) {
-		if (ctfile_write_header(ctx, fnode, fnode->fl_sname, 1))
-			CWARNX("header write failed");
+		if (ctfile_write_header(ctx, fnode, fnode->fl_sname, 1)) {
+			CNDBG(CT_LOG_CTFILE, "special dev header write failed");
+			return (1);
+		}
 	} else if (C_ISFIFO(type)) {
-		CWARNX("fifo not supported");
+		CNDBG(CT_LOG_CTFILE, "fifo not supported (%s)",
+		    fnode->fl_sname);
 	} else if (C_ISLINK(type)) {
 		if (fnode->fl_sname == NULL &&
 		    fnode->fl_hlname == NULL) {
-			CWARNX("%slink with no name or dest",
+			CABORTX("%slink with no name or dest",
 			    fnode->fl_hardlink ? "hard" : "sym");
-			return;
 		} else if (fnode->fl_sname == NULL) {
-			CWARNX("%slink with no name",
+			CABORTX("%slink with no name",
 			    fnode->fl_hardlink ? "hard" : "sym");
-			return;
 		} else if (fnode->fl_hlname == NULL) {
-			CWARNX("%slink with no dest",
+			CABORTX("%slink with no dest",
 			    fnode->fl_hardlink ? "hard" : "sym");
-			return;
 		}
 		CNDBG(CT_LOG_CTFILE, "mylink %s %s", fnode->fl_sname,
 		    fnode->fl_hlname);
-		if (ctfile_write_header(ctx, fnode, fnode->fl_sname, 1))
-			CWARNX("header write failed");
+		if (ctfile_write_header(ctx, fnode, fnode->fl_sname, 1)) {
+			CNDBG(CT_LOG_CTFILE, "link header write failed");
+			return (1);
+		}
 
 		if (fnode->fl_hardlink) {
 			fnode->fl_type = C_TY_REG; /* cheat */
 		}
 
-		if (ctfile_write_header(ctx, fnode, fnode->fl_hlname, 0))
-			CWARNX("header write failed");
+		if (ctfile_write_header(ctx, fnode, fnode->fl_hlname, 0)) {
+			CNDBG(CT_LOG_CTFILE, "link header2 write failed");
+			return (1);
+		}
 
 		fnode->fl_type = type; /* restore */
 
 	} else if (C_ISSOCK(type)) {
-		CWARNX("cannot archive a socket %s", fnode->fl_sname);
+		CNDBG(CT_LOG_CTFILE, "cannot archive a socket %s",
+		    fnode->fl_sname);
 	} else {
-		CWARNX("invalid type on %s %d", fnode->fl_sname,
+		CABORTX("invalid type on %s %d", fnode->fl_sname,
 		    type);
 	}
+
+	return (0);
 }
 
 int

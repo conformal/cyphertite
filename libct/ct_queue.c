@@ -1059,7 +1059,11 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 		state->ct_print_file_start(state->ct_print_state, fnode);
 		state->ct_print_file_end(state->ct_print_state, fnode,
 		    state->ct_max_block_size);
-		ctfile_write_special(trans->tr_ctfile, fnode);
+		if (ctfile_write_special(trans->tr_ctfile, fnode))
+			CWARNX("failed to write special entry for %s",
+			    fnode->fl_sname);
+		/* XXX fail operation if failed*/
+
 		release_fnode = 1;
 		break;
 	case TR_S_FILE_START:
