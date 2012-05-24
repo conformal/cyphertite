@@ -307,7 +307,8 @@ ct_ssl_connect(struct ct_global_state *state, int nonfatal)
 			assl_fatalx("server connect failed");
 	}
 	if (state->ct_config->ct_io_bw_limit && ctx != NULL)
-		ct_ssl_init_bw_lim(ct_event_get_base(state->event_state),
+		state->bw_limit =
+		    ct_ssl_init_bw_lim(ct_event_get_base(state->event_state),
 		    ctx, state->ct_config->ct_io_bw_limit);
 
 	return ctx;
