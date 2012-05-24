@@ -160,7 +160,7 @@ ct_match_insert_rb(struct ct_match *match, char *string)
 	struct ct_match_node	*n;
 
 	if (match->cm_mode != CT_MATCH_RB)
-		CFATALX("match mode %d is not rb", match->cm_mode);
+		CABORTX("match mode %d is not rb", match->cm_mode);
 	n = e_calloc(1, sizeof(struct ct_match_node));
 	n->cmn_string = e_strdup(string);
 	if (RB_INSERT(ct_match_tree, match->cm_rb_head, n)) {
@@ -173,7 +173,7 @@ int
 ct_match_rb_is_empty(struct ct_match *match)
 {
 	if (match->cm_mode != CT_MATCH_RB)
-		CFATALX("match mode %d is not rb", match->cm_mode);
+		CABORTX("match mode %d is not rb", match->cm_mode);
 	return (RB_EMPTY(match->cm_rb_head));
 }
 
@@ -264,7 +264,7 @@ ct_match_compile(int mode, char **flist)
 		}
 		break;
 	default:
-		CFATALX("invalid match mode");
+		CABORTX("invalid match mode");
 	}
 
 	return (match);
@@ -293,7 +293,7 @@ ct_match_unwind(struct ct_match *match)
 		}
 		break;
 	default:
-		CFATALX("invalid match mode");
+		CABORTX("invalid match mode");
 	}
 	e_free(&match);
 }
@@ -312,21 +312,23 @@ ct_match(struct ct_match *match, char *candidate)
 		return (ct_glob_match(match->cm_glob, candidate));
 		break;
 	default:
-		CFATALX("invalid match mode");
+		CABORTX("invalid match mode");
 	}
 	/* NOTREACHED */
 }
 
 char **
-ct_matchlist_fromfile(const char *file)
+ct_matchlist_fromfile(const char *file, int *nentries)
 {
 	FILE		*f;
 	char		**flist, *line;
 	size_t		 len, lineno = 0;
 	int		 n = 0;
 
-	if ((f = fopen(file, "r")) == NULL)
-		CFATAL("can't open match file %s", file);
+	if ((f = fopen(file, "r")) == NULL) {
+		*nentries = -1;
+		return (NULL);
+	}
 
 	/* XXX:
 	 * Wish there was a nicer way to count these lines.
@@ -338,10 +340,14 @@ ct_matchlist_fromfile(const char *file)
 		free(line);
 	}
 
+	*nentries = n;
 	if (n == 0)
 		return (NULL);
-	if (fseeko(f, 0, SEEK_SET) != 0)
-		CFATAL("can't seek to start of match file %s", file);
+	if (fseeko(f, 0, SEEK_SET) != 0) {
+		*nentries = -1;
+		return (NULL);
+	}
+		
 	flist = e_calloc(n + 1, sizeof(*flist));
 
 	/* do it again actually parsing this time */
@@ -374,8 +380,9 @@ ct_match_fromfile(const char *file, int matchmode)
 {
 	struct ct_match	*match;
 	char		**flist;
+	int		 nentries;
 
-	if ((flist = ct_matchlist_fromfile(file)) == NULL)
+	if ((flist = ct_matchlist_fromfile(file, &nentries)) == NULL)
 		return (NULL);
 
 	match = ct_match_compile(matchmode, flist);

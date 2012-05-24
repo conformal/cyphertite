@@ -357,17 +357,28 @@ ct_main(int argc, char **argv)
 
 	if ((ct_action == CT_A_LIST || ct_action == CT_A_EXTRACT)) {
 		if (ct_includefile != NULL) {
+			int nentries; 
+
 			if (argc != 0)
 				CFATALX("-I is invalid when a pattern is "
 				    "provided on the command line");
-			includelist = ct_matchlist_fromfile(ct_includefile);
+			includelist = ct_matchlist_fromfile(ct_includefile,
+			    &nentries);
+			if (nentries == -1)
+				CFATAL("can't get includelist from %s",
+				    ct_includefile);
+
 			freeincludes = 1;
 		} else {
 			includelist = argv;
 		}
 	}
-	if (ct_excludefile != NULL)
-		excludelist = ct_matchlist_fromfile(ct_excludefile);
+	if (ct_excludefile != NULL) {
+		int	nentries;
+		excludelist = ct_matchlist_fromfile(ct_excludefile, &nentries);
+		if (nentries == -1)
+			CFATAL("can't get excludelsit from %s", ct_excludefile);
+	}
 
 
 	if ((conf = ct_load_config(&config_file)) == NULL) {
