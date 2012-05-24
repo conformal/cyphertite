@@ -1088,16 +1088,21 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 			    trans->tr_size[(int)trans->tr_dataslot],
 			    trans->tr_eof);
 
-			ctfile_write_file_sha(trans->tr_ctfile, trans->tr_sha,
-			    trans->tr_csha, trans->tr_iv);
+			if (ctfile_write_file_sha(trans->tr_ctfile,
+			    trans->tr_sha, trans->tr_csha, trans->tr_iv) != 0)
+				CWARNX("failed to write sha for %s",
+				    fnode->fl_sname);
 		}
 
 		if (trans->tr_eof) {
-			if (trans->tr_eof == 2)
-				ctfile_write_file_pad(trans->tr_ctfile,
-				    trans->tr_fl_node);
-			ctfile_write_file_end(trans->tr_ctfile,
-			    trans->tr_fl_node);
+			if (trans->tr_eof == 2 && ctfile_write_file_pad(
+			    trans->tr_ctfile, trans->tr_fl_node) != 0)
+				CWARNX("failed to pad file for %s",
+				    trans->tr_fl_node->fl_sname);
+			if (ctfile_write_file_end(trans->tr_ctfile,
+			    trans->tr_fl_node) != 0)
+				CWARNX("failed to write trailer for %s",
+				    trans->tr_fl_node->fl_sname);
 			state->ct_print_file_end(state->ct_print_state,
 			    fnode, state->ct_max_block_size);
 			release_fnode = 1;

@@ -923,9 +923,6 @@ ctfile_write_file_sha(struct ctfile_write_state *ctx, uint8_t *sha,
 		ret = ct_xdr_dedup_sha(&ctx->cws_xdr, sha);
 	}
 
-	if (ret == FALSE)
-		CWARNX("failed to write sha");
-
 	return (ret == FALSE);
 }
 
