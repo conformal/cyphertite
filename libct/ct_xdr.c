@@ -458,9 +458,6 @@ ctfile_parse_read_trailer(struct ctfile_parse_state *ctx,
 
 	ret = ct_xdr_trailer(&ctx->xs_xdr, trl);
 
-	if (ret == FALSE)
-		CWARNX("failed to read trailer sha");
-
 	return (ret == FALSE);
 }
 
@@ -533,7 +530,6 @@ ctfile_parse(struct ctfile_parse_state *ctx)
 		 } else {
 			ret = ctfile_parse_read_trailer(ctx, &ctx->xs_trl);
 			if (ret) {
-				CWARNX("trailer read failed");
 				goto fail;
 			}
 
