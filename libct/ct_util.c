@@ -86,7 +86,7 @@ ct_init(struct ct_config *conf, int need_secrets, int verbose,
 
 	if (need_secrets != 0 && conf->ct_crypto_secrets != NULL) {
 		if (stat(conf->ct_crypto_secrets, &sb) == -1) {
-			CFATALX("No crypto secrets file, please run"
+			CFATALX("No crypto secrets file, please run "
 			    "ctctl secrets generate or ctctl secrets download");
 		}
 		/* we got crypto */
