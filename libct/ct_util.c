@@ -285,7 +285,7 @@ ct_add_operation_after(struct ct_global_state *state, struct ct_op *after,
 }
 
 /* Do a complete ct operation from start to finish */
-void
+int
 ct_do_operation(struct ct_config *conf,  ct_op_cb *start, ct_op_cb *complete,
     void *args, int need_secrets)
 {
@@ -297,9 +297,10 @@ ct_do_operation(struct ct_config *conf,  ct_op_cb *start, ct_op_cb *complete,
 	state = ct_init(conf, need_secrets, NULL);
 	ct_add_operation(state, start, complete, args);
 	ct_wakeup_file(state->event_state);
-	if ((ret = ct_event_dispatch(state->event_state)) != 0)
-		CWARN("event_dispatch returned failure");
+	ret = ct_event_dispatch(state->event_state);
 	ct_cleanup(state);
+
+	return (ret);
 }
 
 void
