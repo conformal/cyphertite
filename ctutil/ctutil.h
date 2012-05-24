@@ -184,6 +184,7 @@ struct ct_metadata_footer {
 int	ct_get_password(char *, size_t, char *, int);
 int	ct_savecore(void);
 size_t	ct_str_repeat(char *dest, size_t buf_size, const char *src, int repeat);
+void	ct_expand_tilde(char **, const char *);
 
 /* compression */
 struct ct_compress_ctx;

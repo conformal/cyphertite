@@ -23,41 +23,57 @@
 #include <string.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <limits.h>
 
 #include <clog.h>
+#include <exude.h>
 #include <ctutil.h>
 
 void
-ct_expand_tilde(char **dst, char *key, char *val)
+ct_expand_tilde(char **path, const char *s)
 {
-	char			*uid_s;
-	struct			passwd *pwd;
-	int			i;
-	uid_t			uid;
+        struct passwd           *pwd;
+        const char              *sc = s;
+        char                    *uid_s;
+        char                     user[LOGIN_NAME_MAX];
+        uid_t                    uid;
+        int                      i;
 
-	if (dst == NULL || key == NULL || val == NULL)
-		CFATALX("invalid parameter");
+        if (path == NULL || s == NULL)
+                CFATALX("invalid parameters");
 
-	if (val[0] == '~' && strlen(val) > 1) {
-		if ((uid = getuid()) == 0) {
-			/* see if we are using sudo and get caller uid */
-			uid_s = getenv("SUDO_UID");
-			if (uid_s)
-				uid = atoi(uid_s);
-		}
-		pwd = getpwuid(uid);
-		if (pwd == NULL)
-			CFATALX("invalid user %d", uid);
+        if (s[0] != '~') {
+                goto no_expansion;
+        }
 
-		i = 1;
-		while (val[i] == CT_PATHSEP && val[i] != '\0')
-			i++;
+        ++s;
+        for (i = 0; s[i] != CT_PATHSEP && s[i] != '\0'; ++i)
+                user[i] = s[i];
+        user[i] = '\0';
+        s = &s[i];
 
-		if (asprintf(dst, "%s%c%s", pwd->pw_dir, CT_PATHSEP,
-		    &val[i]) == -1)
-			CFATALX("no memory for %s", key);
-	} else
-		*dst = strdup(val);
+        if (strlen(user) == 0) {
+                uid = getuid();
+                if (uid == 0) {
+                        /* see if we are using sudo and get caller uid */
+                        uid_s = getenv("SUDO_UID");
+                        if (uid_s)
+                                uid = atoi(uid_s);
+                }
+                if ((pwd = getpwuid(uid)) == NULL) {
+                        goto no_expansion;
+                }
+        } else {
+                if ((pwd = getpwnam(user)) == NULL) {
+                        goto no_expansion;
+                }
+        }
+
+        e_asprintf(path, "%s%s", pwd->pw_dir, s);
+        return;
+
+no_expansion:
+        *path = e_strdup(sc);
 }
 
 /*
