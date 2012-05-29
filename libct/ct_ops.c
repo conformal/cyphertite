@@ -459,6 +459,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size);
 		state->extract_state = ct_file_extract_init(NULL,
 		    0, 0, 0, NULL, NULL);
+		op->op_priv = ex_priv;
 		break;
 	case CT_S_FINISHED:
 		return;
@@ -473,8 +474,6 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			ct_set_file_state(state, CT_S_WAITING_TRANS);
 			return;
 		}
-		/* unless start of file this is right */
-		trans->tr_fl_node = ex_priv->fl_ex_node;
 
 		if (ex_priv->done) {
 			CNDBG(CT_LOG_CTFILE, "Hit end of ctfile");
@@ -484,9 +483,11 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			ct_queue_first(state, trans);
 			CNDBG(CT_LOG_TRANS, "extract finished");
 			ct_set_file_state(state, CT_S_FINISHED);
-			e_free(&ex_priv);
 			return;
 		}
+
+		/* unless start of file this is right */
+		trans->tr_fl_node = ex_priv->fl_ex_node;
 
 		switch ((ret = ctfile_parse(&ex_priv->xdr_ctx))) {
 		case XS_RET_FILE:
