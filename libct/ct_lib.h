@@ -18,6 +18,7 @@
 
 #include <ct_types.h>
 #include <ct_socket.h>
+#include <ct_threads.h>
 
 struct ct_config {
 	char	*ct_host;
