@@ -1400,11 +1400,8 @@ ct_file_extract_open(struct ct_extract_state *ces, struct fnode *fnode)
 	ces->ces_fd = mkstemp_at(fnode->fl_parent_dir->d_fd,
 	    fnode->fl_fname);
 #endif
-	if (ces->ces_fd == -1) {
-		CWARN("unable to open file for writing %s", fnode->fl_sname);
+	if (ces->ces_fd == -1)
 		return (1);
-	}
-
 	return (0);
 }
 

@@ -1115,6 +1115,8 @@ ct_complete_normal(struct ct_global_state *state, struct ct_trans *trans)
 			state->ct_print_file_start(state->ct_print_state,
 			    trans->tr_fl_node);
 		} else {
+			CWARN("unable to open file for writing %s",
+			    fnode->fl_sname);
 			trans->tr_fl_node->fl_skip_file = 1;
 		}
 		break;
