@@ -80,10 +80,6 @@ void ct_setup_wakeup_pipe(struct event_base *, struct ct_ctx *ctx, void *vctx,
     ct_func_cb *func_cb);
 void * ct_cb_thread(void *);
 
-
-/* XXX -global to cause threads to exit on next wakup.*/
-int ct_exiting;
-
 void
 ct_setup_wakeup_pipe(struct event_base *base, struct ct_ctx *ctx, void *vctx,
     ct_func_cb *func_cb)
