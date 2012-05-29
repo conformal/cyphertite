@@ -121,8 +121,6 @@ ct_init(struct ct_config *conf, int need_secrets,
 	/* set defaults */
 	ct_set_log_fns(state, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
-	state->event_state = ct_event_init(state, ct_reconnect, info_cb);
-
 	if (need_secrets != 0 && conf->ct_crypto_secrets != NULL) {
 		if (stat(conf->ct_crypto_secrets, &sb) == -1) {
 			CFATALX("No crypto secrets file, please run "
@@ -136,7 +134,7 @@ ct_init(struct ct_config *conf, int need_secrets,
 			CFATALX("can't unlock secrets file");
 	}
 
-	ct_init_eventloop(state);
+	ct_init_eventloop(state, info_cb);
 
 	return (state);
 }
@@ -185,12 +183,14 @@ ct_set_log_fns(struct ct_global_state *state, void *logst,
 
 
 void
-ct_init_eventloop(struct ct_global_state *state)
+ct_init_eventloop(struct ct_global_state *state,
+    void (*info_cb)(evutil_socket_t, short, void *))
 {
 
 #if defined(CT_EXT_INIT)
 	CT_EXT_INIT(state);
 #endif
+	state->event_state = ct_event_init(state, ct_reconnect, info_cb);
 
 	state->ct_db_state = ctdb_setup(state->ct_config->ct_localdb,
 	    state->ct_config->ct_crypto_secrets != NULL);
@@ -243,13 +243,14 @@ ct_cleanup_eventloop(struct ct_global_state *state)
 	CT_LOCK_RELEASE(&state->ct_write_lock);
 	CT_LOCK_RELEASE(&state->ct_queued_lock);
 	CT_LOCK_RELEASE(&state->ct_complete_lock);
+
+	ct_event_cleanup(state->event_state);
 }
 
 void
 ct_cleanup(struct ct_global_state *state)
 {
 	ct_cleanup_eventloop(state);
-	ct_event_cleanup(state->event_state);
 }
 
 struct ct_op *
@@ -654,6 +655,7 @@ ct_shutdown(struct ct_global_state *state)
 {
 	ctdb_shutdown(state->ct_db_state);
 	state->ct_db_state = NULL;
+	ct_event_shutdown(state->event_state);
 	ct_event_loopbreak(state->event_state);
 }
 

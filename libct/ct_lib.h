@@ -242,7 +242,8 @@ int			 ct_set_log_fns(struct ct_global_state *, void *,
 			     ct_log_file_start_fn *, ct_log_file_end_fn *,
 			     ct_log_file_skip_fn *, ct_log_traverse_start_fn *,
 			     ct_log_traverse_end_fn *);
-void			ct_init_eventloop(struct ct_global_state *);
+void			ct_init_eventloop(struct ct_global_state *,
+			     void (*info_cb)(evutil_socket_t, short, void *));
 void			ct_cleanup(struct ct_global_state *);
 void			ct_cleanup_eventloop(struct ct_global_state *);
 
@@ -262,6 +263,7 @@ struct ct_event_state	*ct_event_init(struct ct_global_state *,
 int ct_event_dispatch(struct ct_event_state *);
 int ct_event_loopbreak(struct ct_event_state *);
 struct event_base	*ct_event_get_base(struct ct_event_state *);
+void ct_event_shutdown(struct ct_event_state *);
 void ct_event_cleanup(struct ct_event_state *);
 void ct_wakeup_file(struct ct_event_state *);
 void ct_wakeup_sha(struct ct_event_state *);

@@ -38,11 +38,13 @@ struct ct_ctx {
 	struct event		*ctx_ev;
 	ct_func_cb		*ctx_fn;
 	void			(*ctx_wakeup)(struct ct_ctx *);
+	void			(*ctx_shutdown)(struct ct_ctx *);
 	void			*ctx_varg;
 #if CT_ENABLE_PTHREADS
 	pthread_mutex_t 	ctx_mtx;
 	pthread_cond_t 		ctx_cv;
 	pthread_t		ctx_thread;
+	int			ctx_exiting;
 #endif
 	int			ctx_type;
 	int                     ctx_pipe[2];
@@ -69,6 +71,7 @@ struct ct_event_state {
 void ct_handle_wakeup(int, short, void *);
 void ct_pipe_sig(int, short, void *);
 void ct_wakeup_x_pipe(struct ct_ctx *);
+void ct_shutdown_x_pipe(struct ct_ctx *);
 #if CT_ENABLE_THREADS
 void ct_wakeup_x_cv(struct ct_ctx *);
 void ct_setup_wakeup_cv(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb);
@@ -90,6 +93,7 @@ ct_setup_wakeup_pipe(struct event_base *base, struct ct_ctx *ctx, void *vctx,
 	ctx->ctx_varg = vctx;
 	ctx->ctx_fn = func_cb;
 	ctx->ctx_wakeup = ct_wakeup_x_pipe;
+	ctx->ctx_shutdown = ct_shutdown_x_pipe;
 
 	if (pipe(ctx->ctx_pipe))
 		CFATAL("pipe create failed");
@@ -193,6 +197,20 @@ ct_wakeup_x_pipe(struct ct_ctx *ctx)
 
 	wbuf = 'G';
 	if (write(ctx->ctx_pipe[1], &wbuf, 1) == -1) { /* ignore */ }
+}
+
+void
+ct_shutdown_x_pipe(struct ct_ctx *ctx)
+{
+	event_free(ctx->ctx_ev);
+	close(ctx->ctx_pipe[0]);
+	ctx->ctx_pipe[0] = -1;
+	close(ctx->ctx_pipe[1]);
+	ctx->ctx_pipe[1] = -1;
+	ctx->ctx_fn = NULL;
+	ctx->ctx_wakeup = NULL;
+	ctx->ctx_shutdown = NULL;
+	ctx->ctx_ev = NULL;
 }
 
 void
@@ -317,23 +335,28 @@ ct_event_loopbreak(struct ct_event_state *ev_st)
 }
 
 void
+ct_event_shutdown(struct ct_event_state *ev_st)
+{
+	if (ev_st->ct_ctx_complete.ctx_shutdown != NULL)
+		ev_st->ct_ctx_complete.ctx_shutdown(&ev_st->ct_ctx_complete);
+	if (ev_st->ct_ctx_write.ctx_shutdown != NULL)
+		ev_st->ct_ctx_write.ctx_shutdown(&ev_st->ct_ctx_write);
+	if (ev_st->ct_ctx_sha.ctx_shutdown != NULL)
+		ev_st->ct_ctx_sha.ctx_shutdown(&ev_st->ct_ctx_sha);
+	if (ev_st->ct_ctx_compress.ctx_shutdown != NULL)
+		ev_st->ct_ctx_compress.ctx_shutdown(&ev_st->ct_ctx_compress);
+	if (ev_st->ct_ctx_csha.ctx_shutdown != NULL)
+		ev_st->ct_ctx_csha.ctx_shutdown(&ev_st->ct_ctx_csha);
+	if (ev_st->ct_ctx_encrypt.ctx_shutdown != NULL)
+		ev_st->ct_ctx_encrypt.ctx_shutdown(&ev_st->ct_ctx_encrypt);
+}
+
+void
 ct_event_cleanup(struct ct_event_state *ev_st)
 {
 	if (ev_st == NULL)
 		return;
 
-	if (ev_st->ct_ctx_complete.ctx_ev != NULL)
-		event_free(ev_st->ct_ctx_complete.ctx_ev);
-	if (ev_st->ct_ctx_write.ctx_ev != NULL)
-		event_free(ev_st->ct_ctx_write.ctx_ev);
-	if (ev_st->ct_ctx_sha.ctx_ev != NULL)
-		event_free(ev_st->ct_ctx_sha.ctx_ev);
-	if (ev_st->ct_ctx_compress.ctx_ev != NULL)
-		event_free(ev_st->ct_ctx_compress.ctx_ev);
-	if (ev_st->ct_ctx_csha.ctx_ev != NULL)
-		event_free(ev_st->ct_ctx_csha.ctx_ev);
-	if (ev_st->ct_ctx_encrypt.ctx_ev != NULL)
-		event_free(ev_st->ct_ctx_encrypt.ctx_ev);
 	if (ev_st->ct_ev_sig_info != NULL)
 		event_free(ev_st->ct_ev_sig_info);
 	if (ev_st->ct_ev_sig_usr1 != NULL)
@@ -369,6 +392,22 @@ ct_wakeup_x_cv(struct ct_ctx *ctx)
 }
 
 void
+ct_shutdown_cv(struct ct_ctx *ctx)
+{
+	pthread_mutex_lock(&ctx->ctx_mtx);
+	ctx->ctx_exiting = 1;
+	ctx->ctx_fn = NULL;
+	ctx->ctx_wakeup = NULL;
+	ctx->ctx_shutdown = NULL;
+	pthread_cond_signal(&ctx->ctx_cv);
+	pthread_mutex_unlock(&ctx->ctx_mtx);
+
+	if (ctx->ctx_thread != pthread_self() &&
+	    pthread_join(ctx->ctx_thread, NULL) != 0)
+		CABORT("can't join on thread");
+}
+
+void
 ct_setup_wakeup_cv(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb)
 {
 	pthread_attr_t	 attr;
@@ -377,6 +416,7 @@ ct_setup_wakeup_cv(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb)
 	ctx->ctx_varg = vctx;
 	ctx->ctx_fn = func_cb;
 	ctx->ctx_wakeup = ct_wakeup_x_cv;
+	ctx->ctx_shutdown = ct_shutdown_cv;
 
 	pthread_mutex_init(&ctx->ctx_mtx, NULL);
 	pthread_cond_init (&ctx->ctx_cv, NULL);
@@ -394,13 +434,18 @@ ct_cb_thread(void *vctx)
 	do {
 		pthread_mutex_lock(&ctx->ctx_mtx);
 		pthread_cond_wait(&ctx->ctx_cv, &ctx->ctx_mtx);
-		if (ct_exiting)
+		if (ctx->ctx_exiting) {
+			pthread_mutex_unlock(&ctx->ctx_mtx);
 			break;
+		}
 		pthread_mutex_unlock(&ctx->ctx_mtx);
 
 		ctx->ctx_fn(ctx->ctx_varg);
 
 	} while (1);
+
+	pthread_cond_destroy(&ctx->ctx_cv);
+	pthread_mutex_destroy(&ctx->ctx_mtx);
 
 	pthread_exit(NULL);
 }
