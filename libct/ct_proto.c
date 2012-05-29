@@ -589,6 +589,8 @@ ct_parse_xml_close_reply(struct ct_header *hdr, void *vbody)
 	xe = TAILQ_FIRST(&xl);
 	if (strcmp(xe->name, "ct_md_close") == 0) {
 		rv = 0;
+	} else {
+		rv = 1;
 	}
 
 	xmlsd_unwind(&xl);
