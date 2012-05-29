@@ -273,7 +273,7 @@ ct_populate_fnode_from_flist(struct ct_archive_state *cas,
 	if (flnode->fl_flags & C_FF_CLOSEDIR) {
 		dname = gen_fname(flnode);
 		if ((dfound = ct_archive_lookup_dir(cas, dname)) == NULL)
-			CFATALX("close entry for non existant directory %s",
+			CABORTX("close entry for non existant directory %s",
 			    dname);
 		e_free(&dname);
 #ifndef CT_NO_OPENAT
@@ -356,7 +356,7 @@ ct_populate_fnode_from_flist(struct ct_archive_state *cas,
 	if (C_ISDIR(fnode->fl_type)) {
 		dname = gen_fname(flnode);
 		if ((dfound = ct_archive_lookup_dir(cas, dname)) == NULL)
-			CFATALX("directory not found in d_name_tree %s",
+			CABORTX("directory not found in d_name_tree %s",
 			    dname);
 		e_free(&dname);
 		fnode->fl_curdir_dir = dfound;
@@ -1365,7 +1365,7 @@ int
 ct_file_extract_open(struct ct_extract_state *ces, struct fnode *fnode)
 {
 	if (ces->ces_fd != -1) {
-		CFATALX("file open on extract_open");
+		CABORTX("file open on extract_open");
 	}
 
 	ct_file_extract_nextdir(ces, fnode);
@@ -1611,9 +1611,8 @@ ct_file_extract_nextdir(struct ct_extract_state *ces, struct fnode *fnode)
 		;
 
 	/* should never happen */
-	if (ndirs == 0) {
-		CFATALX("no dirs");
-	}
+	if (ndirs == 0)
+		CABORTX("no dirs");
 
 	newdirlist = e_calloc(ndirs + 1, sizeof(*newdirlist));
 
