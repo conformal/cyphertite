@@ -38,8 +38,6 @@ void			ct_xml_file_close(struct ct_global_state *);
 
 int			ct_basis_setup(const char *, char **, int,
 			    time_t *);
-void		 	ct_complete_metadata(struct ct_global_state *,
-			    struct ct_trans *);
 
 typedef void (ct_func_cb)(void *);
 void ct_setup_wakeup_file(struct ct_event_state *, void *, ct_func_cb *);
