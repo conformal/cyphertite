@@ -79,6 +79,17 @@ ctfile_complete_noop_final(struct ct_global_state *state,
 }
 
 int
+ctfile_xml_open_complete(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	/* change state and wake up process waiting on us */
+	ct_set_file_state(state, CT_S_RUNNING);
+	ct_wakeup_file(state->event_state);
+
+	return (0);
+}
+
+int
 ctfile_archive_complete_write(struct ct_global_state *state,
     struct ct_trans *trans)
 {
@@ -274,7 +285,7 @@ ct_xml_file_open(struct ct_global_state *state, struct ct_trans *trans,
     const char *file, int mode, uint32_t chunkno)
 {
 	trans->tr_state = TR_S_XML_OPEN;
-	trans->tr_complete = ctfile_complete_noop;
+	trans->tr_complete = ctfile_xml_open_complete;
 
 	if (ct_create_xml_open(&trans->hdr, (void **)&trans->tr_data[2],
 	    file, mode, chunkno) != 0)
@@ -620,9 +631,6 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 		CNDBG(CT_LOG_FILE, "%s opened\n",
 		    filename);
 		e_free(&filename);
-		/* XXX move this to the completion handler? */
-		ct_set_file_state(state, CT_S_RUNNING);
-		ct_wakeup_file(state->event_state);
 		trans->tr_state = TR_S_XML_OPENED;
 		break;
 	case TR_S_XML_CLOSING:
