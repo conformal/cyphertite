@@ -126,7 +126,10 @@ ct_get_cert_bundle(const char *user, const char *pass, char **xml,
 	 * causes issues with OpenSSL, so we rely on it having been initalized
 	 * before hand [assl].
 	 */
-	flags = CURL_GLOBAL_ALL & (~CURL_GLOBAL_SSL);
+	flags = CURL_GLOBAL_ALL;
+#ifndef CT_CURL_INIT_SSL
+	flags &= ~CURL_GLOBAL_SSL;
+#endif
 	curl_global_init(flags);
 
 	c = curl_easy_init();
