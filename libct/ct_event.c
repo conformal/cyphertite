@@ -74,13 +74,13 @@ void ct_wakeup_x_pipe(struct ct_ctx *);
 void ct_shutdown_x_pipe(struct ct_ctx *);
 #if CT_ENABLE_THREADS
 void ct_wakeup_x_cv(struct ct_ctx *);
-void ct_setup_wakeup_cv(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb);
+int ct_setup_wakeup_cv(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb);
 #endif
-void ct_setup_wakeup_pipe(struct event_base *, struct ct_ctx *ctx, void *vctx,
+int ct_setup_wakeup_pipe(struct event_base *, struct ct_ctx *ctx, void *vctx,
     ct_func_cb *func_cb);
 void * ct_cb_thread(void *);
 
-void
+int
 ct_setup_wakeup_pipe(struct event_base *base, struct ct_ctx *ctx, void *vctx,
     ct_func_cb *func_cb)
 {
@@ -92,7 +92,7 @@ ct_setup_wakeup_pipe(struct event_base *base, struct ct_ctx *ctx, void *vctx,
 	ctx->ctx_shutdown = ct_shutdown_x_pipe;
 
 	if (pipe(ctx->ctx_pipe))
-		CFATAL("pipe create failed");
+		return (1);
 
 	/* make pipes nonblocking - both sides of pipe */
 	for (i= 0; i < 2; i++)
@@ -104,72 +104,73 @@ ct_setup_wakeup_pipe(struct event_base *base, struct ct_ctx *ctx, void *vctx,
 	ctx->ctx_ev = event_new(base, (ctx->ctx_pipe)[0],
 	    EV_READ|EV_PERSIST, ct_handle_wakeup, ctx);
 	event_add(ctx->ctx_ev, NULL);
+
+	return (0);
 }
 
-void
+int
 ct_setup_wakeup_file(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
 {
-	ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_file, vctx,
-	    func_cb);
+	return ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_file,
+	    vctx, func_cb);
 }
 
-void
+int
 ct_setup_wakeup_sha(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
 {
 #if CT_ENABLE_THREADS
-	ct_setup_wakeup_cv(&ev_st->ct_ctx_sha, vctx, func_cb);
+	return ct_setup_wakeup_cv(&ev_st->ct_ctx_sha, vctx, func_cb);
 #else
-	ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_sha, vctx,
-	    func_cb);
-#endif
-}
-
-void
-ct_setup_wakeup_compress(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
-{
-#if CT_ENABLE_THREADS
-	ct_setup_wakeup_cv(&ev_st->ct_ctx_compress, vctx, func_cb);
-#else
-	ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_compress,
+	return ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_sha,
 	    vctx, func_cb);
 #endif
 }
 
-void
+int
+ct_setup_wakeup_compress(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
+{
+#if CT_ENABLE_THREADS
+	return ct_setup_wakeup_cv(&ev_st->ct_ctx_compress, vctx, func_cb);
+#else
+	return ct_setup_wakeup_pipe(ev_st->ct_evt_base,
+	    &ev_st->ct_ctx_compress, vctx, func_cb);
+#endif
+}
+
+int
 ct_setup_wakeup_csha(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
 {
 #if CT_ENABLE_THREADS
-	ct_setup_wakeup_cv(&ev_st->ct_ctx_csha, vctx, func_cb);
+	return ct_setup_wakeup_cv(&ev_st->ct_ctx_csha, vctx, func_cb);
 #else
-	ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_csha, vctx,
-	    func_cb);
+	return ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_csha,
+	    vctx, func_cb);
 #endif
 }
 
-void
+int
 ct_setup_wakeup_encrypt(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
 {
 #if CT_ENABLE_THREADS
-	ct_setup_wakeup_cv(&ev_st->ct_ctx_encrypt, vctx, func_cb);
+	return ct_setup_wakeup_cv(&ev_st->ct_ctx_encrypt, vctx, func_cb);
 #else
-	ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_encrypt, vctx,
-	    func_cb);
+	return ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_encrypt,
+	    vctx, func_cb);
 #endif
 }
 
-void
+int
 ct_setup_wakeup_complete(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
 {
-	/* XXX - is this still pipe? */
-	ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_complete, vctx,
-	    func_cb);
+	return ct_setup_wakeup_pipe(ev_st->ct_evt_base,
+	    &ev_st->ct_ctx_complete, vctx, func_cb);
 }
 
-void
+int
 ct_setup_wakeup_write(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
 {
-	ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_write, vctx,
-	    func_cb);
+	return ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_write,
+	    vctx, func_cb);
 }
 
 void
@@ -405,7 +406,7 @@ ct_shutdown_cv(struct ct_ctx *ctx)
 		CABORT("can't join on thread");
 }
 
-void
+int
 ct_setup_wakeup_cv(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb)
 {
 	pthread_attr_t	 attr;
@@ -422,6 +423,8 @@ ct_setup_wakeup_cv(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb)
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	pthread_create(&ctx->ctx_thread, &attr, ct_cb_thread, (void *)ctx);
+
+	return (0);
 }
 
 void *

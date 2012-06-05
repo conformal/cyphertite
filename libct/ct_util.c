@@ -178,10 +178,12 @@ ct_set_log_fns(struct ct_global_state *state, void *logst,
 }
 
 
-void
+int
 ct_init_eventloop(struct ct_global_state *state,
     void (*info_cb)(evutil_socket_t, short, void *))
 {
+	int ret, s_errno;
+
 	state->event_state = ct_event_init(state, ct_reconnect, info_cb);
 
 #if defined(CT_EXT_INIT)
@@ -209,15 +211,35 @@ ct_init_eventloop(struct ct_global_state *state,
 	CT_LOCK_INIT(&state->ct_queued_lock);
 	CT_LOCK_INIT(&state->ct_complete_lock);
 
-	ct_setup_wakeup_file(state->event_state, state, ct_nextop);
-	ct_setup_wakeup_sha(state->event_state, state, ct_compute_sha);
-	ct_setup_wakeup_compress(state->event_state, state,
-	    ct_compute_compress);
-	ct_setup_wakeup_csha(state->event_state, state, ct_compute_csha);
-	ct_setup_wakeup_encrypt(state->event_state, state, ct_compute_encrypt);
-	ct_setup_wakeup_write(state->event_state, state, ct_process_write);
-	ct_setup_wakeup_complete(state->event_state, state,
-	    ct_process_completions);
+	if ((ret = ct_setup_wakeup_file(state->event_state, state,
+	    ct_nextop)) != 0)
+		goto fail;
+	if ((ret = ct_setup_wakeup_sha(state->event_state, state,
+	    ct_compute_sha)) != 0)
+		goto fail;
+	if ((ret = ct_setup_wakeup_compress(state->event_state, state,
+	    ct_compute_compress)) != 0)
+		goto fail;
+	if ((ret = ct_setup_wakeup_csha(state->event_state, state,
+	    ct_compute_csha)) != 0)
+		goto fail;
+	if ((ret = ct_setup_wakeup_encrypt(state->event_state, state,
+	    ct_compute_encrypt)) != 0)
+		goto fail;
+	if ((ret = ct_setup_wakeup_write(state->event_state, state,
+	    ct_process_write)) != 0)
+		goto fail;
+	if ((ret = ct_setup_wakeup_complete(state->event_state, state,
+	    ct_process_completions)) != 0)
+		goto fail;
+	return (0);
+
+fail:
+	s_errno = errno;
+	ct_cleanup_eventloop(state);
+	errno = s_errno;
+
+	return (ret);
 }
 
 void

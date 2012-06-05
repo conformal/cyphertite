@@ -37,14 +37,14 @@ int			ct_basis_setup(const char *, char **, int,
 			    time_t *);
 
 typedef void (ct_func_cb)(void *);
-void ct_setup_wakeup_file(struct ct_event_state *, void *, ct_func_cb *);
-void ct_setup_wakeup_sha(struct ct_event_state *, void *, ct_func_cb *);
-void ct_setup_wakeup_compress(struct ct_event_state *, void *, ct_func_cb *);
-void ct_setup_wakeup_csha(struct ct_event_state *, void *, ct_func_cb *);
-void ct_setup_wakeup_encrypt(struct ct_event_state *, void *, ct_func_cb *);
-void ct_setup_wakeup_write(struct ct_event_state *, void *, ct_func_cb *);
-void ct_setup_wakeup_complete(struct ct_event_state *, void *, ct_func_cb *);
-void ct_set_reconnect_timeout(struct ct_event_state *, int);
+int	ct_setup_wakeup_file(struct ct_event_state *, void *, ct_func_cb *);
+int	ct_setup_wakeup_sha(struct ct_event_state *, void *, ct_func_cb *);
+int	ct_setup_wakeup_compress(struct ct_event_state *, void *, ct_func_cb *);
+int	ct_setup_wakeup_csha(struct ct_event_state *, void *, ct_func_cb *);
+int	ct_setup_wakeup_encrypt(struct ct_event_state *, void *, ct_func_cb *);
+int	ct_setup_wakeup_write(struct ct_event_state *, void *, ct_func_cb *);
+int	ct_setup_wakeup_complete(struct ct_event_state *, void *, ct_func_cb *);
+void	ct_set_reconnect_timeout(struct ct_event_state *, int);
 
 void ctfile_extract_handle_eof(struct ct_global_state *, struct ct_trans *);
 
