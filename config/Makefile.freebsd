@@ -7,7 +7,7 @@ CFLAGS+= -fdiagnostics-show-option -fno-strict-aliasing
 CFLAGS+= -DNEED_LIBCLENS
 CFLAGS+= -I${INCDIR}/clens -I${LOCALBASE}/ssl/include
 LDFLAGS+= -L${LOCALBASE}/ssl/lib
-LDADD+= -lclens
+LDADDLATE+= -lclens
 LDADDSSL+= -Wl,-Bstatic -lssl -lcrypto -Wl,-Bdynamic
 
 .if defined(ENABLE_THREADS) && ${ENABLE_THREADS} == 1

@@ -50,7 +50,7 @@ CPPFLAGS+= -DBUILDSTR=\"$(BUILDVERSION)\"
 LDADD+= -L${LOCALBASE}/lib
 LDADD+=	-lassl -lclog -lcrypto -levent_core -lexpat -lexude -lshrink
 LDADD+=	-lsqlite3 -lssl -lutil -lxmlsd -ledit -lncurses -lcurl
-LDADD+= ${LDADDSSL} -lct -lctutil
+LDADD+= ${LDADDSSL} -lct -lctutil ${LDADDLATE} 
 CLEANFILES= cyphertite.cat1 cyphertite.conf.cat5
 
 CFLAGS+= -I${.CURDIR}/../libshrink -I${.CURDIR}
