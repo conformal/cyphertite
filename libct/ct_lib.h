@@ -173,6 +173,22 @@ struct ct_global_state {
 
 struct ct_global_state *ct_setup_state(struct ct_config *);
 
+/* Simplified API */
+int
+ct_do_remotelist(struct ct_global_state *state, char **search, char **exclude,
+    int matchmode,
+    void (*printfn) (struct ct_global_state *state, struct ct_op *op));
+
+int
+ct_do_remotearchive(struct ct_global_state *state, char *ctfile, char **flist,
+    char *tdir, char **excludelist, char *includefile, int match_mode,
+    int no_cross_mounts, int strip_slash, int follow_root_symlink,
+    int follow_symlinks, struct ct_config *conf);
+
+int
+ct_do_remoteextract(struct ct_global_state *state, char *ctfile, char *tdir,
+    char **excludelist, char **includefile, int match_mode, int strip_slash,
+    int follow_symlinks, int preserve_attr,  struct ct_config *conf);
 
 /* File status */
 #define CT_S_STARTING		(0)

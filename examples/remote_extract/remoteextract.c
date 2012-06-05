@@ -74,17 +74,11 @@ remotelist_print(struct ct_global_state *state, struct ct_op *op)
 	}
 }
 
-/******************************  BEGIN MOVE TO LIBCT ******************/
 #define CT_INIT_ASSL	1
 #define CT_INIT_CLOG	2
 #define CT_INIT_EXUDE	4
 
 int ct_setup(int flags, int cflags, int debug_mask);
-int 
-ct_do_remotearchive(struct ct_global_state *state, char *ctfile, char **flist,
-    char *tdir, char **excludelist, char *includefile, int match_mode,
-    int no_cross_mounts, int strip_slash, int follow_root_symlink,
-    int follow_symlinks, struct ct_config *conf);
 
 int
 ct_setup(int flags, int cflags, int debug_mask)
@@ -111,94 +105,6 @@ ct_setup(int flags, int cflags, int debug_mask)
 	}
 	return 0;
 }
-
-int 
-	
-ct_do_remotearchive(struct ct_global_state *state, char *ctfile, char **flist,
-    char *tdir, char **excludelist, char *includefile, int match_mode,
-    int no_cross_mounts, int strip_slash, int follow_root_symlink,
-    int follow_symlinks, struct ct_config *conf)
-{
-	int			 ret;
-
-        struct ct_archive_args           caa;
-
-	ct_normalize_filelist(flist);
-	caa.caa_filelist = flist;
-	caa.caa_excllist = excludelist;
-	caa.caa_matchmode = match_mode;
-	caa.caa_includefile = includefile;
-	caa.caa_tdir = tdir;
-	caa.caa_tag = ctfile; 
-	caa.caa_ctfile_basedir = conf->ct_ctfile_cachedir;
-	/* we want to encrypt as long as we have keys */
-	caa.caa_encrypted = (conf->ct_crypto_secrets != NULL);
-	caa.caa_allfiles = conf->ct_multilevel_allfiles;
-	caa.caa_no_cross_mounts = no_cross_mounts;
-	caa.caa_strip_slash = strip_slash;
-	caa.caa_follow_root_symlink = follow_root_symlink;
-	caa.caa_follow_symlinks = follow_symlinks;
-	caa.caa_max_differentials = conf->ct_max_differentials;
-	if (conf->ct_auto_differential)
-		/*
-		 * Need to work out basis filename and
-		 * download it if necessary
-		 */
-		ctfile_find_for_operation(state, ctfile,
-		    ctfile_nextop_archive, &caa, 0, 1);
-	else   {
-		/* No basis, just start the op */
-		ctfile_nextop_archive(state, NULL, &caa);
-	}
-
-
-	ct_wakeup_file(state->event_state);
-
-	ret = ct_event_dispatch(state->event_state);
-	if (ret != 0)
-		CWARNX("event_dispatch returned, %d %s", errno,
-		    strerror(errno));
-
-	return ret;
-}
-
-int 
-ct_do_remoteextract(struct ct_global_state *state, char *ctfile, char *tdir,
-    char **excludelist, char **includefile, int match_mode, int strip_slash,
-    int follow_symlinks, int preserve_attr,  struct ct_config *conf);
-
-int 
-ct_do_remoteextract(struct ct_global_state *state, char *ctfile, char *tdir,
-    char **excludelist, char **includelist, int match_mode, int strip_slash,
-    int follow_symlinks, int preserve_attr,  struct ct_config *conf)
-{
-	int			 ret;
-
-        struct ct_extract_args           cea;
-
-	cea.cea_local_ctfile = NULL; /* to be found */
-	cea.cea_filelist = includelist;
-	cea.cea_excllist = excludelist;
-	cea.cea_matchmode = match_mode;
-	cea.cea_ctfile_basedir = conf->ct_ctfile_cachedir;
-	cea.cea_tdir = tdir;
-	cea.cea_strip_slash = strip_slash;
-	cea.cea_attr = preserve_attr;
-	cea.cea_follow_symlinks = follow_symlinks;
-	ctfile_find_for_operation(state, ctfile,
-	    ctfile_nextop_extract, &cea, 1, 0);
-
-	ct_wakeup_file(state->event_state);
-
-	ret = ct_event_dispatch(state->event_state);
-	if (ret != 0)
-		CWARNX("event_dispatch returned, %d %s", errno,
-		    strerror(errno));
-
-	return ret;
-}
-/****************************** END MOVE TO LIBCT ******************/
-
 
 int
 main(int argc, char **argv)
