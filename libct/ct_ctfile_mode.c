@@ -54,6 +54,8 @@ ct_op_cb ct_cull_complete;
 ct_op_cb ct_cull_collect_ctfiles;
 ct_op_cb ct_cull_fetch_all_ctfiles;
 
+void	 ct_xml_file_open(struct ct_global_state *, struct ct_trans *,
+	     const char *, int, uint32_t, ct_complete_fn);
 /*
  * clean up after a ctfile archive/extract operation by freeing the remotename
  */
@@ -189,7 +191,8 @@ loop:
 
 	if (cas->cas_open_sent == 0) {
 		cas->cas_open_sent = 1;
-		ct_xml_file_open(state, ct_trans, rname, MD_O_WRITE, 0);
+		ct_xml_file_open(state, ct_trans, rname, MD_O_WRITE, 0,
+		    ctfile_xml_open_complete);
 		/* xml thread will wake us up when it gets the open */
 		ct_set_file_state(state, CT_S_WAITING_SERVER);
 		return;
@@ -282,10 +285,10 @@ loop:
 
 void
 ct_xml_file_open(struct ct_global_state *state, struct ct_trans *trans,
-    const char *file, int mode, uint32_t chunkno)
+    const char *file, int mode, uint32_t chunkno, ct_complete_fn callback)
 {
 	trans->tr_state = TR_S_XML_OPEN;
-	trans->tr_complete = ctfile_xml_open_complete;
+	trans->tr_complete = callback;
 
 	if (ct_create_xml_open(&trans->hdr, (void **)&trans->tr_data[2],
 	    file, mode, chunkno) != 0)
@@ -383,9 +386,14 @@ int
 ctfile_extract_complete_open(struct ct_global_state *state,
     struct ct_trans *trans)
 {
+	int	ret;
+
+	ret = ctfile_xml_open_complete(state, trans);
+
 	if (ct_file_extract_open(state->extract_state, trans->tr_fl_node) != 0)
 		CFATALX("unable to open file %s", trans->tr_fl_node->fl_name);
-	return (0);
+
+	return (ret);
 }
 
 int
@@ -441,7 +449,6 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 	}
 	ct_set_file_state(state, CT_S_RUNNING);
 
-again:
 	trans = ct_trans_alloc(state);
 	if (trans == NULL) {
 		/* system busy, return */
@@ -450,14 +457,6 @@ again:
 		return;
 	}
 	if (ces->ces_open_sent == 0) {
-		ct_xml_file_open(state, trans, rname, MD_O_READ, 0);
-		ces->ces_open_sent = 1;
-		/* xml thread will wake us up when it gets the open */
-		ct_set_file_state(state, CT_S_WAITING_SERVER);
-		return;
-	} else if (ces->ces_is_open == 0) {
-		/* XXX merge mostly into completion of xml open? */
-		ces->ces_is_open = 1;
 		ces->ces_fnode = e_calloc(1, sizeof(*ces->ces_fnode));
 		ces->ces_fnode->fl_type = C_TY_REG;
 		ces->ces_fnode->fl_parent_dir =
@@ -470,14 +469,15 @@ again:
 		ces->ces_fnode->fl_atime = time(NULL);
 		ces->ces_fnode->fl_mtime = time(NULL);
 
-		trans = ct_trans_realloc_local(state, trans);
 		trans->tr_fl_node = ces->ces_fnode;
-		trans->tr_state = TR_S_EX_FILE_START;
-		trans->tr_complete = ctfile_extract_complete_open;
-		trans->hdr.c_flags |= C_HDR_F_METADATA;
-		ct_queue_first(state, trans);
-		goto again;
-	}
+
+		ct_xml_file_open(state, trans, rname, MD_O_READ, 0,
+		    ctfile_extract_complete_open);
+		ces->ces_open_sent = 1;
+		/* xml thread will wake us up when it gets the open */
+		ct_set_file_state(state, CT_S_WAITING_SERVER);
+		return;
+	} 
 
 	trans->tr_fl_node = ces->ces_fnode;
 	trans->tr_state = TR_S_EX_SHA;

@@ -28,9 +28,6 @@ msgcomplete_ty		ct_write_done;
 void			ct_handle_xml_reply(struct ct_global_state *,
 			    struct ct_trans *trans,
 			    struct ct_header *hdr, void *vbody);
-void			ct_xml_file_open(struct ct_global_state *,
-			    struct ct_trans *, const char *,
-			    int, uint32_t);
 int			ct_xml_file_open_polled(
 			    struct ct_global_state *,
 			    const char *, int, uint32_t);
