@@ -102,20 +102,27 @@ ct_log_traverse_end_default(void *state, char **filelist)
 {
 }
 
-struct ct_global_state *
-ct_init(struct ct_config *conf, int need_secrets,
-    void (*info_cb)(evutil_socket_t, short, void *))
+int
+ct_init(struct ct_global_state **statep, struct ct_config *conf,
+    int need_secrets, void (*info_cb)(evutil_socket_t, short, void *))
 {
-	struct ct_global_state *state;
+	struct ct_global_state *state = NULL;
 	extern void		ct_reconnect(evutil_socket_t, short, void *);
 	struct stat		sb;
+	int			ret = 0;
 
 	/* Run with restricted umask as we create numerous sensitive files. */
 	umask(S_IRWXG|S_IRWXO);
 
-	state = ct_setup_state(conf);
+	if ((state = ct_setup_state(conf)) == NULL) {
+		ret = 1;
+		goto fail;
+	}
+
 	/* set defaults */
-	ct_set_log_fns(state, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+	if ((ret = ct_set_log_fns(state, NULL, NULL, NULL, NULL, NULL, NULL,
+	    NULL)) != 0)
+		goto fail;
 
 	if (need_secrets != 0 && conf->ct_crypto_secrets != NULL) {
 		if (stat(conf->ct_crypto_secrets, &sb) == -1) {
@@ -130,9 +137,18 @@ ct_init(struct ct_config *conf, int need_secrets,
 			CFATALX("can't unlock secrets file");
 	}
 
-	ct_init_eventloop(state, info_cb);
+	if ((ret = ct_init_eventloop(state, info_cb)) != 0)
+		goto fail;
 
-	return (state);
+	*statep = state;
+	return (0);
+
+fail:
+	if (state != NULL) {
+		e_free(&state->ct_stats);
+		e_free(&state);
+	}
+	return (ret);
 }
 
 int
@@ -315,7 +331,9 @@ ct_do_operation(struct ct_config *conf,  ct_op_cb *start, ct_op_cb *complete,
 
 	ct_prompt_for_login_password(conf);
 
-	state = ct_init(conf, need_secrets, NULL);
+	if ((ret = ct_init(&state, conf, need_secrets, NULL)) != 0)
+		return (ret);
+
 	ct_add_operation(state, start, complete, args);
 	ct_wakeup_file(state->event_state);
 	ret = ct_event_dispatch(state->event_state);

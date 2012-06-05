@@ -250,10 +250,11 @@ void			ct_reconnect(evutil_socket_t, short, void *);
 int			ct_reconnect_internal(struct ct_global_state *);
 int			ct_assl_negotiate_poll(struct ct_global_state *);
 
-struct ct_global_state	*ct_init(struct ct_config *, int,
-			     void (*info_cb)(evutil_socket_t, short, void *));
-int			 ct_set_log_fns(struct ct_global_state *, void *,
-			    ct_log_ctfile_info_fn *, 
+int			ct_init(struct ct_global_state **, struct ct_config *,
+			     int,
+			     void  (*info_cb)(evutil_socket_t, short, void *));
+int			ct_set_log_fns(struct ct_global_state *, void *,
+			     ct_log_ctfile_info_fn *, 
 			     ct_log_file_start_fn *, ct_log_file_end_fn *,
 			     ct_log_file_skip_fn *, ct_log_traverse_start_fn *,
 			     ct_log_traverse_end_fn *);

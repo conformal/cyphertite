@@ -297,7 +297,9 @@ cull(struct ct_cli_cmd *c, int argc, char **argv)
 
 	need_secrets = 1;
 
-	state = ct_init(ctctl_config, need_secrets, ct_info_sig);
+	if ((ret = ct_init(&state, ctctl_config, need_secrets,
+	    ct_info_sig)) != 0)
+		CFATALX("failed to initialize");
 
 	ct_cull_kick(state);
 	ct_wakeup_file(state->event_state);
