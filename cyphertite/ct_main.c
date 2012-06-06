@@ -535,6 +535,7 @@ ct_main(int argc, char **argv)
 			caa.caa_follow_root_symlink = follow_root_symlink;
 			caa.caa_follow_symlinks = follow_symlinks;
 			caa.caa_max_differentials = 0; /* unlimited */
+			caa.caa_basis = ct_basisbackup;
 			caa.caa_tag = ctfile;
 			ct_add_operation(state, ct_archive, NULL, &caa);
 		} else if (ct_action == CT_A_EXTRACT) {
