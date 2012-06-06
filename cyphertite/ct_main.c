@@ -423,7 +423,8 @@ ct_main(int argc, char **argv)
 	    conf->ct_ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0));
 
 	if ((ret = ct_init(&state, conf, need_secrets, ct_info_sig)) != 0)
-		CFATALX("failed to initialise cyphertite");
+		CFATALX("failed to initialise cyphertite: %s",
+		    ct_strerror(ret));
 
 	if (conf->ct_crypto_passphrase != NULL &&
 	    conf->ct_secrets_upload != 0) {

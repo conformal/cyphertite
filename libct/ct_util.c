@@ -61,6 +61,33 @@ void			ct_print_scaled_stat(FILE *, const char *, int64_t,
 			    int64_t, int);
 char			*ct_getloginbyuid(uid_t);
 
+/* XXX use message catalog when warranted. */
+const char *ct_errmsgs[] = {
+	[CTE_ERRNO] = " ",
+	[CTE_EMPTY_XML] = "empty xml body",
+	[CTE_SHORT_READ] = "short read",
+	[CTE_SHORT_WRITE] = "short write",
+	[CTE_INVALID_REPLY_LEN] = "invalid reply length",
+	[CTE_INVALID_REPLY_TYPE] = "invalid reply type",
+	[CTE_XML_PARSE_FAIL] = "XML parse failure",
+	[CTE_INVALID_XML_TYPE]	 = "Invalid XML type",
+	[CTE_NO_SECRETS_FILE] = "No crypto secrets file, please run "
+     "ctctl secrets generate or ctctl secrets download",
+};
+
+const char *
+ct_strerror(int ct_errno)
+{
+	if (ct_errno == CTE_ERRNO)
+		return (strerror(errno));
+
+	if (ct_errno < 0 || ct_errno >= CTE_MAX)
+		CABORTX("ct_errno out of range %d", ct_errno);
+
+	return (ct_errmsgs[ct_errno]);
+}
+
+
 
 ct_log_ctfile_info_fn		ct_log_ctfile_info_default;
 ct_log_file_start_fn		ct_log_file_start_default;

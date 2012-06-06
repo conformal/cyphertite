@@ -110,14 +110,19 @@ struct ctfile_list_file {
 #define	CT_LOG_VERTREE	(0x800)
 
 /* error codes */
-#define CTE_ERRNO		-1
-#define CTE_EMPTY_XML		-2
-#define CTE_SHORT_READ		-3
-#define CTE_SHORT_WRITE		-4
-#define CTE_INVALID_REPLY_LEN	-5
-#define CTE_INVALID_REPLY_TYPE	-6
-#define CTE_XML_PARSE_FAIL	-7
-#define CTE_INVALID_XML_TYPE	-8
-#define CTE_NO_SECRETS_FILE	-9
+#define CTE_ERRNO			1
+#define CTE_EMPTY_XML			2
+#define CTE_SHORT_READ			3
+#define CTE_SHORT_WRITE			4
+#define CTE_INVALID_REPLY_LEN		5
+#define CTE_INVALID_REPLY_TYPE		6
+#define CTE_XML_PARSE_FAIL		7
+#define CTE_INVALID_XML_TYPE		8
+#define CTE_NO_SECRETS_FILE		9
+#define CTE_INVALID_SECRETS_FILE	10	
+#define CTE_INVALID_PASSPHRASE		11
+#define CTE_MAX				12
+
+const char	*ct_strerror(int);
 
 #endif /* ! CT_TYPES_H */

@@ -506,12 +506,12 @@ ct_unlock_secrets(const char *passphrase, const char *filename,
 	FILE			*f;
 	HMAC_CTX		hctx;
 	SHA512_CTX		ctx;
-	int			tot, tot_aes, tot_iv, rv = -1, got_digest = 0;
+	int			tot, tot_aes, tot_iv, got_digest = 0;
+	int			rv = CTE_INVALID_SECRETS_FILE;
 	struct stat		sb;
 
 	if (filename == NULL) {
-		CNDBG(CT_LOG_CRYPTO, "no filename");
-		return (-1);
+		CABORTX("%s: no filename", __func__);
 	}
 
 	if (passphrase)
@@ -524,13 +524,13 @@ ct_unlock_secrets(const char *passphrase, const char *filename,
 
 	f = fopen(filename, "r");
 	if (f == NULL) {
-		CWARN("can't fopen secrets file");
-		return (-1);
+		/* XXX different error code? */
+		return (CTE_INVALID_SECRETS_FILE);
 	}
 
 	while (fgets(line, sizeof line, f)) {
 		if ((s = strchr(line, '\n')) == NULL) {
-			CWARNX("input line too long");
+			CNDBG(CT_LOG_CRYPTO, "input line too long");
 			goto done;
 		}
 		*s = '\0';
@@ -686,7 +686,7 @@ ct_unlock_secrets(const char *passphrase, const char *filename,
 
 	/* step 3 */
 	if (bcmp(d_hmac_maskkey, hmac_maskkey, sizeof hmac_maskkey)) {
-		CWARNX("invalid password");
+		rv = CTE_INVALID_PASSPHRASE;
 		goto done;
 	}
 
