@@ -349,7 +349,7 @@ ct_nextop(void *vctx)
 
 	op = TAILQ_FIRST(&state->ct_operations);
 	if (op == NULL)
-		CFATALX("no operation in queue");
+		CABORTX("no operation in queue");
 
 	op->op_start(state, op);
 }
@@ -361,7 +361,7 @@ ct_op_complete(struct ct_global_state *state)
 
 	op = TAILQ_FIRST(&state->ct_operations);
 	if (op == NULL)
-		CFATALX("no operation in queue");
+		CABORTX("no operation in queue");
 
 	if (op->op_complete)
 		op->op_complete(state, op);
