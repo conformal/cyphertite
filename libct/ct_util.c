@@ -59,8 +59,6 @@ struct ct_io_queue	*ct_ioctx_alloc(void);
 void			ct_ioctx_free(struct ct_io_queue *);
 void			ct_print_scaled_stat(FILE *, const char *, int64_t,
 			    int64_t, int);
-int			ct_validate_xml_negotiate_xml(struct ct_global_state *,
-			    struct ct_header *, char *);
 char			*ct_getloginbyuid(uid_t);
 
 
@@ -126,15 +124,15 @@ ct_init(struct ct_global_state **statep, struct ct_config *conf,
 
 	if (need_secrets != 0 && conf->ct_crypto_secrets != NULL) {
 		if (stat(conf->ct_crypto_secrets, &sb) == -1) {
-			CFATALX("No crypto secrets file, please run "
-			    "ctctl secrets generate or ctctl secrets download");
+			ret = CTE_NO_SECRETS_FILE;
+			goto fail;
 		}
 		/* we got crypto */
-		if (ct_unlock_secrets(conf->ct_crypto_passphrase,
+		if ((ret = ct_unlock_secrets(conf->ct_crypto_passphrase,
 		    conf->ct_crypto_secrets,
 		    state->ct_crypto_key, sizeof(state->ct_crypto_key),
-		    state->ct_iv, sizeof(state->ct_iv)))
-			CFATALX("can't unlock secrets file");
+		    state->ct_iv, sizeof(state->ct_iv))) != 0)
+			goto fail;
 	}
 
 	if ((ret = ct_init_eventloop(state, info_cb)) != 0)
@@ -211,8 +209,8 @@ ct_init_eventloop(struct ct_global_state *state,
 
 	gettimeofday(&state->ct_stats->st_time_start, NULL);
 	state->ct_assl_ctx = ct_ssl_connect(state, 0);
-	if (ct_assl_negotiate_poll(state))
-		CFATALX("negotiate failed");
+	if ((ret = ct_assl_negotiate_poll(state)) != 0)
+		goto fail;
 
 	CNDBG(CT_LOG_NET, "assl data: as bits %d, protocol [%s]",
 	    state->ct_assl_ctx->c->as_bits,
@@ -251,6 +249,7 @@ ct_init_eventloop(struct ct_global_state *state,
 	return (0);
 
 fail:
+	/* Save errno in case CTE_ERRNO */
 	s_errno = errno;
 	ct_cleanup_eventloop(state);
 	errno = s_errno;
@@ -487,19 +486,19 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 	uint8_t				 buf[20];
 
 	/* send server request */
-	if (ct_create_neg(&hdr, &body, state->ct_max_trans,
-	    state->ct_max_block_size) != 0)
-		CFATALX("can't create neg packet");
+	if ((rv = ct_create_neg(&hdr, &body, state->ct_max_trans,
+	    state->ct_max_block_size)) != 0)
+		goto done;
 	payload_sz = hdr.c_size;
 	ct_wire_header(&hdr);
 	if (ct_assl_io_write_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
 	    ASSL_TIMEOUT) != sizeof hdr) {
-		CWARNX("could not write header");
+		rv = CTE_SHORT_WRITE;
 		goto done;
 	}
 	if (ct_assl_io_write_poll(state->ct_assl_ctx, body, payload_sz,
 	    ASSL_TIMEOUT) != payload_sz) {
-		CWARNX("could not write body");
+		rv = CTE_SHORT_WRITE;
 		goto done;
 	}
 
@@ -507,12 +506,14 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 	sz = ct_assl_io_read_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
 	    ASSL_TIMEOUT);
 	if (sz != sizeof hdr) {
+		rv = CTE_SHORT_READ;
 		CWARNX("invalid header size %ld", (long) sz);
 		goto done;
 	}
 	ct_unwire_header(&hdr);
 	/* negotiate reply is the same size as the request, so reuse the body */
 	if (hdr.c_size != payload_sz)  {
+		rv = CTE_INVALID_REPLY_LEN;
 		CWARNX("invalid negotiate reply size %d", hdr.c_size);
 		goto done;
 	}
@@ -520,12 +521,12 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 	if (ct_assl_io_read_poll(state->ct_assl_ctx, buf,
 		    hdr.c_size, ASSL_TIMEOUT) != hdr.c_size) {
 		CWARNX("couldn't read neg parameters");
+		rv = CTE_SHORT_READ;
 		goto done;
 	}
 
-	if (ct_parse_neg_reply(&hdr, buf, &state->ct_max_trans,
-	    &state->ct_max_block_size) != 0) {
-		CWARNX("couldn't parse negotiate reply: %s", "errno here");
+	if ((rv = ct_parse_neg_reply(&hdr, buf, &state->ct_max_trans,
+	    &state->ct_max_block_size)) != 0) {
 		goto done;
 	}
 	e_free(&body);
@@ -533,19 +534,19 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 	CNDBG(CT_LOG_NET, "negotiated queue depth: %u max chunk size: %u",
 	    state->ct_max_trans, state->ct_max_block_size);
 
-	if (ct_create_login(&hdr, &body, state->ct_config->ct_username,
-	    state->ct_config->ct_password) != 0)
+	if ((rv = ct_create_login(&hdr, &body, state->ct_config->ct_username,
+	    state->ct_config->ct_password)) != 0)
 		goto done;
 	payload_sz = hdr.c_size;
 	ct_wire_header(&hdr);
 	if (ct_assl_io_write_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
 	    ASSL_TIMEOUT) != sizeof hdr) {
-		CWARNX("could not write header");
+		rv = CTE_SHORT_WRITE;
 		goto done;
 	}
 	if (ct_assl_io_write_poll(state->ct_assl_ctx, body, payload_sz,
 	    ASSL_TIMEOUT) != payload_sz) {
-		CWARNX("could not write body");
+		rv = CTE_SHORT_WRITE;
 		goto done;
 	}
 
@@ -553,7 +554,7 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 	sz = ct_assl_io_read_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
 	    ASSL_TIMEOUT);
 	if (sz != sizeof hdr) {
-		CWARNX("invalid header size %ld", (long) sz);
+		rv = CTE_SHORT_READ;
 		goto done;
 	}
 	e_free(&body);
@@ -561,15 +562,16 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 
 	/* XXX need a way to get error crud out, right now the function warns
 	   for us. */
-	if (ct_parse_login_reply(&hdr, NULL) != 0)
+	if ((rv = ct_parse_login_reply(&hdr, NULL)) != 0)
 		goto done;
 
-	if (ct_skip_xml_negotiate)
+	if (ct_skip_xml_negotiate) {
+		rv = 0;
 		goto out;
+	}
 
-	if (ct_create_xml_negotiate(&hdr, &body,
-	    ctdb_get_genid(state->ct_db_state)) != 0) {
-		CWARNX("can't create xml negototiate packet");
+	if ((rv = ct_create_xml_negotiate(&hdr, &body,
+	    ctdb_get_genid(state->ct_db_state))) != 0) {
 		goto done;
 	}
 
@@ -577,12 +579,13 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 	ct_wire_header(&hdr);
 	if (ct_assl_io_write_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
 	    ASSL_TIMEOUT) != sizeof hdr) {
-		CWARNX("could not write header");
+		rv = CTE_SHORT_WRITE;
 		goto done;
 	}
 	if (ct_assl_io_write_poll(state->ct_assl_ctx, body, payload_sz,
 	    ASSL_TIMEOUT)
 	    != payload_sz) {
+		rv = CTE_SHORT_WRITE;
 		CWARNX("could not write body");
 		goto done;
 	}
@@ -592,25 +595,27 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 	sz = ct_assl_io_read_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
 	    ASSL_TIMEOUT);
 	if (sz != sizeof hdr) {
+		rv = CTE_SHORT_READ;
 		CWARNX("invalid header size %" PRId64, (int64_t)sz);
 		goto done;
 	}
 	ct_unwire_header(&hdr);
 
 	if (hdr.c_size == 0) {
-		goto done;
+		rv = 0;
+		goto out;
 	}
 	/* get server reply body */
 	body = e_calloc(1, hdr.c_size);
 	sz = ct_assl_io_read_poll(state->ct_assl_ctx, body, hdr.c_size,
 	    ASSL_TIMEOUT);
 	if (sz != hdr.c_size) {
-		CWARNX("invalid xml body size %"PRId64" %d", (int64_t)sz,
-		    hdr.c_size);
+		rv = CTE_SHORT_READ;
 		goto done;
 	}
 	/* XXX check xml data */
-	if (ct_validate_xml_negotiate_xml(state, &hdr, body)) {
+	if ((rv = ct_parse_xml_negotiate_reply(&hdr, body,
+	    state->ct_db_state)) != 0) {
 		e_free(&body);
 		goto done;
 	}
@@ -622,70 +627,6 @@ out:
 	rv = 0;
 done:
 	return (rv);
-}
-int
-ct_validate_xml_negotiate_xml(struct ct_global_state *state,
-    struct ct_header *hdr, char *xml_body)
-{
-	struct xmlsd_element_list xl;
-	struct xmlsd_element	*xe;
-	char			*attrval;
-	const char		*err;
-	int			attrval_i = -1;
-	int			r, rv = -1;
-
-	TAILQ_INIT(&xl);
-
-	r = xmlsd_parse_mem(xml_body, hdr->c_size - 1, &xl);
-	if (r != XMLSD_ERR_SUCCES) {
-		CNDBG(CT_LOG_NET, "xml reply '[%s]'", xml_body ? xml_body :
-		    "<NULL>");
-		CWARN("XML parse fail on XML negotiate");
-		goto done;
-	}
-
-	/*
-	 * XXX - do we want to validate the results?
-	 * - other than validating it parses correctly, seems that
-	 *   additional validation would just complicate future
-	 *   client-server communication.
-	 * - because of this assumption, any non-recognised
-	 *   elements must be ignored.
-	 */
-
-	xe = TAILQ_FIRST(&xl);
-	if (strcmp (xe->name, "ct_negotiate_reply") != 0) {
-		CWARNX("Invalid xml reply type %s, [%s]", xe->name, xml_body);
-		goto done;
-	}
-
-	TAILQ_FOREACH(xe, &xl, entry) {
-		if (strcmp (xe->name, "clientdbgenid") == 0) {
-			attrval = xmlsd_get_attr(xe, "value");
-			err = NULL;
-			attrval_i = strtonum(attrval, -1, INT_MAX, &err);
-			if (err) {
-				CWARNX("unable to parse clientdbgenid [%s]",
-				    attrval);
-				goto done;
-			}
-			CNDBG(CT_LOG_NET, "got cliendbgenid value %d",
-			    attrval_i);
-			break;
-		}
-	}
-
-	if (attrval_i != -1 && attrval_i !=
-	    ctdb_get_genid(state->ct_db_state)) {
-		CNDBG(CT_LOG_DB, "need to recreate localdb");
-		ctdb_reopendb(state->ct_db_state, attrval_i);
-	}
-
-
-	xmlsd_unwind(&xl);
-	rv = 0;
-done:
-	return rv; /* success */
 }
 
 void
