@@ -230,7 +230,7 @@ ct_parse_xml_negotiate_reply(struct ct_header *hdr, void *body,
 
 	if (attrval_i != -1 && attrval_i !=
 	    ctdb_get_genid(ctdb)) {
-		CINFO("need to recreate localdb");
+		CNDBG(CT_LOG_DB, "need to recreate localdb");
 		ctdb_reopendb(ctdb, attrval_i);
 	}
 
