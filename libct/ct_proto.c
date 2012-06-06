@@ -34,6 +34,43 @@
 
 void	*ct_body_alloc_xml(size_t);
 
+int c_hdr_login_reply_ex_errcodes[] = {
+	CTE_INVALID_CREDENTIALS,
+	CTE_ACCOUNT_DISABLED,
+};
+
+int c_hdr_write_reply_ex_errcodes[] = {
+	CTE_OUT_OF_SPACE,
+};
+
+int
+ct_errcode_from_status(struct ct_header *hdr)
+{
+	int	ret = CTE_OPERATION_FAILED;
+
+#ifndef nitems
+#define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
+#endif
+
+	switch (hdr->c_opcode) {
+	case C_HDR_O_LOGIN_REPLY:
+		if (hdr->c_ex_status > nitems(c_hdr_login_reply_ex_errcodes))
+			break;
+		ret = c_hdr_login_reply_ex_errcodes[hdr->c_ex_status];
+		break;
+	case C_HDR_O_WRITE_REPLY:
+		if (hdr->c_ex_status > nitems(c_hdr_write_reply_ex_errcodes))
+			break;
+		ret = c_hdr_write_reply_ex_errcodes[hdr->c_ex_status];
+		break;
+	default:
+		break;
+
+	}
+#undef nitems
+
+	return (ret);
+}
 /*
  * For use with xmlsd_generate for allocating xml bodies.
  * The body alloc is done directly instead of in another path so as to
@@ -77,11 +114,12 @@ ct_parse_neg_reply(struct ct_header *hdr, void *body, int *max_trans,
 {
 	uint8_t		*buf = body;
 	
-	if (hdr->c_version != C_HDR_VERSION ||
-	    hdr->c_opcode != C_HDR_O_NEG_REPLY ||
-	    hdr->c_size != 8) {
-		return (1);
-	}
+	if (hdr->c_version != C_HDR_VERSION)
+		return (CTE_INVALID_REPLY_VERSION);
+	if (hdr->c_opcode != C_HDR_O_NEG_REPLY)
+		return (CTE_INVALID_REPLY_TYPE);
+	if (hdr->c_size != 8)
+		return (CTE_INVALID_REPLY_LEN);
 
 	*max_trans = buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
 	*max_block_size = buf[4] | (buf[5] << 8) | (buf[6] << 16) |
@@ -101,8 +139,7 @@ char *passphrase)
 	ct_sha512((uint8_t *)passphrase, pwd_digest, strlen(passphrase));
 	if (ct_base64_encode(CT_B64_ENCODE, pwd_digest, sizeof pwd_digest,
 	    (uint8_t *)b64_digest, sizeof b64_digest)) {
-		CWARNX("can't base64 encode password");
-		return (1);
+		return (CTE_CANT_BASE64);
 	}
 
 	user_len = strlen(username);
@@ -130,22 +167,14 @@ char *passphrase)
 int
 ct_parse_login_reply(struct ct_header *hdr, void *body)
 {
-	if (hdr->c_version != C_HDR_VERSION) {
-		CWARNX("invalid protocol version %d", hdr->c_version);
-		return (1);
-	}
-	if (hdr->c_opcode != C_HDR_O_LOGIN_REPLY) {
-		CWARNX("invalid opcode %d", hdr->c_opcode);
-		return (1);
-	}
-	if (hdr->c_status != C_HDR_S_OK) {
-		CWARNX("login failed: %s", ct_header_strerror(hdr));
-		return (1);
-	}
-	if (hdr->c_size != 0) {
-		CWARNX("invalid server reply");
-		return (1);
-	}
+	if (hdr->c_version != C_HDR_VERSION)
+		return (CTE_INVALID_REPLY_VERSION);
+	if (hdr->c_opcode != C_HDR_O_LOGIN_REPLY)
+		return (CTE_INVALID_REPLY_TYPE);
+	if (hdr->c_status != C_HDR_S_OK)
+		return (ct_errcode_from_status(hdr));
+	if (hdr->c_size != 0)
+		return (CTE_INVALID_REPLY_LEN);
 
 	return (0);
 }
@@ -185,7 +214,7 @@ ct_parse_xml_negotiate_reply(struct ct_header *hdr, void *body,
 	char			*xml_body = body;
 	const char		*err;
 	int			attrval_i = -1;
-	int			r, rv = -1;
+	int			r, rv;
 
 	TAILQ_INIT(&xl);
 
@@ -193,7 +222,7 @@ ct_parse_xml_negotiate_reply(struct ct_header *hdr, void *body,
 	if (r != XMLSD_ERR_SUCCES) {
 		CNDBG(CT_LOG_NET, "xml reply '[%s]'", xml_body ? xml_body :
 		    "<NULL>");
-		CWARN("XML parse fail on XML negotiate");
+		rv = CTE_XML_PARSE_FAIL;
 		goto done;
 	}
 
@@ -208,7 +237,8 @@ ct_parse_xml_negotiate_reply(struct ct_header *hdr, void *body,
 
 	xe = TAILQ_FIRST(&xl);
 	if (strcmp (xe->name, "ct_negotiate_reply") != 0) {
-		CWARNX("Invalid xml reply type %s, [%s]", xe->name, xml_body);
+		CNDBG(CT_LOG_XML, "invalid xml type %s", xe->name);
+		rv = CTE_INVALID_XML_TYPE;
 		goto done;
 	}
 
@@ -218,8 +248,10 @@ ct_parse_xml_negotiate_reply(struct ct_header *hdr, void *body,
 			err = NULL;
 			attrval_i = strtonum(attrval, -1, INT_MAX, &err);
 			if (err) {
-				CWARNX("unable to parse clientdbgenid [%s]",
+				CNDBG(CT_LOG_XML,
+				    "unable to parse clientdbgenid [%s]",
 				    attrval);
+				rv = CTE_XML_PARSE_FAIL;
 				goto done;
 			}
 			CNDBG(CT_LOG_NET, "got cliendbgenid value %d",
@@ -261,12 +293,13 @@ int
 ct_parse_exists_reply(struct ct_header *hdr, void *body, int *exists)
 {
 	if (hdr->c_version != C_HDR_VERSION)
-		return (1);
+		return (CTE_INVALID_REPLY_VERSION);
 	if (hdr->c_opcode != C_HDR_O_EXISTS_REPLY)
-		return (1);
+		return (CTE_INVALID_REPLY_TYPE);
+
 	switch (hdr->c_status) {
 	case C_HDR_S_FAIL:
-		return (1);
+		return (CTE_OPERATION_FAILED); /* XXX better errno? */
 	case C_HDR_S_EXISTS:
 		*exists = 1;
 		break;
@@ -274,7 +307,7 @@ ct_parse_exists_reply(struct ct_header *hdr, void *body, int *exists)
 		*exists = 0;
 		break;
 	default:
-		return (1);
+		return (CTE_INVALID_REPLY_TYPE);
 	}
 	return (0);
 }
@@ -325,11 +358,11 @@ int
 ct_parse_write_reply(struct ct_header *hdr, void *vbody)
 {
 	if (hdr->c_version != C_HDR_VERSION)
-		return (1);
+		return (CTE_INVALID_REPLY_VERSION);
 	if (hdr->c_opcode != C_HDR_O_WRITE_REPLY)
-		return (1);
+		return (CTE_INVALID_REPLY_TYPE);
 	if (hdr->c_status != C_HDR_S_OK)
-		return (1);
+		return (ct_errcode_from_status(hdr));
 	return (0);
 }
 
@@ -354,10 +387,11 @@ ct_parse_read_reply(struct ct_header *hdr, void *vbody)
 {
 	if (hdr->c_version != C_HDR_VERSION)
 		return (1);
+		return (CTE_INVALID_REPLY_VERSION);
 	if (hdr->c_opcode != C_HDR_O_READ_REPLY)
-		return (1);
+		return (CTE_INVALID_REPLY_TYPE);
 	if (hdr->c_status != C_HDR_S_OK)
-		return (1);
+		return (ct_errcode_from_status(hdr));
 	return (0);
 }
 
@@ -369,30 +403,31 @@ ct_parse_read_ctfile_chunk_info(struct ct_header *hdr, void *vbody,
 
 	/* Not metadata? */
 	if ((hdr->c_flags & C_HDR_F_METADATA) == 0) {
-		CWARNX("not metadata packet");
-		return (1);
+		/* invalid to call with a packet without metadata set. */
+		CABORTX("not metadata packet");
 	}
 	/*
 	 * The server will only send ctfileproto v1 (ex_status == 0) or
 	 * v3 (ex_status == 2), v3 fixed a byteswapping issue in v2. v2
 	 * will never be sent to a client that speaks other versions.
 	 */
-	if (hdr->c_ex_status != 0 && hdr->c_ex_status != 2) {
-	       CWARNX("invalid metadata prootcol (v%d)",
-	           hdr->c_ex_status + 1);
-		return (1);
-	}
+	if (hdr->c_ex_status != 0 && hdr->c_ex_status != 2)
+		return (CTE_INVALID_CTFILE_PROTOCOL);
 	if (hdr->c_ex_status == 2) {
 			cmf = (struct ct_metadata_footer *)
 			    ((uint8_t *)vbody + hdr->c_size - sizeof(*cmf));
 			cmf->cmf_size = ntohl(cmf->cmf_size);
 			cmf->cmf_chunkno = ntohl(cmf->cmf_chunkno);
 
+			CNDBG(CT_LOG_CTFILE,
+			    "size: a %" PRIu32 "d e %" PRIu32 
+			    "chunkno a %" PRIu32 "d e %" PRIu32, cmf->cmf_size,
+			    (uint32_t)(hdr->c_size - sizeof(*cmf)),
+			    cmf->cmf_chunkno, expected_chunkno);
 			if (cmf->cmf_size != hdr->c_size - sizeof(*cmf))
-				CFATALX("invalid chunkfile footer");
+				return (CTE_INVALID_CTFILE_FOOTER);
 			if (cmf->cmf_chunkno != expected_chunkno)
-				CFATALX("invalid chunkno %u %u",
-				    cmf->cmf_chunkno, expected_chunkno);
+				return (CTE_INVALID_CTFILE_CHUNKNO);
 			hdr->c_size -= sizeof(*cmf);
 	}
 
@@ -455,8 +490,10 @@ ct_parse_xml_prepare(struct ct_header *hdr, void *vbody,
 	TAILQ_INIT(xl);
 
 	r = xmlsd_parse_mem(body, hdr->c_size - 1, xl);
-	if (r)
-		CFATALX("XML parse failed! (%d)", r);
+	if (r) {
+		CNDBG(CT_LOG_XML, "XML parse failed! (%d)", r);
+		return (CTE_XML_PARSE_FAIL);
+	}
 
 	TAILQ_FOREACH(xe, xl, entry) {
 		CNDBG(CT_LOG_XML, "%d %s = %s (parent = %s)",
@@ -466,12 +503,15 @@ ct_parse_xml_prepare(struct ct_header *hdr, void *vbody,
 			CNDBG(CT_LOG_XML, "\t%s = %s", xa->name, xa->value);
 	}
 
-	r = xmlsd_validate(xl, x_cmds);
-	if (r)
-		CFATALX("XML validate of '%s' failed! (%d)", body, r);
+	if ((r = xmlsd_validate(xl, x_cmds)) != 0) {
+		CNDBG(CT_LOG_XML, "XML validate of '%s' failed! (%d)", body, r);
+		return (CTE_INVALID_XML_TYPE);
+	}
 
-	if (TAILQ_EMPTY(xl))
-		CFATALX("parse command: No XML");
+	if (TAILQ_EMPTY(xl)) {
+		CNDBG(CT_LOG_XML, "parse command: No XML");
+		return (CTE_EMPTY_XML);
+	}
 
 	return (0);
 }
@@ -494,8 +534,8 @@ ct_create_xml_open(struct ct_header *hdr, void **vbody, const char *file,
 	CNDBG(CT_LOG_XML, "settting up XML open for %s", file);
 	if (ct_base64_encode(CT_B64_M_ENCODE, (uint8_t *)file, strlen(file),
 	    (uint8_t *)b64, sizeof(b64))) {
-		CWARNX("can't base64 encode %s", file);
-		return (1);
+		CNDBG(CT_LOG_CTFILE, "can't base64 encode %s", file);
+		return (CTE_CANT_BASE64);
 	}
 
 	if (mode == MD_O_WRITE || mode == MD_O_APPEND) {
@@ -528,7 +568,7 @@ ct_parse_xml_open_reply(struct ct_header *hdr, void *vbody, char **filename)
 {
 	struct xmlsd_element_list	 xl;
 	struct xmlsd_element		*xe;
-	int			rv = 1;
+	int				 rv;
 
 	if ((rv = ct_parse_xml_prepare(hdr, vbody, ct_xml_open_cmds, &xl)) != 0)
 		return (rv);
@@ -542,13 +582,13 @@ ct_parse_xml_open_reply(struct ct_header *hdr, void *vbody, char **filename)
 					e_free(filename);
 			}
 		}
+		rv = 0;
 	} else {
-		return (1);
-		CABORTX("unexpected XML returned [%s]", (char *)vbody);
+		rv = CTE_INVALID_XML_TYPE;
 	}
 
 	xmlsd_unwind(&xl);
-	return (0);
+	return (rv);
 }
 
 int
@@ -590,11 +630,11 @@ ct_parse_xml_close_reply(struct ct_header *hdr, void *vbody)
 	if (strcmp(xe->name, "ct_md_close") == 0) {
 		rv = 0;
 	} else {
-		rv = 1;
+		rv = CTE_INVALID_XML_TYPE;
 	}
 
 	xmlsd_unwind(&xl);
-	return (0);
+	return (rv);
 }
 
 int
@@ -660,21 +700,32 @@ ct_parse_xml_list_reply(struct ct_header *hdr, void *vbody,
 				tmp = xmlsd_get_attr(xe, "size");
 				file->mlf_size = strtonum(tmp, 0, LLONG_MAX,
 				    &errstr);
-				if (errstr != NULL)
-					CFATAL("can't parse file size %s",
-					    errstr);
+				if (errstr != NULL) {
+					CNDBG(CT_LOG_XML,
+					    "can't parse file size %s", errstr);
+					e_free(&file);
+					continue;
+				}
 
 				tmp = xmlsd_get_attr(xe, "mtime");
 				file->mlf_mtime = strtonum(tmp, 0, LLONG_MAX,
 				    &errstr);
-				if (errstr != NULL)
-					CFATAL("can't parse mtime: %s", errstr);
+				if (errstr != NULL) {
+					e_free(&file);
+					CNDBG(CT_LOG_XML,
+					    "can't parse file mtime %s",
+					    errstr);
+					e_free(&file);
+					continue;
+				}
 				SIMPLEQ_INSERT_TAIL(head, file, mlf_link);
 			}
 		}
+	} else  {
+		rv = CTE_INVALID_XML_TYPE;
 	}
 	xmlsd_unwind(&xl);
-	return (0);
+	return (rv);
 }
 
 int
@@ -689,8 +740,8 @@ ct_create_xml_delete(struct ct_header *hdr, void **vbody, const char *name)
 	CNDBG(CT_LOG_XML, "creating xml delete for %s", name);
 	if (ct_base64_encode(CT_B64_M_ENCODE, (uint8_t *)name, strlen(name),
 	    (uint8_t *)b64, sizeof(b64))) {
-		CWARNX("cant base64 encode %s", name);
-		return (1);
+		CNDBG(CT_LOG_CTFILE, "can't base64 encode %s", name);
+		return (CTE_CANT_BASE64);
 	}
 
 	xe = xmlsd_create(&xl, "ct_md_delete");
@@ -734,12 +785,16 @@ ct_parse_xml_delete_reply(struct ct_header *hdr, void *vbody, char **filename)
 				if (ct_base64_encode(CT_B64_M_DECODE,
 				    (uint8_t *)*filename, strlen(*filename),
 				    (uint8_t *)b64, sizeof(b64))) {
-					CFATALX("cant base64 encode %s",
+					CNDBG(CT_LOG_XML,
+					    "cant base64 decode %s",
 					    *filename);
+					return (CTE_CANT_BASE64);
 				}
 				*filename = e_strdup(b64);
 			}
 		}
+	} else  {
+		rv = CTE_INVALID_XML_TYPE;
 	}
 
 	xmlsd_unwind(&xl);
@@ -763,8 +818,7 @@ ct_create_xml_cull_setup(struct ct_header *hdr, void **vbody,
 		type = "precious";
 		break;
 	default:
-		CWARNX("invalid cull type %d", mode);
-		return (1);
+		CABORTX("invalid cull type %d", mode);
 	};
 
 	xp = xmlsd_create(&xl, "ct_cull_setup");
@@ -799,6 +853,8 @@ ct_parse_xml_cull_setup_reply(struct ct_header *hdr, void *vbody)
 	xe = TAILQ_FIRST(&xl);
 	if (strcmp(xe->name, "ct_cull_setup_reply") == 0) {
 		CNDBG(CT_LOG_XML, "cull_setup_reply");
+	} else  {
+		rv = CTE_INVALID_XML_TYPE;
 	}
 
 	xmlsd_unwind(&xl);
@@ -863,6 +919,8 @@ ct_parse_xml_cull_shas_reply(struct ct_header *hdr, void *vbody)
 	xe = TAILQ_FIRST(&xl);
 	if (strcmp(xe->name, "ct_cull_shas_reply") == 0) {
 		CNDBG(CT_LOG_XML, "cull_shas_reply");
+	} else  {
+		rv = CTE_INVALID_XML_TYPE;
 	}
 
 	xmlsd_unwind(&xl);
@@ -886,8 +944,7 @@ ct_create_xml_cull_complete(struct ct_header *hdr, void **vbody,
 		type = "process";
 		break;
 	default:
-		CWARNX("invalid cull type %d", mode);
-		return (1);
+		CABORTX("invalid cull type %d", mode);
 	};
 
 	xp = xmlsd_create(&xl, "ct_cull_complete");
@@ -922,6 +979,8 @@ ct_parse_xml_cull_complete_reply(struct ct_header *hdr, void *vbody)
 	xe = TAILQ_FIRST(&xl);
 	if (strcmp(xe->name, "ct_cull_complete_reply") == 0) {
 		CNDBG(CT_LOG_XML, "cull_complete_reply");
+	} else  {
+		rv = CTE_INVALID_XML_TYPE;
 	}
 
 	xmlsd_unwind(&xl);

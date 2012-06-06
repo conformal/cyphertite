@@ -121,7 +121,17 @@ struct ctfile_list_file {
 #define CTE_NO_SECRETS_FILE		9
 #define CTE_INVALID_SECRETS_FILE	10	
 #define CTE_INVALID_PASSPHRASE		11
-#define CTE_MAX				12
+#define CTE_INVALID_REPLY_VERSION	12
+#define CTE_CANT_BASE64			13
+#define CTE_INVALID_CREDENTIALS		14
+#define CTE_ACCOUNT_DISABLED		15
+#define CTE_OUT_OF_SPACE		16
+#define CTE_OPERATION_FAILED		17 	/* XXX unknown error ? */
+#define CTE_INVALID_CTFILE_PROTOCOL	18
+#define CTE_INVALID_CTFILE_FOOTER	19
+#define CTE_INVALID_CTFILE_CHUNKNO	20
+#define CTE_INVALID_CULL_TYPE		21
+#define CTE_MAX				22
 
 const char	*ct_strerror(int);
 

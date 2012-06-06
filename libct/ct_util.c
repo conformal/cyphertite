@@ -72,7 +72,21 @@ const char *ct_errmsgs[] = {
 	[CTE_XML_PARSE_FAIL] = "XML parse failure",
 	[CTE_INVALID_XML_TYPE]	 = "Invalid XML type",
 	[CTE_NO_SECRETS_FILE] = "No crypto secrets file, please run "
-     "ctctl secrets generate or ctctl secrets download",
+	     "ctctl secrets generate or ctctl secrets download",
+	[CTE_INVALID_SECRETS_FILE] = "Invalid secrets file",
+	[CTE_INVALID_PASSPHRASE	] = "Invalid passphrase",
+	[CTE_INVALID_REPLY_VERSION] = "Invalid reply version",
+	[CTE_CANT_BASE64	] = "Can not base64",
+	[CTE_INVALID_CREDENTIALS] = "Invalid credentials",
+	[CTE_ACCOUNT_DISABLED	] = "Account Disabled - Please log in to your "
+	    "cyphertite.com account or contact support@cyphertite.com",
+	[CTE_OUT_OF_SPACE	] = "Account has run out of space - Please log "
+	    "in to your cyphertite.com account or contact support@cyphertite.com",
+	[CTE_OPERATION_FAILED	] = "Operation failed",
+	[CTE_INVALID_CTFILE_PROTOCOL] = "Invalid ctfile protocol",
+	[CTE_INVALID_CTFILE_FOOTER] = "Invalid ctfile footer",
+	[CTE_INVALID_CTFILE_CHUNKNO] = "Invalid ctfile chunkno",
+	[CTE_INVALID_CULL_TYPE] = "Invalid cull type",
 };
 
 const char *
