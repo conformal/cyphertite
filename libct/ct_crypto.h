@@ -34,8 +34,6 @@ int			ct_create_iv_ctfile(uint32_t, uint8_t *, size_t);
 int			ct_create_secrets(const char *, const char *, uint8_t *, uint8_t *);
 int			ct_unlock_secrets(const char *, const char *, uint8_t *, size_t,
 			    uint8_t *, size_t);
-void			ct_crypt_create_iv(uint8_t *iv, size_t, uint8_t *,
-			    size_t);
 int			ct_crypto_blocksz(void);
 
 #endif /* ! CT_CRYPTO_H */

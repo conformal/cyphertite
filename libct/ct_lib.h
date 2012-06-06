@@ -50,7 +50,6 @@ struct ct_config {
 
 struct ct_config	*ct_load_config(char **);
 void			 ct_unload_config(char *, struct ct_config *);
-void	ct_create_config(void);
 char *ct_system_config(void);
 char *ct_user_config(void);
 char *ct_user_config_old(void);
@@ -362,7 +361,6 @@ void			 ctfile_trim_cache(const char *, long long);
 void			 ct_prompt_for_login_password(struct ct_config *);
 void			 ct_normalize_username(char *);
 char			*ct_normalize_path(char *);
-char			*ct_normalize_path(char *);
 void			 ct_normalize_filelist(char **);
 
 /* Operation API */
@@ -492,7 +490,6 @@ struct ctfile_parse_state;
 
 void	ct_extract_setup(struct ct_extract_head *, struct ctfile_parse_state *,
 	    const char *, const char *, int *, int);
-void	ct_extract_setup_dir(const char *);
 void	ct_extract_open_next(struct ct_extract_head *,
 	    struct ctfile_parse_state *, int);
 void	ct_extract_cleanup_queue(struct ct_extract_head *);
@@ -518,10 +515,9 @@ void			 ct_file_extract_cleanup(struct ct_extract_state *);
 struct ct_archive_state;
 struct ct_archive_state	*ct_archive_init(const char *);
 struct dnode		*ct_archive_get_rootdir(struct ct_archive_state *);
+struct dnode		*ct_archive_insert_dir(struct ct_archive_state *, struct dnode *);
 struct dnode		*ct_archive_lookup_dir(struct ct_archive_state *,
 			     const char *);
-struct dnode		*ct_file_archive_insert_dir(struct ct_archive_state *,
-			     struct dnode *);
 void			 ct_archive_cleanup(struct ct_archive_state *);
 
 
