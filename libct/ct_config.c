@@ -348,6 +348,13 @@ ct_load_config(char **configfile)
 		}
 	}
 
+	if (conf.ct_cert == NULL)
+		CFATALX("no cert provided in config");
+	if (conf.ct_ca_cert == NULL)
+		CFATALX("no ca_cert provided in config");
+	if (conf.ct_key == NULL)
+		CFATALX("no key provided in config");
+
 	if (ctfile_mode_str != NULL) {
 		if (strcmp(ctfile_mode_str, "remote") == 0)
 			conf.ct_ctfile_mode = CT_MDMODE_REMOTE;
