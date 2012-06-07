@@ -87,6 +87,10 @@ const char *ct_errmsgs[] = {
 	[CTE_INVALID_CTFILE_FOOTER] = "Invalid ctfile footer",
 	[CTE_INVALID_CTFILE_CHUNKNO] = "Invalid ctfile chunkno",
 	[CTE_INVALID_CULL_TYPE] = "Invalid cull type",
+	[CTE_LOAD_CERTS] = "Failed to load certs. Ensure that the ca_cert, "
+	    "cert and key are set to valid paths in the configuration file",
+	[CTE_ASSL_CONTEXT] = "Failed to allocate assl context",
+	[CTE_CONNECT_FAILED] = "Failed to connect",
 };
 
 const char *
@@ -249,7 +253,8 @@ ct_init_eventloop(struct ct_global_state *state,
 	    state->ct_config->ct_crypto_secrets != NULL);
 
 	gettimeofday(&state->ct_stats->st_time_start, NULL);
-	state->ct_assl_ctx = ct_ssl_connect(state, 0);
+	if ((ret = ct_ssl_connect(state)) != 0)
+		goto fail;
 	if ((ret = ct_assl_negotiate_poll(state)) != 0)
 		goto fail;
 
@@ -302,11 +307,7 @@ void
 ct_cleanup_eventloop(struct ct_global_state *state)
 {
 	ct_trans_cleanup(state);
-	if (state->ct_assl_ctx) {
-		ct_ssl_cleanup(state->ct_assl_ctx, state->bw_limit);
-		state->ct_assl_ctx = NULL;
-		state->bw_limit = NULL;
-	}
+	ct_ssl_cleanup(state);
 	ctdb_shutdown(state->ct_db_state);
 	state->ct_db_state = NULL;
 	// XXX: ct_lock_cleanup();
@@ -419,36 +420,36 @@ ct_op_complete(struct ct_global_state *state)
 	return (0);
 }
 
-static void
+static int
 ct_load_certs(struct ct_global_state *state, struct assl_context *c)
 {
-	if (state->ct_config->ct_cert == NULL)
-		CFATALX("no cert provided in config");
-	if (state->ct_config->ct_ca_cert == NULL)
-		CFATALX("no ca_cert provided in config");
-	if (state->ct_config->ct_key == NULL)
-		CFATALX("no key provided in config");
-
 	if (assl_load_file_certs(c, state->ct_config->ct_ca_cert,
 	    state->ct_config->ct_cert, state->ct_config->ct_key))
+		return (CTE_LOAD_CERTS);
 		assl_fatalx("Failed to load certs. Ensure that "
 		    "the ca_cert, cert and key are set to valid paths in "
 		    "the configuration file");
 }
 
-struct ct_assl_io_ctx *
-ct_ssl_connect(struct ct_global_state *state, int nonfatal)
+int
+ct_ssl_connect(struct ct_global_state *state)
 {
 	struct ct_assl_io_ctx	*ctx;
 	struct assl_context	*c;
+	int			 ret;
 
 	ctx = e_calloc(1, sizeof (*ctx));
 
-	c = assl_alloc_context(ASSL_M_TLSV1_CLIENT, 0);
-	if (c == NULL)
-		assl_fatalx("assl_alloc_context");
+	if ((c = assl_alloc_context(ASSL_M_TLSV1_CLIENT, 0)) == NULL) {
+		e_free(&ctx);
+		return (CTE_ASSL_CONTEXT);
+	}
 
-	ct_load_certs(state, c);
+	if ((ret = ct_load_certs(state, c)) != 0) {
+		/* free assl thingy */
+		e_free(&ctx);
+		return (ret);
+	}
 
 	ct_assl_io_ctx_init(ctx, c, ct_handle_msg, ct_write_done,
 	    state, ct_header_alloc, ct_header_free, ct_body_alloc,
@@ -459,30 +460,32 @@ ct_ssl_connect(struct ct_global_state *state, int nonfatal)
 	    ASSL_F_NONBLOCK|ASSL_F_KEEPALIVE|ASSL_F_THROUGHPUT,
 	    ct_event_get_base(state->event_state), ct_event_assl_read,
 	    ct_event_assl_write, ctx)) {
-		if (nonfatal) {
-			/* XXX */
-			ct_assl_disconnect(ctx);
-			e_free(&ctx);
-			ctx = NULL;
-		} else
-			assl_fatalx("server connect failed");
+		ct_assl_disconnect(ctx);
+		e_free(&ctx);
+		ctx = NULL;
+		return (CTE_CONNECT_FAILED);
 	}
+
+	state->ct_assl_ctx = ctx;
+
 	if (state->ct_config->ct_io_bw_limit && ctx != NULL)
 		state->bw_limit =
 		    ct_ssl_init_bw_lim(ct_event_get_base(state->event_state),
 		    ctx, state->ct_config->ct_io_bw_limit);
 
-	return ctx;
+	return (0);
 }
 
 void
-ct_ssl_cleanup(struct ct_assl_io_ctx *ctx, struct bw_limit_ctx *blc)
+ct_ssl_cleanup(struct ct_global_state *state)
 {
-	if (blc != NULL)
-		ct_ssl_cleanup_bw_lim(blc);
-	if (ctx != NULL) {
-		ct_assl_disconnect(ctx);
-		e_free(&ctx);
+	if (state->bw_limit != NULL) {
+		ct_ssl_cleanup_bw_lim(state->bw_limit);
+		state->bw_limit = NULL;
+	}
+	if (state->ct_assl_ctx != NULL) {
+		ct_assl_disconnect(state->ct_assl_ctx);
+		e_free(&state->ct_assl_ctx);
 	}
 }
 

@@ -243,11 +243,9 @@ struct bw_limit_ctx	*ct_ssl_init_bw_lim(struct event_base *,
 			    struct ct_assl_io_ctx *, int);
 void			ct_ssl_cleanup_bw_lim(struct bw_limit_ctx *);
 
-struct ct_assl_io_ctx	*ct_ssl_connect(struct ct_global_state *, int);
-void			ct_ssl_cleanup(struct ct_assl_io_ctx *,
-			    struct bw_limit_ctx *);
+int			ct_ssl_connect(struct ct_global_state *);
+void			ct_ssl_cleanup(struct ct_global_state *);
 void			ct_reconnect(evutil_socket_t, short, void *);
-int			ct_reconnect_internal(struct ct_global_state *);
 int			ct_assl_negotiate_poll(struct ct_global_state *);
 
 int			ct_init(struct ct_global_state **, struct ct_config *,

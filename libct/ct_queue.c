@@ -32,6 +32,7 @@
 #include <ct_internal.h>
 
 
+int	ct_reconnect_internal(struct ct_global_state *);
 
 void ct_handle_exists_reply(struct ct_global_state *,  struct ct_trans *,
     struct ct_header *, void *);
@@ -626,8 +627,9 @@ int
 ct_reconnect_internal(struct ct_global_state *state)
 {
 	struct ct_trans		*trans, *ttrans;
+	int			 ret;
 
-	if ((state->ct_assl_ctx = ct_ssl_connect(state, 1)) != NULL) {
+	if ((ret = ct_ssl_connect(state)) != 0) {
 		if (ct_assl_negotiate_poll(state)) {
 			CFATALX("negotiate failed");
 		}
@@ -713,6 +715,8 @@ ct_reconnect_internal(struct ct_global_state *state)
 		}
 		CT_UNLOCK(&state->ct_write_lock);
 	} else {
+		CNDBG(CT_LOG_NET, "failed to reconnect to server: %s",
+		    ct_strerror(ret));
 		if (state->ct_disconnected == 2)
 			CWARNX("Lost connection to server will attempt "
 			    "to reconnect");
@@ -723,7 +727,7 @@ ct_reconnect_internal(struct ct_global_state *state)
 		}
 		state->ct_disconnected++;
 	}
-	return (state->ct_assl_ctx == NULL);
+	return (state->ct_disconnected > 0);
 }
 
 void
@@ -755,9 +759,7 @@ ct_handle_disconnect(struct ct_global_state *state)
 	int			 idle = 1;
 
 	state->ct_disconnected = 1;
-	ct_ssl_cleanup(state->ct_assl_ctx, state->bw_limit);
-	state->ct_assl_ctx = NULL;
-	state->bw_limit = NULL;
+	ct_ssl_cleanup(state);
 
 	while ((trans = ct_dequeue_inflight(state)) != NULL) {
 		CNDBG(CT_LOG_NET,

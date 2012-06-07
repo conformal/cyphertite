@@ -518,17 +518,16 @@ config_generate(struct ct_cli_cmd *c, int argc, char **argv)
 	state = ct_setup_state(&config);
 	assl_initialize();
 	state->event_state = ct_event_init(state, NULL, NULL);
-	state->ct_assl_ctx = ct_ssl_connect(state, 0);
-	if (ct_assl_negotiate_poll(state)) {
-		CFATALX("unable to connect to server");
+	if ((rv = ct_ssl_connect(state)) != 0)
+		CFATALX("unable to connect to server: %s", ct_strerror(rv));
+	if ((rv = ct_assl_negotiate_poll(state)) != 0) {
+		CFATALX("unable to log in to server: %s", ct_strerror(rv));
 	}
 	/*
 	 * XXX: It would make more sense to leave the connection open here, but
 	 * there are some corner cases that need to be handled if so.
 	 */
-	ct_ssl_cleanup(state->ct_assl_ctx, state->bw_limit);
-	state->ct_assl_ctx = NULL;
-	state->bw_limit = NULL;
+	ct_ssl_cleanup(state);
 	ct_event_cleanup(state->event_state);
 	state->event_state = NULL;
 

@@ -131,7 +131,10 @@ struct ctfile_list_file {
 #define CTE_INVALID_CTFILE_FOOTER	19
 #define CTE_INVALID_CTFILE_CHUNKNO	20
 #define CTE_INVALID_CULL_TYPE		21
-#define CTE_MAX				22
+#define CTE_LOAD_CERTS			22
+#define CTE_ASSL_CONTEXT		23
+#define CTE_CONNECT_FAILED		24
+#define CTE_MAX				25
 
 const char	*ct_strerror(int);
 
