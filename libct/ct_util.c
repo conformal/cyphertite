@@ -158,7 +158,7 @@ ct_init(struct ct_global_state **statep, struct ct_config *conf,
 	umask(S_IRWXG|S_IRWXO);
 
 	if ((state = ct_setup_state(conf)) == NULL) {
-		ret = 1;
+		ret = CTE_ERRNO;
 		goto fail;
 	}
 
