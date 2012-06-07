@@ -92,7 +92,7 @@ ct_setup_wakeup_pipe(struct event_base *base, struct ct_ctx *ctx, void *vctx,
 	ctx->ctx_shutdown = ct_shutdown_x_pipe;
 
 	if (pipe(ctx->ctx_pipe))
-		return (1);
+		return (CTE_ERRNO);
 
 	/* make pipes nonblocking - both sides of pipe */
 	for (i= 0; i < 2; i++)
