@@ -103,6 +103,7 @@ main(int argc, char **argv)
 	char  *ctfile;
 	int    match_mode, no_cross_mounts, strip_slash;
 	int    follow_root_symlink, follow_symlinks;
+	int    ret;
 
 	/* setup arguments */
 	excludelist = NULL;
@@ -132,7 +133,8 @@ main(int argc, char **argv)
 
 	ct_prompt_for_login_password(conf);
 
-	state = ct_init(conf, 0, ct_info_sig);
+	if ((ret = ct_init(&state, conf, 0, ct_info_sig)) != 0)
+		CFATALX("can't initialize: %s", ct_strerror(ret));
 
 	rslt = ct_do_remotearchive(state, ctfile, flist, tdir, excludelist,
 	    includelist, match_mode, no_cross_mounts, strip_slash,

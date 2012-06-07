@@ -104,6 +104,7 @@ main(int argc, char **argv)
 	int    attr;
 	int    match_mode, strip_slash;
 	int    follow_symlinks;
+	int    ret;
 
 	/* setup arguments */
 	excludelist = NULL;
@@ -128,7 +129,8 @@ main(int argc, char **argv)
 
 	ct_prompt_for_login_password(conf);
 
-	state = ct_init(conf, 0, ct_info_sig);
+	if ((ret = ct_init(&state, conf, 0, ct_info_sig)) != 0)
+		CFATALX("can't initialize: %s", ct_strerror(ret));
 
 	rslt = ct_do_remoteextract(state, ctfile, tdir, excludelist, includelist,
 	    match_mode, strip_slash, follow_symlinks, attr, conf);

@@ -333,7 +333,7 @@ ctfb_main(int argc, char *argv[])
 
 	/* We may have to download files later, always set up */
 	if ((ret = ct_init(&ctfb_state, conf, 1, ct_info_sig)) != 0)
-		CFATALX("failed to initialize");
+		CFATALX("failed to initialize: %s", ct_strerror(ret));
 	state = ctfb_state;
 
 	/* if we're in remote mode, try and grab the appropriate files */

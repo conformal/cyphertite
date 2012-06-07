@@ -127,7 +127,8 @@ main(int argc, char **argv)
 
 	ct_prompt_for_login_password(conf);
 
-	state = ct_init(conf, 0, ct_info_sig);
+	if ((rslt = ct_init(&state, conf, 0, ct_info_sig)) != 0)
+		CFATALX("can't initialize: %s", ct_strerror(rslt));
 
 	char **search;
 	char **exclude;
