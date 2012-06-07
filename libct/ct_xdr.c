@@ -685,7 +685,7 @@ ctfile_write_init(const char *ctfile, const char *ctfile_basedir, int type,
 	ctx->cws_dirnum = -1;
 
 	if (lvl != 0 && basis == NULL)
-		CFATALX("multilevel archive with no basis");
+		CABORTX("multilevel archive with no basis");
 
 	/* open metadata file */
 	if ((ctx->cws_f = fopen(ctfile, "wb")) == NULL)
