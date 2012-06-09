@@ -1,0 +1,46 @@
+.\"
+.\" Copyright (c) 2012 Conformal Systems LLC <info@conformal.com>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate: June 8 2012 $
+.Dt CT 3
+.Os
+.Sh NAME
+.Nm simplect
+.Nd simple cyphertite library api
+.Sh SYNOPSIS
+
+.Ft int 
+.Fn ct_do_remotearchive "struct ct_global_state *state" "char *ctfile" "char **flist" "char *tdir" "char **excludelist" "char *includefile" "int match_mode" "int no_cross_mounts" "int strip_slash" "int follow_root_symlink" "int follow_symlinks" "struct ct_config *conf"
+.Ft int 
+.Fn ct_do_remoteextract "struct ct_global_state *state" "char *ctfile" "char *tdir" "char **excludelist" "char **includelist" "int match_mode" "int strip_slash" "int follow_symlinks" "int preserve_attr" "struct ct_config *conf"
+.Ft int 
+.Fn ct_do_remotelist "struct ct_global_state *state" "char **search" "char **exclude" "int matchmode" "void (*printfn) (struct ct_global_state *state, struct ct_op *op)"
+
+.Sh DESCRIPTION
+
+.\"ct_sapi.c
+
+.Sh RETURN VALUES
+
+.Sh EXAMPLES
+
+.Sh SEE ALSO
+.Xr ct 3
+
+.Sh HISTORY
+.An -nosplit
+.Nm
+was written by
+.An Conformal Systems, LLC. Aq info@conformal.com .
