@@ -160,11 +160,38 @@ install:
 	$(INSTALL) -m 0644 $(OBJPREFIX)$(LIB.STATIC) $(DESTDIR)$(LIBDIR)/
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(INCDIR)/cyphertite
 	$(INSTALL) -m 0644 $(LIB.HEADERS) $(DESTDIR)$(INCDIR)/cyphertite
+	$(foreach page, $(LIB.MANPAGES), \
+		$(INSTALL) -m 0444 $(page) $(addprefix $(DESTDIR)$(MANDIR)/, \
+		$(subst ., man, $(suffix $(page))))/; \
+	)
+	@set $(addprefix $(DESTDIR)$(MANDIR)/, $(LIB.MLINKS)); \
+	while : ; do \
+		case $$# in \
+			0) break;; \
+			1) echo "Warning: Unbalanced MLINK: $$1"; break;; \
+		esac; \
+		page=$$1; shift; link=$$1; shift; \
+		echo $(LN) $(LNFORCE) $$page $$link; \
+		$(LN) $(LNFORCE) $$page $$link; \
+	done
 
 uninstall:
 	$(RM) $(DESTDIR)$(LIBDIR)/$(LIB.STATIC)
 	$(RM) $(addprefix $(DESTDIR)$(INCDIR)/cyphertite, $(LIB.HEADERS))
 	$(RMDIR) $(DESTDIR)$(INCDIR)/cyphertite
+	while : ; do \
+		case $$# in \
+			0) break;; \
+			1) echo "Warning: Unbalanced MLINK: $$1"; break;; \
+		esac; \
+		page=$$1; shift; link=$$1; shift; \
+		echo $(RM) $$link; \
+		$(RM) $$link; \
+	done
+	$(foreach page, $(LIB.MANPAGES), \
+		$(RM) $(addprefix $(DESTDIR)$(MANDIR)/, \
+		$(subst ., man, $(suffix $(page))))/$(page); \
+	)
 
 clean:
 	$(RM) $(LIB.OBJS)
