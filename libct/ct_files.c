@@ -741,11 +741,12 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 
 		/* XXX - deal with stdin */
 		/* XXX - if basisbackup should the type change ? */
-		if ((cap->cap_cws = ctfile_write_init(ctfile,
+		if ((error = ctfile_write_init(&cap->cap_cws, ctfile,
 		    caa->caa_ctfile_basedir, CT_MD_REGULAR, basisbackup,
 		    nextlvl, cwd, filelist, caa->caa_encrypted,
-		    caa->caa_allfiles, state->ct_max_block_size)) == NULL)
-			CFATAL("can't create %s", ctfile);
+		    caa->caa_allfiles, state->ct_max_block_size)) != 0)
+			CFATAL("can't create %s: %s", ctfile,
+			    ct_strerror(error));
 
 		if (basisbackup != NULL)
 			e_free(&basisbackup);

@@ -22,6 +22,7 @@
 #include <string.h>
 #include <time.h>
 #include <inttypes.h>
+#include <errno.h>
 
 #include <libgen.h>
 
@@ -46,7 +47,7 @@ bool_t		ct_xdr_dedup_sha_crypto(XDR *, uint8_t *, uint8_t *,
 bool_t          ct_xdr_header(XDR *, struct ctfile_header *, int);
 bool_t          ct_xdr_trailer(XDR *, struct ctfile_trailer *);
 bool_t          ct_xdr_stdin(XDR *, struct ctfile_stdin *);
-bool_t          ct_xdr_gheader(XDR *, struct ctfile_gheader *, int,
+int          	ct_xdr_gheader(XDR *, struct ctfile_gheader *, int,
 		    const char *);
 
 static FILE	*ctfile_open(const char *, const char *,
@@ -135,7 +136,7 @@ ct_xdr_stdin(XDR *xdrs, struct ctfile_stdin *objp)
 	return (TRUE);
 }
 
-bool_t
+int
 ct_xdr_gheader(XDR *xdrs, struct ctfile_gheader *objp,
     int direction, const char *ctfile_basedir)
 {
@@ -143,49 +144,54 @@ ct_xdr_gheader(XDR *xdrs, struct ctfile_gheader *objp,
 	int	 i;
 
 	if (!xdr_int(xdrs, &objp->cmg_beacon))
-		return (FALSE);
+		return (CTE_XDR);
 	if (!xdr_int(xdrs, &objp->cmg_version))
-		return (FALSE);
+		return (CTE_XDR);
 	if (!xdr_int(xdrs, &objp->cmg_chunk_size))
-		return (FALSE);
+		return (CTE_XDR);
 	if (!xdr_int64_t(xdrs, &objp->cmg_created))
-		return (FALSE);
+		return (CTE_XDR);
 	if (!xdr_int(xdrs, &objp->cmg_type))
-		return (FALSE);
+		return (CTE_XDR);
 	if (!xdr_int(xdrs, &objp->cmg_flags))
-		return (FALSE);
+		return (CTE_XDR);
 	if (direction  == XDR_ENCODE && ctfile_basedir != NULL &&
 	    objp->cmg_prevlvl_filename != NULL &&
 	    objp->cmg_prevlvl_filename[0] != '\0') {
 		/* XXX technically should just remove basedir if present */
 		strlcpy(base, objp->cmg_prevlvl_filename, sizeof(base));
-		if ((basep = basename(base)) == NULL)
-			CFATALX("can't basename %s",
+		if ((basep = basename(base)) == NULL) {
+			CNDBG(CT_LOG_CTFILE, "can't basename %s",
 			    objp->cmg_prevlvl_filename);
+			return (CTE_INVALID_PATH);
+		}
 		prevlvl = basep;
 	} else {
 		prevlvl = objp->cmg_prevlvl_filename;
 	}
 	if (!xdr_string(xdrs, &prevlvl, PATH_MAX))
-		return (FALSE);
+		return (CTE_XDR);
 	if (direction == XDR_DECODE && ctfile_basedir != NULL &&
 	    prevlvl != NULL && prevlvl[0] != '\0') {
 		strlcpy(base, prevlvl, sizeof(base));
-		if ((basep = basename(base)) == NULL)
-			CFATALX("can't basename %s", prevlvl);
+		if ((basep = basename(base)) == NULL) {
+			CNDBG(CT_LOG_CTFILE, "can't basename %s", prevlvl);
+			return (CTE_INVALID_PATH);
+		}
 		if (asprintf(&objp->cmg_prevlvl_filename, "%s%s",
-		    ctfile_basedir, basep) == -1)
-			CFATALX("out of memory");
+		    ctfile_basedir, basep) == -1) {
+			return (CTE_ERRNO);
+		}
 	} else {
 		objp->cmg_prevlvl_filename = prevlvl;
 	}
 	if (objp->cmg_version >= CT_MD_V2) {
 		if (!xdr_int(xdrs, &objp->cmg_cur_lvl))
-			return (FALSE);
+			return (CTE_XDR);
 		if (!xdr_string(xdrs, &objp->cmg_cwd, PATH_MAX))
-			return (FALSE);
+			return (CTE_XDR);
 		if (!xdr_int(xdrs, &objp->cmg_num_paths))
-			return (FALSE);
+			return (CTE_XDR);
 		if (direction == XDR_DECODE) {
 			if (objp->cmg_num_paths != 0)
 				objp->cmg_paths = e_calloc(objp->cmg_num_paths,
@@ -195,13 +201,13 @@ ct_xdr_gheader(XDR *xdrs, struct ctfile_gheader *objp,
 		}
 		for (i = 0; i < objp->cmg_num_paths; i++) {
 			if (!xdr_string(xdrs, &objp->cmg_paths[i], PATH_MAX))
-				return (FALSE);
+				return (CTE_XDR);
 			if (direction == XDR_DECODE)
 				objp->cmg_paths[i] =
 				    ct_normalize_path(objp->cmg_paths[i]);
 		}
 	}
-	return (TRUE);
+	return (0);
 }
 
 /*
@@ -243,7 +249,7 @@ ctfile_open_f(FILE *f, const char *ctfile_basedir, struct ctfile_gheader *gh,
 
 	bzero(gh, sizeof *gh);
 
-	if (ct_xdr_gheader(xdr, gh, XDR_DECODE, ctfile_basedir) == FALSE) {
+	if (ct_xdr_gheader(xdr, gh, XDR_DECODE, ctfile_basedir) != 0) {
 		CWARNX("e_xdr_gheader failed");
 		goto destroy;
 	}
@@ -668,14 +674,15 @@ static int	 ctfile_write_header_entry(struct ctfile_write_state *, char *,
 /*
  * API for creating ctfiles.
  */
-struct ctfile_write_state *
-ctfile_write_init(const char *ctfile, const char *ctfile_basedir, int type,
-    const char *basis, int lvl, char *cwd, char **filelist, int encrypted,
-    int allfiles, int max_block_size)
+int
+ctfile_write_init(struct ctfile_write_state **ctxp, const char *ctfile,
+    const char *ctfile_basedir, int type, const char *basis, int lvl,
+    char *cwd, char **filelist, int encrypted, int allfiles, int max_block_size)
 {
 	struct ctfile_write_state	*ctx;
 	char				**fptr;
 	struct ctfile_gheader		 gh;
+	int				 ret, s_errno;
 
 	ctx = e_calloc(1, sizeof(*ctx));
 
@@ -687,8 +694,10 @@ ctfile_write_init(const char *ctfile, const char *ctfile_basedir, int type,
 		CABORTX("multilevel archive with no basis");
 
 	/* open metadata file */
-	if ((ctx->cws_f = fopen(ctfile, "wb")) == NULL)
+	if ((ctx->cws_f = fopen(ctfile, "wb")) == NULL) {
+		ret = CTE_ERRNO;
 		goto fail;
+	}
 
 	/* prepare header */
 	bzero(&gh, sizeof gh);
@@ -715,18 +724,23 @@ ctfile_write_init(const char *ctfile, const char *ctfile_basedir, int type,
 
 	/* write global header */
 	xdrstdio_create(&ctx->cws_xdr, ctx->cws_f, XDR_ENCODE);
-	if (ct_xdr_gheader(&ctx->cws_xdr, &gh, XDR_ENCODE,
-	    ctfile_basedir) == FALSE)
-		CFATALX("e_xdr_gheader failed");
+	if ((ret = ct_xdr_gheader(&ctx->cws_xdr, &gh, XDR_ENCODE,
+	    ctfile_basedir)) != 0) {
+		goto fail;
+	}
 
-	return (ctx);
+	*ctxp = ctx;
+	return (0);
 fail:
+	s_errno = errno;
 	if (ctx) {
 		if (ctx->cws_f)
 			fclose(ctx->cws_f);
 		e_free(&ctx);
 	}
-	return (NULL);
+	*ctxp = NULL;
+	errno = s_errno;
+	return (ret);
 }
 
 /*

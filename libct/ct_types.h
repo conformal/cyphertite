@@ -134,7 +134,9 @@ struct ctfile_list_file {
 #define CTE_LOAD_CERTS			22
 #define CTE_ASSL_CONTEXT		23
 #define CTE_CONNECT_FAILED		24
-#define CTE_MAX				25
+#define CTE_INVALID_PATH		25
+#define CTE_XDR				26
+#define CTE_MAX				27
 
 const char	*ct_strerror(int);
 

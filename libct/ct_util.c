@@ -91,6 +91,8 @@ const char *ct_errmsgs[] = {
 	    "cert and key are set to valid paths in the configuration file",
 	[CTE_ASSL_CONTEXT] = "Failed to allocate assl context",
 	[CTE_CONNECT_FAILED] = "Failed to connect",
+	[CTE_INVALID_PATH] = "Invalid path",
+	[CTE_XDR] = "XDR library error",
 };
 
 const char *

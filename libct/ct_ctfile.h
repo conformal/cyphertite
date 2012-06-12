@@ -139,9 +139,9 @@ struct dnode *ctfile_parse_finddir(struct ctfile_parse_state *, int);
 struct dnode *ctfile_parse_insertdir(struct ctfile_parse_state *, struct dnode *);
 
 struct ctfile_write_state;
-struct ctfile_write_state
-	*ctfile_write_init(const char *, const char *, int, const char *, int,
-	    char *, char **, int, int, int);
+int	 ctfile_write_init(struct ctfile_write_state **, const char *,
+	     const char *, int, const char *, int, char *, char **, int, int,
+	     int);
 int	 ctfile_write_special(struct ctfile_write_state *, struct fnode *);
 int	 ctfile_write_file_start(struct ctfile_write_state *, struct fnode *);
 int	 ctfile_write_file_sha(struct ctfile_write_state *, uint8_t *,
