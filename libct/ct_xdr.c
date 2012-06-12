@@ -773,9 +773,9 @@ ctfile_write_header(struct ctfile_write_state *ctx, struct fnode *fnode,
 
 	if (C_ISDIR(fnode->fl_type)) {
 		if (fnode->fl_curdir_dir->d_num == -2) {
-			CFATALX("directory for allocation in write path");
+			CABORTX("directory for allocation in write path");
 		} else if (fnode->fl_curdir_dir->d_num != -1) {
-			CFATALX("already allocated directory %" PRIu64
+			CABORTX("already allocated directory %" PRIu64
 			    " in write path", fnode->fl_curdir_dir->d_num);
 		}
 		/* alloc_dirnum will write the node */
