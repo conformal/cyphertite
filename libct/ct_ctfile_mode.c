@@ -625,12 +625,14 @@ void
 ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
     struct ct_header *hdr, void *vbody)
 {
-	char *filename;
+	int	 ret;
+	char	*filename;
 
 	switch (trans->tr_state) {
 	case TR_S_XML_OPEN:
-		if (ct_parse_xml_open_reply(hdr, vbody, &filename) != 0)
-			CFATALX("XXX");
+		if ((ret = ct_parse_xml_open_reply(hdr, vbody, &filename)) != 0)
+			CFATALX("failed to parse xml open reply: %s",
+			    ct_strerror(ret));
 		if (filename == NULL)
 			CFATALX("couldn't open remote file");
 		CNDBG(CT_LOG_FILE, "%s opened\n",
@@ -639,19 +641,22 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 		trans->tr_state = TR_S_XML_OPENED;
 		break;
 	case TR_S_XML_CLOSING:
-		if (ct_parse_xml_close_reply(hdr, vbody) != 0)
-			CFATALX("XXX");
+		if ((ret = ct_parse_xml_close_reply(hdr, vbody)) != 0)
+			CFATALX("failed to parse xml close reply: %s",
+			    ct_strerror(ret));
 		trans->tr_state = TR_S_DONE;
 		break;
 	case TR_S_XML_LIST:
-		if (ct_parse_xml_list_reply(hdr, vbody,
-		    &state->ctfile_list_files) != 0)
+		if ((ret = ct_parse_xml_list_reply(hdr, vbody,
+		    &state->ctfile_list_files)) != 0)
 			CFATALX("XXX");
 		trans->tr_state = TR_S_DONE;
 		break;
 	case TR_S_XML_DELETE:
-		if (ct_parse_xml_delete_reply(hdr, vbody, &filename) != 0)
-			CFATALX("XXX");
+		if ((ret = ct_parse_xml_delete_reply(hdr, vbody,
+		    &filename)) != 0)
+			CFATALX("failed to parse xml delete reply: %s",
+			    ct_strerror(ret));
 		if (filename == NULL)
 			printf("specified archive does not exist\n");
 		else
@@ -660,21 +665,24 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 		break;
 	case TR_S_XML_CULL_SEND:
 		/* XXX this is for both complete and setup */
-		if (ct_parse_xml_cull_setup_reply(hdr, vbody))
-			CFATALX("XXX");
+		if ((ret = ct_parse_xml_cull_setup_reply(hdr, vbody)) != 0)
+			CFATALX("failed to parse cull setup reply: %s",
+			    ct_strerror(ret));
 		trans->tr_state = TR_S_DONE;
 		break;
 	case TR_S_XML_CULL_SHA_SEND:
-		if (ct_parse_xml_cull_shas_reply(hdr, vbody))
-			CFATALX("XXX");
+		if ((ret = ct_parse_xml_cull_shas_reply(hdr, vbody)) != 0)
+			CFATALX("failed to parse cull shas reply: %s",
+			    ct_strerror(ret));
 		if (trans->tr_eof == 1)
 			trans->tr_state = TR_S_DONE;
 		else
 			trans->tr_state = TR_S_XML_CULL_REPLIED;
 		break;
 	case TR_S_XML_CULL_COMPLETE_SEND:
-		if (ct_parse_xml_cull_complete_reply(hdr, vbody))
-			CFATALX("XXX");
+		if ((ret = ct_parse_xml_cull_complete_reply(hdr, vbody)) != 0)
+			CFATALX("failed to parse cull complete reply: %s",
+			    ct_strerror(ret));
 		trans->tr_state = TR_S_DONE;
 		break;
 	default:
