@@ -68,22 +68,16 @@ ct_cmp_iotrans(struct ct_trans *c1, struct ct_trans *c2)
 	    ? -1 : (c1->hdr.c_tag > c2->hdr.c_tag));
 }
 
-/* structure to push data to next cache line - cache isolation */
-struct ct_global_state  ct_int_state;
-struct ct_statistics ct_int_stats;
-
-struct ct_global_state *ct_state = &ct_int_state;
-
 struct ct_global_state *
 ct_setup_state(struct ct_config *conf)
 {
 	struct ct_global_state *state;
 
 	/* unless we have shared memory, init is simple */
-	state = ct_state = &ct_int_state;
+	state = e_calloc(1, sizeof(*state));
 
 	state->ct_config = conf;
-	state->ct_stats = &ct_int_stats;
+	state->ct_stats = e_calloc(1, sizeof(*state->ct_stats));
 
 	TAILQ_INIT(&state->ct_trans_free_head);
 	state->ct_trans_id = 0;

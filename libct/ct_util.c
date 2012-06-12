@@ -251,6 +251,8 @@ void
 ct_cleanup(struct ct_global_state *state)
 {
 	ct_cleanup_eventloop(state);
+	e_free(&state->ct_stats);
+	e_free(&state);
 }
 
 struct ct_op *
