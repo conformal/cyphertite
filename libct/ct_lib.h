@@ -186,6 +186,9 @@ struct ct_global_state {
 	ct_log_file_skip_fn		*ct_print_file_skip;
 	ct_log_traverse_start_fn	*ct_print_traverse_start;
 	ct_log_traverse_start_fn	*ct_print_traverse_end;
+
+	/* User data (opaque). */
+	void				*ct_userptr;
 };
 
 struct ct_global_state *ct_setup_state(struct ct_config *);
