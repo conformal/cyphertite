@@ -596,7 +596,6 @@ ctfile_parse_seek(struct ctfile_parse_state *ctx)
 		if (ctx->xs_gh.cmg_flags & CT_MD_CRYPTO) {
 			if (ct_xdr_dedup_sha_crypto(&ctx->xs_xdr, ctx->xs_sha,
 			    ctx->xs_csha, ctx->xs_iv) == FALSE) {
-				CFATALX("file corrupt: can't get sha");
 				ctx->xs_state = XS_STATE_FAIL;
 				return 1;
 			}
