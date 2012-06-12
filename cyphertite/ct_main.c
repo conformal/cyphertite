@@ -1153,9 +1153,13 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode,
 	char				 shat[SHA_DIGEST_STRING_LENGTH];
 
 	ces = ct_file_extract_init(NULL, 1, 1, 0, NULL, NULL);
-	match = ct_match_compile(match_mode, flist);
-	if (excludelist != NULL)
-		ex_match = ct_match_compile(match_mode, excludelist);
+	if ((ret = ct_match_compile(&match, match_mode, flist)) != 0)
+		CFATALX("failed to compile match pattern: %s",
+		    ct_strerror(ret));
+	if (excludelist != NULL && (ret = ct_match_compile(&ex_match,
+	    match_mode, excludelist)) != 0)
+		CFATALX("failed to compile exclude pattern: %s",
+		    ct_strerror(ret));
 
 	verbose++;	/* by default print something. */
 
