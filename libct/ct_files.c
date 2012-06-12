@@ -638,7 +638,7 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		    caa->caa_follow_root_symlink, caa->caa_follow_symlinks,
 		    state->ct_stats);
 		state->ct_print_traverse_end(state->ct_print_state, filelist);
-		if (caa->caa_tdir && chdir(caa->caa_tdir) != 0)
+		if (caa->caa_tdir && chdir(cwd) != 0)
 			CFATALX("can't chdir back to %s", cwd);
 		/*
 		 * Get the first file we must operate on.
