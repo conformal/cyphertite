@@ -268,11 +268,15 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			ex_priv = e_calloc(1, sizeof(*ex_priv));
 			TAILQ_INIT(&ex_priv->extract_head);
 
-			ex_priv->inc_match = ct_match_compile(match_mode,
-			    filelist);
-			if (cea->cea_excllist != NULL)
-				ex_priv->ex_match = ct_match_compile(match_mode,
-				    cea->cea_excllist);
+			if ((ret = ct_match_compile(&ex_priv->inc_match,
+			    match_mode, filelist)) != 0)
+				CFATALX("failed to compile include pattern: %s",
+				    ct_strerror(ret));
+			if (cea->cea_excllist != NULL &&
+			    (ret = ct_match_compile(&ex_priv->ex_match,
+			    match_mode, cea->cea_excllist)) != 0)
+				CFATALX("failed to compile exclude pattern: %s",
+				    ct_strerror(ret));
 			op->op_priv = ex_priv;
 		}
 		ct_extract_setup(&ex_priv->extract_head,
@@ -294,8 +298,10 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 		/* create rb tree head, prepare to start inserting */
 		if (ex_priv->allfiles) {
 			char *nothing = NULL;
-			ex_priv->rb_match =
-			    ct_match_compile(CT_MATCH_RB, &nothing);
+			if ((ret = ct_match_compile(&ex_priv->rb_match,
+			    CT_MATCH_RB, &nothing)) != 0)
+				CFATALX("couldn't create match tree: %s",
+				    ct_strerror(ret));
 			ex_priv->fillrb = 1;
 		}
 		break;

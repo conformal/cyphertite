@@ -570,13 +570,18 @@ ctfile_list_complete(struct ctfile_list *files,  int matchmode, char **flist,
 {
 	struct ct_match		*match, *ex_match = NULL;
 	struct ctfile_list_file	*file;
+	int			 ret;
 
 	if (SIMPLEQ_EMPTY(files))
 		return;
 
-	match = ct_match_compile(matchmode, flist);
-	if (excludelist)
-		ex_match = ct_match_compile(matchmode, excludelist);
+	if ((ret = ct_match_compile(&match, matchmode, flist)) != 0)
+		CFATALX("couldn't compile match pattern: %s", ct_strerror(ret));
+	if (excludelist && (ret = ct_match_compile(&ex_match, matchmode,
+	    excludelist)) != 0)
+		CFATALX("couldn't compile exclude pattern: %s",
+		    ct_strerror(ret));
+
 	while ((file = SIMPLEQ_FIRST(files)) != NULL) {
 		SIMPLEQ_REMOVE_HEAD(files, mlf_link);
 		if (ct_match(match, file->mlf_name) == 0 && (ex_match == NULL ||

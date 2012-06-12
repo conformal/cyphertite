@@ -698,13 +698,18 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		cap->cap_fd = -1;
 		TAILQ_INIT(&cap->cap_flist);
 		op->op_priv = cap;
-		if (caa->caa_includelist)
-			cap->cap_include =
-			    ct_match_compile(caa->caa_matchmode,
-			        caa->caa_includelist);
-		if (caa->caa_excllist)
-			cap->cap_exclude = ct_match_compile(caa->caa_matchmode,
-			    caa->caa_excllist);
+		if (caa->caa_includelist) {
+			if ((error = ct_match_compile(&cap->cap_include,
+			    caa->caa_matchmode, caa->caa_includelist)) != 0)
+				CFATALX("can't compile include list: %s",
+				    ct_strerror(error));
+		}
+		if (caa->caa_excllist) {
+			if ((error = ct_match_compile(&cap->cap_exclude,
+			    caa->caa_matchmode, caa->caa_excllist)) != 0)
+				CFATALX("can't compile exclude list: %s",
+				    ct_strerror(error));
+		}
 
 		if (basisbackup != NULL &&
 		    (nextlvl = ct_basis_setup(basisbackup, filelist,

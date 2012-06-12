@@ -93,6 +93,7 @@ const char *ct_errmsgs[] = {
 	[CTE_CONNECT_FAILED] = "Failed to connect",
 	[CTE_INVALID_PATH] = "Invalid path",
 	[CTE_XDR] = "XDR library error",
+	[CTE_REGEX] = "Invalid regular expression",
 };
 
 const char *

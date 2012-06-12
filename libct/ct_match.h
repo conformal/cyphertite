@@ -24,7 +24,7 @@
 
 struct ct_match;
 
-struct ct_match		*ct_match_compile(int, char **);
+int			 ct_match_compile(struct ct_match **, int, char **);
 char			**ct_matchlist_fromfile(const char *, int *);
 void			 ct_matchlist_free(char **);
 int			 ct_match(struct ct_match *, char *);

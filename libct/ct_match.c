@@ -29,7 +29,8 @@
 #include <util.h>
 #endif
 
-#include "ct_match.h"
+#include <ct_match.h>
+#include <ct_types.h>
 
 
 struct ct_match_node {
@@ -52,12 +53,12 @@ struct ct_match {
 };
 
 
-void		ct_regex_comp(regex_t *, char **);
+int		ct_regex_comp(regex_t *, char **);
 int		ct_regex_match(regex_t *, char *);
 void		ct_regex_unwind(regex_t *);
 void		ct_glob_unwind(char **);
 int		ct_glob_match(char **, char *);
-void		ct_rb_comp(struct ct_match_tree *, char **);
+int		ct_rb_comp(struct ct_match_tree *, char **);
 int		ct_rb_match(struct ct_match_tree *, char *);
 void		ct_rb_unwind(struct ct_match_tree *);
 int		ct_match_rb_cmp(struct ct_match_node *, struct ct_match_node *);
@@ -70,7 +71,7 @@ ct_match_rb_cmp(struct ct_match_node *d1, struct ct_match_node *d2)
 RB_PROTOTYPE(ct_match_tree, ct_match_node, cmn_entry, ct_match_rb_cmp);
 RB_GENERATE(ct_match_tree, ct_match_node, cmn_entry, ct_match_rb_cmp);
 
-void
+int
 ct_regex_comp(regex_t *re, char **flist)
 {
 	int i, rv;
@@ -91,14 +92,18 @@ ct_regex_comp(regex_t *re, char **flist)
 	}
 
 	if (q == NULL)
-		return;
+		return (0);
 
 	if ((rv = regcomp(re, q, REG_EXTENDED | REG_NOSUB)) != 0) {
 		regerror(rv, re, error, sizeof(error) - 1);
-		CFATALX("extract_archive: regcomp failed: %s", error);
+		CNDBG(CT_LOG_FILE, "regcomp failed: %s", error);
+		e_free(&q);
+		return (CTE_REGEX);
 	}
 
 	e_free(&q);
+
+	return (0);
 }
 
 int
@@ -178,7 +183,7 @@ ct_match_rb_is_empty(struct ct_match *match)
 }
 
 
-void
+int
 ct_rb_comp(struct ct_match_tree *head, char **flist)
 {
 	int			i;
@@ -196,6 +201,8 @@ ct_rb_comp(struct ct_match_tree *head, char **flist)
 			continue;
 		}
 	}
+
+	return (0);
 }
 
 int
@@ -230,11 +237,11 @@ ct_rb_unwind(struct ct_match_tree *head)
 	}
 }
 
-struct ct_match *
-ct_match_compile(int mode, char **flist)
+int
+ct_match_compile(struct ct_match **matchp, int mode, char **flist)
 {
 	struct ct_match	*match;
-	int		 i;
+	int		 i, ret;
 
 	match = e_calloc(1, sizeof(*match));
 	match->cm_mode = mode;
@@ -242,18 +249,20 @@ ct_match_compile(int mode, char **flist)
 	switch (mode) {
 	case CT_MATCH_REGEX:
 		match->cm_regex = e_calloc(1, sizeof(regex_t));
-		ct_regex_comp(match->cm_regex, flist);
+		ret = ct_regex_comp(match->cm_regex, flist);
 		break;
 	case CT_MATCH_RB:
 		match->cm_rb_head = e_calloc(1, sizeof(*match->cm_rb_head));
-		ct_rb_comp(match->cm_rb_head, flist);
+		ret = ct_rb_comp(match->cm_rb_head, flist);
 		break;
 	case CT_MATCH_GLOB:
 		for (i = 0; flist[i] != NULL; i++)
 			if (flist[i] == NULL)
 				break;
-		if (i == 0)
-			return (match);
+		if (i == 0) {
+			ret = 0;
+			break;
+		}
 		i++; /* extra NULL */
 		match->cm_glob = e_calloc(i, sizeof(char *));
 
@@ -262,12 +271,14 @@ ct_match_compile(int mode, char **flist)
 				break;
 			match->cm_glob[i] = e_strdup(flist[i]);
 		}
+		ret = 0;
 		break;
 	default:
 		CABORTX("invalid match mode");
 	}
 
-	return (match);
+	*matchp = match;
+	return (ret);
 }
 
 void
