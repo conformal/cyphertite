@@ -113,10 +113,6 @@ ct_init(struct ct_config *conf, int need_secrets,
 	/* Run with restricted umask as we create numerous sensitive files. */
 	umask(S_IRWXG|S_IRWXO);
 
-	/* XXX - scale bandwith limiting until the algorithm is improved */
-	if (conf->ct_io_bw_limit) {
-		conf->ct_io_bw_limit = conf->ct_io_bw_limit * 10 / 7;
-	}
 	state = ct_setup_state(conf);
 	/* set defaults */
 	ct_set_log_fns(state, NULL, NULL, NULL, NULL, NULL, NULL, NULL);

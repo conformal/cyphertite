@@ -398,6 +398,13 @@ ct_load_config(char **configfile)
 		    ct_compression_type);
 	}
 
+	/*
+	 * XXX - The bw limiting code algorithm isn't quite accurate right now,
+	 * so tweak it slightly until we fix that.
+	 */
+	if (conf.ct_io_bw_limit) {
+		conf.ct_io_bw_limit = conf.ct_io_bw_limit * 10 / 7;
+	}
 	/* set polltype used by libevent */
 	ct_polltype_setup(ct_polltype);
 
