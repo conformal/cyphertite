@@ -170,6 +170,7 @@ loop:
 		ct_trans->hdr.c_flags = C_HDR_F_METADATA;
 		ct_trans->tr_ctfile_name = rname;
 		state->ct_stats->st_bytes_tot += cas->cas_size;
+		(void)fclose(cas->cas_handle);
 		e_free(&cas);
 		op->op_priv = NULL;
 		ct_queue_first(state, ct_trans);
