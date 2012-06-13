@@ -309,15 +309,14 @@ ct_xml_file_open_polled(struct ct_global_state *state, const char *file,
 {
 #define ASSL_TIMEOUT 20
 	struct ct_header	 hdr;
-	void			*body;
+	void			*body = NULL;
 	size_t			 sz;
-	int			 rv = 1;
+	int			 rv;
 
 	CNDBG(CT_LOG_XML, "setting up XML");
 
 	if ((rv = ct_create_xml_open(&hdr, &body, file, mode, chunkno)) != 0)
-		CFATALX("can't create ctfile open packet: %s",
-		    ct_strerror(rv));
+		goto done;
 
 	sz = hdr.c_size;
 	/* use previous packet id so it'll fit with the state machine */
@@ -325,12 +324,12 @@ ct_xml_file_open_polled(struct ct_global_state *state, const char *file,
 	ct_wire_header(&hdr);
 	if (ct_assl_io_write_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
 	    ASSL_TIMEOUT) != sizeof hdr) {
-		CWARNX("could not write header");
+		rv = CTE_SHORT_WRITE;
 		goto done;
 	}
 	if (ct_assl_io_write_poll(state->ct_assl_ctx, body, sz,
 	    ASSL_TIMEOUT) != sz) {
-		CWARNX("could not write body");
+		rv = CTE_SHORT_WRITE;
 		goto done;
 	}
 	e_free(&body);
@@ -338,19 +337,19 @@ ct_xml_file_open_polled(struct ct_global_state *state, const char *file,
 	/* get server reply */
 	if (ct_assl_io_read_poll(state->ct_assl_ctx, &hdr, sizeof hdr,
 	    ASSL_TIMEOUT) != sizeof hdr) {
-		CWARNX("invalid header size");
+		rv = CTE_SHORT_READ;
 		goto done;
 	}
 	ct_unwire_header(&hdr);
-
-	if (hdr.c_status == C_HDR_S_OK && hdr.c_opcode == C_HDR_O_XML_REPLY)
-		rv = 0;
 
 	/* we know the open was ok or bad, just read the body and dump it */
 	body = e_calloc(1, hdr.c_size);
 	if (ct_assl_io_read_poll(state->ct_assl_ctx, body, hdr.c_size,
 	    ASSL_TIMEOUT) != hdr.c_size) {
-		rv = 1;
+		rv = CTE_SHORT_READ;
+	} else if (hdr.c_status == C_HDR_S_OK &&
+	    hdr.c_opcode == C_HDR_O_XML_REPLY) {
+		rv = 0;
 	}
 	e_free(&body);
 

@@ -92,7 +92,8 @@ ct_setup_state(struct ct_config *conf)
 		state->ct_compress_state =
 		    ct_init_compression(conf->ct_compress);
 		if (state->ct_compress_state == NULL)
-			CFATALX("Can't initialise compression!");
+			CFATALX("%d: %s", conf->ct_compress,
+			    ct_strerror(CTE_SHRINK_INIT));
 		state->ct_alloc_block_size =
 		    ct_compress_bounds(state->ct_compress_state,
 		    state->ct_max_block_size);
@@ -314,7 +315,7 @@ ct_dequeue_complete(struct ct_global_state *state)
 		state->ct_complete_rblen--;
 		state->ct_packet_id++;
 	} else if (trans != NULL && trans->tr_trans_id < state->ct_packet_id) {
-		CFATALX("old transaction found in completion queue %" PRIu64
+		CABORTX("old transaction found in completion queue %" PRIu64
 		    " %" PRIu64, trans->tr_trans_id, state->ct_packet_id);
 	} else {
 		trans = NULL;
@@ -461,7 +462,7 @@ skip_csha:
 		ct_queue_write(state, trans);
 		break;
 	default:
-		CFATALX("state %d, not handled in ct_queue_transfer()",
+		CABORTX("state %d, not handled in ct_queue_transfer()",
 		    trans->tr_state);
 	}
 }
@@ -573,7 +574,7 @@ ct_trans_alloc(struct ct_global_state *state)
 
 		trans->hdr.c_tag = state->ct_tr_tag++;
 		if (state->ct_tr_tag >= 0x10000)
-			CFATALX("too many transactions allocated");
+			CABORTX("too many transactions allocated");
 	}
 
 	return trans;
@@ -630,8 +631,9 @@ ct_reconnect_internal(struct ct_global_state *state)
 	int			 ret;
 
 	if ((ret = ct_ssl_connect(state)) != 0) {
-		if (ct_assl_negotiate_poll(state)) {
-			CFATALX("negotiate failed");
+		if ((ret = ct_assl_negotiate_poll(state)) != 0) {
+			CFATALX("negotiate failed on reconnect: %s",
+			    ct_strerror(ret));
 		}
 
 		if (state->ct_disconnected > 2)
@@ -693,10 +695,11 @@ ct_reconnect_internal(struct ct_global_state *state)
 				 * queue being full and how much we have in
 				 * the queue after us and just do this polled.
 				 */
-				if (ct_xml_file_open_polled(state,
+				if ((ret = ct_xml_file_open_polled(state,
 				    trans->tr_ctfile_name, MD_O_APPEND,
-				    trans->tr_ctfile_chunkno))
-					CFATALX("can't reopen metadata file");
+				    trans->tr_ctfile_chunkno)) != 0)
+					CFATALX("can't reopen metadata file: %s",
+					    ct_strerror(ret));
 				break;
 			} else if (trans->tr_state == TR_S_EX_SHA) {
 				CNDBG(CT_LOG_NET, "read in queue chunkno %d",
@@ -709,7 +712,8 @@ ct_reconnect_internal(struct ct_global_state *state)
 				if (ct_xml_file_open_polled(state,
 				    trans->tr_ctfile_name, MD_O_READ,
 				    trans->tr_ctfile_chunkno))
-					CFATALX("can't reopen metadata file");
+					CFATALX("can't reopen metadata file: %s",
+					    ct_strerror(ret));
 				break;
 			}
 		}
@@ -799,7 +803,8 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 		    "handle message iotrans %u opcode %u status %u",
 		    hdr->c_tag, hdr->c_opcode, hdr->c_status);
 		if ((trans = ct_lookup_inflight(state, hdr->c_tag)) == NULL)
-			CFATALX("invalid io transaction reply(1)");
+			CFATALX("%d: %s", hdr->c_tag,
+			    ct_strerror(CTE_UNEXPECTED_TRANS));
 	}
 
 	if (trans)
@@ -819,8 +824,8 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 		ct_handle_xml_reply(state, trans, hdr, vbody);
 		break;
 	default:
-		CFATALX("unexpected message received 0x%x",
-		    hdr->c_opcode);
+		CFATALX("0x%x: %s", hdr->c_opcode,
+		    ct_strerror(CTE_UNEXPECTED_OPCODE));
 	}
 }
 
@@ -838,7 +843,7 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 
 	if (cnt != 0 && (hdr->c_opcode != C_HDR_O_WRITE ||
 	    (hdr->c_flags & C_HDR_F_METADATA) == 0))
-		CFATALX("not expecting vbody");
+		CABORTX("not expecting vbody");
 
 	CNDBG(CT_LOG_NET, "write done, trans %" PRIu64 " op %u",
 	    trans->tr_trans_id, hdr->c_opcode);
@@ -866,7 +871,7 @@ ct_write_done(void *vctx, struct ct_header *hdr, void *vbody, int cnt)
 		break;
 	default:
 		/* Should not happen */
-		CFATALX("unknown packet written for hdr opcode %u tag %u "
+		CABORTX("unknown packet written for hdr opcode %u tag %u "
 		    "trans %" PRIu64, hdr->c_opcode, hdr->c_tag,
 		    trans->tr_trans_id);
 	}
@@ -902,6 +907,7 @@ ct_body_alloc(void *vctx, struct ct_header *hdr)
 		trans = RB_FIND(ct_iotrans_lookup, &state->ct_inflight,
 		    &ltrans);
 
+		/* XXX in this case should we fallback to alocation? */
 		if (trans == NULL)
 			CFATALX("invalid io transaction reply(2)");
 
@@ -963,7 +969,7 @@ ct_compute_sha(void *vctx)
 			ct_queue_transfer(state, trans);
 			continue;
 		default:
-			CFATALX("unexpected transaction state %d",
+			CABORTX("unexpected transaction state %d",
 			    trans->tr_state);
 		}
 		state->ct_stats->st_chunks_tot++;
@@ -1114,7 +1120,7 @@ ct_process_write(void *vctx)
 			data = trans->tr_data[2];
 			break;
 		default:
-			CFATALX("unexpected state in wakeup_write %d",
+			CABORTX("unexpected state in wakeup_write %d",
 			    trans->tr_state);
 		}
 
@@ -1139,12 +1145,13 @@ void
 ct_handle_exists_reply(struct ct_global_state *state, struct ct_trans *trans,
     struct ct_header *hdr, void *vbody)
 {
-	int exists;
+	int exists, ret;
 
 	CNDBG(CT_LOG_NET, "exists_reply %" PRIu64 " status %u",
 	    trans->tr_trans_id, hdr->c_status);
-	if (ct_parse_exists_reply(hdr, vbody, &exists) != 0)
-		CFATALX("invalid exists reply from server");
+	if ((ret = ct_parse_exists_reply(hdr, vbody, &exists)) != 0)
+		CFATALX("invalid exists reply from server: %s",
+		    ct_strerror(ret) );
 	if (exists) {
 		/* enter shas into local db */
 		trans->tr_state = TR_S_EXISTS;
@@ -1188,18 +1195,18 @@ ct_handle_read_reply(struct ct_global_state *state, struct ct_trans *trans,
     struct ct_header *hdr, void *vbody)
 {
 	char				 shat[SHA_DIGEST_STRING_LENGTH];
-	int				 slot;
+	int				 slot, ret;
 
 	/* data was written to the 'alternate slot' so switch it */
 	slot = trans->tr_dataslot = !(trans->tr_dataslot);
 
-	if (ct_parse_read_reply(hdr, vbody) == 0) {
+	if ((ret = ct_parse_read_reply(hdr, vbody)) == 0) {
 		trans->tr_state = TR_S_EX_READ;
 		if ((hdr->c_flags & C_HDR_F_METADATA) &&
-		    ct_parse_read_ctfile_chunk_info(hdr, vbody,
-			trans->tr_ctfile_chunkno) != 0) 
-				CFATALX("invalid ctfile read packet");
-				/* XXX get a errstring out of parser */
+		    (ret = ct_parse_read_ctfile_chunk_info(hdr, vbody,
+			trans->tr_ctfile_chunkno)) != 0) 
+				CFATALX("invalid ctfile read packet: %s",
+				    ct_strerror(ret));
 	} else {
 		CNDBG(CT_LOG_NET, "c_flags on reply %x", hdr->c_flags);
 		/* read failure for ctfiles just means eof */
@@ -1209,8 +1216,8 @@ ct_handle_read_reply(struct ct_global_state *state, struct ct_trans *trans,
 		} else {
 			/* any other read failure is bad */
 			ct_sha1_encode(trans->tr_sha, shat);
-			CFATALX("Data missing on server return %u shat %s",
-			    hdr->c_status, shat);
+			CFATALX("Data missing on server sha %s: %s",
+			    shat, ct_strerror(ret));
 		}
 	} 
 
@@ -1258,7 +1265,7 @@ ct_compute_compress(void *vctx)
 			ncompmode = state->ct_config->ct_compress;
 			break;
 		default:
-			CFATALX("unexpected state for compress %d",
+			CABORTX("unexpected state for compress %d",
 			    trans->tr_state);
 		}
 
@@ -1269,17 +1276,18 @@ ct_compute_compress(void *vctx)
 				ct_cleanup_compression(
 				    state->ct_compress_state);
 			if ((state->ct_compress_state =
-			    ct_init_compression(ncompmode)) == NULL)
-				CFATALX("can't init compression mode %d",
-				    ncompmode);
+			    ct_init_compression(ncompmode)) == NULL) {
+				CFATALX("%d: %s", ncompmode,
+				    ct_strerror(CTE_SHRINK_INIT));
+			}
 		}
 
 		if (state->ct_compress_state == NULL)
-			CFATALX("compression mode 0?");
+			CABORTX("compression mode 0?");
 
 		slot = trans->tr_dataslot;
 		if (slot > 1) {
-			CFATALX("transaction with special slot in compress: %d",
+			CABORTX("transaction with special slot in compress: %d",
 			    slot);
 		}
 		src = trans->tr_data[slot];
@@ -1313,8 +1321,8 @@ ct_compute_compress(void *vctx)
 			rv = ct_uncompress(state->ct_compress_state, src, dst,
 			    len, &newlen);
 			if (rv)
-				CFATALX("failed to decompress block len %d",
-				    len);
+				CFATALX("%s",
+				    ct_strerror(CTE_DECOMPRESS_FAILED));
 		}
 
 		CNDBG(CT_LOG_TRANS, "compress block of %d to %lu, rv %d", len,
@@ -1361,14 +1369,14 @@ ct_compute_encrypt(void *vctx)
 			encr = 1;
 			break;
 		default:
-			CFATALX("unexpected state for encr %d",
+			CABORTX("unexpected state for encr %d",
 			    trans->tr_state);
 		}
 
 
 		slot = trans->tr_dataslot;
 		if (slot > 1) {
-			CFATALX("transaction with special slot in encr: %d",
+			CABORTX("transaction with special slot in encr: %d",
 			    slot);
 		}
 		src = trans->tr_data[slot];
@@ -1403,8 +1411,8 @@ ct_compute_encrypt(void *vctx)
 		}
 
 		if (newlen < 0)
-			CFATALX("failed to %scrypt files",
-			    encr ? "en" : "de");
+			CFATALX("%s", ct_strerror(encr ? CTE_ENCRYPT_FAILED :
+			    CTE_DECRYPT_FAILED));
 
 		CNDBG(CT_LOG_TRANS,
 		    "%scrypt block of %d to %lu", encr ? "en" : "de",

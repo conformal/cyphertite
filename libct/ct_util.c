@@ -94,6 +94,14 @@ const char *ct_errmsgs[] = {
 	[CTE_INVALID_PATH] = "Invalid path",
 	[CTE_XDR] = "XDR library error",
 	[CTE_REGEX] = "Invalid regular expression",
+	[CTE_UNEXPECTED_OPCODE] = "Unexpected opcode recieved",
+	[CTE_UNEXPECTED_TRANS] = "Unexpected transaction recieved",
+	[CTE_SHRINK_INIT] = "Could not initialise compression",
+	[CTE_DECOMPRESS_FAILED] = "Failed to decompress block",
+	[CTE_INVALID_IV_LENGTH] = "Invalid iv length",
+	[CTE_ENCRYPT_FAILED] = "Failed to encrypt chunk",
+	[CTE_DECRYPT_FAILED] = "Failed to decrypt chunk",
+
 };
 
 const char *

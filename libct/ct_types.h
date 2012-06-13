@@ -137,7 +137,14 @@ struct ctfile_list_file {
 #define CTE_INVALID_PATH		25
 #define CTE_XDR				26
 #define CTE_REGEX			27
-#define CTE_MAX				28
+#define CTE_UNEXPECTED_OPCODE		28
+#define CTE_UNEXPECTED_TRANS		29
+#define CTE_SHRINK_INIT			30
+#define CTE_DECOMPRESS_FAILED		31
+#define CTE_INVALID_IV_LENGTH		32
+#define CTE_DECRYPT_FAILED		33
+#define CTE_ENCRYPT_FAILED		34
+#define CTE_MAX				35
 
 const char	*ct_strerror(int);
 

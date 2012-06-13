@@ -210,7 +210,7 @@ ct_create_iv(uint8_t *key, size_t keylen, uint8_t *src, size_t srclen,
 
 	if (ivlen != SHA256_DIGEST_LENGTH) {
 		CNDBG(CT_LOG_CRYPTO, "invalid iv length");
-		return (1);
+		return (CTE_INVALID_IV_LENGTH);
 	}
 
 	HMAC_CTX_init(&hctx);
@@ -227,7 +227,7 @@ ct_create_iv_ctfile(uint32_t chunkno, uint8_t *iv, size_t ivlen)
 {
 	if (ivlen != SHA256_DIGEST_LENGTH) {
 		CNDBG(CT_LOG_CRYPTO, "invalid iv length");
-		return (1);
+		return (CTE_INVALID_IV_LENGTH);
 	}
 
 	bzero(iv, ivlen);
