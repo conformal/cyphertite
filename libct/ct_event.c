@@ -333,6 +333,8 @@ ct_event_loopbreak(struct ct_event_state *ev_st)
 void
 ct_event_shutdown(struct ct_event_state *ev_st)
 {
+	if (ev_st->ct_ctx_file.ctx_shutdown != NULL)
+		ev_st->ct_ctx_file.ctx_shutdown(&ev_st->ct_ctx_file);
 	if (ev_st->ct_ctx_complete.ctx_shutdown != NULL)
 		ev_st->ct_ctx_complete.ctx_shutdown(&ev_st->ct_ctx_complete);
 	if (ev_st->ct_ctx_write.ctx_shutdown != NULL)
