@@ -131,7 +131,7 @@ ct_extract_open_next(struct ct_extract_head *extract_head, struct ctfile_parse_s
 		if (next)
 			e_free(&next);
 	} else {
-		CFATALX("open next with no next archive");
+		CABORTX("open next with no next archive");
 	}
 }
 
@@ -289,9 +289,10 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 		    cea->cea_attr,  cea->cea_follow_symlinks,
 		    ex_priv->allfiles, cea->cea_log_state,
 		    cea->cea_log_chown_failed);
+		/* XXX we should handle this better */
 		if (state->ct_max_block_size <
 		    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size)
-			CFATALX("block size negotiated with server %d is "
+			CABORTX("block size negotiated with server %d is "
 			    "smaller than file max block size %d",
 			    state->ct_max_block_size,
 			    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size);
@@ -555,9 +556,10 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 		    cefa->cefa_ctfile, NULL, cefa->cefa_ctfile_off) != 0)
 			CFATALX("can't open metadata file %s",
 			    cefa->cefa_ctfile);
+		 /* XXX we should handle this better */
 		if (state->ct_max_block_size <
 		    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size)
-			CFATALX("block size negotiated with server %d is "
+			CABORTX("block size negotiated with server %d is "
 			    "smaller than file max block size %d",
 			    state->ct_max_block_size,
 			    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size);
@@ -598,7 +600,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 		case XS_RET_FILE:
 			CNDBG(CT_LOG_CTFILE, "opening file");
 			if (ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas == -1)
-				CFATALX("can't extract file with -1 shas");
+				CABORTX("can't extract file with -1 shas");
 
 			trans = ct_trans_realloc_local(state, trans);
 			trans->tr_fl_node = ex_priv->fl_ex_node =
@@ -675,7 +677,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			CFATALX("failed to parse metadata file");
 			break;
 		default:
-			CFATALX("%s: invalid state %d", __func__, ret);
+			CABORTX("%s: invalid state %d", __func__, ret);
 		}
 		ct_queue_first(state, trans);
 	}
