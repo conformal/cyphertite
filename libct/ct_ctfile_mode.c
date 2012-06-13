@@ -287,12 +287,14 @@ void
 ct_xml_file_open(struct ct_global_state *state, struct ct_trans *trans,
     const char *file, int mode, uint32_t chunkno, ct_complete_fn callback)
 {
+	int	ret;
+
 	trans->tr_state = TR_S_XML_OPEN;
 	trans->tr_complete = callback;
 
-	if (ct_create_xml_open(&trans->hdr, (void **)&trans->tr_data[2],
-	    file, mode, chunkno) != 0)
-		CFATALX("can't create xml open packet");
+	if ((ret = ct_create_xml_open(&trans->hdr, (void **)&trans->tr_data[2],
+	    file, mode, chunkno)) != 0)
+		CFATALX("can't create xml open packet: %s", ct_strerror(ret));
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = trans->hdr.c_size;
 
@@ -313,8 +315,9 @@ ct_xml_file_open_polled(struct ct_global_state *state, const char *file,
 
 	CNDBG(CT_LOG_XML, "setting up XML");
 
-	if (ct_create_xml_open(&hdr, &body, file, mode, chunkno) != 0)
-		CFATALX("can't create ctfile open packet");
+	if ((rv = ct_create_xml_open(&hdr, &body, file, mode, chunkno)) != 0)
+		CFATALX("can't create ctfile open packet: %s",
+		    ct_strerror(rv));
 
 	sz = hdr.c_size;
 	/* use previous packet id so it'll fit with the state machine */
@@ -362,6 +365,7 @@ void
 ct_xml_file_close(struct ct_global_state *state)
 {
 	struct ct_trans			*trans;
+	int				 ret;
 
 	trans = ct_trans_alloc(state);
 	if (trans == NULL) {
@@ -374,8 +378,10 @@ ct_xml_file_close(struct ct_global_state *state)
 	trans->tr_state = TR_S_XML_CLOSING;
 	trans->tr_complete = ctfile_complete_noop;
 
-	if (ct_create_xml_close(&trans->hdr, (void **)&trans->tr_data[2]) != 0)
-		CFATALX("Could not create xml close packet");
+	if ((ret = ct_create_xml_close(&trans->hdr,
+	    (void **)&trans->tr_data[2])) != 0)
+		CFATALX("Could not create xml close packet: %s",
+		    ct_strerror(ret));
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = trans->hdr.c_size;
 
@@ -518,14 +524,17 @@ ctfile_extract_complete_eof(struct ct_global_state *state,
 void
 ctfile_extract_handle_eof(struct ct_global_state *state, struct ct_trans *trans)
 {
+	int	ret;
+
 	if (ct_get_file_state(state) != CT_S_FINISHED) {
 		ct_set_file_state(state, CT_S_FINISHED);
 		trans->tr_state = TR_S_XML_CLOSING;
 		trans->tr_complete = ctfile_extract_complete_eof;
 
-		if (ct_create_xml_close(&trans->hdr,
-		    (void **)&trans->tr_data[2]) != 0)
-			CFATALX("Could not create xml close packet");
+		if ((ret = ct_create_xml_close(&trans->hdr,
+		    (void **)&trans->tr_data[2])) != 0)
+			CFATALX("Could not create xml close packet: %s",
+			    ct_strerror(ret));
 		trans->tr_dataslot = 2;
 		trans->tr_size[2] = trans->hdr.c_size;
 	} else {
@@ -548,6 +557,7 @@ void
 ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_trans			*trans;
+	int				 ret;
 
 	ct_set_file_state(state, CT_S_FINISHED);
 
@@ -555,8 +565,10 @@ ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 
 	trans->tr_state = TR_S_XML_LIST;
 
-	if (ct_create_xml_list(&trans->hdr, (void **)&trans->tr_data[2]) != 0)
-		CFATALX("Could not create xml list packet");
+	if ((ret = ct_create_xml_list(&trans->hdr,
+	    (void **)&trans->tr_data[2])) != 0)
+		CFATALX("Could not create xml list packet: %s",
+		    ct_strerror(ret));
 	trans->tr_dataslot = 2;
 	trans->tr_complete = ctfile_complete_noop_final;
 	trans->tr_size[2] = trans->hdr.c_size;
@@ -601,15 +613,17 @@ ctfile_delete(struct ct_global_state *state, struct ct_op *op)
 {
 	const char			*rname = op->op_args;
 	struct ct_trans			*trans;
+	int				 ret;
 
 	trans = ct_trans_alloc(state);
 	trans->tr_state = TR_S_XML_DELETE;
 
 	rname = ctfile_cook_name(rname);
 
-	if (ct_create_xml_delete(&trans->hdr, (void **)&trans->tr_data[2],
-	    rname) != 0)
-		CFATALX("Could not create xml delete packet for %s", rname);
+	if ((ret = ct_create_xml_delete(&trans->hdr,
+	     (void **)&trans->tr_data[2], rname)) != 0)
+		CFATALX("Could not create xml delete packet for %s: %s",
+		    rname, ct_strerror(ret));
 	trans->tr_dataslot = 2;
 	trans->tr_complete = ctfile_complete_noop_final;
 	trans->tr_size[2] = trans->hdr.c_size;
@@ -649,7 +663,8 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 	case TR_S_XML_LIST:
 		if ((ret = ct_parse_xml_list_reply(hdr, vbody,
 		    &state->ctfile_list_files)) != 0)
-			CFATALX("XXX");
+			CFATALX("failed to parse xml list reply: %s",
+			    ct_strerror(ret));
 		trans->tr_state = TR_S_DONE;
 		break;
 	case TR_S_XML_DELETE:
@@ -918,6 +933,7 @@ void
 ct_cull_setup(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_trans			*trans;
+	int				 ret;
 
 	arc4random_buf(&cull_uuid, sizeof(cull_uuid));
 
@@ -931,9 +947,10 @@ ct_cull_setup(struct ct_global_state *state, struct ct_op *op)
 		return;
 	}
 
-	if (ct_create_xml_cull_setup(&trans->hdr, (void **)&trans->tr_data[2],
-	    cull_uuid, CT_CULL_PRECIOUS) != 0)
-		CFATALX("Could not create xml cull setup packet");
+	if ((ret = ct_create_xml_cull_setup(&trans->hdr,
+	    (void **)&trans->tr_data[2], cull_uuid, CT_CULL_PRECIOUS)) != 0)
+		CFATALX("Could not create xml cull setup packet: %s",
+		    ct_strerror(ret));
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = trans->hdr.c_size;
 	trans->tr_state = TR_S_XML_CULL_SEND;
@@ -949,6 +966,7 @@ void
 ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_trans			*trans;
+	int				 ret;
 
 	if (sent_complete) {
 		return;
@@ -963,9 +981,10 @@ ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 	}
 	sent_complete = 1;
 
-	if (ct_create_xml_cull_complete(&trans->hdr,
-	    (void **)&trans->tr_data[2], cull_uuid, CT_CULL_PROCESS) != 0)
-		CFATALX("Could not create xml cull setup packet");
+	if ((ret = ct_create_xml_cull_complete(&trans->hdr,
+	    (void **)&trans->tr_data[2], cull_uuid, CT_CULL_PROCESS)) != 0)
+		CFATALX("Could not create xml cull setup packet: %s",
+		    ct_strerror(ret));
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = trans->hdr.c_size;
 	trans->tr_state = TR_S_XML_CULL_COMPLETE_SEND;
@@ -980,7 +999,7 @@ void
 ct_cull_send_shas(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_trans			*trans;
-	int				 sha_add;
+	int				 sha_add, ret;
 
 	CNDBG(CT_LOG_TRANS, "cull_send_shas");
 	if (shacnt == 0 || RB_EMPTY(&ct_sha_rb_head)) {
@@ -997,9 +1016,10 @@ ct_cull_send_shas(struct ct_global_state *state, struct ct_op *op)
 	}
 
 	trans->tr_state = TR_S_XML_CULL_SHA_SEND;
-	if (ct_create_xml_cull_shas(&trans->hdr, (void **)&trans->tr_data[2],
-	    cull_uuid, &ct_sha_rb_head, sha_per_packet, &sha_add) != 0)
-		CFATALX("can't create cull shas packet");
+	if ((ret = ct_create_xml_cull_shas(&trans->hdr,
+	    (void **)&trans->tr_data[2], cull_uuid, &ct_sha_rb_head,
+	    sha_per_packet, &sha_add)) != 0)
+		CFATALX("can't create cull shas packet: %s", ct_strerror(ret));
 	shacnt -= sha_add;
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = trans->hdr.c_size;
