@@ -298,7 +298,8 @@ ct_config_parse(struct ct_settings *settings, const char *filename)
 		}
 
 		if ((var = strsep(&cp, WS)) == NULL || cp == NULL)
-			CFATALX("invalid config file entry: %s", line);
+			CFATALX("%s: invalid config file entry: %s", filename,
+			    line);
 
 		cp += (long)strspn(cp, WS);
 
@@ -312,7 +313,8 @@ ct_config_parse(struct ct_settings *settings, const char *filename)
 		val[++i] = '\0';
 
 		if (ct_settings_add(settings, var, val))
-			CFATALX("%s: invalid conf file entry: %s=%s", filename, var, val);
+			CFATALX("%s: invalid config file entry: %s=%s",
+			    filename, var, val);
 
 		free(line);
 	}
