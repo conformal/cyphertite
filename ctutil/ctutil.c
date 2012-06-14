@@ -312,7 +312,7 @@ ct_config_parse(struct ct_settings *settings, const char *filename)
 		val[++i] = '\0';
 
 		if (ct_settings_add(settings, var, val))
-			CFATALX("invalid conf file entry: %s=%s", var, val);
+			CFATALX("%s: invalid conf file entry: %s=%s", filename, var, val);
 
 		free(line);
 	}
