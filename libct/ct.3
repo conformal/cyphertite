@@ -72,7 +72,7 @@ ct_ctfile.h functions used internally only:
 .Fn ctfile_parse_init_f "struct ctfile_parse_state *ctx" "FILE *f" "const char *ctfile_basedir"
 .\" #define ctfile_parse_init(ctx, file, basedir)		\
 .\" 	ctfile_parse_init_at(ctx, file, basedir, 0)
-.Ft void
+.Ft int
 .Fn ctfile_write_special "struct ctfile_write_state *ctx" "struct fnode *fnode"
 .Ft int
 .Fn ctfile_write_file_start "struct ctfile_write_state *ctx" "struct fnode *fnode"
@@ -82,7 +82,7 @@ ct_ctfile.h functions used internally only:
 .Fn ctfile_write_file_pad "struct ctfile_write_state *ctx" "struct fnode *fn"
 .Ft int
 .Fn ctfile_write_file_end "struct ctfile_write_state *ctx" "struct fnode *fnode"
-.Ft void
+.Ft int
 .Fn ctfile_write_close "struct ctfile_write_state *ctx"
 .Ft char *
 .Fn ctfile_get_previous "const char *path"
@@ -114,7 +114,7 @@ ct_db.h functions used internally only:
 .In ct_internal.h
 
 .Ft int
-.Fn ct_basis_setup "const char *basisbackup" "char **filelist" "int max_differentials" "time_t *prev_backup" "int verbose"
+.Fn ct_basis_setup "const char *basisbackup" "char **filelist" "int max_differentials" "time_t *prev_backup"
 
 ct_internal.h functions used internally only:
 
@@ -162,9 +162,9 @@ ct_internal.h functions used internally only:
 .Ft int
 .Fn ct_assl_negotiate_poll "struct ct_global_state *state"
 .Ft struct ct_global_state *
-.Fn ct_init "struct ct_config *conf" "int need_secrets" "int verbose" "void (*info_cb)(evutil_socket_t, short, void *)"
+.Fn ct_init "struct ct_config *conf" "int need_secrets" "void (*info_cb)(evutil_socket_t, short, void *)"
 .Ft void
-.Fn ct_init_eventloop "struct ct_global_state *state"
+.Fn ct_init_eventloop "struct ct_global_state *state" "void (*info_cb)(evutil_socket_t, short, void *)"
 .Ft void
 .Fn ct_cleanup "struct ct_global_state *state"
 .Ft void
@@ -235,7 +235,7 @@ ct_internal.h functions used internally only:
 .Fn ct_add_operation "struct ct_global_state *state" "ct_op_cb *start" "ct_op_cb *complete" "void *args"
 .Ft struct ct_op *
 .Fn ct_add_operation_after "struct ct_global_state *state" "struct ct_op *after" "ct_op_cb *start" "ct_op_cb *complete" "void *args"
-.Ft void
+.Ft int
 .Fn ct_do_operation "struct ct_config *conf" "ct_op_cb *start" "ct_op_cb *complete" "void *args" "int need_secrets"
 .Ft int
 .Fn ct_list "const char *file" "char **flist" "char **excludelist" "int match_mode" "const char *ctfile_basedir" "int strip_slash" "int verbose"
@@ -250,9 +250,9 @@ ct_internal.h functions used internally only:
 .Ft void
 .Fn ctfile_find_for_operation "struct ct_global_state *state" "char *tag" "ctfile_find_callback *nextop" "void *nextop_args" "int download_chain" "int empty_ok"
 .Ft void
-.Fn ct_extract_setup "struct ct_extract_head *extract_head" "struct ctfile_parse_state *ctx" "const char *file" "const char *ctfile_basedir" "int *is_allfiles" "int print"
+.Fn ct_extract_setup "struct ct_extract_head *extract_head" "struct ctfile_parse_state *ctx" "const char *file" "const char *ctfile_basedir" "int *is_allfiles"
 .Ft void
-.Fn ct_extract_open_next "struct ct_extract_head *extract_head" "struct ctfile_parse_state *ctx" "int print"
+.Fn ct_extract_open_next "struct ct_extract_head *extract_head" "struct ctfile_parse_state *ctx"
 .Ft int
 .Fn ct_file_extract_open "struct ct_extract_state *ces" "struct fnode *fnode"
 .Ft void
@@ -307,6 +307,8 @@ ct_lib.h functions used internally only:
 .Ft struct event_base *
 .Fn ct_event_get_base "struct ct_event_state *ev_ct"
 .Ft void
+ct_event_shutdown "struct ct_event_state *ev_st"
+.Ft void
 .Fn ct_wakeup_decrypt "struct ct_event_state *ev_ct"
 .Ft void
 .Fn ct_wakeup_uncompress "struct ct_event_state *ev_ct"
@@ -333,7 +335,7 @@ ct_lib.h functions used internally only:
 .Ft void
 .Fn ct_extract_cleanup_queue "struct ct_extract_head *extract_head"
 .Ft struct ct_extract_state *
-.Fn ct_file_extract_init "const char *tdir" "int attr" "int follow_symlinks" "int verbose" "int allfiles"
+.Fn ct_file_extract_init "const char *tdir" "int attr" "int follow_symlinks" "int allfiles" "void *log_state" "ct_log_chown_failed_fn *log_chown_failed"
 .Ft struct dnode *
 .Fn ct_file_extract_get_rootdir "struct ct_extract_state *ces"
 .Ft struct dnode *
@@ -368,7 +370,7 @@ ct_lib.h functions used internally only:
 .Ft struct ct_match *
 .Fn ct_match_fromfile "const char *file" "int matchmode"
 .Ft char **
-.Fn ct_matchlist_fromfile "const char *file"
+.Fn ct_matchlist_fromfile "const char *file" "int *nentries"
 .Ft void
 .Fn ct_matchlist_free "char **flist"
 .Ft int
@@ -620,7 +622,7 @@ struct ctfile_parse_state {
 
 .Ft int
 .\"XXX ct_basis_setup is in ct_xdr.c ???
-.Fn ct_basis_setup "const char *basisbackup" "char **filelist" "int max_differentials" "time_t *prev_backup" "int verbose"
+.Fn ct_basis_setup "const char *basisbackup" "char **filelist" "int max_differentials" "time_t *prev_backup"
 
 .Ss LIB
 
@@ -1053,7 +1055,7 @@ struct ct_op {
 .Ft struct ct_op *
 .Fn ct_add_operation_after "struct ct_global_state *state" "struct ct_op *after" "ct_op_cb *start" "ct_op_cb *complete" "void *args"
 .br
-.Ft void
+.Ft int
 .Fn ct_do_operation "struct ct_config *conf" "ct_op_cb *start" "ct_op_cb *complete" "void *args" "int need_secrets"
 
 .\"ct_ops.c
@@ -1102,10 +1104,10 @@ typedef void	(ctfile_find_callback)(struct ct_global_state *,
 .\"ct_ops.c
 
 .Ft void
-.Fn ct_extract_setup "struct ct_extract_head *extract_head" "struct ctfile_parse_state *ctx" "const char *file" "const char *ctfile_basedir" "int *is_allfiles" "int print"
+.Fn ct_extract_setup "struct ct_extract_head *extract_head" "struct ctfile_parse_state *ctx" "const char *file" "const char *ctfile_basedir" "int *is_allfiles"
 .br
 .Ft void
-.Fn ct_extract_open_next "struct ct_extract_head *extract_head" "struct ctfile_parse_state *ctx" "int print"
+.Fn ct_extract_open_next "struct ct_extract_head *extract_head" "struct ctfile_parse_state *ctx"
 
 .\"ct_files.c
 
@@ -1183,7 +1185,7 @@ typedef void	(ctfile_find_callback)(struct ct_global_state *,
 .Fn ct_match_fromfile "const char *file" "int matchmode"
 .br
 .Ft char **
-.Fn ct_matchlist_fromfile "const char *file"
+.Fn ct_matchlist_fromfile "const char *file" "int *nentries"
 .br
 .Ft void
 .Fn ct_matchlist_free "char **flist"
