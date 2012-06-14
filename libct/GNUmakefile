@@ -123,7 +123,6 @@ LIB.MLINKS+=ct.3 ct_file_extract_close.3
 LIB.MLINKS+=ct.3 ct_file_extract_special.3
 LIB.MLINKS+=ct.3 ct_get_answer.3
 LIB.MLINKS+=ct.3 ct_prompt_password.3
-LIB.MLINKS+=ct.3 ct_pr_fmt_file.3
 LIB.MLINKS+=ct.3 ct_getloginbyuid.3
 LIB.MLINKS+=simplect.3 ct_do_remotelist.3
 LIB.MLINKS+=simplect.3 ct_do_remotearchive.3

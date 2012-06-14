@@ -106,7 +106,6 @@ MLINKS+=ct.3 ct_file_extract_close.3
 MLINKS+=ct.3 ct_file_extract_special.3
 MLINKS+=ct.3 ct_get_answer.3
 MLINKS+=ct.3 ct_prompt_password.3
-MLINKS+=ct.3 ct_pr_fmt_file.3
 MLINKS+=ct.3 ct_getloginbyuid.3
 MLINKS+=simplect.3 ct_do_remotelist.3
 MLINKS+=simplect.3 ct_do_remotearchive.3

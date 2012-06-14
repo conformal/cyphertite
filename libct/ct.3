@@ -263,8 +263,6 @@ ct_internal.h functions used internally only:
 .Fn ct_get_answer "char *prompt" "char *a1" "char *a2" "char *default_val" "char *answer" "size_t answer_len" "int secret"
 .Ft int
 .Fn ct_prompt_password "char *prompt" "char *answer" "size_t answer_len" "char *answer2" "size_t answer2_len" "int confirm"
-.Ft void
-.Fn ct_pr_fmt_file "struct fnode *fnode" "int verbose"
 .Ft char *
 .Fn ct_getloginbyuid "uid_t uid"
 .Ft int 
@@ -288,8 +286,6 @@ ct_lib.h functions used internally only:
 .Fn ct_reconnect "evutil_socket_t" "short event" "void *varg"
 .Ft int
 .Fn ct_reconnect_internal "struct ct_global_state *state"
-.Ft void
-.Fn ct_cleanup_login_cache "void"
 .Ft void
 .Fn ct_compute_sha "void *vctx"
 .Ft void
@@ -352,12 +348,6 @@ ct_event_shutdown "struct ct_event_state *ev_st"
 .Fn ct_archive_insert_dir "struct ct_archive_state *cas" "struct dnode *"
 .Ft void
 .Fn ct_archive_cleanup "struct ct_archive_state *cas"
-.Ft void
-.Fn ct_print_file_start "struct fnode *fnode" "int verbose"
-.Ft void
-.Fn ct_print_file_end "struct fnode *fnode" "int verbose" "int block_size"
-.Ft void
-.Fn ct_print_ctfile_info "const char *filename" "struct ctfile_gheader *gh"
 
 .Ss MATCH
 
@@ -1131,13 +1121,6 @@ typedef void	(ctfile_find_callback)(struct ct_global_state *,
 .Fn ct_prompt_password "char *prompt" "char *answer" "size_t answer_len" "char *answer2" "size_t answer2_len" "int confirm"
 
 .\"ct_util.c
-
-.Bd -literal
-/* print file data nicely  this wants to be a callback" "really */
-.Ed
-
-.Ft void
-.Fn ct_pr_fmt_file "struct fnode *fnode" "int verbose"
 
 .Bd -literal
 /* Probably doesn't belong here */
