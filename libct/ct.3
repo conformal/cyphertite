@@ -237,8 +237,6 @@ ct_internal.h functions used internally only:
 .Fn ct_add_operation_after "struct ct_global_state *state" "struct ct_op *after" "ct_op_cb *start" "ct_op_cb *complete" "void *args"
 .Ft int
 .Fn ct_do_operation "struct ct_config *conf" "ct_op_cb *start" "ct_op_cb *complete" "void *args" "int need_secrets"
-.Ft int
-.Fn ct_list "const char *file" "char **flist" "char **excludelist" "int match_mode" "const char *ctfile_basedir" "int strip_slash" "int verbose"
 .Ft void
 .Fn ctfile_list_complete "struct ctfile_list *files" "int matchmode" "char **flist" "char **excludelist" "struct ctfile_list_tree *results"
 .Ft int
@@ -1057,11 +1055,6 @@ struct ct_op {
 .br
 .Ft int
 .Fn ct_do_operation "struct ct_config *conf" "ct_op_cb *start" "ct_op_cb *complete" "void *args" "int need_secrets"
-
-.\"ct_ops.c
-
-.Ft int
-.Fn ct_list "const char *file" "char **flist" "char **excludelist" "int match_mode" "const char *ctfile_basedir" "int strip_slash" "int verbose"
 
 .\"ct_file_mode.c
 

@@ -93,7 +93,6 @@ MLINKS+=ct.3 ct_normalize_filelist.3
 MLINKS+=ct.3 ct_add_operation.3
 MLINKS+=ct.3 ct_add_operation_after.3
 MLINKS+=ct.3 ct_do_operation.3
-MLINKS+=ct.3 ct_list.3
 MLINKS+=ct.3 ctfile_list_complete.3
 MLINKS+=ct.3 ct_file_on_server.3
 MLINKS+=ct.3 ct_cull_kick.3
