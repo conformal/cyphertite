@@ -20,6 +20,13 @@
 #include <ct_socket.h>
 #include <ct_threads.h>
 
+#define CT_VERSION_MAJOR	1
+#define CT_VERSION_MINOR	2
+#define CT_VERSION_PATCH	2
+#define CT_VERSION		CT_STR(CT_VERSION_MAJOR) "." \
+				CT_STR(CT_VERSION_MINOR) "." \
+				CT_STR(CT_VERSION_PATCH)
+
 struct ct_config {
 	char	*ct_host;
 	char	*ct_hostport;

@@ -17,7 +17,7 @@
 #
 # Get version from header.
 #
-HEADER=cyphertite/ct.h
+HEADER=libct/ct_lib.h
 SCRIPT=version.sh
 if [ ! -f "$HEADER" ]; then
 	echo "$SCRIPT: error: $HEADER does not exist" 1>&2

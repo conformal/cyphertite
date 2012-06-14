@@ -42,12 +42,7 @@
 /* versioning */
 #define CT_STRINGIFY(x)		#x
 #define CT_STR(x)		CT_STRINGIFY(x)
-#define CT_VERSION_MAJOR	1
-#define CT_VERSION_MINOR	2
-#define CT_VERSION_PATCH	2
-#define CT_VERSION		CT_STR(CT_VERSION_MAJOR) "." \
-				CT_STR(CT_VERSION_MINOR) "." \
-				CT_STR(CT_VERSION_PATCH)
+
 extern char		*__progname;
 extern int		ct_skip_xml_negotiate;
 
