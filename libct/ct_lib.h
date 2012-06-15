@@ -20,6 +20,10 @@
 #include <ct_socket.h>
 #include <ct_threads.h>
 
+/* versioning */
+#define CT_STRINGIFY(x)		#x
+#define CT_STR(x)		CT_STRINGIFY(x)
+
 #define CT_VERSION_MAJOR	1
 #define CT_VERSION_MINOR	2
 #define CT_VERSION_PATCH	2

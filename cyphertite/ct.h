@@ -39,10 +39,6 @@
 #define evutil_socket_t int
 #endif
 
-/* versioning */
-#define CT_STRINGIFY(x)		#x
-#define CT_STR(x)		CT_STRINGIFY(x)
-
 extern char		*__progname;
 extern int		ct_skip_xml_negotiate;
 
