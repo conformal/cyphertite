@@ -46,6 +46,8 @@
 #include <ct_match.h>
 #include <ct_ext.h>
 
+extern char *__progname;
+
 void
 ct_info_sig(evutil_socket_t fd, short event, void *vctx)
 {
@@ -105,7 +107,6 @@ main(int argc, char **argv)
 	excludelist = NULL;
 	includelist = NULL;
 	tdir = NULL;
-	ctfile = e_strdup("tagname");
 	match_mode = 0;
 	no_cross_mounts = 1;
 	strip_slash = 1;
@@ -113,6 +114,12 @@ main(int argc, char **argv)
 	follow_symlinks = 0;
 
 	ct_setup(CT_INIT_ASSL|CT_INIT_CLOG|CT_INIT_EXUDE, cflags, debug_mask);
+
+	if (argc < 3) {
+		CFATALX("usage: %s <metatdata file tag> <files>", __progname);
+	}
+	ctfile = argv[1]; /* metafile tag */
+	flist = &argv[2]; /* file name list */
 
 	if ((conf = ct_load_config(&config_file)) == NULL) {
 		CFATALX("config file not found. Run \"cyphertitectl config "
@@ -122,11 +129,6 @@ main(int argc, char **argv)
 	ct_prompt_for_login_password(conf);
 
 	state = ct_init(conf, 0, ct_info_sig);
-
-	argv++; /* eat program name */
-	ctfile = argv[0]; /* first arg is tag */
-	argv++; /* skip tag*/
-	flist = argv;
 
 	ct_do_remotearchive(state, ctfile, flist, tdir, excludelist,
 	    includelist, match_mode, no_cross_mounts, strip_slash,
