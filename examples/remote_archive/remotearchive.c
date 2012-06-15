@@ -46,32 +46,10 @@
 #include <ct_match.h>
 #include <ct_ext.h>
 
-static void printtime(time_t ftime);
-
 void
 ct_info_sig(evutil_socket_t fd, short event, void *vctx)
 {
 	CINFO("signalled");
-}
-
-void
-remotelist_print(struct ct_global_state *state, struct ct_op *op)
-{
-	struct ctfile_list_file         *file;
-	int64_t                          maxsz = 8;
-	int                              numlen;
-
-	numlen = snprintf(NULL, 0, "%" PRId64, maxsz);
-
-	while ((file = SIMPLEQ_FIRST(&state->ctfile_list_files)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(&state->ctfile_list_files, mlf_link);
-
-		printf("%*llu ", numlen, (unsigned long long)file->mlf_size);
-		printtime(file->mlf_mtime);
-		printf("\t");
-		printf("%s\n", file->mlf_name);
-		e_free(&file);
-	}
 }
 
 #define CT_INIT_ASSL	1
@@ -161,29 +139,3 @@ main(int argc, char **argv)
 
 	return 0;
 }
-
-/* Taken from OpenBSD ls */
-static void
-printtime(time_t ftime)
-{
-        int i;
-        char *longstring;
-
-        longstring = ctime(&ftime);
-        for (i = 4; i < 11; ++i)
-                (void)putchar(longstring[i]);
-
-#define DAYSPERNYEAR    365
-#define SECSPERDAY      (60*60*24)
-#define SIXMONTHS       ((DAYSPERNYEAR / 2) * SECSPERDAY)
-        if (ftime + SIXMONTHS > time(NULL))
-                for (i = 11; i < 16; ++i)
-                        (void)putchar(longstring[i]);
-        else {
-                (void)putchar(' ');
-                for (i = 20; i < 24; ++i)
-                        (void)putchar(longstring[i]);
-        }
-        (void)putchar(' ');
-}
-
