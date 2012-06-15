@@ -118,7 +118,7 @@ main(int argc, char **argv)
 	if (argc < 2) {
 		CFATALX("usage: %s <metadata file tag>", __progname);
 	}
-	ctfile = argv[1]; /* metadata file tag */
+	ctfile = e_strdup(argv[1]); /* metadata file tag */
 
 	if ((conf = ct_load_config(&config_file)) == NULL) {
 		CFATALX("config file not found. Run \"cyphertitectl config "
@@ -135,6 +135,9 @@ main(int argc, char **argv)
 	ct_cleanup(state);
 
 	ct_unload_config(config_file, conf);
+
+	if (ctfile)
+		e_free(&ctfile);
 
 	return 0;
 }

@@ -94,6 +94,7 @@ main(int argc, char **argv)
 	char			*config_file = NULL;
 	uint32_t		 cflags = CLOG_F_ENABLE | CLOG_F_STDERR;
 	uint64_t		 debug_mask = 0;
+	int			 i, filecount;
 
 	char **excludelist;
 	char **flist;
@@ -118,8 +119,11 @@ main(int argc, char **argv)
 	if (argc < 3) {
 		CFATALX("usage: %s <metatdata file tag> <files>", __progname);
 	}
-	ctfile = argv[1]; /* metafile tag */
-	flist = &argv[2]; /* file name list */
+	ctfile = e_strdup(argv[1]);	/* metafile tag		*/
+	filecount = argc - 2;
+	flist = e_calloc(filecount+1, sizeof(char *));
+	for(i = 0; i < filecount; i++)
+		flist[i] = e_strdup(argv[i+2]);
 
 	if ((conf = ct_load_config(&config_file)) == NULL) {
 		CFATALX("config file not found. Run \"cyphertitectl config "
@@ -137,6 +141,15 @@ main(int argc, char **argv)
 	ct_cleanup(state);
 
 	ct_unload_config(config_file, conf);
+
+	if (ctfile)
+		e_free(&ctfile);
+	if (flist) {
+		for(i = 0; i < filecount; i++)
+			if (flist[i])
+				e_free(&flist[i]);
+		e_free(&flist);
+	}
 
 	return 0;
 }
