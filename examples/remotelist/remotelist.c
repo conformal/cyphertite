@@ -107,8 +107,6 @@ ct_setup(int flags, int cflags, int debug_mask)
 	return 0;
 }
 
-/****************************** END MOVE TO LIBCT ******************/
-
 int
 main(int argc, char **argv)
 {
