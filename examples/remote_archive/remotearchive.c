@@ -94,7 +94,7 @@ main(int argc, char **argv)
 	char			*config_file = NULL;
 	uint32_t		 cflags = CLOG_F_ENABLE | CLOG_F_STDERR;
 	uint64_t		 debug_mask = 0;
-	int			 i, filecount;
+	int			 i, filecount, rslt;
 
 	char **excludelist;
 	char **flist;
@@ -134,7 +134,7 @@ main(int argc, char **argv)
 
 	state = ct_init(conf, 0, ct_info_sig);
 
-	ct_do_remotearchive(state, ctfile, flist, tdir, excludelist,
+	rslt = ct_do_remotearchive(state, ctfile, flist, tdir, excludelist,
 	    includelist, match_mode, no_cross_mounts, strip_slash,
 	    follow_root_symlink, follow_symlinks, conf);
 
@@ -151,5 +151,5 @@ main(int argc, char **argv)
 		e_free(&flist);
 	}
 
-	return 0;
+	return rslt;
 }

@@ -59,7 +59,7 @@ remotelist_print(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ctfile_list_file         *file;
 	int64_t                          maxsz = 8;
-	int                              numlen;
+	int                              numlen, rslt;
 
 	numlen = snprintf(NULL, 0, "%" PRId64, maxsz);
 
@@ -138,13 +138,14 @@ main(int argc, char **argv)
 	exclude = NULL;
 	matchmode = CT_MATCH_GLOB;
 
-	ct_do_remotelist(state, search, exclude, matchmode, remotelist_print);
+	rslt = ct_do_remotelist(state, search, exclude, matchmode,
+	    remotelist_print);
 
 	ct_cleanup(state);
 
 	ct_unload_config(config_file, conf);
 
-	return 0;
+	return rslt;
 }
 
 /* Taken from OpenBSD ls */

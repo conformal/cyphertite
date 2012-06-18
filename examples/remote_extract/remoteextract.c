@@ -94,6 +94,7 @@ main(int argc, char **argv)
 	char			*config_file = NULL;
 	uint32_t		 cflags = CLOG_F_ENABLE | CLOG_F_STDERR;
 	uint64_t		 debug_mask = 0;
+	int			 rslt;
 
 	char **excludelist;
 	char **includelist;
@@ -129,7 +130,7 @@ main(int argc, char **argv)
 
 	state = ct_init(conf, 0, ct_info_sig);
 
-	ct_do_remoteextract(state, ctfile, tdir, excludelist, includelist,
+	rslt = ct_do_remoteextract(state, ctfile, tdir, excludelist, includelist,
 	    match_mode, strip_slash, follow_symlinks, attr, conf);
 
 	ct_cleanup(state);
@@ -139,5 +140,5 @@ main(int argc, char **argv)
 	if (ctfile)
 		e_free(&ctfile);
 
-	return 0;
+	return rslt;
 }
