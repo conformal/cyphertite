@@ -59,7 +59,7 @@ remotelist_print(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ctfile_list_file         *file;
 	int64_t                          maxsz = 8;
-	int                              numlen, rslt;
+	int                              numlen;
 
 	numlen = snprintf(NULL, 0, "%" PRId64, maxsz);
 
@@ -115,6 +115,7 @@ main(int argc, char **argv)
 	char			*config_file = NULL;
 	uint32_t		 cflags = CLOG_F_ENABLE | CLOG_F_STDERR;
 	uint64_t		 debug_mask = 0;
+	int			 rslt;
 
 	ct_setup(CT_INIT_ASSL|CT_INIT_CLOG|CT_INIT_EXUDE, cflags, debug_mask);
 
