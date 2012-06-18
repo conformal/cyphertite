@@ -172,7 +172,6 @@ ct_get_debugmask(char *debugstring)
 		{ "all", ~(0ULL) },
 	};
 
-	CWARNX("%s", __func__);
 	next = debugstring;
 	while ((cur = next) != NULL) {
 		neg = 0;
