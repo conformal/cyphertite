@@ -951,7 +951,7 @@ ct_traverse(struct ct_archive_state *cas, char **paths,
 	}
 	if (no_cross_mounts)
 		fts_options |= FTS_XDEV;
-	CWARNX("options =  %d", fts_options);
+	CDBG("options =  %d", fts_options);
 	ftsp = fts_open(paths, fts_options, NULL);
 	if (ftsp == NULL)
 		CFATAL("fts_open failed");
