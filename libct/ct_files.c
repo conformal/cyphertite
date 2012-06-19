@@ -825,7 +825,7 @@ loop:
 	if (new_file) {
 		cap->cap_curnode->fl_state = CT_FILE_PROCESSING;
 		if (cap->cap_fd != -1) {
-			CFATALX("state error, new file open,"
+			CABORTX("state error, new file open,"
 			    " sz %" PRId64 " offset %" PRId64,
 			    (int64_t) cap->cap_curnode->fl_size,
 			    (int64_t) cap->cap_curnode->fl_offset);
@@ -907,7 +907,7 @@ loop:
 		goto loop;
 	} else {
 		if (cap->cap_fd == -1) {
-			CFATALX("state error, old file not open,"
+			CABORTX("state error, old file not open,"
 			    " sz %" PRId64 " offset %" PRId64,
 			    (int64_t) cap->cap_curnode->fl_size,
 			    (int64_t) cap->cap_curnode->fl_offset);
