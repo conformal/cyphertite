@@ -234,7 +234,6 @@ loop:
 
 	/* Are we done here? */
 	if (cas->cas_size == cas->cas_offset) {
-		ct_set_file_state(state, CT_S_FINISHED);
 
 		ct_trans->tr_fl_node = NULL;
 		ct_trans->tr_state = TR_S_XML_CLOSE;
@@ -248,6 +247,7 @@ loop:
 		e_free(&cas);
 		op->op_priv = NULL;
 		ct_queue_first(state, ct_trans);
+		ct_set_file_state(state, CT_S_FINISHED);
 		CNDBG(CT_LOG_FILE, "setting eof on trans %" PRIu64,
 		    ct_trans->tr_trans_id);
 		return;
@@ -641,7 +641,6 @@ ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 
 	if (ct_get_file_state(state) == CT_S_FINISHED)
 		return;
-	ct_set_file_state(state, CT_S_FINISHED);
 
 	trans = ct_trans_alloc(state);
 
@@ -659,6 +658,8 @@ ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 	trans->tr_size[2] = trans->hdr.c_size;
 
 	ct_queue_first(state, trans);
+
+	ct_set_file_state(state, CT_S_FINISHED);
 }
 
 /*
@@ -1343,9 +1344,9 @@ ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 	trans->tr_eof = 1;
 	trans->tr_complete = ct_cull_handle_complete;
 	trans->tr_cleanup = NULL;
-	ct_set_file_state(state, CT_S_FINISHED);
 
 	ct_queue_first(state, trans);
+	ct_set_file_state(state, CT_S_FINISHED);
 	return;
 
 dying:
@@ -1358,7 +1359,7 @@ void
 ct_cull_send_shas(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_trans			*trans;
-	int				 sha_add, ret;
+	int				 sha_add, ret, done = 0;
 
 	if (ct_get_file_state(state) == CT_S_FINISHED)
 		return;
@@ -1395,12 +1396,14 @@ ct_cull_send_shas(struct ct_global_state *state, struct ct_op *op)
 	sha_payload_sz += trans->hdr.c_size;
 
 	if (shacnt == 0 || RB_EMPTY(&ct_sha_rb_head)) {
-		ct_set_file_state(state, CT_S_FINISHED);
 		trans->tr_eof = 1;
+		done = 1;
 		CNDBG(CT_LOG_SHA, "shacnt %" PRIu64, shacnt);
 	}
 	ct_queue_first(state, trans);
-
+	if (done) {
+		ct_set_file_state(state, CT_S_FINISHED);
+	}
 	return;
 
 dying:

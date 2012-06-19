@@ -1056,7 +1056,6 @@ skip:
 done:
 	CNDBG(CT_LOG_FILE, "last file read");
 	/* done with backup */
-	ct_set_file_state(state, CT_S_FINISHED);
 
 	ct_trans = ct_trans_alloc(state);
 	if (ct_trans == NULL) {
@@ -1083,6 +1082,7 @@ done:
 	op->op_priv = NULL;
 
 	ct_queue_first(state, ct_trans);
+	ct_set_file_state(state, CT_S_FINISHED);
 
 	return;
 
