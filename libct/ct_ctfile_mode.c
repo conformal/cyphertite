@@ -573,6 +573,8 @@ ctfile_delete(struct ct_global_state *state, struct ct_op *op)
 	e_free(&rname);
 
 	ct_queue_first(state, trans);
+
+	ct_set_file_state(state, CT_S_FINISHED);
 }
 
 void
@@ -878,6 +880,8 @@ ct_cull_setup(struct ct_global_state *state, struct ct_op *op)
 	trans->tr_state = TR_S_XML_CULL_SEND;
 
 	ct_queue_first(state, trans);
+
+	ct_set_file_state(state, CT_S_FINISHED);
 }
 
 int sent_complete;
