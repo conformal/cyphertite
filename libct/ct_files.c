@@ -741,7 +741,7 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		    &cap->cap_flist, &cap->cap_curlist, cap->cap_include,
 		    cap->cap_exclude, caa->caa_strip_slash,
 		    caa->caa_follow_symlinks)) == NULL)
-			CFATALX("all files specified excluded or nonexistant");
+			CFATALX("%s", ct_strerror(CTE_ALL_FILES_EXCLUDED));
 
 
 		/* XXX - deal with stdin */

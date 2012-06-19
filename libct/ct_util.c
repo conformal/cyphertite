@@ -101,7 +101,7 @@ const char *ct_errmsgs[] = {
 	[CTE_INVALID_IV_LENGTH] = "Invalid iv length",
 	[CTE_ENCRYPT_FAILED] = "Failed to encrypt chunk",
 	[CTE_DECRYPT_FAILED] = "Failed to decrypt chunk",
-
+	[CTE_ALL_FILES_EXCLUDED] = "All files excluded or nonexistant",
 };
 
 const char *
