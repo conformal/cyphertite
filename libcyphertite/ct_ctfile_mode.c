@@ -643,6 +643,12 @@ ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 		return;
 
 	trans = ct_trans_alloc(state);
+	if (trans == NULL) {
+		/* system busy, return */
+		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
+		ct_set_file_state(state, CT_S_WAITING_TRANS);
+		return;
+	}
 
 	trans->tr_state = TR_S_XML_LIST;
 
@@ -728,6 +734,12 @@ ctfile_delete(struct ct_global_state *state, struct ct_op *op)
 		return;
 
 	trans = ct_trans_alloc(state);
+	if (trans == NULL) {
+		/* system busy, return */
+		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
+		ct_set_file_state(state, CT_S_WAITING_TRANS);
+		return;
+	}
 	trans->tr_state = TR_S_XML_DELETE;
 
 	if ((rname = ctfile_cook_name(rname)) == NULL) {
@@ -1282,8 +1294,8 @@ ct_cull_setup(struct ct_global_state *state, struct ct_op *op)
 	ct_set_file_state(state, CT_S_RUNNING);
 
 	trans = ct_trans_alloc(state);
-
 	if (trans == NULL) {
+		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
 		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
@@ -1328,6 +1340,7 @@ ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 	trans = ct_trans_alloc(state);
 
 	if (trans == NULL) {
+		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
 		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
@@ -1373,6 +1386,7 @@ ct_cull_send_shas(struct ct_global_state *state, struct ct_op *op)
 	trans = ct_trans_alloc(state);
 
 	if (trans == NULL) {
+		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
 		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
