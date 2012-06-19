@@ -61,6 +61,9 @@ ctfile_cook_name(const char *path)
 
 /*
  * Return boolean whether the ctfile in question is already in the cache.
+ * Note that we do not fail if we can't open the cachedir, that just implies
+ * that *for us* the ctfile is not cached. If the problem is permissions then
+ * we will discover this as soon as we try and write there (which is fatal).
  */
 int
 ctfile_in_cache(const char *ctfile, const char *cachedir)
@@ -70,7 +73,7 @@ ctfile_in_cache(const char *ctfile, const char *cachedir)
 	int		 found = 0;
 
 	if ((dirp = opendir(cachedir)) == NULL)
-		CFATAL("can't open ctfile cache dir");
+		return (0);
 	while ((dp = readdir(dirp)) != NULL) {
 		if (strcmp(dp->d_name, ctfile) == 0) {
 			CNDBG(CT_LOG_CTFILE, "found in cachedir");
