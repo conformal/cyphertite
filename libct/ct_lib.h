@@ -533,7 +533,7 @@ struct dnode		*ct_file_extract_lookup_dir(struct ct_extract_state *,
 			     const char *);
 int			 ct_file_extract_open(struct ct_extract_state *,
 			     struct fnode *fnode);
-void			 ct_file_extract_write(struct ct_extract_state *,
+int			 ct_file_extract_write(struct ct_extract_state *,
 			     struct fnode *, uint8_t *buf, size_t size);
 void			 ct_file_extract_close(struct ct_extract_state *,
 			     struct fnode *fnode);

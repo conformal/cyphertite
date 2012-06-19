@@ -405,13 +405,14 @@ int
 ctfile_extract_complete_read(struct ct_global_state *state, struct ct_trans
 *trans)
 {
+	int	ret;
+
 	CNDBG(CT_LOG_FILE, "writing packet sz %d",
 	    trans->tr_size[(int)trans->tr_dataslot]);
-	ct_file_extract_write(state->extract_state,
+	if ((ret = ct_file_extract_write(state->extract_state,
 	    trans->tr_fl_node, trans->tr_data[(int)trans->tr_dataslot],
-	    trans->tr_size[(int)trans->tr_dataslot]);
-	/* XXX failure? */
-
+	    trans->tr_size[(int)trans->tr_dataslot])) != 0)
+		CFATALX("failed to write file: %s", ct_strerror(ret));
 	return (0);
 }
 

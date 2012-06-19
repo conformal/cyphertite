@@ -185,7 +185,7 @@ int
 ct_extract_complete_file_read(struct ct_global_state *state,
     struct ct_trans *trans)
 {
-	int slot;
+	int	slot, ret;
 
 	state->ct_stats->st_chunks_completed++;
 	if (trans->tr_fl_node->fl_skip_file == 0) {
@@ -193,9 +193,10 @@ ct_extract_complete_file_read(struct ct_global_state *state,
 		ct_sha1_add(trans->tr_data[slot],
 		    &trans->tr_fl_node->fl_shactx,
 		    trans->tr_size[slot]);
-		ct_file_extract_write(state->extract_state,
+		if ((ret = ct_file_extract_write(state->extract_state,
 		    trans->tr_fl_node, trans->tr_data[slot],
-		    trans->tr_size[slot]);
+		    trans->tr_size[slot])) != 0)
+			CFATALX("failed to write file: %s", ct_strerror(ret));
 		state->ct_stats->st_bytes_written +=
 		    trans->tr_size[slot];
 	}

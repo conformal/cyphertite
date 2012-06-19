@@ -1500,17 +1500,20 @@ ct_file_extract_open(struct ct_extract_state *ces, struct fnode *fnode)
 	return (0);
 }
 
-void
+int
 ct_file_extract_write(struct ct_extract_state *ces, struct fnode *fnode,
     uint8_t *buf, size_t size)
 {
-	ssize_t len;
+	ssize_t	len;
+	int	ret = 0;
+
+	if (fnode == NULL)
+		CABORTX("file write on non open file");
 
 	len = write(ces->ces_fd, buf, size);
-
 	if (len != size)
-		CFATAL("unable to write file %s",
-		    fnode ? fnode->fl_sname : "[not open]" );
+		ret = CTE_ERRNO;
+	return (ret);
 }
 
 void
