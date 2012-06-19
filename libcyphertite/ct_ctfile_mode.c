@@ -724,10 +724,29 @@ ctfile_list_complete(struct ctfile_list *files,  int matchmode, char **flist,
 	return(0);
 }
 
+int
+ctfile_delete_complete(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	struct ct_op			*op;
+	struct ctfile_delete_args	*cda;
+
+	op = ct_get_current_operation(state);
+	if (op == NULL)
+		CABORTX("no current operation while delete inprogress");
+	cda = op->op_args;
+
+	if (cda->cda_callback != NULL)
+		cda->cda_callback(cda, state, trans);
+	
+	return (1);
+}
+
 void
 ctfile_delete(struct ct_global_state *state, struct ct_op *op)
 {
-	const char			*rname = op->op_args;
+	struct ctfile_delete_args	*cda = op->op_args;
+	const char			*rname;
 	struct ct_trans			*trans;
 	int				 ret;
 
@@ -744,8 +763,8 @@ ctfile_delete(struct ct_global_state *state, struct ct_op *op)
 	}
 	trans->tr_state = TR_S_XML_DELETE;
 
-	if ((rname = ctfile_cook_name(rname)) == NULL) {
-		ct_fatal(state, rname, CTE_INVALID_CTFILE_NAME);
+	if ((rname = ctfile_cook_name(cda->cda_name)) == NULL) {
+		ct_fatal(state, cda->cda_name, CTE_INVALID_CTFILE_NAME);
 		ct_trans_free(state, trans);
 		return;
 	}
@@ -758,7 +777,7 @@ ctfile_delete(struct ct_global_state *state, struct ct_op *op)
 		return;
 	}
 	trans->tr_dataslot = 2;
-	trans->tr_complete = ctfile_complete_noop_final;
+	trans->tr_complete = ctfile_delete_complete;
 	trans->tr_cleanup = NULL;
 	trans->tr_size[2] = trans->hdr.c_size;
 
@@ -818,10 +837,7 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 			    ret);
 			goto just_queue;
 		}
-		if (filename == NULL)
-			printf("specified archive does not exist\n");
-		else
-			printf("%s deleted\n", filename);
+		trans->tr_ctfile_name = filename; /* whether NULL or not */
 		trans->tr_state = TR_S_DONE;
 		break;
 	case TR_S_XML_CULL_SEND:
@@ -885,11 +901,6 @@ just_queue:
  * 4 - schedule deletions.
  * 5 - on completion of deletion, remove cachefile.
  */
-struct ctfile_delete_args {
-	char		*pattern;
-	int		 matchmode;
-};
-
 ct_op_complete_cb	ctfile_process_delete;
 ct_op_complete_cb	ctfile_delete_extract_cleanup;
 ct_op_cb 		ctfile_delete_check_required;
@@ -1023,10 +1034,14 @@ ctfile_delete_check_required(struct ct_global_state *state, struct ct_op *op)
 		goto dying;
 	}
 	while ((file = RB_ROOT(&del_tree)) != NULL) {
+		struct ctfile_delete_args	*cda;
 		RB_REMOVE(ctfile_list_tree, &del_tree, file);
+		cda = e_malloc(sizeof(*cda));
+		cda->cda_name = e_strdup(file->mlf_name);
+		cda->cda_callback = ccda->ccda_callback;
 
 		ct_add_operation(state, ctfile_delete, ctfile_delete_from_cache,
-		    e_strdup(file->mlf_name));
+		    cda);
 		e_free(&file);
 		
 	}
@@ -1064,12 +1079,14 @@ dying:
 int
 ctfile_delete_from_cache(struct ct_global_state *state, struct ct_op *op)
 {
-	char	*filename = op->op_args;
+	struct ctfile_delete_args	*cda = op->op_args;
 
 	/* remove the deleted file from cachedir. */
-	(void)ctfile_cache_remove(filename,
+	(void)ctfile_cache_remove(cda->cda_name,
 	    state->ct_config->ct_ctfile_cachedir);
-	e_free(&filename);
+	e_free(&cda->cda_name);
+	e_free(&cda);
+
 	return (0);
 }
 
@@ -1580,10 +1597,13 @@ prev_ct_file:
 	}
 	RB_FOREACH(file, ctfile_list_tree, &ct_cull_all_ctfiles) {
 		if (file->mlf_keep == 0) {
+			struct ctfile_delete_args	*cda;
 			CNDBG(CT_LOG_CTFILE, "adding %s to delete list",
 			    file->mlf_name);
+			cda = e_calloc(1, sizeof(*cda));
+			cda->cda_name = e_strdup(file->mlf_name);
 			ct_add_operation(state, ctfile_delete,
-			    ctfile_delete_from_cache, e_strdup(file->mlf_name));
+			    ctfile_delete_from_cache, cda);
 		} else {
 			CNDBG(CT_LOG_CTFILE, "adding %s to keep list",
 			    file->mlf_name);

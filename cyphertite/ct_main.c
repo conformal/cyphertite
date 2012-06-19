@@ -83,6 +83,7 @@ ct_log_ctfile_info_fn		ct_print_ctfile_info;
 ct_log_traverse_start_fn	ct_print_traverse_start;
 ct_log_traverse_end_fn		ct_print_traverse_end;
 ct_log_chown_failed_fn		ct_print_extract_chown_failed;
+ctfile_delete_complete_fn	ct_print_delete;
 char			*ct_getloginbyuid(uid_t);
 void			ct_cleanup_login_cache(void);
 int		 ct_list(const char *, char **, char **, int, const char *,
@@ -516,6 +517,7 @@ ct_main(int argc, char **argv)
 		} else if (ct_action == CT_A_ERASE) {
 			ccda.ccda_pattern = ctfile;
 			ccda.ccda_matchmode = ct_match_mode;
+			ccda.ccda_callback = ct_print_delete;
 			ct_add_operation(state, ctfile_list_start,
 			    ctfile_process_delete, &ccda);
 		} else if (ct_action == CT_A_LIST) {
@@ -1033,6 +1035,17 @@ ct_print_extract_chown_failed(void *state, struct fnode *fnode,
 			CWARN("can't chown %s\"%s\"", dir, name);
 	} else {
 		CFATAL("can't chown %s\"%s\"", dir, name);
+	}
+}
+
+void
+ct_print_delete(struct ctfile_delete_args *cda,
+    struct ct_global_state *state, struct ct_trans *trans)
+{
+	if (trans->tr_ctfile_name == NULL) {
+		printf("could not delete %s\n", cda->cda_name);
+	} else if (ct_verbose) {
+		printf("%s deleted\n", trans->tr_ctfile_name);
 	}
 }
 

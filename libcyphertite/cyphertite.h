@@ -476,10 +476,22 @@ struct ct_ctfileop_args {
 	int		 cca_ctfile; /* is ctfile or other data */
 };
 
+/* arguments for globa check and delete */
+struct ctfile_delete_args;
+typedef void ctfile_delete_complete_fn(struct ctfile_delete_args *,
+    struct ct_global_state *, struct ct_trans *);
 struct ct_ctfile_delete_args {
-	char			*ccda_pattern;
-	int			 ccda_matchmode;
+	char				*ccda_pattern;
+	int				 ccda_matchmode;
+	ctfile_delete_complete_fn	*ccda_callback;
 };
+
+/* argumentsfor ctfile_delete() itself */
+struct ctfile_delete_args {
+	const char			*cda_name;
+	ctfile_delete_complete_fn	*cda_callback;
+};
+
 
 struct ct_op	*ct_add_operation(struct ct_global_state *, ct_op_cb *,
 		     ct_op_complete_cb *, void *);
@@ -490,6 +502,7 @@ int		 ct_do_operation(struct ct_config *, ct_op_cb *,
 void		 ct_clear_operation(struct ct_global_state *);
 void		 ct_nextop(void *);
 int		 ct_op_complete(struct ct_global_state *state);
+struct ct_op	*ct_get_current_operation(struct ct_global_state *);
 ct_op_cb	 ct_archive;
 ct_op_cb	 ct_extract;
 ct_op_cb	 ctfile_archive;

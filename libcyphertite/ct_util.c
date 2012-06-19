@@ -512,6 +512,12 @@ ct_op_complete(struct ct_global_state *state)
 	return (0);
 }
 
+struct ct_op*
+ct_get_current_operation(struct ct_global_state *state)
+{
+	return (TAILQ_FIRST(&state->ct_operations));
+}
+
 static int
 ct_load_certs(struct ct_global_state *state, struct assl_context *c)
 {
