@@ -691,7 +691,7 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 	switch (ct_get_file_state(state)) {
 	case CT_S_STARTING:
 		if (*filelist == NULL) {
-			CFATALX("no files specified");
+			CFATALX("%s", ct_strerror(CTE_NO_FILES_SPECIFIED));
 		}
 
 		cap = e_calloc(1, sizeof(*cap));
