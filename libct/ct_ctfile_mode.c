@@ -1112,7 +1112,7 @@ ct_cull_collect_ctfiles(struct ct_global_state *state, struct ct_op *op)
 	now -= (24 * 60 * 60 * state->ct_config->ct_ctfile_keep_days);
 	if (strftime(buf, TIMEDATA_LEN, "%Y%m%d-%H%M%S",
 	    localtime(&now)) == 0)
-		CFATALX("can't format time");
+		CABORTX("can't format time");
 
 	timelen = strlen(buf);
 
