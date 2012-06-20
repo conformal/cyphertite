@@ -146,7 +146,13 @@ struct ctfile_list_file {
 #define CTE_ENCRYPT_FAILED		34
 #define CTE_ALL_FILES_EXCLUDED		35
 #define CTE_ARCHIVE_FULLNAME		36
-#define CTE_MAX				37
+#define CTE_NO_SUCH_BACKUP		37
+#define CTE_NO_SECRETS_ON_SERVER	38
+#define CTE_BACKUP_ALREADY_EXISTS	39
+#define CTE_SECRETS_FILE_SIZE_MISMATCH	40
+#define CTE_SECRETS_FILE_DIFFERS	41
+#define CTE_SECRETS_FILE_SHORT_READ	42
+#define CTE_MAX				43
 
 const char	*ct_strerror(int);
 

@@ -242,8 +242,8 @@ ctfile_find_for_extract_complete(struct ct_global_state *state,
 		if (ccfa->ccfa_empty_ok)
 			goto do_operation;
 		else
-			CFATALX("unable to find metadata tagged %s",
-			    ccfa->ccfa_tag);
+			CFATALX("%s: %s", ccfa->ccfa_tag,
+			    ct_strerror(CTE_NO_SUCH_BACKUP));
 	}
 
 	/* pick the newest one */
@@ -436,7 +436,7 @@ ctfile_nextop_archive(struct ct_global_state *state, char *basis, void *args)
 	now = time(NULL);
 	if (strftime(buf, TIMEDATA_LEN, "%Y%m%d-%H%M%S",
 	    localtime(&now)) == 0)
-		CFATALX("can't format time");
+		CABORTX("can't format time");
 	e_asprintf(&fullname, "%s-%s", buf, ctfile);
 	CNDBG(CT_LOG_CTFILE, "backup file is %s", fullname);
 
@@ -444,8 +444,8 @@ ctfile_nextop_archive(struct ct_global_state *state, char *basis, void *args)
 	cachename = ctfile_get_cachename(fullname,
 	    state->ct_config->ct_ctfile_cachedir);
 	if (ctfile_in_cache(fullname, state->ct_config->ct_ctfile_cachedir))
-		CFATALX("generated metadata name %s already in cache dir",
-		    fullname);
+		CFATALX("%s: %s", fullname,
+		    ct_strerror(CTE_BACKUP_ALREADY_EXISTS));
 
 	e_free(&ctfile);
 	e_free(&fullname);
@@ -492,8 +492,7 @@ ct_check_secrets_extract(struct ct_global_state *state, struct ct_op *op)
 	struct ct_ctfileop_args	*cca;
 
 	if (!ct_file_on_server(state, "crypto.secrets"))
-		CFATALX("upload_crypto_secrets set but no secrets file on"
-		    "server, please use cyphertitectl secrets_upload");
+		CFATALX("%s", ct_strerror(CTE_NO_SECRETS_ON_SERVER));
 
 	cca = e_calloc(1, sizeof(*cca));
 	/* XXX temporary name? */
@@ -523,21 +522,22 @@ ct_compare_secrets(struct ct_global_state *state, struct ct_op *op)
 	strlcpy(temp_path, cca->cca_tdir, sizeof(temp_path));
 	strlcat(temp_path, cca->cca_localname, sizeof(temp_path));
 	if (stat(state->ct_config->ct_crypto_secrets, &sb) != 0)
-		CFATAL("can't stat secrets file at \"%s\"",
-		    state->ct_config->ct_crypto_secrets);
+		CFATALX("\"%s\": %s", state->ct_config->ct_crypto_secrets,
+		    ct_strerror(CTE_ERRNO));
 	if (stat(temp_path, &tsb) != 0)
-		CFATAL("can't stat temporary secrets file");
+		CFATAL("\"%s\": %s", temp_path, ct_strerror(CTE_ERRNO));
 
 	/* Compare size first */
 	if (tsb.st_size != sb.st_size)
-		CFATALX("size doesn't match for server secrets file "
-		    "(%" PRId64 " vs %" PRId64 "), please confirm that local "
-		    "secrets file is the correct one", (int64_t)tsb.st_size, (int64_t)sb.st_size);
+		CFATALX("%" PRId64 " vs %" PRId64 ": %s", (int64_t)tsb.st_size,
+		    (int64_t)sb.st_size,
+		    ct_strerror(CTE_SECRETS_FILE_SIZE_MISMATCH));
 
 	if ((f = fopen(state->ct_config->ct_crypto_secrets, "rb")) == NULL)
-		CFATAL("can't open secrets file");
+		CFATALX("\"%s\": %s", state->ct_config->ct_crypto_secrets,
+		    ct_strerror(CTE_ERRNO));
 	if ((tf = fopen(temp_path, "rb")) == NULL)
-		CFATAL("can't open temporary secrets file");
+		CFATAL("temp_path: %s", ct_strerror(CTE_ERRNO));
 	/* read then throw away */
 	unlink(temp_path);
 	while (sb.st_size > 0) {
@@ -547,17 +547,22 @@ ct_compare_secrets(struct ct_global_state *state, struct ct_op *op)
 		sb.st_size -= sz;
 		CNDBG(CT_LOG_FILE, "sz = %" PRId64 " remaining = %" PRId64,
 		    (int64_t)sz, (int64_t)sb.st_size);
-		if ((rsz = fread(buf, 1, sz, f)) != sz)
-			CFATALX("short read on secrets file (%" PRId64
-			    " %" PRId64 ")", (int64_t)sz, (int64_t)rsz);
-		if ((rsz = fread(tbuf, 1, sz, tf)) != sz)
-			CFATALX("short read on temporary secrets file "
-			    "(%" PRId64 " %" PRId64 ")", (int64_t)sz,
+		if ((rsz = fread(buf, 1, sz, f)) != sz) {
+			CNDBG(CT_LOG_CRYPTO, "short read on secrets file (%"
+			    PRId64 " %" PRId64 ")", (int64_t)sz, (int64_t)rsz);
+			CFATALX("%s: %s", state->ct_config->ct_crypto_secrets,
+			    ct_strerror(CTE_SECRETS_FILE_SHORT_READ));
+		}
+		if ((rsz = fread(tbuf, 1, sz, tf)) != sz) {
+			CNDBG(CT_LOG_CRYPTO, "short read on temporary secrets "
+			    "file (%" PRId64 " %" PRId64 ")", (int64_t)sz,
 			    (int64_t)rsz);
+			CFATALX("%s: %s", temp_path,
+			    ct_strerror(CTE_SECRETS_FILE_SHORT_READ));
+		}
 
 		if (memcmp(buf, tbuf, sz) != 0)
-			CFATALX("secrets file on server differs from local"
-			    " please check which is correct and rectify");
+			CFATALX("%s", ct_strerror(CTE_SECRETS_FILE_DIFFERS));
 	}
 	fclose(f);
 	fclose(tf);

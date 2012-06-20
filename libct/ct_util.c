@@ -103,6 +103,12 @@ const char *ct_errmsgs[] = {
 	[CTE_DECRYPT_FAILED] = "Failed to decrypt chunk",
 	[CTE_ALL_FILES_EXCLUDED] = "All files excluded or nonexistant",
 	[CTE_ARCHIVE_FULLNAME] = "Remote mode archive provided timestamped tag",
+	[CTE_NO_SUCH_BACKUP] = "No such backup on server",
+	[CTE_BACKUP_ALREADY_EXISTS] = "Backup already exists in cache directory",
+	[CTE_NO_SECRETS_ON_SERVER] = "Upload_crypto_secrets is set, but no secrets file is on the server. Please use cyphertitectl secrets_upload",
+	[CTE_SECRETS_FILE_SIZE_MISMATCH] = "Secrets file size mismatch, please confirm that local secrets file is the correct one",
+	[CTE_SECRETS_FILE_DIFFERS] = "Secrets file on server differs from local.  Please check which is correct",
+	[CTE_SECRETS_FILE_SHORT_READ] = "Short read while comparing secrets files",
 };
 
 const char *
