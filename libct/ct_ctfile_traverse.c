@@ -126,7 +126,7 @@ datecompare(const FTSENT **a, const FTSENT **b)
  * We delete files in date order, oldest first, until the size constraint has
  * been met.
  */
-void
+int
 ctfile_trim_cache(const char *cachedir, long long max_size)
 {
 	char		*paths[2];
@@ -138,8 +138,10 @@ ctfile_trim_cache(const char *cachedir, long long max_size)
 	paths[1] = NULL;
 
 	if ((ftsp = fts_open(paths, FTS_XDEV | FTS_PHYSICAL | FTS_NOCHDIR,
-	   NULL)) == NULL)
-		CFATAL("can't open metadata cache to scan");
+	   NULL)) == NULL) {
+		CNDBG(CT_LOG_CTFILE, "can't open metadata cache to scan");
+		return (CTE_ERRNO);
+	}
 
 	while ((fe = fts_read(ftsp)) != NULL) {
 		switch(fe->fts_info) {
@@ -155,10 +157,13 @@ ctfile_trim_cache(const char *cachedir, long long max_size)
 		case FTS_ERR:
 		case FTS_DNR:
 		case FTS_NS:
+			CNDBG(CT_LOG_CTFILE, "can't read directory entry %s",
+			    strerror(fe->fts_errno));
+			(void)fts_close(ftsp);
 			errno = fe->fts_errno;
-			CFATAL("can't read directory entry");
+			return (CTE_ERRNO);
 		case FTS_DC:
-			CWARNX("file system cycle found");
+			CNDBG(CT_LOG_CTFILE, "file system cycle found");
 			/* FALLTHROUGH */
 		default:
 			/* valid but we don't care */
@@ -169,13 +174,15 @@ ctfile_trim_cache(const char *cachedir, long long max_size)
 	(void)fts_close(ftsp);
 
 	if (dirsize <= max_size)
-		return;
+		return (0);
 	CNDBG(CT_LOG_CTFILE, "cleaning up cachedir, %llu > %llu",
 	    (long long)dirsize, (long long)max_size);
 
 	if ((ftsp = fts_open(paths, FTS_XDEV | FTS_PHYSICAL | FTS_NOCHDIR,
-	    datecompare)) == NULL)
-		CFATAL("can't open metadata cache to trim");
+	    datecompare)) == NULL) {
+		CNDBG(CT_LOG_CTFILE, "can't open metadata cache to trim");
+		return (CTE_ERRNO);
+	}
 
 	while ((fe = fts_read(ftsp)) != NULL) {
 		switch(fe->fts_info) {
@@ -192,10 +199,13 @@ ctfile_trim_cache(const char *cachedir, long long max_size)
 		case FTS_ERR:
 		case FTS_DNR:
 		case FTS_NS:
+			CNDBG(CT_LOG_CTFILE, "can't read directory entry %s",
+			    strerror(fe->fts_errno));
+			(void)fts_close(ftsp);
 			errno = fe->fts_errno;
-			CFATAL("can't read directory entry");
+			return (CTE_ERRNO);
 		case FTS_DC:
-			CWARNX("file system cycle found");
+			CNDBG(CT_LOG_CTFILE, "file system cycle found");
 			/* FALLTHROUGH */
 		default:
 			/* valid but we don't care */
@@ -208,4 +218,6 @@ ctfile_trim_cache(const char *cachedir, long long max_size)
 	}
 
 	(void)fts_close(ftsp);
+
+	return (0);
 }

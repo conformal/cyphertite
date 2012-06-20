@@ -386,7 +386,7 @@ char			*ctfile_cook_name(const char *);
 int			 ctfile_in_cache(const char *, const char *);
 char			*ctfile_get_cachename(const char *, const char *);
 int			 ctfile_verify_name(char *);
-void			 ctfile_trim_cache(const char *, long long);
+int			 ctfile_trim_cache(const char *, long long);
 
 void			 ct_prompt_for_login_password(struct ct_config *);
 void			 ct_normalize_username(char *);
