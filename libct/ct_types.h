@@ -152,7 +152,9 @@ struct ctfile_list_file {
 #define CTE_SECRETS_FILE_SIZE_MISMATCH	40
 #define CTE_SECRETS_FILE_DIFFERS	41
 #define CTE_SECRETS_FILE_SHORT_READ	42
-#define CTE_MAX				43
+#define CTE_NO_FILES_SPECIFIED		43
+#define CTE_NO_FILES_ACCESSIBLE		44
+#define CTE_MAX				45
 
 const char	*ct_strerror(int);
 

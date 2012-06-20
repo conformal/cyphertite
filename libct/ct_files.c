@@ -74,7 +74,7 @@ RB_GENERATE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 static void		 ct_traverse(struct ct_archive_state *, char **,
 			     struct flist_head *, int, int, int, int,
 			     struct ct_statistics *);
-static int		 ct_sched_backup_file(struct ct_archive_state *,
+static void		 ct_sched_backup_file(struct ct_archive_state *,
 			     struct stat *, char *, int, int, int,
 			     struct flist_head *, struct fl_tree *,
 			     struct ct_statistics *);
@@ -473,7 +473,7 @@ ct_archive_cleanup(struct ct_archive_state *cas)
 	e_free(&cas);
 }
 
-static int
+static void
 ct_sched_backup_file(struct ct_archive_state *cas, struct stat *sb,
     char *filename, int forcedir, int closedir, int strip_slash,
     struct flist_head *flist, struct fl_tree *ino_tree,
@@ -488,11 +488,11 @@ ct_sched_backup_file(struct ct_archive_state *cas, struct stat *sb,
 	/* compute 'safe' name */
 	safe = ct_name_to_safename(filename, strip_slash);
 	if (safe == NULL)
-		return 0;
+		return;
 
 	if (closedir) {
 		if ((dnode = ct_archive_lookup_dir(cas, filename)) == NULL)
-			CFATALX("close directory for nonexistant dir %s",
+			CABORTX("close directory for nonexistant dir %s",
 			    filename);
 	} else if (forcedir || S_ISDIR(sb->st_mode)) {
 		dnode = e_calloc(1, sizeof(*dnode));
@@ -502,7 +502,7 @@ ct_sched_backup_file(struct ct_archive_state *cas, struct stat *sb,
 			/* this directory already exists, do not record twice */
 			e_free(&dnode->d_name);
 			e_free(&dnode);
-			return 0;
+			return;
 		} else
 			CNDBG(CT_LOG_CTFILE, "inserted %s", filename);
 		/* The rest of the intialisation happens below */
@@ -570,7 +570,7 @@ ct_sched_backup_file(struct ct_archive_state *cas, struct stat *sb,
 insert:
 	TAILQ_INSERT_TAIL(flist, flnode, fl_list);
 
-	return 0;
+	return;
 }
 
 struct ct_archive_priv {
@@ -1031,9 +1031,7 @@ ct_traverse(struct ct_archive_state *cas, char **paths,
 	FTSENT			*fe;
 	struct fl_tree		 ino_tree;
 	char			 clean[PATH_MAX];
-	int			 fts_options;
-	int			 cnt;
-	int			 forcedir;
+	int			 fts_options, cnt, forcedir, ret;
 
 	RB_INIT(&ino_tree);
 	fts_options = FTS_NOCHDIR;
@@ -1049,7 +1047,7 @@ ct_traverse(struct ct_archive_state *cas, char **paths,
 	CDBG("options =  %d", fts_options);
 	ftsp = fts_open(paths, fts_options, NULL);
 	if (ftsp == NULL)
-		CFATAL("fts_open failed");
+		CFATALX("fts_open: %s", ct_strerror(CTE_ERRNO));
 
 	cnt = 0;
 	while ((fe = fts_read(ftsp)) != NULL) {
@@ -1079,7 +1077,7 @@ ct_traverse(struct ct_archive_state *cas, char **paths,
 			CWARN("unable to access %s", fe->fts_path);
 			continue;
 		default:
-			CFATALX("bad fts_info (%d)", fe->fts_info);
+			CABORTX("bad fts_info (%d)", fe->fts_info);
 		}
 
 		/* backup dirs above fts starting point */
@@ -1087,28 +1085,28 @@ ct_traverse(struct ct_archive_state *cas, char **paths,
 			/* XXX technically this should apply to files too */
 			if (follow_root_symlink && fe->fts_info == FTS_D)
 				forcedir = 1;
-			if (backup_prefix(cas, clean, files, &ino_tree,
-			    strip_slash, ct_stats))
-				CFATAL("backup_prefix failed");
+			if ((ret = backup_prefix(cas, clean, files, &ino_tree,
+			    strip_slash, ct_stats)) != 0)
+				CFATALX("backup_prefix: %s",
+				    ct_strerror(ret));
 		}
 
 		CNDBG(CT_LOG_FILE, "scheduling backup of %s", clean);
 		/* backup all other files */
 sched:
-		if (ct_sched_backup_file(cas, fe->fts_statp, clean, forcedir,
+		ct_sched_backup_file(cas, fe->fts_statp, clean, forcedir,
 		    fe->fts_info == FTS_DP ? 1 : 0, strip_slash, files,
-		    &ino_tree, ct_stats))
-			CFATAL("backup_file failed: %s", clean);
+		    &ino_tree, ct_stats);
 
 	}
 
 	if (cnt == 0)
-		CFATALX("can't access any of the specified file(s)");
+		CFATALX("%s", ct_strerror(CTE_NO_FILES_ACCESSIBLE));
 
 	if (fe == NULL && errno)
-		CFATAL("fts_read failed");
+		CFATALX("fts_read: %s", ct_strerror(CTE_ERRNO));
 	if (fts_close(ftsp))
-		CFATAL("fts_close failed");
+		CFATALX("fts_close: %s", ct_strerror(CTE_ERRNO));
 	gettimeofday(&ct_stats->st_time_scan_end, NULL);
 }
 
@@ -1226,17 +1224,16 @@ backup_prefix(struct ct_archive_state *cas, char *root,
 
 		/* XXX racy? */
 		if (stat(dir, &sb))
-			return (1);
+			return (CTE_ERRNO);
 
 		/* file type changed since fts_open */
 		if (!S_ISDIR(sb.st_mode)) {
 			errno = ENOTDIR;
-			return (1);
+			return (CTE_ERRNO);
 		}
 
-		if (ct_sched_backup_file(cas, &sb, dir, 1, 0, strip_slash,
-		    flist, ino_tree, ct_stats))
-			return (1);
+		ct_sched_backup_file(cas, &sb, dir, 1, 0, strip_slash,
+		    flist, ino_tree, ct_stats);
 	}
 
 	return (0);
@@ -1484,8 +1481,13 @@ ct_file_extract_open(struct ct_extract_state *ces, struct fnode *fnode)
 		    ces->ces_rootdir->d_name, CT_PATHSEP, fnode->fl_sname);
 	}
 	strlcpy(dirpath, tpath, sizeof(dirpath));
-	if ((dirp = dirname(dirpath)) == NULL)
-		CFATALX("can't get dirname of %s", tpath);
+	/*
+	 * dirname() shouldn't fatal al-la posix, however implelemtations that
+	 * use an internal buffer fail if the string is too long. Since our
+	 * string is already capped at PATH_MAX this should not ever fail.
+	 */
+	if ((dirp = dirname(dirpath)) == NULL) /* XXX CTE_ERRNO */
+		CABORTX("can't get dirname of %s", tpath);
 
 	e_asprintf(&fnode->fl_fname, "%s%c%s", dirp, CT_PATHSEP,
 	    "cyphertite.XXXXXXXXXX");
@@ -1643,7 +1645,7 @@ link_out:
 			return;
 		}
 	} else {
-		CFATALX("illegal file %s of type %d", fnode->fl_sname,
+		CABORTX("illegal file %s of type %d", fnode->fl_sname,
 		    fnode->fl_mode);
 	}
 
@@ -2182,7 +2184,7 @@ ct_populate_fnode(struct ct_extract_state *ces, struct ctfile_parse_state *ctx,
 		fnode->fl_parent_dir = ctfile_parse_finddir(ctx,
 		    ctx->xs_hdr.cmh_parent_dir);
 		if (fnode->fl_parent_dir == NULL)
-			CFATALX("can't find parent dir %" PRId64 " for %s",
+			CABORTX("can't find parent dir %" PRId64 " for %s",
 			    ctx->xs_hdr.cmh_parent_dir, ctx->xs_hdr.cmh_filename);
 		e_asprintf(&fnode->fl_sname, "%s/%s",
 		    fnode->fl_parent_dir->d_name, ctx->xs_hdr.cmh_filename);

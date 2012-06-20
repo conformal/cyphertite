@@ -109,6 +109,8 @@ const char *ct_errmsgs[] = {
 	[CTE_SECRETS_FILE_SIZE_MISMATCH] = "Secrets file size mismatch, please confirm that local secrets file is the correct one",
 	[CTE_SECRETS_FILE_DIFFERS] = "Secrets file on server differs from local.  Please check which is correct",
 	[CTE_SECRETS_FILE_SHORT_READ] = "Short read while comparing secrets files",
+	[CTE_NO_FILES_SPECIFIED] = "No files specified",
+	[CTE_NO_FILES_ACCESSIBLE] = "Can not access any of the specified files",
 };
 
 const char *
