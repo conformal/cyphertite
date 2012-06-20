@@ -113,7 +113,11 @@ ctfile_is_fullname(const char *ctfile)
 	int			match = 0, rv;
 	if ((rv = regcomp(&re, pattern, REG_EXTENDED | REG_NOSUB)) != 0) {
 		regerror(rv, &re, error, sizeof(error) - 1);
-		CFATALX("%s: regcomp failed: %s", __func__, error);
+		/*
+		 * We use exude, so memory errors are already fatal. The
+		 * only way we will fail here is OOM or programming error.
+		 */
+		CABORTX("%s: regcomp failed: %s", __func__, error);
 	}
 	if (regexec(&re, ctfile, 0, NULL, 0) == 0)
 		match = 1;
