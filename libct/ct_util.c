@@ -102,6 +102,7 @@ const char *ct_errmsgs[] = {
 	[CTE_ENCRYPT_FAILED] = "Failed to encrypt chunk",
 	[CTE_DECRYPT_FAILED] = "Failed to decrypt chunk",
 	[CTE_ALL_FILES_EXCLUDED] = "All files excluded or nonexistant",
+	[CTE_ARCHIVE_FULLNAME] = "Remote mode archive provided timestamped tag",
 };
 
 const char *

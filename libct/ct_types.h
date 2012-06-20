@@ -145,7 +145,8 @@ struct ctfile_list_file {
 #define CTE_DECRYPT_FAILED		33
 #define CTE_ENCRYPT_FAILED		34
 #define CTE_ALL_FILES_EXCLUDED		35
-#define CTE_MAX				36
+#define CTE_ARCHIVE_FULLNAME		36
+#define CTE_MAX				37
 
 const char	*ct_strerror(int);
 

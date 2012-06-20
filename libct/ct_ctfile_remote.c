@@ -431,7 +431,7 @@ ctfile_nextop_archive(struct ct_global_state *state, char *basis, void *args)
 	ctfile = ctfile_cook_name(caa->caa_tag);
 
 	if (ctfile_is_fullname(ctfile) != 0)
-		CFATALX("metadata name with date tag already filled in");
+		CFATALX("%s", ct_strerror(CTE_ARCHIVE_FULLNAME));
 
 	now = time(NULL);
 	if (strftime(buf, TIMEDATA_LEN, "%Y%m%d-%H%M%S",
