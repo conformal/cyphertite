@@ -111,6 +111,10 @@ const char *ct_errmsgs[] = {
 	[CTE_SECRETS_FILE_SHORT_READ] = "Short read while comparing secrets files",
 	[CTE_NO_FILES_SPECIFIED] = "No files specified",
 	[CTE_NO_FILES_ACCESSIBLE] = "Can not access any of the specified files",
+	[CTE_CRAZY_PATH] = "Path can not be sanitized",
+	[CTE_CANT_OPEN_REMOTE] = "Can not open remote file",
+	[CTE_INVALID_CONFIG_VALUE] = "Invalid configuration value",
+	[CTE_MISSING_CONFIG_VALUE] = "Missing configuration value",
 };
 
 const char *

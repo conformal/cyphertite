@@ -1064,7 +1064,8 @@ ct_traverse(struct ct_archive_state *cas, char **paths,
 		case FTS_DP: /* Setup for close dir, no stats */
 			/* sanitize path */
 			if (eat_double_dots(fe->fts_path, clean) == NULL)
-				CFATAL("can't sanitize %s", fe->fts_path);
+				CFATALX("%s: %s", fe->fts_path,
+				    ct_strerror(CTE_CRAZY_PATH));
 			if (fe->fts_info == FTS_DP)
 				goto sched;
 			break;

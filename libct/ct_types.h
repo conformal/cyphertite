@@ -154,7 +154,11 @@ struct ctfile_list_file {
 #define CTE_SECRETS_FILE_SHORT_READ	42
 #define CTE_NO_FILES_SPECIFIED		43
 #define CTE_NO_FILES_ACCESSIBLE		44
-#define CTE_MAX				45
+#define CTE_CRAZY_PATH			45
+#define CTE_CANT_OPEN_REMOTE		46
+#define CTE_INVALID_CONFIG_VALUE	47
+#define CTE_MISSING_CONFIG_VALUE	48
+#define CTE_MAX				49
 
 const char	*ct_strerror(int);
 

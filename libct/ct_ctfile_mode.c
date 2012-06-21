@@ -137,7 +137,7 @@ ctfile_archive(struct ct_global_state *state, struct ct_op *op)
 		}
 		CNDBG(CT_LOG_FILE, "opening ctfile for archive %s", ctfile);
 		if ((cas->cas_handle = fopen(tpath, "rb")) == NULL)
-			CFATAL("can't open %s for reading", ctfile);
+			CFATAL("%s: %s", ctfile, ct_strerror(CTE_ERRNO));
 		if (cca->cca_ctfile) {
 			struct ctfile_parse_state	 xs_ctx;
 			int				 ret;
@@ -159,7 +159,7 @@ ctfile_archive(struct ct_global_state *state, struct ct_op *op)
 		}
 
 		if (fstat(fileno(cas->cas_handle), &sb) == -1)
-			CFATAL("can't stat backup file %s", ctfile);
+			CFATALX("%s: %s", ctfile, ct_strerror(CTE_ERRNO));
 		cas->cas_size = sb.st_size;
 		cas->cas_fnode = e_calloc(1, sizeof(*cas->cas_fnode));
 
@@ -432,6 +432,7 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 	const char			*rname = cca->cca_remotename;
 	struct ct_trans			*trans;
 	struct ct_header		*hdr;
+	int				 ret;
 
 	switch (ct_get_file_state(state)) {
 	case CT_S_STARTING:
@@ -497,10 +498,10 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 	hdr->c_ex_status = 2;
 	hdr->c_flags |= C_HDR_F_METADATA;
 
-	if (ct_create_iv_ctfile(trans->tr_ctfile_chunkno, trans->tr_iv,
-	    sizeof(trans->tr_iv)))
-		CFATALX("can't create iv for ctfile block no %d",
-		    trans->tr_ctfile_chunkno);
+	if ((ret = ct_create_iv_ctfile(trans->tr_ctfile_chunkno, trans->tr_iv,
+	    sizeof(trans->tr_iv))) != 0)
+		CFATALX("ctfile iv for %d: %s",
+		    trans->tr_ctfile_chunkno, ct_strerror(ret));
 	ct_queue_first(state, trans);
 }
 
@@ -648,7 +649,7 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 			CFATALX("failed to parse xml open reply: %s",
 			    ct_strerror(ret));
 		if (filename == NULL)
-			CFATALX("couldn't open remote file");
+			CFATALX("%s", ct_strerror(CTE_CANT_OPEN_REMOTE));
 		CNDBG(CT_LOG_FILE, "%s opened\n",
 		    filename);
 		e_free(&filename);

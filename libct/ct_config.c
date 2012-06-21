@@ -349,11 +349,11 @@ ct_load_config(char **configfile)
 	}
 
 	if (conf.ct_cert == NULL)
-		CFATALX("no cert provided in config");
+		CFATALX("cert: %s", ct_strerror(CTE_MISSING_CONFIG_VALUE));
 	if (conf.ct_ca_cert == NULL)
-		CFATALX("no ca_cert provided in config");
+		CFATALX("ca_cert: %s", ct_strerror(CTE_MISSING_CONFIG_VALUE));
 	if (conf.ct_key == NULL)
-		CFATALX("no key provided in config");
+		CFATALX("key: %s", ct_strerror(CTE_MISSING_CONFIG_VALUE));
 
 	if (ctfile_mode_str != NULL) {
 		if (strcmp(ctfile_mode_str, "remote") == 0)
@@ -361,7 +361,8 @@ ct_load_config(char **configfile)
 		else if (strcmp(ctfile_mode_str, "local") == 0)
 			conf.ct_ctfile_mode = CT_MDMODE_LOCAL;
 		else
-			CFATALX("invalid ctfile mode specified");
+			CFATALX("ctfile_mode: %s",
+			    ct_strerror(CTE_INVALID_CONFIG_VALUE));
 	}
 
 	/* Fix up cachedir: code requires it to end with a slash. */
@@ -373,9 +374,11 @@ ct_load_config(char **configfile)
 		if ((rv = snprintf(ct_fullcachedir, sizeof(ct_fullcachedir),
 		    "%s%c", conf.ct_ctfile_cachedir, CT_PATHSEP)) == -1 ||
 		    rv > PATH_MAX)
-			CFATALX("invalid metadata pathname");
+			CFATALX("ctfile_cachedir: %s",
+			    ct_strerror(CTE_INVALID_CONFIG_VALUE));
 		free(conf.ct_ctfile_cachedir);
 		conf.ct_ctfile_cachedir = strdup(ct_fullcachedir);
+		/* XXX Wtf is this? */
 		if (ct_fullcachedir == NULL)
 			CFATALX("can't allocate memory for cachedir");
 
@@ -383,13 +386,14 @@ ct_load_config(char **configfile)
 
 	if (conf.ct_ctfile_mode == CT_MDMODE_REMOTE &&
 	    conf.ct_ctfile_cachedir == NULL)
-		CFATALX("remote mode needs a cache directory set");
+		CFATALX("ctfile_cachedir: %s",
+		    ct_strerror(CTE_MISSING_CONFIG_VALUE));
 
 	/* And make sure it exists. */
 	if (conf.ct_ctfile_cachedir != NULL &&
 	    ct_make_full_path(conf.ct_ctfile_cachedir, 0700) != 0)
-		CFATALX("can't create ctfile cache directory %s",
-		    conf.ct_ctfile_cachedir);
+		CFATALX("%s: %s", conf.ct_ctfile_cachedir,
+		    ct_strerror(CTE_ERRNO));
 
 	/* Apply compression from config. */
 	if (ct_compression_type == NULL) {
@@ -401,8 +405,8 @@ ct_load_config(char **configfile)
 	} else if (strcmp("lzw", ct_compression_type) == 0) {
 		conf.ct_compress = C_HDR_F_COMP_LZW;
 	} else {
-		CFATAL("compression type %s not recognized",
-		    ct_compression_type);
+		CFATAL("session_compression: %s",
+		    ct_strerror(CTE_MISSING_CONFIG_VALUE));
 	}
 
 	/*

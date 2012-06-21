@@ -1356,6 +1356,7 @@ ct_compute_encrypt(void *vctx)
 	int			slot;
 	int			encr;
 	int			len;
+	int			ret;
 
 	while ((trans = ct_dequeue_encrypt(state)) != NULL) {
 		switch(trans->tr_state) {
@@ -1392,14 +1393,17 @@ ct_compute_encrypt(void *vctx)
 		if (encr) {
 			/* encr the chunk. */
 			if ((trans->hdr.c_flags & C_HDR_F_METADATA) == 0) {
-				if (ct_create_iv(state->ct_iv,
-				    sizeof(state->ct_iv), src, len, iv, ivlen))
-					CFATALX("can't create iv");
+				if ((ret = ct_create_iv(state->ct_iv,
+				    sizeof(state->ct_iv), src, len, iv,
+				    ivlen)) != 0)
+					CFATALX("can't create iv: %s",
+					    ct_strerror(ret));
 			} else {
-				if (ct_create_iv_ctfile(
-				    trans->tr_ctfile_chunkno, iv, ivlen))
-					CFATALX("can't create iv for ctfile %d",
-					    trans->tr_ctfile_chunkno);
+				if ((ret = ct_create_iv_ctfile(
+				    trans->tr_ctfile_chunkno, iv, ivlen)) != 0)
+					CFATALX("can't create iv for ctfile %d:"
+					    "%s", trans->tr_ctfile_chunkno,
+					    ct_strerror(ret));
 			}
 
 			newlen = ct_encrypt(key, keysz, iv, ivlen, src,
