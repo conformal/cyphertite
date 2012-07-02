@@ -96,8 +96,8 @@ ct_do_remotearchive(struct ct_global_state *state, char *ctfile, char **flist,
 	caa.caa_strip_slash = strip_slash;
 	caa.caa_follow_root_symlink = follow_root_symlink;
 	caa.caa_follow_symlinks = follow_symlinks;
-	caa.caa_max_differentials = conf->ct_max_differentials;
-	if (conf->ct_auto_differential)
+	caa.caa_max_incrementals = conf->ct_max_incrementals;
+	if (conf->ct_auto_incremental)
 		/*
 		 * Need to work out basis filename and
 		 * download it if necessary

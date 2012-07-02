@@ -401,11 +401,11 @@ ct_main(int argc, char **argv)
 	}
 
 	if (level0)
-		conf->ct_auto_differential = 0; /* force differential off */
+		conf->ct_auto_incremental = 0; /* force incremental off */
 
 	if (conf->ct_ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0 &&
 	    ct_basisbackup != NULL)
-		CFATALX("differential basis in remote mode");
+		CFATALX("incremental basis in remote mode");
 
 	/* Don't bother starting a connection if just listing local files. */
 	if (ct_action == CT_A_LIST &&
@@ -478,8 +478,8 @@ ct_main(int argc, char **argv)
 			caa.caa_strip_slash = strip_slash;
 			caa.caa_follow_root_symlink = follow_root_symlink;
 			caa.caa_follow_symlinks = follow_symlinks;
-			caa.caa_max_differentials = conf->ct_max_differentials;
-			if (conf->ct_auto_differential)
+			caa.caa_max_incrementals = conf->ct_max_incrementals;
+			if (conf->ct_auto_incremental)
 				/*
 				 * Need to work out basis filename and
 				 * download it if necessary
@@ -535,7 +535,7 @@ ct_main(int argc, char **argv)
 			caa.caa_strip_slash = strip_slash;
 			caa.caa_follow_root_symlink = follow_root_symlink;
 			caa.caa_follow_symlinks = follow_symlinks;
-			caa.caa_max_differentials = 0; /* unlimited */
+			caa.caa_max_incrementals = 0; /* unlimited */
 			caa.caa_basis = ct_basisbackup;
 			caa.caa_tag = ctfile;
 			ct_add_operation(state, ct_archive, NULL, &caa);

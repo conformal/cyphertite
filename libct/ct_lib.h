@@ -49,8 +49,8 @@ struct ct_config {
 	int	ct_max_trans;
 	int	ct_compress;
 	int	ct_multilevel_allfiles;
-	int	ct_auto_differential;
-	int	ct_max_differentials;
+	int	ct_auto_incremental;
+	int	ct_max_incrementals;
 	int	ct_ctfile_keep_days;
 #define CT_MDMODE_LOCAL		(0)
 #define CT_MDMODE_REMOTE	(1)
@@ -434,7 +434,7 @@ struct ct_archive_args {
 	int			 caa_encrypted;
 	int			 caa_allfiles;
 	int			 caa_no_cross_mounts;
-	int			 caa_max_differentials;
+	int			 caa_max_incrementals;
 	int			 caa_strip_slash;
 	int			 caa_follow_root_symlink;
 	int			 caa_follow_symlinks;

@@ -114,7 +114,7 @@ ct_db.h functions used internally only:
 .In ct_internal.h
 
 .Ft int
-.Fn ct_basis_setup "const char *basisbackup" "char **filelist" "int max_differentials" "time_t *prev_backup"
+.Fn ct_basis_setup "const char *basisbackup" "char **filelist" "int max_incrementals" "time_t *prev_backup"
 
 ct_internal.h functions used internally only:
 
@@ -610,7 +610,7 @@ struct ctfile_parse_state {
 
 .Ft int
 .\"XXX ct_basis_setup is in ct_xdr.c ???
-.Fn ct_basis_setup "const char *basisbackup" "char **filelist" "int max_differentials" "time_t *prev_backup"
+.Fn ct_basis_setup "const char *basisbackup" "char **filelist" "int max_incrementals" "time_t *prev_backup"
 
 .Ss LIB
 
@@ -638,8 +638,8 @@ struct ct_config {
 	int	ct_max_trans;
 	int	ct_compress;
 	int	ct_multilevel_allfiles;
-	int	ct_auto_differential;
-	int	ct_max_differentials;
+	int	ct_auto_incremental;
+	int	ct_max_incrementals;
 	int	ct_ctfile_keep_days;
 #define CT_MDMODE_LOCAL		(0)
 #define CT_MDMODE_REMOTE	(1)

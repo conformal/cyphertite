@@ -79,7 +79,7 @@ ct_extract_setup_queue(struct ct_extract_head *extract_head,
 	struct ct_extract_stack	*nfile;
 
 	if (ctfile_parse_init(ctx, file, ctfile_basedir))
-		CFATALX("extract failure: unable to open differential archive"
+		CFATALX("extract failure: unable to open incremental archive"
 		    "'%s'\n", file);
 
 	if (ctx->xs_gh.cmg_prevlvl_filename) {

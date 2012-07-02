@@ -289,20 +289,26 @@ ct_load_config(char **configfile)
 		    NULL },
 		{ "ctfile_cachedir_max_size", CT_S_SIZE, NULL, NULL, NULL,
 		    &conf.ct_ctfile_max_cachesize, NULL },
-		{ "ctfile_remote_auto_differential" , CT_S_INT,
-		    &conf.ct_auto_differential, NULL, NULL, NULL },
-		{ "ctfile_max_differentials" , CT_S_INT, &conf.ct_max_differentials,
+		{ "ctfile_max_incrementals" , CT_S_INT, &conf.ct_max_incrementals,
 		    NULL, NULL, NULL },
-		{ "ctfile_differential_allfiles", CT_S_INT,
+		{ "ctfile_remote_auto_incremental" , CT_S_INT,
+		    &conf.ct_auto_incremental, NULL, NULL, NULL },
+		{ "ctfile_max_incrementals" , CT_S_INT, &conf.ct_max_incrementals,
+		    NULL, NULL, NULL },
+		{ "ctfile_incremental_allfiles", CT_S_INT,
 		    &conf.ct_multilevel_allfiles, NULL, NULL, NULL },
 		/* backwards compat, old names */
+		{ "ctfile_remote_auto_differential" , CT_S_INT,
+		    &conf.ct_auto_incremental, NULL, NULL, NULL },
+		{ "ctfile_differential_allfiles", CT_S_INT,
+		    &conf.ct_multilevel_allfiles, NULL, NULL, NULL },
 		{ "md_mode", CT_S_STR, NULL, &ctfile_mode_str, NULL, NULL },
 		{ "md_cachedir", CT_S_DIR, NULL, &conf.ct_ctfile_cachedir, NULL, NULL },
 		{ "md_cachedir_max_size", CT_S_SIZE, NULL, NULL, NULL,
 		    &conf.ct_ctfile_max_cachesize, NULL },
 		{ "md_remote_auto_differential" , CT_S_INT,
-		    &conf.ct_auto_differential, NULL, NULL, NULL },
-		{ "md_max_differentials" , CT_S_INT, &conf.ct_max_differentials,
+		    &conf.ct_auto_incremental, NULL, NULL, NULL },
+		{ "md_max_differentials" , CT_S_INT, &conf.ct_max_incrementals,
 		    NULL, NULL, NULL },
 		{ "ctfile_expire_day" , CT_S_INT, &conf.ct_ctfile_keep_days,
 		    NULL, NULL, NULL },
@@ -475,13 +481,13 @@ ct_write_config(struct ct_config *config, FILE *f, int save_password,
 	if (config->ct_ctfile_mode == CT_MDMODE_REMOTE) {
 		fprintf(f, "ctfile_cachedir\t\t\t\t= %s\n",
 		    config->ct_ctfile_cachedir);
-		fprintf(f, "ctfile_remote_auto_differential\t\t= %d\n",
-		    config->ct_auto_differential);
+		fprintf(f, "ctfile_remote_auto_incremental\t\t= %d\n",
+		    config->ct_auto_incremental);
 	} else {
 		fprintf(f, "#ctfile_cachedir\t\t\t= %s\n",
 		    config->ct_ctfile_cachedir);
-		fprintf(f, "#ctfile_remote_auto_differential\t= %d\n",
-		    config->ct_auto_differential);
+		fprintf(f, "#ctfile_remote_auto_incremental\t= %d\n",
+		    config->ct_auto_incremental);
 	}
 	fprintf(f, "upload_crypto_secrets\t\t\t= %d\n",
 	    config->ct_secrets_upload);

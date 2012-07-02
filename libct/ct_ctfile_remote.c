@@ -258,7 +258,7 @@ ctfile_find_for_extract_complete(struct ct_global_state *state,
 	/*
 	 * if the metadata file is not in the cache directory then we
 	 * need to download it first. if we need to recursively download
-	 * a differential chain then that code will handle scheduling
+	 * a incremental chain then that code will handle scheduling
 	 * those operations too. If we have it, we still need to check
 	 * that all others in the chain exist, however.
 	 */
@@ -296,7 +296,7 @@ ctfile_extract_nextop(struct ct_global_state *state, struct ct_op *op)
 	char					*cachename;
 
 	/*
-	 * If this is an operation that needs the full differential chain
+	 * If this is an operation that needs the full incremental chain
 	 * recursively fetch the next one in the chain till done.
 	 */
 	if (ccffa->ccffa_download_chain) {

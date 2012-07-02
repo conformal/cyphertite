@@ -713,7 +713,7 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 
 		if (basisbackup != NULL &&
 		    (nextlvl = ct_basis_setup(basisbackup, filelist,
-		        caa->caa_max_differentials,
+		        caa->caa_max_incrementals,
 		        &cap->cap_prev_backup_time)) == 0)
 			e_free(&basisbackup);
 

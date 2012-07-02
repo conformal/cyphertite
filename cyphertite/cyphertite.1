@@ -220,12 +220,12 @@ Only applicable to remote
 management mode.
 .It Fl A
 override the config file directive
-.Em ctfile_differential_allfiles
+.Em ctfile_incremental_allfiles
 and turn that feature off.
 This option will cancel out
 .Fl a .
 .It Fl B Ar ctfile
-Specify the archive to be used as the basis of a differential backup.
+Specify the archive to be used as the basis of a incremental backup.
 Files with a modification time (mtime) newer than the previous backup
 will be archived.
 The behavior is dump-like and helps limit the size of the
@@ -299,7 +299,7 @@ from descending into directories that have a different device number
 than the file from which the descent began.
 .It Fl a
 override the config file directive
-.Em ctfile_differential_allfiles
+.Em ctfile_incremental_allfiles
 and turn that feature on.
 This option will cancel out
 .Fl A .
@@ -468,7 +468,7 @@ pattern
 .Pp
 .Dl $ cyphertite -cvf pictures.ct *.jpg
 .Pp
-Perform a differential backup of an archive named
+Perform a incremental backup of an archive named
 .Pa htdocs-201104.ct .
 Files in
 .Pa /var/www/htdocs
@@ -509,7 +509,7 @@ to interactively generate an account configuration as follows:
 .Dl Automatically generate crypto passphrase? [yes]:
 .Dl Choose a ctfile operation mode (remote/local) [remote]:
 .Dl Target ctfile cache directory [/root/.cyphertite/ct_cachedir]:
-.Dl Use automatic remote differentials? [no]:
+.Dl Use automatic remote incrementals? [no]:
 .Dl Configuration file created.
 .Pp
 Using the built-in configuration file generator simplifies

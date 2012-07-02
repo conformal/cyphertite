@@ -128,31 +128,31 @@ All unreferenced data as a result of removing those
 will also be removed.
 .Pp
 .It Xo
-.Ic ctfile_remote_auto_differential =
+.Ic ctfile_remote_auto_incremental =
 .Pq Ic 0 Ns \&| Ns Ic 1
 .Xc
-Specify if differentials should be generated for remote mode.
+Specify if incrementals should be generated for remote mode.
 This only applies for remote
 .Ar ctfile
 mode.
 .Pp
 .It Xo
-.Ic ctfile_max_differentials = Ar number
+.Ic ctfile_max_incrementals = Ar number
 .Xc
-Specify the number of differential backups to perform between full
+Specify the number of incremental backups to perform between full
 (level 0) backups.
 For example, setting this value to 6 would instruct cyphertite to
-perform one full backup followed by 6 differential backups.
+perform one full backup followed by 6 incremental backups.
 Assuming backups are performed daily, the aforementioned value would
-result in a full backup once per week with 6 days of differential
+result in a full backup once per week with 6 days of incremental
 backups.
 .Pp
 .It Xo
-.Ic ctfile_differential_allfiles =
+.Ic ctfile_incremental_allfiles =
 .Pq Ic 0 Ns \&| Ns Ic 1
 .Xc
 Toggle ``allfiles'' mode on and off.
-A differential archive made in allfiles mode will contain the complete list of files that
+An incremental archive made in allfiles mode will contain the complete list of files that
 were present at the time it was made.
 An archive made without allfiles will only have the list of files that changed
 since the previous level archive, and thus on extract all files will be

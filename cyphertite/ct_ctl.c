@@ -704,12 +704,12 @@ crypto_passphrase:
 
 		if (rv == 1) {
 			strlcpy(prompt,
-			    "Use automatic remote differentials? [no]: ",
+			    "Use automatic remote incrementals? [no]: ",
 			    sizeof(prompt));
 			rv = ct_get_answer(prompt, "yes", "no", "no", answer,
 			    sizeof answer, 0);
 			if (rv == 1)
-				config.ct_auto_differential = 1;
+				config.ct_auto_incremental = 1;
 		}
 	} else {
 		config.ct_ctfile_mode = CT_MDMODE_REMOTE;
