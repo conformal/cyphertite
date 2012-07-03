@@ -19,7 +19,7 @@ INCDIR?=${LOCALBASE}/include
 LIBDIR?=${LOCALBASE}/lib
 .PATH: ${.CURDIR}/../ctutil
 
-LIB=	ct
+LIB=	cyphertite
 SRCS=	ct_match.c ct_proto.c ct_xdr.c ct_db.c ct_trees.c ct_crypto.c
 SRCS+=	ct_aes_xts.c
 

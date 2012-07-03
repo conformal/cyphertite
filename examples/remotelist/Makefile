@@ -25,19 +25,19 @@ install:
 
 .if ${.CURDIR} == ${.OBJDIR}
 LDADD+= -L${.CURDIR}/../../ctutil
-LDADD+= -L${.CURDIR}/../../libct
+LDADD+= -L${.CURDIR}/../../libcyphertite
 .elif ${.CURDIR}/obj == ${.OBJDIR}
 LDADD+= -L${.CURDIR}/../../ctutil/obj
-LDADD+= -L${.CURDIR}/../../libct/obj
+LDADD+= -L${.CURDIR}/../../libcyphertite/obj
 .else
 LDADD+= -L${.OBJDIR}/../../ctutil
-LDADD+= -L${.OBJDIR}/../../libct
+LDADD+= -L${.OBJDIR}/../../libcyphertite
 .endif
 
 BUILDVERSION != sh "${.CURDIR}/../../buildver.sh"
 
 INCFLAGS+= -I${.CURDIR}/../../ctutil -I${LOCALBASE}/include
-INCFLAGS+= -I${.CURDIR}/../../libct
+INCFLAGS+= -I${.CURDIR}/../../libcyphertite
 CFLAGS+= ${INCFLAGS} ${WARNFLAGS}
 .if !${BUILDVERSION} == ""
 CPPFLAGS+= -DBUILDSTR=\"$(BUILDVERSION)\"
@@ -46,7 +46,7 @@ CPPFLAGS+= -DBUILDSTR=\"$(BUILDVERSION)\"
 LDADD+= -L${LOCALBASE}/lib
 LDADD+=	-lassl -lclog -lcrypto -levent_core -lexpat -lexude -lshrink
 LDADD+=	-lsqlite3 -lssl -lutil -lxmlsd -ledit -lncurses -lcurl
-LDADD+= ${LDADDSSL} -lct -lctutil ${LDADDLATE} 
+LDADD+= ${LDADDSSL} -lcyphertite -lctutil ${LDADDLATE} 
 CLEANFILES= cyphertite.cat1 cyphertite.conf.cat5
 
 CFLAGS+= -I${.CURDIR}

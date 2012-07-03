@@ -1,5 +1,7 @@
 lib/libctutil.a
 lib/libctutil_p.a
+lib/libcyphertite.a
+lib/libcyphertite_p.a
 include/cyphertite/ctutil.h
 include/cyphertite/ct_socket.h
 include/cyphertite/ct_xml.h

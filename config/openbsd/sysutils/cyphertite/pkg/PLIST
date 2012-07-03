@@ -11,6 +11,8 @@ include/cyphertite/ct_xml.h
 include/cyphertite/ctutil.h
 lib/libctutil.a
 lib/libctutil_p.a
+lib/libcyphertite.a
+lib/libcyphertite_p.a
 @man man/man1/ct.1
 @man man/man1/ctfb.1
 @man man/man1/ctctl.1

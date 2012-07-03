@@ -26,7 +26,7 @@
 PROJECT=cyphertite
 PROJECT_UC=$(echo $PROJECT | tr '[:lower:]' '[:upper:]')
 SCRIPT=$(basename $0)
-HEADER=../libct/ct.h
+HEADER=../libcyphertite/ct_lib.h
 VER_PREFIX=CT
 PROJ_CHANGES=../CHANGES
 RPM_SPEC=${PROJECT}.spec

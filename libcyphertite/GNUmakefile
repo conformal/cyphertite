@@ -36,7 +36,7 @@ CPPFLAGS += -DNEED_LIBCLENS -D_PASSWORD_LEN=128
 INCFLAGS += -I. -I../ctutil -I$(INCDIR)/clens -I$(LOCALBASE)/ssl/include
 CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(OPTLEVEL) $(DEBUG)
 
-LIB.NAME = ct
+LIB.NAME = cyphertite
 
 LIB.SRCS  = ct_aes_xts.c ct_bw_lim.c ct_config.c ct_config_paths.c ct_crypto.c
 LIB.SRCS += ct_ctfile_mode.c ct_ctfile_remote.c ct_ctfile_traverse.c ct_db.c

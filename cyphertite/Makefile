@@ -24,24 +24,24 @@ MAN= cyphertitectl.1 cyphertite.1 cyphertite.conf.5 cyphertitefb.1
 .if ${.CURDIR} == ${.OBJDIR}
 LDADD+= -L${.CURDIR}/../ctutil
 DPADD+= ${.CURDIR}/../ctutil/libctutil.a
-LDADD+= -L${.CURDIR}/../libct
-DPADD+= ${.CURDIR}/../libct/libct.a
+LDADD+= -L${.CURDIR}/../libcyphertite
+DPADD+= ${.CURDIR}/../libcyphertite/libcyphertite.a
 .elif ${.CURDIR}/obj == ${.OBJDIR}
 LDADD+= -L${.CURDIR}/../ctutil/obj
 DPADD+= ${.CURDIR}/../ctutil/obj/libctutil.a
-LDADD+= -L${.CURDIR}/../libct/obj
-DPADD+= ${.CURDIR}/../libct/obj/libct.a
+LDADD+= -L${.CURDIR}/../libcyphertite/obj
+DPADD+= ${.CURDIR}/../libcyphertite/obj/libcyphertite.a
 .else
 LDADD+= -L${.OBJDIR}/../ctutil
 DPADD+= ${.OBJDIR}/../ctutil/libctutil.a
-LDADD+= -L${.OBJDIR}/../libct
-DPADD+= ${.OBJDIR}/../libct/libct.a
+LDADD+= -L${.OBJDIR}/../libcyphertite
+DPADD+= ${.OBJDIR}/../libcyphertite/libcyphertite.a
 .endif
 
 BUILDVERSION != sh "${.CURDIR}/../buildver.sh"
 
 INCFLAGS+= -I${.CURDIR}/../ctutil -I${LOCALBASE}/include
-INCFLAGS+= -I${.CURDIR}/../libct
+INCFLAGS+= -I${.CURDIR}/../libcyphertite
 CFLAGS+= ${INCFLAGS} ${WARNFLAGS}
 .if !${BUILDVERSION} == ""
 CPPFLAGS+= -DBUILDSTR=\"$(BUILDVERSION)\"
@@ -50,7 +50,7 @@ CPPFLAGS+= -DBUILDSTR=\"$(BUILDVERSION)\"
 LDADD+= -L${LOCALBASE}/lib
 LDADD+=	-lassl -lclog -lcrypto -levent_core -lexpat -lexude -lshrink
 LDADD+=	-lsqlite3 -lssl -lutil -lxmlsd -ledit -lncurses -lcurl
-LDADD+= ${LDADDSSL} -lct -lctutil ${LDADDLATE} 
+LDADD+= ${LDADDSSL} -lcyphertite -lctutil ${LDADDLATE} 
 CLEANFILES= cyphertite.cat1 cyphertite.conf.cat5
 
 CFLAGS+= -I${.CURDIR}/../libshrink -I${.CURDIR}
