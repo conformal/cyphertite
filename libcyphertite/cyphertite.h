@@ -252,7 +252,7 @@ int			ct_init(struct ct_global_state **, struct ct_config *,
 			     int,
 			     void  (*info_cb)(evutil_socket_t, short, void *));
 int			ct_set_log_fns(struct ct_global_state *, void *,
-			     ct_log_ctfile_info_fn *, 
+			     ct_log_ctfile_info_fn *,
 			     ct_log_file_start_fn *, ct_log_file_end_fn *,
 			     ct_log_file_skip_fn *, ct_log_traverse_start_fn *,
 			     ct_log_traverse_end_fn *);
@@ -507,7 +507,7 @@ void		 ctfile_find_for_operation(struct ct_global_state *, char *,
 ctfile_find_callback	 ctfile_nextop_extract;
 ctfile_find_callback	 ctfile_nextop_archive;
 ctfile_find_callback	 ctfile_nextop_justdl;
-		
+
 /* Extract state api functions */
 TAILQ_HEAD(ct_extract_head, ct_extract_stack);
 struct ct_extract_stack   {
