@@ -258,7 +258,7 @@ ctfile_find_for_extract_complete(struct ct_global_state *state,
 	/*
 	 * if the metadata file is not in the cache directory then we
 	 * need to download it first. if we need to recursively download
-	 * a incremental chain then that code will handle scheduling
+	 * an incremental chain then that code will handle scheduling
 	 * those operations too. If we have it, we still need to check
 	 * that all others in the chain exist, however.
 	 */
