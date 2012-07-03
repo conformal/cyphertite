@@ -34,7 +34,7 @@
 #include <clog.h>
 #include <exude.h>
 
-#include <ct_lib.h>
+#include <cyphertite.h>
 #include "ct.h"
 #include "ct_fb.h"
 

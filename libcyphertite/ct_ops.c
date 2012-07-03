@@ -25,7 +25,7 @@
 
 #include <ct_ctfile.h>
 #include <ct_match.h>
-#include <ct_lib.h>
+#include <cyphertite.h>
 
 const uint8_t	 zerosha[SHA_DIGEST_LENGTH];
 

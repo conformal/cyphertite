@@ -26,7 +26,7 @@
 #include <ct_socket.h>
 
 #include <ct_types.h>
-#include <ct_lib.h>
+#include <cyphertite.h>
 
 struct bw_debug {
 	struct timeval	io_time;

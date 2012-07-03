@@ -131,7 +131,7 @@ ct_internal.h functions used internally only:
 
 .Ss LIB
 
-.In ct_lib.h
+.In cyphertite.h
 
 .Ft struct ct_config *
 .Fn ct_load_config "char **configfile"
@@ -272,7 +272,7 @@ ct_internal.h functions used internally only:
 .Ft int 
 .Fn ct_do_remoteextract "struct ct_global_state *state" "char *ctfile" "char *tdir" "char **excludelist" "char **includelist" "int match_mode" "int strip_slash" "int follow_symlinks" "int preserve_attr" "struct ct_config *conf"
 
-ct_lib.h functions used internally only:
+cyphertite.h functions used internally only:
 
 .Ft int
 .Fn ct_get_file_state "struct ct_global_state *state"
@@ -614,7 +614,7 @@ struct ctfile_parse_state {
 
 .Ss LIB
 
-.\"ct_lib.h
+.\"cyphertite.h
 
 .Fd #include <ct_types.h>
 .br

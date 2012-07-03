@@ -36,7 +36,7 @@
 
 #include <ctutil.h>
 
-#include <ct_lib.h>
+#include <cyphertite.h>
 #include <ct_types.h>
 #include <ct_crypto.h>
 

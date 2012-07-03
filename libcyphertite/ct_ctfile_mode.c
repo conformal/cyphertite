@@ -41,7 +41,7 @@
 #include <ct_proto.h>
 #include <ct_match.h>
 #include <ct_ctfile.h>
-#include <ct_lib.h>
+#include <cyphertite.h>
 #include <ct_ext.h>
 #include <ct_internal.h>
 

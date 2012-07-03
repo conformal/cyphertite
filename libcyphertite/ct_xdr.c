@@ -32,7 +32,7 @@
 #include <clog.h>
 #include <exude.h>
 
-#include <ct_lib.h>
+#include <cyphertite.h>
 #include <ct_ctfile.h>
 #include <ct_internal.h>
 

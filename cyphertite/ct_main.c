@@ -45,7 +45,7 @@
 #include <ctutil.h>
 
 #include <ct_crypto.h>
-#include <ct_lib.h>
+#include <cyphertite.h>
 #include "ct.h"
 #include "ct_ctl.h"
 #include "ct_fb.h"

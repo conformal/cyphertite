@@ -36,7 +36,7 @@
 
 #include <ct_match.h>
 #include <ct_ctfile.h>
-#include <ct_lib.h>
+#include <cyphertite.h>
 
 ct_op_cb	ctfile_find_for_extract;
 ct_op_cb	ctfile_find_for_extract_complete;
