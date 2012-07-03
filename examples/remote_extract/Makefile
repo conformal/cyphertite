@@ -36,8 +36,9 @@ LDADD+= -L${.OBJDIR}/../../libcyphertite
 
 BUILDVERSION != sh "${.CURDIR}/../../buildver.sh"
 
-INCFLAGS+= -I${.CURDIR}/../../ctutil -I${LOCALBASE}/include
+INCFLAGS+= -I${.CURDIR}/../../ctutil
 INCFLAGS+= -I${.CURDIR}/../../libcyphertite
+INCFLAGS+= -I${LOCALBASE}/include
 CFLAGS+= ${INCFLAGS} ${WARNFLAGS}
 .if !${BUILDVERSION} == ""
 CPPFLAGS+= -DBUILDSTR=\"$(BUILDVERSION)\"
