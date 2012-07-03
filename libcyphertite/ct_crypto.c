@@ -37,13 +37,6 @@
 #include <ct_crypto.h>
 #include <ct_types.h>
 
-
-#ifdef __linux__
-#ifndef PASS_MAX
-#define PASS_MAX		(1024)
-#endif
-#endif
-
 const EVP_CIPHER *EVP_aes_xts(void);
 
 /* passphrase stuff */
@@ -326,7 +319,7 @@ ct_create_secrets(const char *passphrase, const char *filename,
     uint8_t *myaeskey, uint8_t *myivkey)
 {
 	const char		*p;
-	char			pwd[PASS_MAX];
+	char			pwd[CT_PASS_MAX];
 	uint8_t			salt[C_SALT_LEN];
 	uint8_t			key[C_PWDKEY_LEN], maskkey[C_PWDKEY_LEN];
 	uint8_t			aeskey[CT_KEY_LEN], ivkey[CT_IV_LEN];
@@ -501,7 +494,7 @@ ct_unlock_secrets(const char *passphrase, const char *filename,
 	uint32_t		rounds = 0, f_version = 0;
 	uint32_t		rounds_load = 0, f_version_load = 0;
 	const char		*p;
-	char			pwd[PASS_MAX];
+	char			pwd[CT_PASS_MAX];
 	char			line[1024], *s;
 	FILE			*f;
 	HMAC_CTX		hctx;

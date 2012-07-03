@@ -30,7 +30,7 @@ MKDIR ?= mkdir
 RM ?= rm -f
 
 # Compiler and linker flags.
-CPPFLAGS += -DNEED_LIBCLENS -D_PASSWORD_LEN=128
+CPPFLAGS += -DNEED_LIBCLENS
 INCFLAGS += -I. -I$(INCDIR)/clens -I$(LOCALBASE)/ssl/include
 CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(OPTLEVEL) $(DEBUG)
 

@@ -47,7 +47,7 @@ int
 ct_get_password(char *password, size_t passwordlen, char *prompt, int verify)
 {
 	int			rv = 1;
-	char			pw[_PASSWORD_LEN + 1];
+	char			pw[CT_PASS_MAX + 1];
 
 	if (readpassphrase(prompt ? prompt : "New password: ", password,
 	    passwordlen, RPP_REQUIRE_TTY) == NULL) {
