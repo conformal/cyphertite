@@ -386,7 +386,6 @@ int
 ct_parse_read_reply(struct ct_header *hdr, void *vbody)
 {
 	if (hdr->c_version != C_HDR_VERSION)
-		return (1);
 		return (CTE_INVALID_REPLY_VERSION);
 	if (hdr->c_opcode != C_HDR_O_READ_REPLY)
 		return (CTE_INVALID_REPLY_TYPE);
