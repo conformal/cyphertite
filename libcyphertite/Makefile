@@ -120,7 +120,7 @@ MLINKS+=ct.3 ct_body_alloc_xml.3
 
 NOPIC=	nopic
 
-INCFLAGS+= -I${.CURDIR}/../ctutil -I${LOCALBASE}/include -I${.CURDIR}
+INCFLAGS+= -I${.CURDIR}/../ctutil -I${.CURDIR} -I${LOCALBASE}/include
 CFLAGS+= ${INCFLAGS} ${WARNFLAGS}
 
 analyze: all
