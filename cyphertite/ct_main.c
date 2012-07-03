@@ -1048,7 +1048,10 @@ ct_cleanup_login_cache(void)
 
 	while ((tmp = RB_ROOT(&ct_login_cache)) != NULL) {
 		RB_REMOVE(ct_login_cache_tree, &ct_login_cache, tmp);
-		e_free(&tmp->lc_name);
+		/* may cache negative entries, uid not found, avoid NULL free */
+		if (tmp->lc_name != NULL) {
+			e_free(&tmp->lc_name);
+		}
 		e_free(&tmp);
 	}
 	ct_login_cache_size  = 0;
