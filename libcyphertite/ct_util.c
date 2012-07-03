@@ -450,9 +450,7 @@ ct_load_certs(struct ct_global_state *state, struct assl_context *c)
 	if (assl_load_file_certs(c, state->ct_config->ct_ca_cert,
 	    state->ct_config->ct_cert, state->ct_config->ct_key))
 		return (CTE_LOAD_CERTS);
-		assl_fatalx("Failed to load certs. Ensure that "
-		    "the ca_cert, cert and key are set to valid paths in "
-		    "the configuration file");
+	return (0);
 }
 
 int
