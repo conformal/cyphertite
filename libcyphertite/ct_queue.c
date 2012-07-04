@@ -630,7 +630,7 @@ ct_reconnect_internal(struct ct_global_state *state)
 	struct ct_trans		*trans, *ttrans;
 	int			 ret;
 
-	if ((ret = ct_ssl_connect(state)) != 0) {
+	if ((ret = ct_ssl_connect(state)) == 0) {
 		if ((ret = ct_assl_negotiate_poll(state)) != 0) {
 			CFATALX("negotiate failed on reconnect: %s",
 			    ct_strerror(ret));
