@@ -19,6 +19,7 @@
 #include <inttypes.h>
 #include <fcntl.h> /* XXX portability */
 #include <unistd.h>
+#include <errno.h>
 
 #include <clog.h>
 #include <exude.h>
@@ -32,20 +33,20 @@ const uint8_t	 zerosha[SHA_DIGEST_LENGTH];
 /*
  * Code for extract.
  */
-static void	ct_extract_setup_queue(struct ct_extract_head *,
+static int	ct_extract_setup_queue(struct ct_extract_head *,
 	    struct ctfile_parse_state *, const char *, const char *, int);
 
-void
+int
 ct_extract_setup(struct ct_extract_head *extract_head,
     struct ctfile_parse_state *ctx, const char *file,
     const char *ctfile_basedir, int *is_allfiles)
 {
 	struct ct_extract_stack	*nfile;
 	char			*prevlvl;
+	int			 ret;
 
-	if (ctfile_parse_init(ctx, file, ctfile_basedir))
-		CFATALX("extract failure: unable to open metadata file '%s'\n",
-		    file);
+	if ((ret = ctfile_parse_init(ctx, file, ctfile_basedir)) != 0)
+		return (ret);
 
 	*is_allfiles = (ctx->xs_gh.cmg_flags & CT_MD_MLB_ALLFILES);
 
@@ -57,30 +58,41 @@ ct_extract_setup(struct ct_extract_head *extract_head,
 		prevlvl = e_strdup(ctx->xs_gh.cmg_prevlvl_filename);
 
 		ctfile_parse_close(ctx);
-		ct_extract_setup_queue(extract_head, ctx, prevlvl,
-		    ctfile_basedir, *is_allfiles);
+		if ((ret = ct_extract_setup_queue(extract_head, ctx, prevlvl,
+		    ctfile_basedir, *is_allfiles)) != 0) {
+			int s_errno = errno;
+
+			/* unwind */
+			e_free(&prevlvl);
+			ct_extract_cleanup_queue(extract_head);
+
+			errno = s_errno;
+			return (ret);
+		}
 
 		e_free(&prevlvl);
 
 		if (*is_allfiles) {
 			ctfile_parse_close(ctx);
 			/* reopen first file */
-			ct_extract_open_next(extract_head, ctx);
+			ret = ct_extract_open_next(extract_head, ctx);
 		}
 	}
+
+	return (ret);
 }
 
-static void
+static int
 ct_extract_setup_queue(struct ct_extract_head *extract_head,
     struct ctfile_parse_state *ctx, const char *file,
     const char *ctfile_basedir, int is_allfiles)
 {
 	char			*prevlvl;
 	struct ct_extract_stack	*nfile;
+	int			 ret;
 
-	if (ctfile_parse_init(ctx, file, ctfile_basedir))
-		CFATALX("extract failure: unable to open incremental archive"
-		    "'%s'\n", file);
+	if ((ret = ctfile_parse_init(ctx, file, ctfile_basedir)) != 0)
+		return (ret);
 
 	if (ctx->xs_gh.cmg_prevlvl_filename) {
 		/* need to nest another level deep.*/
@@ -109,23 +121,31 @@ ct_extract_setup_queue(struct ct_extract_head *extract_head,
 		nfile->filename = e_strdup(file);
 		TAILQ_INSERT_TAIL(extract_head, nfile, next);
 	}
+
+	return (0);
 }
 
-void
+int
 ct_extract_open_next(struct ct_extract_head *extract_head, struct ctfile_parse_state *ctx)
 {
 	struct ct_extract_stack *next;
+	int			 ret, s_errno;
 
 	if (!TAILQ_EMPTY(extract_head)) {
 		next = TAILQ_FIRST(extract_head);
 		CNDBG(CT_LOG_CTFILE,
 		    "should start restoring [%s]", next->filename);
-		TAILQ_REMOVE(extract_head, next, next);
 
 		/* Basedir not needed here because we are done with prevlvl */
-		if (ctfile_parse_init(ctx, next->filename, NULL))
-			CFATALX("failed to open %s", next->filename);
+		if ((ret = ctfile_parse_init(ctx, next->filename, NULL)) != 0) {
+			s_errno = errno;
+			/* chain is broken, clean it up */
+			ct_extract_cleanup_queue(extract_head);
+			errno = s_errno;
+			return (ret);
+		}
 
+		TAILQ_REMOVE(extract_head, next, next);
 		if (next->filename)
 			e_free(&next->filename);
 		if (next)
@@ -133,6 +153,8 @@ ct_extract_open_next(struct ct_extract_head *extract_head, struct ctfile_parse_s
 	} else {
 		CABORTX("open next with no next archive");
 	}
+
+	return (0);
 }
 
 void
@@ -280,9 +302,10 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 				    ct_strerror(ret));
 			op->op_priv = ex_priv;
 		}
-		ct_extract_setup(&ex_priv->extract_head,
+		if ((ret = ct_extract_setup(&ex_priv->extract_head,
 		    &ex_priv->xdr_ctx, ctfile, cea->cea_ctfile_basedir,
-		    &ex_priv->allfiles);
+		    &ex_priv->allfiles)) != 0)
+			CFATALX("can't setup queue: %s", ct_strerror(ret));
 		state->ct_print_ctfile_info(state->ct_print_state,
 		    ex_priv->xdr_ctx.xs_filename, &ex_priv->xdr_ctx.xs_gh);
 		
@@ -482,8 +505,11 @@ skip:
 				}
 				ct_trans_free(state, trans);
 				/* reinits ex_priv->xdr_ctx */
-				ct_extract_open_next(&ex_priv->extract_head,
-				    &ex_priv->xdr_ctx);
+				if ((ret =
+				    ct_extract_open_next(&ex_priv->extract_head,
+				    &ex_priv->xdr_ctx)) != 0)
+					CFATALX("can't open next file: %s",
+					    ct_strerror(ret));
 				state->ct_print_ctfile_info(
 				    state->ct_print_state,
 				    ex_priv->xdr_ctx.xs_filename,
@@ -523,7 +549,8 @@ we_re_done_here:
 			return;
 			break;
 		case XS_RET_FAIL:
-			CFATALX("failed to parse metadata file");
+			CFATALX("failed to parse metadata file: %s",
+			    ct_strerror(ex_priv->xdr_ctx.xs_errno));
 			break;
 		}
 	}
@@ -675,7 +702,8 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			ex_priv->done = 1;
 			break;
 		case XS_RET_FAIL:
-			CFATALX("failed to parse metadata file");
+			CFATALX("failed to parse metadata file: %s",
+			    ct_strerror(ex_priv->xdr_ctx.xs_errno));
 			break;
 		default:
 			CABORTX("%s: invalid state %d", __func__, ret);

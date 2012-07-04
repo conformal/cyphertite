@@ -1153,6 +1153,7 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode,
 	int				 state;
 	int				 doprint = 0;
 	int				 ret;
+	int				 s_errno, ct_errno;
 	char				 shat[SHA_DIGEST_STRING_LENGTH];
 
 	ces = ct_file_extract_init(NULL, 1, 1, 0, NULL, NULL);
@@ -1170,7 +1171,7 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode,
 next_file:
 	ret = ctfile_parse_init(&xs_ctx, file, ctfile_basedir);
 	if (ret)
-		CFATALX("failed to open %s", file);
+		CFATALX("failed to open %s: %s", file, ct_strerror(ret));
 	ct_print_ctfile_info(&verbose, file, &xs_ctx.xs_gh);
 
 	if (ct_next_filename)
@@ -1244,6 +1245,8 @@ next_file:
 		case XS_RET_EOF:
 			break;
 		case XS_RET_FAIL:
+			s_errno = errno;
+			ct_errno = xs_ctx.xs_errno;
 			;
 		}
 
@@ -1252,7 +1255,8 @@ next_file:
 	ctfile_parse_close(&xs_ctx);
 
 	if (ret != XS_RET_EOF) {
-		CWARNX("end of archive not hit");
+		errno = s_errno;
+		CWARNX("corrupt ctfile: %s", ct_strerror(ct_errno));
 	} else {
 		if (ct_next_filename) {
 			file = ct_next_filename;

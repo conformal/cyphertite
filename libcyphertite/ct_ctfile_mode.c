@@ -141,16 +141,20 @@ ctfile_archive(struct ct_global_state *state, struct ct_op *op)
 		if (cca->cca_ctfile) {
 			struct ctfile_parse_state	 xs_ctx;
 			int				 ret;
-			if (ctfile_parse_init_f(&xs_ctx, cas->cas_handle, NULL))
-				CFATALX("%s is not a valid ctfile, can't "
-				    "open", tpath);
+			if ((error = ctfile_parse_init_f(&xs_ctx,
+			    cas->cas_handle, NULL)) != 0)
+				CFATALX("%s: %s", tpath, ct_strerror(error));
 			while ((ret = ctfile_parse(&xs_ctx)) != XS_RET_EOF) {
 				if (ret == XS_RET_SHA)  {
-					if (ctfile_parse_seek(&xs_ctx))
-						CFATALX("seek failed");
+					if (ctfile_parse_seek(&xs_ctx)) {
+						CFATALX("%s can't seek: %s",
+						    tpath, ct_strerror(
+						    xs_ctx.xs_errno));
+					}
 				} else if (ret == XS_RET_FAIL) {
-					CFATALX("%s is not a valid ctfile, EOF"
-					    " not found", tpath);
+					CFATALX("%s is not a valid ctfile, %s",
+					    tpath,
+					    ct_strerror(xs_ctx.xs_errno));
 				}
 
 			}
@@ -843,7 +847,7 @@ ct_cull_add_shafile(const char *file, const char *cachedir)
 	char				*ct_next_filename;
 	char				*ct_filename_free = NULL;
 	char				*cachename;
-	int				ret;
+	int				ret, s_errno = 0, ct_errno;
 
 	CNDBG(CT_LOG_TRANS, "processing [%s]", file);
 
@@ -870,7 +874,7 @@ next_file:
 	CNDBG(CT_LOG_CTFILE, "opening [%s]", file);
 
 	if (ret)
-		CFATALX("failed to open %s", file);
+		CFATALX("%s: %s", file, ct_strerror(ret));
 
 	if (ct_filename_free) {
 		e_free(&ct_filename_free);
@@ -901,7 +905,9 @@ next_file:
 		case XS_RET_EOF:
 			break;
 		case XS_RET_FAIL:
-			;
+			s_errno = errno; /* save just in case */
+			ct_errno = xs_ctx.xs_errno;
+			break;
 		}
 
 	} while (ret != XS_RET_EOF && ret != XS_RET_FAIL);
@@ -909,7 +915,8 @@ next_file:
 	ctfile_parse_close(&xs_ctx);
 
 	if (ret != XS_RET_EOF) {
-		CWARNX("end of archive not hit");
+		errno = s_errno; /* in case it is CTE_ERRNO */
+		CWARNX("%s: %s", file, ct_strerror(ct_errno));
 	} else {
 		if (ct_next_filename) {
 			file = ct_next_filename;

@@ -50,9 +50,9 @@ bool_t          ct_xdr_stdin(XDR *, struct ctfile_stdin *);
 int          	ct_xdr_gheader(XDR *, struct ctfile_gheader *, int,
 		    const char *);
 
-static FILE	*ctfile_open(const char *, const char *,
-		     struct ctfile_gheader *, XDR *);
-static FILE	*ctfile_open_f(FILE *, const char *,
+static int	 ctfile_open(const char *, const char *,
+		     FILE **, struct ctfile_gheader *, XDR *);
+static int	 ctfile_open_f(FILE *, const char *,
 		     struct ctfile_gheader *, XDR *);
 static void	 ctfile_close(FILE *, XDR *);
 static void	 ctfile_cleanup_gheader(struct ctfile_gheader *);
@@ -223,16 +223,14 @@ ctfile_close(FILE *file, XDR *xdr)
 /*
  * Open filename as a ctfile, returning the xdr pointer and the global header.
  */
-FILE *
-ctfile_open(const char *filename, const char *ctfile_basedir,
+int
+ctfile_open(const char *filename, const char *ctfile_basedir, FILE **f,
     struct ctfile_gheader *gh, XDR *xdr)
 {
-	FILE			*f;
-	f = fopen(filename, "rb");
-	if (f == NULL)
-		return (NULL);
+	if ((*f = fopen(filename, "rb")) == NULL)
+		return (CTE_ERRNO);
 
-	return (ctfile_open_f(f, ctfile_basedir, gh, xdr));
+	return (ctfile_open_f(*f, ctfile_basedir, gh, xdr));
 }
 
 /*
@@ -240,17 +238,19 @@ ctfile_open(const char *filename, const char *ctfile_basedir,
  *
  * Upon failure the file will be *closed*.
  */
-FILE *
+int
 ctfile_open_f(FILE *f, const char *ctfile_basedir, struct ctfile_gheader *gh,
     XDR *xdr)
 {
+	int 	ret;
 
 	xdrstdio_create(xdr, f, XDR_DECODE);
 
 	bzero(gh, sizeof *gh);
 
 	if (ct_xdr_gheader(xdr, gh, XDR_DECODE, ctfile_basedir) != 0) {
-		CWARNX("e_xdr_gheader failed");
+		CNDBG(CT_LOG_CTFILE, "e_xdr_gheader failed");
+		ret = CTE_CTFILE_CORRUPT;
 		goto destroy;
 	}
 
@@ -262,23 +262,26 @@ ctfile_open_f(FILE *f, const char *ctfile_basedir, struct ctfile_gheader *gh,
 	}
 
 	if (gh->cmg_beacon != CT_MD_BEACON) {
-		CWARNX("Not a cyphertite file");
+		CNDBG(CT_LOG_CTFILE, "%d is incorrect beacon value (%d exp)",
+		    gh->cmg_beacon, CT_MD_BEACON);
+		ret = CTE_CTFILE_CORRUPT;
 		goto cleanup;
 	}
 	if (gh->cmg_version > CT_MD_VERSION) {
-		CWARNX("Invalid version %d, expected %d", gh->cmg_version,
-		    CT_MD_VERSION);
+		CNDBG(CT_LOG_CTFILE, "%d is incorrect version value (%d exp)",
+		    gh->cmg_beacon, CT_MD_VERSION);
+		ret = CTE_CTFILE_CORRUPT;
 		goto cleanup;
 	}
 
-	return (f);
+	return (0);
 
 cleanup:
 	ctfile_cleanup_gheader(gh);
 destroy:
 	xdr_destroy(xdr);
 	fclose(f);
-	return (NULL);
+	return (ret);
 }
 
 /*
@@ -379,7 +382,7 @@ ctfile_get_previous(const char *path)
 	XDR			 xdr;
 	struct ctfile_gheader	 gh;
 
-	if ((ctfile = ctfile_open(path, NULL, &gh, &xdr)) != NULL) {
+	if (ctfile_open(path, NULL, &ctfile, &gh, &xdr) == 0) {
 		if (gh.cmg_prevlvl_filename)
 			ret = e_strdup(gh.cmg_prevlvl_filename);
 
@@ -394,11 +397,14 @@ int
 ctfile_parse_init_f(struct ctfile_parse_state *ctx, FILE *f,
     const char *ctfile_basedir)
 {
-	bzero (ctx, sizeof(*ctx));
-	if ((ctx->xs_f = ctfile_open_f(f, ctfile_basedir,
-	    &ctx->xs_gh, &ctx->xs_xdr)) == NULL)
-		return 2;
+	int ret;
 
+	bzero (ctx, sizeof(*ctx));
+	if ((ret = ctfile_open_f(f, ctfile_basedir,
+	    &ctx->xs_gh, &ctx->xs_xdr)) != 0)
+		return (ret);
+
+	ctx->xs_f = f;
 	ctx->xs_filename  = NULL;
 	ctx->xs_dnum = 0;
 	RB_INIT(&ctx->xs_dnum_head);
@@ -406,27 +412,30 @@ ctfile_parse_init_f(struct ctfile_parse_state *ctx, FILE *f,
 	ctx->xs_sha_sz = 0;
 	ctx->xs_state = XS_STATE_FILE;
 	ctx->xs_wasfile = 1;
-	return 0;
+
+	return (0);
 }
 
 int
 ctfile_parse_init_at(struct ctfile_parse_state *ctx, const char *file,
     const char *ctfile_basedir, off_t offset)
 {
+	int	ret, s_errno;
+
 	bzero (ctx, sizeof(*ctx));
-	ctx->xs_f = ctfile_open(file,  ctfile_basedir, &ctx->xs_gh,
-	    &ctx->xs_xdr);
-	if (ctx->xs_f == NULL)
-		return 2;
+	if ((ret = ctfile_open(file,  ctfile_basedir, &ctx->xs_f, &ctx->xs_gh,
+	    &ctx->xs_xdr)) != 0)
+		return (ret);
 
 	ctx->xs_filename  = e_strdup(file);
 	ctx->xs_dnum = 0;
 	RB_INIT(&ctx->xs_dnum_head);
 
 	if (offset != 0 && fseek(ctx->xs_f, offset, SEEK_SET) == -1) {
-		CWARN("failed to seek in file %s", file);
+		s_errno = errno;
 		ctfile_parse_close(ctx);
-		return (3);
+		errno = s_errno;
+		return (CTE_ERRNO);
 	}
 
 	ctx->xs_sha_sz = 0;
@@ -480,8 +489,10 @@ ctfile_parse(struct ctfile_parse_state *ctx)
 	case XS_STATE_FILE:
 		/* actually between files, next expected object is hdr */
 		ret = ctfile_parse_read_header(ctx, &ctx->xs_hdr);
-		if (ret)
+		if (ret) {
+			ctx->xs_errno = CTE_CTFILE_CORRUPT;
 			goto fail;
+		}
 
 		if (ctx->xs_hdr.cmh_beacon == CT_HDR_EOF) {
 			ctx->xs_state = XS_STATE_EOF;
@@ -491,8 +502,10 @@ ctfile_parse(struct ctfile_parse_state *ctx)
 
 		if (C_ISLINK(ctx->xs_hdr.cmh_type)) {
 			ret = ctfile_parse_read_header(ctx, &ctx->xs_lnkhdr);
-			if (ret)
+			if (ret) {
+				ctx->xs_errno = CTE_CTFILE_CORRUPT;
 				goto fail;
+			}
 		}
 		if (C_ISREG(ctx->xs_hdr.cmh_type)) {
 			ctx->xs_sha_cnt = ctx->xs_hdr.cmh_nr_shas;
@@ -520,8 +533,10 @@ ctfile_parse(struct ctfile_parse_state *ctx)
 				ret = ct_xdr_dedup_sha(&ctx->xs_xdr,
 				    ctx->xs_sha);
 			}
-			if (ret == FALSE)
+			if (ret == FALSE) {
+				ctx->xs_errno = CTE_CTFILE_CORRUPT;
 				goto fail;
+			}
 
 			if (ctx->xs_sha_sz == 0) {
 				pos1 = ftello(ctx->xs_f);
@@ -536,6 +551,7 @@ ctfile_parse(struct ctfile_parse_state *ctx)
 		 } else {
 			ret = ctfile_parse_read_trailer(ctx, &ctx->xs_trl);
 			if (ret) {
+				ctx->xs_errno = CTE_CTFILE_CORRUPT;
 				goto fail;
 			}
 
@@ -550,6 +566,7 @@ ctfile_parse(struct ctfile_parse_state *ctx)
 		 * is not allowed
 		 */
 	case XS_STATE_FAIL:
+		ctx->xs_errno = CTE_CTFILE_CORRUPT;
 		goto fail;
 
 	}
@@ -593,7 +610,8 @@ ctfile_parse_seek(struct ctfile_parse_state *ctx)
 	off_t	pos0, pos1;
 
 	if (ctx->xs_state != XS_STATE_SHA)
-		return 1;
+		CABORTX("%s called with invalid state: %d", __func__,
+		    ctx->xs_state);
 	if (ctx->xs_sha_cnt <= 0)
 		return 0;
 
@@ -602,11 +620,13 @@ ctfile_parse_seek(struct ctfile_parse_state *ctx)
 		if (ctx->xs_gh.cmg_flags & CT_MD_CRYPTO) {
 			if (ct_xdr_dedup_sha_crypto(&ctx->xs_xdr, ctx->xs_sha,
 			    ctx->xs_csha, ctx->xs_iv) == FALSE) {
+				ctx->xs_errno = CTE_CTFILE_CORRUPT;
 				ctx->xs_state = XS_STATE_FAIL;
 				return 1;
 			}
 		} else if (ct_xdr_dedup_sha(&ctx->xs_xdr,
-		    ctx->xs_sha) == FALSE) {
+		    ctx->xs_sha) == FALSE) { 
+			ctx->xs_errno = CTE_CTFILE_CORRUPT;
 			ctx->xs_state = XS_STATE_FAIL;
 			return 1;
 		}
@@ -616,6 +636,7 @@ ctfile_parse_seek(struct ctfile_parse_state *ctx)
 		ctx->xs_sha_cnt--;
 	}
 	if (fseek(ctx->xs_f, ctx->xs_sha_sz * ctx->xs_sha_cnt, SEEK_CUR) != 0) {
+		ctx->xs_errno = CTE_ERRNO;
 		ctx->xs_state = XS_STATE_FAIL;
 		return 1;
 	}

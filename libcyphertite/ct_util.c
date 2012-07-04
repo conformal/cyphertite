@@ -115,6 +115,7 @@ const char *ct_errmsgs[] = {
 	[CTE_CANT_OPEN_REMOTE] = "Can not open remote file",
 	[CTE_INVALID_CONFIG_VALUE] = "Invalid configuration value",
 	[CTE_MISSING_CONFIG_VALUE] = "Missing configuration value",
+	[CTE_CTFILE_CORRUPT] = "ctfile is corrupt",
 };
 
 const char *

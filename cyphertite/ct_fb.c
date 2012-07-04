@@ -215,11 +215,12 @@ ct_add_tree(struct ct_fb_entry *head, struct ctfile_parse_state *xdr_ctx,
 			file->cfb_sha_offs = fileoffset;
 			file->cfb_file = ctfile;
 			if (ctfile_parse_seek(xdr_ctx))
-				CFATALX("failed to skip shas in %s",
-				    ctfile->cff_path);
+				CFATALX("%s skip shas: %s",  ctfile->cff_path,
+				    ct_strerror(xdr_ctx->xs_errno));
 		}
 		if (ctfile_parse(xdr_ctx) != XS_RET_FILE_END)
-			CFATALX("no file trailer found");
+			CFATALX("no file trailer: %s",
+			    ct_strerror(xdr_ctx->xs_errno)); 
 		file->cfb_file_size = xdr_ctx->xs_trl.cmt_orig_size;
 	}
 
@@ -245,8 +246,9 @@ ct_build_tree(const char *filename, struct ct_fb_entry *head,
 	CNDBG(CT_LOG_FILE, "entry");
 
 	TAILQ_INIT(&extract_head);
-	ct_extract_setup(&extract_head, &xdr_ctx, filename, ctfile_basedir,
-	    &allfiles);
+	if ((ret = ct_extract_setup(&extract_head, &xdr_ctx, filename,
+	    ctfile_basedir, &allfiles)) != 0)
+		CFATALX("can't setup queue: %s", ct_strerror(ret));
 
 	TAILQ_INIT(&head->cfb_versions);
 	RB_INIT(&head->cfb_children);
@@ -279,7 +281,7 @@ nextfile:
 		case XS_RET_FILE_END:
 			break;
 		default:
-			CFATALX("invalid state in %s: %d", __func__, ret);
+			CABORTX("invalid state in %s: %d", __func__, ret);
 		}
 		offset = ctfile_parse_tell(&xdr_ctx);
 	}
@@ -288,12 +290,16 @@ nextfile:
 		ctfile_parse_close(&xdr_ctx);
 		if (!TAILQ_EMPTY(&extract_head)) {
 			CNDBG(CT_LOG_FILE, "opening next one");
-			ct_extract_open_next(&extract_head, &xdr_ctx);
+			if ((ret = ct_extract_open_next(&extract_head,
+			    &xdr_ctx)) != 0)
+				CFATALX("can't open next file: %s",
+				    ct_strerror(ret));
 			goto nextfile;
 		}
 		/* free state */
 	} else {
-		CFATALX("failed to parse metadata file");
+		CFATALX("failed to parse ctfile: %s",
+		    ct_strerror(xdr_ctx.xs_errno));
 	}
 }
 

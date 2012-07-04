@@ -124,6 +124,7 @@ struct ctfile_parse_state {
 #define	XS_RET_FILE_END		2
 #define	XS_RET_EOF		3
 #define	XS_RET_FAIL		4
+	int			xs_errno;	/* valid if XS_RET_FAIL */
 };
 
 int ctfile_parse_init_at(struct ctfile_parse_state *, const char *,
