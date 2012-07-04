@@ -411,7 +411,9 @@ skip:
 			if (ex_priv->doextract == 0 ||
 			    trans->tr_fl_node->fl_skip_file != 0) {
 				if (ctfile_parse_seek(&ex_priv->xdr_ctx))
-					CFATALX("can't seek past shas");
+					CFATALX("can't seek past shas: %s",
+					    ct_strerror(
+					    ex_priv->xdr_ctx.xs_errno));
 				ct_trans_free(state, trans);
 				continue;
 			}
@@ -421,7 +423,9 @@ skip:
 				CWARNX("\"%s\" truncated during backup",
 				    trans->tr_fl_node->fl_sname);
 				if (ctfile_parse_seek(&ex_priv->xdr_ctx))
-					CFATALX("can't seek past shas");
+					CFATALX("can't seek past trunctation "
+					    "shas: %s", ct_strerror(
+					    ex_priv->xdr_ctx.xs_errno));
 				ct_trans_free(state, trans);
 				continue;
 			}

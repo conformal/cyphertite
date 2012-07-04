@@ -718,11 +718,12 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 			e_free(&basisbackup);
 
 		if (getcwd(cwd, PATH_MAX) == NULL)
-			CFATAL("can't get current working directory");
+			CFATAL("getcwd: %s", ct_strerror(CTE_ERRNO));
 
 		state->archive_state = ct_archive_init(caa->caa_tdir);
 		if (caa->caa_tdir && chdir(caa->caa_tdir) != 0)
-			CFATALX("can't chdir to %s", caa->caa_tdir);
+			CFATALX("can't chdir to %s: %s", caa->caa_tdir,
+			    ct_strerror(CTE_ERRNO));
 		state->ct_print_traverse_start(state->ct_print_state, filelist);
 		ct_traverse(state->archive_state, filelist, &cap->cap_flist,
 		    caa->caa_no_cross_mounts, caa->caa_strip_slash,
@@ -730,7 +731,8 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		    state->ct_stats);
 		state->ct_print_traverse_end(state->ct_print_state, filelist);
 		if (caa->caa_tdir && chdir(cwd) != 0)
-			CFATALX("can't chdir back to %s", cwd);
+			CFATALX("can't chdir back to %s: %s", cwd,
+			    ct_strerror(CTE_ERRNO));
 		/*
 		 * Get the first file we must operate on.
 		 * Do this before we open the ctfile for writing so
