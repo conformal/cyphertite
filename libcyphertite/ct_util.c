@@ -116,6 +116,7 @@ const char *ct_errmsgs[] = {
 	[CTE_INVALID_CONFIG_VALUE] = "Invalid configuration value",
 	[CTE_MISSING_CONFIG_VALUE] = "Missing configuration value",
 	[CTE_CTFILE_CORRUPT] = "ctfile is corrupt",
+	[CTE_INVALID_CTFILE_NAME] = "Invalid ctfile name",
 };
 
 const char *

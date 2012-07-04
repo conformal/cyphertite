@@ -50,11 +50,16 @@ ctfile_cook_name(const char *path)
 {
 	char	*bname;
 
-	bname = ct_basename(path);
-	if (bname == NULL)
-		CFATAL("can't basename metadata path");
-	if (bname[0] == '/')
-		CFATALX("invalid metadata filename");
+	if ((bname = ct_basename(path)) == NULL) {
+		CNDBG(CT_LOG_CTFILE, "can't basename ctfile path %s",
+		    path);
+		return (NULL);
+	}
+	if (bname[0] == '/') {
+		CNDBG(CT_LOG_CTFILE, "invalid metadata filename %s", path);
+		e_free(&bname);
+		bname = NULL;
+	}
 
 	return (bname);
 }
@@ -173,7 +178,8 @@ ctfile_find_for_extract(struct ct_global_state *state, struct ct_op *op)
 	struct ct_ctfile_list_args	*ccla;
 
 	/* cook the ctfile so we only search for the actual tag */
-	ctfile = ctfile_cook_name(ctfile);
+	if ((ctfile = ctfile_cook_name(ctfile)) == NULL)
+		CFATALX("%s: %s", ctfile, ct_strerror(CTE_INVALID_CTFILE_NAME));
 
 	list_fakeop = e_calloc(1, sizeof(*list_fakeop));
 	ccla = e_calloc(1, sizeof(*ccla));
@@ -363,7 +369,9 @@ again:
 		goto out;
 
 	if (prevfile[0] != '\0') {
-		cookedname = ctfile_cook_name(prevfile);
+		if ((cookedname = ctfile_cook_name(prevfile)) == NULL)
+			CFATALX("%s: %s", prevfile,
+			    ct_strerror(CTE_INVALID_CTFILE_NAME));
 		CNDBG(CT_LOG_CTFILE, "prev file %s cookedname %s", prevfile,
 		    cookedname);
 		if (!ctfile_in_cache(cookedname, cca->cca_tdir)) {
@@ -428,7 +436,9 @@ ctfile_nextop_archive(struct ct_global_state *state, char *basis, void *args)
 	 * We now have the basis found for us, cook and prepare the tag
 	 * we wish to create then add the operation.
 	 */
-	ctfile = ctfile_cook_name(caa->caa_tag);
+	if ((ctfile = ctfile_cook_name(caa->caa_tag)) == NULL)
+		CFATALX("%s: %s", caa->caa_tag,
+		    ct_strerror(CTE_INVALID_CTFILE_NAME));
 
 	if (ctfile_is_fullname(ctfile) != 0)
 		CFATALX("%s", ct_strerror(CTE_ARCHIVE_FULLNAME));

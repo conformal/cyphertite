@@ -168,7 +168,9 @@ ctfile_archive(struct ct_global_state *state, struct ct_op *op)
 		cas->cas_fnode = e_calloc(1, sizeof(*cas->cas_fnode));
 
 		if (rname == NULL) {
-			rname = ctfile_cook_name(ctfile);
+			if ((rname = ctfile_cook_name(ctfile)) == NULL)
+				CFATALX("%s: %s", ctfile,
+				    ct_strerror(CTE_INVALID_CTFILE_NAME));
 			cca->cca_remotename = (char *)rname;
 		}
 		break;
@@ -444,7 +446,9 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 		op->op_priv = ces;
 
 		if (rname == NULL) {
-			rname = ctfile_cook_name(ctfile);
+			if ((rname = ctfile_cook_name(ctfile)) == NULL)
+				CFATALX("%s: %s", ctfile,
+				    ct_strerror(CTE_INVALID_CTFILE_NAME));
 			cca->cca_remotename = (char *)rname;
 		}
 		state->extract_state = ct_file_extract_init(cca->cca_tdir,
@@ -623,7 +627,9 @@ ctfile_delete(struct ct_global_state *state, struct ct_op *op)
 	trans = ct_trans_alloc(state);
 	trans->tr_state = TR_S_XML_DELETE;
 
-	rname = ctfile_cook_name(rname);
+	if ((rname = ctfile_cook_name(rname)) == NULL)
+		CFATALX("%s: %s", rname,
+		    ct_strerror(CTE_INVALID_CTFILE_NAME));
 
 	if ((ret = ct_create_xml_delete(&trans->hdr,
 	     (void **)&trans->tr_data[2], rname)) != 0)
