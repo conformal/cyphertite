@@ -239,6 +239,8 @@ ct_extract_complete_file_end(struct ct_global_state *state,
 			    trans->tr_fl_node->fl_sname);
 		ct_file_extract_close(state->extract_state,
 		    trans->tr_fl_node);
+		state->ct_print_file_end(state->ct_print_state,
+		    trans->tr_fl_node, state->ct_max_block_size);
 	}
 	ct_free_fnode(trans->tr_fl_node);
 	trans->tr_fl_node = NULL;
