@@ -1536,18 +1536,20 @@ ct_file_extract_close(struct ct_extract_state *ces, struct fnode *fnode)
 			safe_mode = ~0;
 	}
 
-	if (fchmod(ces->ces_fd, fnode->fl_mode & safe_mode) == -1)
-		CFATAL("chmod failed on %s", fnode->fl_sname);
-
-	if (ces->ces_attr) {
+	if (fchmod(ces->ces_fd, fnode->fl_mode & safe_mode) == -1) {
+		CWARN("chmod failed on %s", fnode->fl_sname);
+	} else if (ces->ces_attr) {
 		tv[0].tv_sec = fnode->fl_atime;
 		tv[1].tv_sec = fnode->fl_mtime;
 		tv[0].tv_usec = tv[1].tv_usec = 0;
 		if (futimes(ces->ces_fd, tv) == -1)
-			CFATAL("utimes failed");
+			CWARN("utimes on %s failed", fnode->fl_sname);
 	}
-	if (ct_rename(ces, fnode) != 0)
-		CFATAL("rename to %s failed", fnode->fl_sname);
+	if (ct_rename(ces, fnode) != 0) {
+		CWARN("rename to %s failed", fnode->fl_sname);
+		/* nuke temp file */
+		(void)ct_unlink(ces, fnode);
+	}
 
 	close(ces->ces_fd);
 	ces->ces_fd = -1;
@@ -1683,12 +1685,11 @@ link_out:
 				safe_mode = ~0;
 		}
 
-		if (ct_chown(ces, fnode, fnode->fl_mode & safe_mode) != 0)
-			CFATAL("chmod failed on %s", fnode->fl_sname);
-
-		if (ces->ces_attr) {
+		if (ct_chown(ces, fnode, fnode->fl_mode & safe_mode) != 0) {
+			CWARN("chmod failed on %s", fnode->fl_sname);
+		} else if (ces->ces_attr) {
 			if (ct_utimes(ces, fnode) != 0)
-				CFATAL("utimes failed");
+				CWARN("utimes failed");
 		}
 	}
 }
@@ -1777,14 +1778,15 @@ ct_file_extract_closefrom(struct ct_extract_state *ces, struct dnode *parent,
 		}
 	}
 	if (chmod(path, child->d_mode & safe_mode) == -1) {
-		CFATAL("can't chmod directory \"%s\"", child->d_name);
-	}
-	if (ces->ces_attr) {
+		CWARNX("can't chmod directory \"%s\"", child->d_name);
+		/* no point trying to utimes, too */
+		goto out;
+	} else if (ces->ces_attr) {
 		tv[0].tv_sec = child->d_atime;
 		tv[1].tv_sec = child->d_mtime;
 		tv[0].tv_usec = tv[1].tv_usec = 0;
 		if (utimes(path, tv) == -1)
-			CFATAL("utimes on \"%s\" failed", child->d_name);
+			CWARN("utimes on \"%s\" failed", child->d_name);
 	}
 #else
 	if (ces->ces_attr) {
@@ -1795,14 +1797,15 @@ ct_file_extract_closefrom(struct ct_extract_state *ces, struct dnode *parent,
 			safe_mode = ~0;
 		}
 	}
-	if (fchmod(child->d_fd, child->d_mode & safe_mode) == -1)
-		CFATAL("can't chmod directory \"%s\"", child->d_name);
-	if (ces->ces_attr) {
+	if (fchmod(child->d_fd, child->d_mode & safe_mode) == -1) {
+		CWARN("can't chmod directory \"%s\"", child->d_name);
+		/* no point trying to utimes, too */
+	} else if (ces->ces_attr) {
 		ts[0].tv_sec = child->d_atime;
 		ts[1].tv_sec = child->d_mtime;
 		ts[0].tv_nsec = ts[1].tv_nsec = 0;
 		if (futimens(child->d_fd, ts) == -1)
-			CFATAL("futimens on \"%s\" failed", child->d_name);
+			CWARN("futimens on \"%s\" failed", child->d_name);
 	}
 	close(child->d_fd);
 #endif
