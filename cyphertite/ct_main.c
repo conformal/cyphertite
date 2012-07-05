@@ -1156,7 +1156,9 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode,
 	int				 s_errno, ct_errno;
 	char				 shat[SHA_DIGEST_STRING_LENGTH];
 
-	ces = ct_file_extract_init(NULL, 1, 1, 0, NULL, NULL);
+	if ((ret = ct_file_extract_init(&ces, NULL, 1, 1, 0, NULL, NULL)) != 0)
+		CFATALX("failed to initialise extract state: %s",
+		    ct_strerror(ret));
 	if ((ret = ct_match_compile(&match, match_mode, flist)) != 0)
 		CFATALX("failed to compile match pattern: %s",
 		    ct_strerror(ret));

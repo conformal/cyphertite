@@ -309,10 +309,12 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 		state->ct_print_ctfile_info(state->ct_print_state,
 		    ex_priv->xdr_ctx.xs_filename, &ex_priv->xdr_ctx.xs_gh);
 		
-		state->extract_state = ct_file_extract_init(cea->cea_tdir,
-		    cea->cea_attr,  cea->cea_follow_symlinks,
+		if ((ret = ct_file_extract_init(&state->extract_state,
+		    cea->cea_tdir, cea->cea_attr,  cea->cea_follow_symlinks,
 		    ex_priv->allfiles, cea->cea_log_state,
-		    cea->cea_log_chown_failed);
+		    cea->cea_log_chown_failed)) != 0)
+			CFATALX("Can not initialise extract state: %s",
+			    ct_strerror(ret));
 		/* XXX we should handle this better */
 		if (state->ct_max_block_size <
 		    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size)
@@ -595,8 +597,10 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			    "smaller than file max block size %d",
 			    state->ct_max_block_size,
 			    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size);
-		state->extract_state = ct_file_extract_init(NULL,
-		    0, 0, 0, NULL, NULL);
+		if ((ret = ct_file_extract_init(&state->extract_state,
+		    NULL, 0, 0, 0, NULL, NULL)) != 0)
+			CFATALX("Can not initialise extract state: %s",
+			    ct_strerror(ret));
 		op->op_priv = ex_priv;
 		break;
 	case CT_S_FINISHED:

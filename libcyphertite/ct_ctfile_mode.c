@@ -451,8 +451,10 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 				    ct_strerror(CTE_INVALID_CTFILE_NAME));
 			cca->cca_remotename = (char *)rname;
 		}
-		state->extract_state = ct_file_extract_init(cca->cca_tdir,
-		    0, 0, 0, NULL, NULL);
+		if ((ret = ct_file_extract_init(&state->extract_state,
+		    cca->cca_tdir, 0, 0, 0, NULL, NULL)) != 0)
+			CFATALX("can't initialise extract state: %s",
+			    ct_strerror(ret));
 		break;
 	case CT_S_WAITING_SERVER:
 		CNDBG(CT_LOG_FILE, "waiting on remote open");

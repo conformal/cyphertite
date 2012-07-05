@@ -402,8 +402,8 @@ struct ct_archive_state {
 	struct d_name_tree	 cas_dname_head;
 };
 
-struct ct_archive_state *
-ct_archive_init(const char *tdir)
+int
+ct_archive_init(struct ct_archive_state **casp, const char *tdir)
 {
 	struct ct_archive_state	*cas;
 	cas = e_calloc(1, sizeof(*cas));
@@ -419,10 +419,17 @@ ct_archive_init(const char *tdir)
 #ifndef CT_NO_OPENAT
 	if ((cas->cas_rootdir.d_fd = open(tdir ? tdir : ".",
 	    O_RDONLY | O_DIRECTORY)) == -1) {
-		CFATAL("can't open %s directory", tdir ? tdir : "current");
+		int  s_errno = errno;;
+
+		e_free(&cas->cas_rootdir.d_name);
+		e_free(&cas);
+		errno = s_errno;
+
+		return (CTE_ERRNO);
 	}
 #endif
-	return (cas);
+	*casp = cas;
+	return (0);
 }
 
 struct dnode *
@@ -720,7 +727,10 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		if (getcwd(cwd, PATH_MAX) == NULL)
 			CFATAL("getcwd: %s", ct_strerror(CTE_ERRNO));
 
-		state->archive_state = ct_archive_init(caa->caa_tdir);
+		if ((error = ct_archive_init(&state->archive_state,
+		    caa->caa_tdir)) != 0)
+			CFATALX("can't initialize archive mode: %s",
+			    ct_strerror(error));
 		if (caa->caa_tdir && chdir(caa->caa_tdir) != 0)
 			CFATALX("can't chdir to %s: %s", caa->caa_tdir,
 			    ct_strerror(CTE_ERRNO));
@@ -1290,14 +1300,14 @@ ct_file_extract_log_default(void *state, struct fnode *fnode,
 {
 }
 
-struct ct_extract_state *
-ct_file_extract_init(const char *tdir, int attr, int follow_symlinks,
-    int allfiles, void *log_state,
+int
+ct_file_extract_init(struct ct_extract_state **cesp, const char *tdir,
+    int attr, int follow_symlinks, int allfiles, void *log_state,
     ct_log_chown_failed_fn *log_chown_failed)
 {
 	struct ct_extract_state	*ces;
 	char			 tpath[PATH_MAX];
-	int			 tries = 0;
+	int			 tries = 0, s_errno;
 
 	ces = e_calloc(1, sizeof(*ces));
 	ces->ces_fd = -1;
@@ -1339,11 +1349,18 @@ try_again:
 		    ct_make_full_path(tpath, 0777) == 0 &&
 		    mkdir(tdir, 0777) == 0)
 			goto try_again;
-		CFATAL("can't open %s directory", tdir ? "-C" : "current");
+		s_errno = errno;
+		
+		e_free(&ces->ces_rootdir);
+		e_free(&ces);
+		errno = s_errno;
+
+		return (CTE_ERRNO);
 	}
 	ces->ces_rootdir->d_name = e_strdup(tpath);
 
-	return (ces);
+	*cesp = ces;
+	return (0);
 }
 
 struct dnode *

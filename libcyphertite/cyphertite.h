@@ -524,8 +524,9 @@ int	ct_extract_open_next(struct ct_extract_head *,
 void	ct_extract_cleanup_queue(struct ct_extract_head *);
 
 struct ct_extract_state;
-struct ct_extract_state	*ct_file_extract_init(const char *, int, int, int,
-			     void *, ct_log_chown_failed_fn *);
+int			 ct_file_extract_init(struct ct_extract_state **,
+			     const char *, int, int, int, void *,
+			     ct_log_chown_failed_fn *);
 struct dnode		*ct_file_extract_get_rootdir(struct ct_extract_state *);
 struct dnode		*ct_file_extract_insert_dir(struct ct_extract_state *,
 			     struct dnode *);
@@ -546,7 +547,8 @@ int			 ct_populate_fnode(struct ct_extract_state *,
 
 /* archive state functions: */
 struct ct_archive_state;
-struct ct_archive_state	*ct_archive_init(const char *);
+int			 ct_archive_init(struct ct_archive_state **,
+			     const char *);
 struct dnode		*ct_archive_get_rootdir(struct ct_archive_state *);
 struct dnode		*ct_archive_insert_dir(struct ct_archive_state *,
 			     struct dnode *);
