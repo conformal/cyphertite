@@ -117,6 +117,8 @@ const char *ct_errmsgs[] = {
 	[CTE_MISSING_CONFIG_VALUE] = "Missing configuration value",
 	[CTE_CTFILE_CORRUPT] = "ctfile is corrupt",
 	[CTE_INVALID_CTFILE_NAME] = "Invalid ctfile name",
+	[CTE_FILELIST_MISMATCH]	 = "List of files provided does not match that in previous backup",
+	[CTE_CWD_MISMATCH]	 = "Current working directory differs from previous backup and not all paths are absolute",
 };
 
 const char *

@@ -718,11 +718,19 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 				    ct_strerror(error));
 		}
 
-		if (basisbackup != NULL &&
-		    (nextlvl = ct_basis_setup(basisbackup, filelist,
-		        caa->caa_max_incrementals,
-		        &cap->cap_prev_backup_time)) == 0)
-			e_free(&basisbackup);
+		if (getcwd(cwd, PATH_MAX) == NULL)
+			CFATALX("getcwd: %s", ct_strerror(CTE_ERRNO));
+
+		if (basisbackup != NULL) {
+			if ((error = ct_basis_setup(&nextlvl, basisbackup,
+			    filelist, caa->caa_max_incrementals,
+			    &cap->cap_prev_backup_time, cwd)) != 0)
+				CFATALX("Can't setup incremental backup: %s",
+				    ct_strerror(error));
+
+			if (nextlvl == 0)
+				e_free(&basisbackup);
+		}
 
 		if (getcwd(cwd, PATH_MAX) == NULL)
 			CFATALX("getcwd: %s", ct_strerror(CTE_ERRNO));

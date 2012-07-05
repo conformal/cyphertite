@@ -306,17 +306,16 @@ ctfile_cleanup_gheader(struct ctfile_gheader *gh)
 
 
 int
-ct_basis_setup(const char *basisbackup, char **filelist, int max_incrementals,
-    time_t *prev_backup)
+ct_basis_setup(int *nextlvlp, const char *basisbackup, char **filelist,
+    int max_incrementals, time_t *prev_backup, const char *cwd)
 {
 	struct ctfile_parse_state	 xs_ctx;
-	char				 cwd[PATH_MAX], **fptr;
+	char				**fptr;
 	time_t				 prev_backup_time = 0;
-	int			 	 nextlvl, i, rooted = 1, ret;
+	int			 	 nextlvl, i, rooted = 1, ret, s_errno;
 
-	if (ctfile_parse_init(&xs_ctx, basisbackup, NULL))
-		CFATALX("unable to open/parse previous backup %s",
-		    basisbackup);
+	if ((ret = ctfile_parse_init(&xs_ctx, basisbackup, NULL)))
+		return (ret);
 
 	if (max_incrementals == 0 ||
 	    xs_ctx.xs_gh.cmg_cur_lvl < max_incrementals) {
@@ -334,9 +333,6 @@ ct_basis_setup(const char *basisbackup, char **filelist, int max_incrementals,
 	 * superset of the previous backup
 	 */
 	if (xs_ctx.xs_gh.cmg_version >= CT_MD_V2) {
-		if (getcwd(cwd, sizeof(cwd)) == NULL)
-			CFATAL("can't get current working directory");
-
 		for (i = 0, fptr = filelist; *fptr != NULL &&
 		    i < xs_ctx.xs_gh.cmg_num_paths; fptr++, i++) {
 			if (strcmp(xs_ctx.xs_gh.cmg_paths[i], *fptr) != 0)
@@ -345,24 +341,33 @@ ct_basis_setup(const char *basisbackup, char **filelist, int max_incrementals,
 				rooted = 0;
 		}
 		if (i < xs_ctx.xs_gh.cmg_num_paths || *fptr != NULL) {
-				CWARNX("list of directories provided does not"
-				    " match list of directories in basis:");
+				CWARNX(" list of directories in basis:");
 				for (i = 0; i < xs_ctx.xs_gh.cmg_num_paths; i++)
 					CWARNX("%s", xs_ctx.xs_gh.cmg_paths[i]);
-				exit(1);
+				return (CTE_FILELIST_MISMATCH);
 		}
 
-		if (rooted == 0 && strcmp(cwd, xs_ctx.xs_gh.cmg_cwd) != 0)
-			CFATALX("current working directory %s differs from "
-			    " basis %s", cwd, xs_ctx.xs_gh.cmg_cwd);
+		if (rooted == 0 && strcmp(cwd, xs_ctx.xs_gh.cmg_cwd) != 0) {
+			CWARNX("previous cwd: %s", xs_ctx.xs_gh.cmg_cwd);
+			return (CTE_CWD_MISMATCH);
+		}
 	}
 
 	while ((ret = ctfile_parse(&xs_ctx)) != XS_RET_EOF) {
 		if (ret == XS_RET_SHA)  {
-			if (ctfile_parse_seek(&xs_ctx))
-				CFATALX("seek failed");
+			if (ctfile_parse_seek(&xs_ctx)) {
+				s_errno = errno;
+				ret = xs_ctx.xs_errno;
+				ctfile_parse_close(&xs_ctx);
+				errno = s_errno;
+				return (ret);
+			}
 		} else if (ret == XS_RET_FAIL) {
-			CFATALX("basis corrupt: EOF not found");
+			s_errno = errno;
+			ret = xs_ctx.xs_errno;
+			ctfile_parse_close(&xs_ctx);
+			errno = s_errno;
+			return (ret);
 		}
 
 	}
@@ -371,7 +376,8 @@ ct_basis_setup(const char *basisbackup, char **filelist, int max_incrementals,
 	if (nextlvl != 0 && prev_backup != NULL)
 		*prev_backup = prev_backup_time;
 
-	return (nextlvl);
+	*nextlvlp = nextlvl;
+	return (0);
 }
 
 char *
