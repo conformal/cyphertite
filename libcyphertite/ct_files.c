@@ -419,7 +419,7 @@ ct_archive_init(struct ct_archive_state **casp, const char *tdir)
 #ifndef CT_NO_OPENAT
 	if ((cas->cas_rootdir.d_fd = open(tdir ? tdir : ".",
 	    O_RDONLY | O_DIRECTORY)) == -1) {
-		int  s_errno = errno;;
+		int  s_errno = errno;
 
 		e_free(&cas->cas_rootdir.d_name);
 		e_free(&cas);
@@ -725,7 +725,7 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 			e_free(&basisbackup);
 
 		if (getcwd(cwd, PATH_MAX) == NULL)
-			CFATAL("getcwd: %s", ct_strerror(CTE_ERRNO));
+			CFATALX("getcwd: %s", ct_strerror(CTE_ERRNO));
 
 		if ((error = ct_archive_init(&state->archive_state,
 		    caa->caa_tdir)) != 0)
@@ -1706,7 +1706,7 @@ link_out:
 			CWARN("chmod failed on %s", fnode->fl_sname);
 		} else if (ces->ces_attr) {
 			if (ct_utimes(ces, fnode) != 0)
-				CWARN("utimes failed");
+				CWARN("utimes on %s failed", fnode->fl_sname);
 		}
 	}
 }
