@@ -1797,7 +1797,6 @@ ct_file_extract_closefrom(struct ct_extract_state *ces, struct dnode *parent,
 	if (chmod(path, child->d_mode & safe_mode) == -1) {
 		CWARNX("can't chmod directory \"%s\"", child->d_name);
 		/* no point trying to utimes, too */
-		goto out;
 	} else if (ces->ces_attr) {
 		tv[0].tv_sec = child->d_atime;
 		tv[1].tv_sec = child->d_mtime;
