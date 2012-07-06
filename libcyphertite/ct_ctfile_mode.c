@@ -855,7 +855,7 @@ ct_cull_add_shafile(const char *file, const char *cachedir)
 	char				*ct_next_filename;
 	char				*ct_filename_free = NULL;
 	char				*cachename;
-	int				ret, s_errno = 0, ct_errno;
+	int				ret, s_errno = 0, ct_errno = 0;
 
 	CNDBG(CT_LOG_TRANS, "processing [%s]", file);
 
