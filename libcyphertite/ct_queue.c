@@ -1042,6 +1042,8 @@ ct_process_completions(void *vctx)
 			if (ct_op_complete(state) != 0)
 				ct_shutdown(state);
 		}
+		if (trans->tr_cleanup != NULL)
+			trans->tr_cleanup(state, trans);
 		ct_trans_free(state, trans);
 
 		/*

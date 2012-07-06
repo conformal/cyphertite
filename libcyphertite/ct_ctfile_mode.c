@@ -91,15 +91,12 @@ ctfile_xml_open_complete(struct ct_global_state *state,
 	return (0);
 }
 
-int
-ctfile_archive_complete_write(struct ct_global_state *state,
+void
+ctfile_archive_free_fnode(struct ct_global_state *state,
     struct ct_trans *trans)
 {
-	if (trans->tr_eof != 0) {
-		ct_free_fnode(trans->tr_fl_node);
-		trans->tr_fl_node = NULL;
-	}
-	return (0);
+	ct_free_fnode(trans->tr_fl_node);
+	trans->tr_fl_node = NULL;
 }
 
 struct ctfile_archive_state {
@@ -211,6 +208,7 @@ loop:
 		ct_trans->tr_fl_node = NULL;
 		ct_trans->tr_state = TR_S_XML_CLOSE;
 		ct_trans->tr_complete = ctfile_complete_noop_final;
+		ct_trans->tr_cleanup = NULL;
 		ct_trans->tr_eof = 1;
 		ct_trans->hdr.c_flags = C_HDR_F_METADATA;
 		ct_trans->tr_ctfile_name = rname;
@@ -242,7 +240,9 @@ loop:
 	ct_trans->tr_fl_node = cas->cas_fnode;
 	ct_trans->tr_chsize = ct_trans->tr_size[0] = rlen;
 	ct_trans->tr_state = TR_S_READ;
-	ct_trans->tr_complete = ctfile_archive_complete_write;
+	/* nothing to do when the data is on the server */
+	ct_trans->tr_complete = ctfile_complete_noop;
+	ct_trans->tr_cleanup = NULL;
 	ct_trans->tr_type = TR_T_WRITE_CHUNK;
 	ct_trans->tr_eof = 0;
 	ct_trans->hdr.c_flags = C_HDR_F_METADATA;
@@ -275,6 +275,7 @@ loop:
 		 */
 		cas->cas_offset = cas->cas_size;
 		ct_trans->tr_eof = 1;
+		ct_trans->tr_cleanup = ctfile_archive_free_fnode;
 	} else {
 		cas->cas_offset += rlen;
 	}
@@ -297,6 +298,7 @@ ct_xml_file_open(struct ct_global_state *state, struct ct_trans *trans,
 
 	trans->tr_state = TR_S_XML_OPEN;
 	trans->tr_complete = callback;
+	trans->tr_cleanup = NULL;
 
 	if ((ret = ct_create_xml_open(&trans->hdr, (void **)&trans->tr_data[2],
 	    file, mode, chunkno)) != 0)
@@ -472,6 +474,7 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 	trans->tr_fl_node = ces->ces_fnode;
 	trans->tr_state = TR_S_EX_SHA;
 	trans->tr_complete = ctfile_extract_complete_read;
+	trans->tr_cleanup = NULL;
 	trans->tr_type = TR_T_READ_CHUNK;
 	trans->tr_eof = 0;
 	trans->tr_ctfile_chunkno = ces->ces_block_no++;
@@ -494,11 +497,17 @@ ctfile_extract_complete_eof(struct ct_global_state *state,
 {
 	ct_file_extract_close(state->extract_state,
 	    trans->tr_fl_node);
+
+	return (1); /* we are done here */
+}
+
+void
+ctfile_extract_cleanup_eof(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
 	ct_file_extract_cleanup(state->extract_state);
 	state->extract_state = NULL;
 	ct_free_fnode(trans->tr_fl_node);
-
-	return (1); /* we are done here */
 }
 
 /*
@@ -514,6 +523,7 @@ ctfile_extract_handle_eof(struct ct_global_state *state, struct ct_trans *trans)
 		ct_set_file_state(state, CT_S_FINISHED);
 		trans->tr_state = TR_S_XML_CLOSING;
 		trans->tr_complete = ctfile_extract_complete_eof;
+		trans->tr_cleanup = ctfile_extract_cleanup_eof;
 
 		if ((ret = ct_create_xml_close(&trans->hdr,
 		    (void **)&trans->tr_data[2])) != 0)
@@ -523,6 +533,7 @@ ctfile_extract_handle_eof(struct ct_global_state *state, struct ct_trans *trans)
 		trans->tr_size[2] = trans->hdr.c_size;
 	} else {
 		trans->tr_complete = ctfile_complete_noop;
+		trans->tr_cleanup = NULL;
 		/*
 		 * We had > 1 ios in flight when we hit eof.
 		 * We're already closing so just carry on and complete/free
@@ -555,6 +566,7 @@ ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 		    ct_strerror(ret));
 	trans->tr_dataslot = 2;
 	trans->tr_complete = ctfile_complete_noop_final;
+	trans->tr_cleanup = NULL;
 	trans->tr_size[2] = trans->hdr.c_size;
 
 	ct_queue_first(state, trans);
@@ -612,6 +624,7 @@ ctfile_delete(struct ct_global_state *state, struct ct_op *op)
 		    rname, ct_strerror(ret));
 	trans->tr_dataslot = 2;
 	trans->tr_complete = ctfile_complete_noop_final;
+	trans->tr_cleanup = NULL;
 	trans->tr_size[2] = trans->hdr.c_size;
 
 	e_free(&rname);
@@ -944,6 +957,7 @@ ct_cull_setup(struct ct_global_state *state, struct ct_op *op)
 	trans->tr_size[2] = trans->hdr.c_size;
 	trans->tr_state = TR_S_XML_CULL_SEND;
 	trans->tr_complete = ct_cull_handle_complete;
+	trans->tr_cleanup = NULL;
 
 	ct_queue_first(state, trans);
 
@@ -978,6 +992,7 @@ ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 	trans->tr_size[2] = trans->hdr.c_size;
 	trans->tr_state = TR_S_XML_CULL_COMPLETE_SEND;
 	trans->tr_complete = ct_cull_handle_complete;
+	trans->tr_cleanup = NULL;
 	ct_set_file_state(state, CT_S_FINISHED);
 
 	ct_queue_first(state, trans);
@@ -1013,6 +1028,7 @@ ct_cull_send_shas(struct ct_global_state *state, struct ct_op *op)
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = trans->hdr.c_size;
 	trans->tr_complete = ct_cull_handle_complete;
+	trans->tr_cleanup = NULL;
 
 	CNDBG(CT_LOG_SHA, "sending shas [%s]", (char *)trans->tr_data[2]);
 	CNDBG(CT_LOG_SHA, "sending shas len %lu",

@@ -298,7 +298,8 @@ void	ct_shutdown(struct ct_global_state *state);
 struct ct_trans;
 
 RB_HEAD(ct_trans_head, ct_trans);
-typedef int (ct_complete_fn)(struct ct_global_state *, struct ct_trans *);
+typedef int	(ct_complete_fn)(struct ct_global_state *, struct ct_trans *);
+typedef void	(ct_cleanup_fn)(struct ct_global_state *, struct ct_trans *);
 
 
 struct ct_trans {
@@ -306,6 +307,7 @@ struct ct_trans {
 	TAILQ_ENTRY(ct_trans)	tr_next;
 	RB_ENTRY(ct_trans)	tr_trans_rbnode;
 	ct_complete_fn		*tr_complete;
+	ct_cleanup_fn		*tr_cleanup;
 
 	/* is this a local or data transaction */
 	int			tr_local;

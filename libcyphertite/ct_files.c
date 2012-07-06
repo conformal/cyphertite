@@ -601,10 +601,17 @@ ct_archive_complete_special(struct ct_global_state *state,
 	if (ctfile_write_special(trans->tr_ctfile, trans->tr_fl_node))
 		CWARNX("failed to write special entry for %s",
 		    trans->tr_fl_node->fl_sname);
-	ct_free_fnode(trans->tr_fl_node);
-	trans->tr_fl_node = NULL;
 
 	return (0);
+}
+
+void
+ct_archive_cleanup_fnode(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+
+	ct_free_fnode(trans->tr_fl_node);
+	trans->tr_fl_node = NULL;
 }
 
 int
@@ -623,8 +630,6 @@ ct_archive_complete_file_start(struct ct_global_state *state,
 		state->ct_print_file_end(state->ct_print_state,
 		    trans->tr_fl_node, state->ct_max_block_size);
 		state->ct_stats->st_files_completed++;
-		ct_free_fnode(trans->tr_fl_node);
-		trans->tr_fl_node = NULL;
 	}
 	return (0);
 }
@@ -656,8 +661,6 @@ ct_archive_complete_write_chunk(struct ct_global_state *state,
 			    trans->tr_fl_node->fl_sname);
 		state->ct_print_file_end(state->ct_print_state,
 		    trans->tr_fl_node, state->ct_max_block_size);
-		ct_free_fnode(trans->tr_fl_node);
-		trans->tr_fl_node = NULL;
 	}
 
 	return (0);
@@ -669,12 +672,24 @@ ct_archive_complete_done(struct ct_global_state *state,
 {
 	if (trans->tr_ctfile) {
 		ctfile_write_close(trans->tr_ctfile);
+		trans->tr_ctfile = NULL;
+	}
+	return (1); /* operation is complete */
+}
+
+void
+ct_archive_cleanup_done(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	/* only valid if we aborted early, else we closed already */
+	if (trans->tr_ctfile) {
+		ctfile_write_abort(trans->tr_ctfile);
+		trans->tr_ctfile = NULL;
 	}
 	if (state->archive_state) {
 		ct_archive_cleanup(state->archive_state);
 		state->archive_state = NULL;
 	}
-	return (1); /* operation is complete */
 }
 
 void
@@ -836,6 +851,7 @@ loop:
 		ct_trans->tr_state = TR_S_SPECIAL;
 		ct_trans->tr_type = TR_T_SPECIAL;
 		ct_trans->tr_complete = ct_archive_complete_special;
+		ct_trans->tr_cleanup = ct_archive_cleanup_fnode;
 		ct_trans->tr_eof = 0;
 		ct_queue_first(state, ct_trans);
 		goto next_file;
@@ -902,9 +918,11 @@ loop:
 			close(cap->cap_fd);
 			cap->cap_fd = -1;
 			ct_trans->tr_eof = 1;
+			ct_trans->tr_cleanup = ct_archive_cleanup_fnode;
 			cap->cap_curnode->fl_state = CT_FILE_FINISHED;
 		} else {
 			ct_trans->tr_eof = 0;
+			ct_trans->tr_cleanup = NULL;
 		}
 
 		/*
@@ -968,6 +986,7 @@ loop:
 		close(cap->cap_fd);
 		cap->cap_fd = -1;
 		ct_trans->tr_eof = 1;
+		ct_trans->tr_cleanup = ct_archive_cleanup_fnode;
 		cap->cap_curnode->fl_state = CT_FILE_FINISHED;
 
 		if (error) {
@@ -1027,6 +1046,7 @@ done:
 	ct_trans->tr_fl_node = NULL;
 	ct_trans->tr_state = TR_S_DONE;
 	ct_trans->tr_complete = ct_archive_complete_done;
+	ct_trans->tr_cleanup = ct_archive_cleanup_done;
 	ct_trans->tr_eof = 0;
 
 	/* We're done, cleanup local state. */

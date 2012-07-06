@@ -169,6 +169,13 @@ ct_extract_cleanup_queue(struct ct_extract_head *extract_head)
 	}
 }
 
+void
+ct_extract_cleanup_fnode(struct ct_global_state *state, struct ct_trans *trans)
+{
+	ct_free_fnode(trans->tr_fl_node);
+	trans->tr_fl_node = NULL;
+}
+
 int
 ct_extract_complete_special(struct ct_global_state *state,
     struct ct_trans *trans)
@@ -179,8 +186,6 @@ ct_extract_complete_special(struct ct_global_state *state,
 	    trans->tr_fl_node);
 	state->ct_print_file_end(state->ct_print_state,
 	    trans->tr_fl_node, state->ct_max_block_size);
-	ct_free_fnode(trans->tr_fl_node);
-	trans->tr_fl_node = NULL;
 
 	return (0);
 }
@@ -242,8 +247,6 @@ ct_extract_complete_file_end(struct ct_global_state *state,
 		state->ct_print_file_end(state->ct_print_state,
 		    trans->tr_fl_node, state->ct_max_block_size);
 	}
-	ct_free_fnode(trans->tr_fl_node);
-	trans->tr_fl_node = NULL;
 	state->ct_stats->st_files_completed++;
 
 	return (0);
@@ -253,11 +256,15 @@ int
 ct_extract_complete_done(struct ct_global_state *state,
     struct ct_trans *trans)
 {
-	if (state->extract_state) {
-		ct_file_extract_cleanup(state->extract_state);	
-		state->extract_state = NULL;
-	}
 	return (1);
+}
+
+void
+ct_extract_cleanup_done(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	ct_file_extract_cleanup(state->extract_state);	
+	state->extract_state = NULL;
 }
 
 struct ct_extract_priv {
@@ -374,9 +381,11 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			if (trans->tr_state == TR_S_EX_SPECIAL) {
 				trans->tr_complete =
 				    ct_extract_complete_special;
+				trans->tr_cleanup = ct_extract_cleanup_fnode;
 			} else {
 				trans->tr_complete =
 				    ct_extract_complete_file_start;
+				trans->tr_cleanup = NULL;
 			}
 
 			ex_priv->doextract = !ct_match(ex_priv->inc_match,
@@ -456,6 +465,7 @@ skip:
 			}
 			trans->tr_state = TR_S_EX_SHA;
 			trans->tr_complete = ct_extract_complete_file_read;
+			trans->tr_cleanup = NULL;
 			trans->tr_dataslot = 0;
 			ct_queue_first(state, trans);
 			break;
@@ -472,6 +482,7 @@ skip:
 			    sizeof(trans->tr_sha));
 			trans->tr_state = TR_S_EX_FILE_END;
 			trans->tr_complete = ct_extract_complete_file_end;
+			trans->tr_cleanup = ct_extract_cleanup_fnode;
 			trans->tr_fl_node->fl_size =
 			    ex_priv->xdr_ctx.xs_trl.cmt_orig_size;
 			ct_queue_first(state, trans);
@@ -545,6 +556,7 @@ we_re_done_here:
 				op->op_priv = NULL;
 				trans->tr_state = TR_S_DONE;
 				trans->tr_complete = ct_extract_complete_done;
+				trans->tr_cleanup = ct_extract_cleanup_done;
 				/*
 				 * Technically this should be a local
 				 * transaction. However, since we are done
@@ -625,6 +637,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			e_free(&ex_priv);
 			trans->tr_state = TR_S_DONE;
 			trans->tr_complete = ct_extract_complete_done;
+			trans->tr_cleanup = ct_extract_cleanup_done;
 			ct_queue_first(state, trans);
 			CNDBG(CT_LOG_TRANS, "extract finished");
 			ct_set_file_state(state, CT_S_FINISHED);
@@ -657,9 +670,11 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			if (trans->tr_state == TR_S_EX_SPECIAL) {
 				trans->tr_complete =
 				    ct_extract_complete_special;
+				trans->tr_cleanup = ct_extract_cleanup_fnode;
 			} else {
 				trans->tr_complete =
 				    ct_extract_complete_file_start;
+				trans->tr_cleanup = NULL;
 			}
 
 			/* XXX Check filename matches what we expect */
@@ -695,6 +710,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			}
 			trans->tr_state = TR_S_EX_SHA;
 			trans->tr_complete = ct_extract_complete_file_read;
+			trans->tr_cleanup = NULL;
 			trans->tr_dataslot = 0;
 			break;
 		case XS_RET_FILE_END:
@@ -706,6 +722,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			    sizeof(trans->tr_sha));
 			trans->tr_state = TR_S_EX_FILE_END;
 			trans->tr_complete = ct_extract_complete_file_end;
+			trans->tr_cleanup = ct_extract_cleanup_fnode;
 			trans->tr_fl_node->fl_size =
 			    ex_priv->xdr_ctx.xs_trl.cmt_orig_size;
 			/* Done now, don't parse further. */
