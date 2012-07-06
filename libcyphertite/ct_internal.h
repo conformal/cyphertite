@@ -31,7 +31,6 @@ void			ct_handle_xml_reply(struct ct_global_state *,
 int			ct_xml_file_open_polled(
 			    struct ct_global_state *,
 			    const char *, int, uint32_t);
-void			ct_xml_file_close(struct ct_global_state *);
 
 int			ct_basis_setup(int *, const char *, char **, int,
 			    time_t *, const char *);

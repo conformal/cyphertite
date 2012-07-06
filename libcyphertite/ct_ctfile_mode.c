@@ -366,33 +366,6 @@ done:
 #undef ASSL_TIMEOUT
 }
 
-void
-ct_xml_file_close(struct ct_global_state *state)
-{
-	struct ct_trans			*trans;
-	int				 ret;
-
-	trans = ct_trans_alloc(state);
-	if (trans == NULL) {
-		/* system busy, return  XXX this would be pretty bad. */
-		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
-		ct_set_file_state(state, CT_S_WAITING_TRANS);
-		return;
-	}
-
-	trans->tr_state = TR_S_XML_CLOSING;
-	trans->tr_complete = ctfile_complete_noop;
-
-	if ((ret = ct_create_xml_close(&trans->hdr,
-	    (void **)&trans->tr_data[2])) != 0)
-		CFATALX("Could not create xml close packet: %s",
-		    ct_strerror(ret));
-	trans->tr_dataslot = 2;
-	trans->tr_size[2] = trans->hdr.c_size;
-
-	ct_queue_first(state, trans);
-}
-
 int
 ctfile_extract_complete_open(struct ct_global_state *state,
     struct ct_trans *trans)
