@@ -1031,3 +1031,13 @@ ctfile_write_close(struct ctfile_write_state *ctx)
 
 	return (ret);
 }
+
+/* Juke clean up any resources we have allocated */
+void
+ctfile_write_abort(struct ctfile_write_state *ctx)
+{
+	/* XXX consider unlinking? */
+	ctfile_close(ctx->cws_f, &ctx->cws_xdr);
+
+	e_free(&ctx);
+}
