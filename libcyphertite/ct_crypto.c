@@ -503,6 +503,7 @@ ct_unlock_secrets(const char *passphrase, const char *filename,
 	int			rv = CTE_INVALID_SECRETS_FILE;
 	struct stat		sb;
 
+	/* XXX all returns should have a different error code */
 	if (filename == NULL) {
 		CABORTX("%s: no filename", __func__);
 	}
@@ -516,10 +517,8 @@ ct_unlock_secrets(const char *passphrase, const char *filename,
 	}
 
 	f = fopen(filename, "r");
-	if (f == NULL) {
-		/* XXX different error code? */
+	if (f == NULL)
 		return (CTE_INVALID_SECRETS_FILE);
-	}
 
 	while (fgets(line, sizeof line, f)) {
 		if ((s = strchr(line, '\n')) == NULL) {
