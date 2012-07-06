@@ -1153,7 +1153,7 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode,
 	int				 state;
 	int				 doprint = 0;
 	int				 ret;
-	int				 s_errno, ct_errno;
+	int				 s_errno = 0, ct_errno = 0;
 	char				 shat[SHA_DIGEST_STRING_LENGTH];
 
 	if ((ret = ct_file_extract_init(&ces, NULL, 1, 1, 0, NULL, NULL)) != 0)
