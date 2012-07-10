@@ -335,6 +335,27 @@ fail:
 	return (ret);
 }
 
+int
+ct_run_eventloop(struct ct_global_state *state)
+{
+	int		evret, ret = 0;
+
+	if ((evret = ct_event_dispatch(state->event_state)) == -1) {
+		ret = CTE_ERRNO; /* libevent error */
+	} else if (evret != 0) {
+		/*
+		 * That i can see only happens if you call libevent with
+		 * no events. so this would be a programming error. - oga.
+		 */
+		CABORTX("ct_event_dispatch returned non zero, non errno %d",
+		    evret);
+	} else if (state->ct_errno != 0) {
+		ret = state->ct_errno;
+	}
+
+	return (ret);
+}
+
 void
 ct_cleanup_eventloop(struct ct_global_state *state)
 {

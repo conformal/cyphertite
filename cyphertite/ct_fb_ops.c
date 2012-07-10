@@ -340,10 +340,13 @@ ctfb_main(int argc, char *argv[])
 		ctfile_find_for_operation(state, ctfile,
 		    ctfile_nextop_justdl, &ct_fb_filename, 1, 0);
 		ct_wakeup_file(ctfb_state->event_state);
-		if ((ret = ct_event_dispatch(ctfb_state->event_state)) != 0) {
-			CWARNX("event loop returned error %d, exiting", ret);
+		if ((ret = ct_run_eventloop(state)) != 0) {
+			if (state->ct_errmsg[0] != '\0')
+				CWARNX("%s: %s", state->ct_errmsg,
+				    ct_strerror(ret));
+			else	
+				CWARNX("%s", ct_strerror(ret));
 			return (ret);
-
 		}
 		ct_cleanup_eventloop(state);
 	} else {

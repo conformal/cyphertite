@@ -559,10 +559,14 @@ ct_main(int argc, char **argv)
 
 	ct_wakeup_file(state->event_state);
 
-	ret = ct_event_dispatch(state->event_state);
-	if (ret != 0)
-		CWARNX("event_dispatch returned, %d %s", errno,
-		    strerror(errno));
+	if ((ret = ct_run_eventloop(state)) != 0) {
+		if (state->ct_errmsg[0] != '\0')
+			CWARNX("%s: %s", state->ct_errmsg,
+			    ct_strerror(ret));
+		else	
+			CWARNX("%s", ct_strerror(ret));
+		return (ret);
+	}
 
 	if (verbose_ratios)
 		ct_dump_stats(state, stdout);
