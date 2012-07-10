@@ -308,21 +308,26 @@ ctdb_cleanup(struct ctdb_state *state)
 
 	CNDBG(CT_LOG_DB, "cleaning up ctdb");
 	if (state->ctdb_in_transaction) {
+		CNDBG(CT_LOG_DB, "finalising transactions");
 		state->ctdb_in_transaction = 0;
 		if (sqlite3_exec(state->ctdb_db, "commit", NULL, 0, &errmsg))
 			CNDBG(CT_LOG_DB, "can't commit %s", errmsg);
 	}
 	if (state->ctdb_stmt_lookup != NULL) {
+		CNDBG(CT_LOG_DB, "finalising stmt_lookup");
 		if (sqlite3_finalize(state->ctdb_stmt_lookup))
 			CNDBG(CT_LOG_DB, "can't finalize lookup");
 	}
 	if (state->ctdb_stmt_insert != NULL) {
+		CNDBG(CT_LOG_DB, "finalising stmt_insert");
 		if (sqlite3_finalize(state->ctdb_stmt_insert))
 			CNDBG(CT_LOG_DB, "can't finalize insert");
 	}
 
-	if (state->ctdb_db != NULL)
+	if (state->ctdb_db != NULL) {
+		CNDBG(CT_LOG_DB, "closing db");
 		sqlite3_close(state->ctdb_db);
+	}
 }
 
 int
