@@ -190,10 +190,8 @@ ct_init(struct ct_global_state **statep, struct ct_config *conf,
 	/* Run with restricted umask as we create numerous sensitive files. */
 	umask(S_IRWXG|S_IRWXO);
 
-	if ((state = ct_setup_state(conf)) == NULL) {
-		ret = CTE_ERRNO;
+	if ((ret = ct_setup_state(&state, conf)) != 0)
 		goto fail;
-	}
 
 	/* set defaults */
 	if ((ret = ct_set_log_fns(state, NULL, NULL, NULL, NULL, NULL, NULL,

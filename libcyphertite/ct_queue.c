@@ -65,8 +65,8 @@ ct_cmp_iotrans(struct ct_trans *c1, struct ct_trans *c2)
 	    ? -1 : (c1->hdr.c_tag > c2->hdr.c_tag));
 }
 
-struct ct_global_state *
-ct_setup_state(struct ct_config *conf)
+int
+ct_setup_state(struct ct_global_state **statep, struct ct_config *conf)
 {
 	struct ct_global_state *state;
 
@@ -91,9 +91,11 @@ ct_setup_state(struct ct_config *conf)
 	if (conf->ct_compress) {
 		state->ct_compress_state =
 		    ct_init_compression(conf->ct_compress);
-		if (state->ct_compress_state == NULL)
-			CFATALX("%d: %s", conf->ct_compress,
-			    ct_strerror(CTE_SHRINK_INIT));
+		if (state->ct_compress_state == NULL) {
+			e_free(&state->ct_stats);
+			e_free(&state);
+			return (CTE_SHRINK_INIT);
+		}
 		state->ct_alloc_block_size =
 		    ct_compress_bounds(state->ct_compress_state,
 		    state->ct_max_block_size);
@@ -134,7 +136,8 @@ ct_setup_state(struct ct_config *conf)
 
 	SIMPLEQ_INIT(&state->ctfile_list_files);
 
-	return (state);
+	*statep = state;
+	return (0);
 }
 
 void

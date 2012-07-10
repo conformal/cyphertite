@@ -515,7 +515,8 @@ config_generate(struct ct_cli_cmd *c, int argc, char **argv)
 	}
 
 	/* Verify username and password are correct before continuing. */
-	state = ct_setup_state(&config);
+	if ((rv = ct_setup_state(&state, &config)) != 0)
+		CFATALX("unable to setup state: %s", ct_strerror(rv));
 	assl_initialize();
 	state->event_state = ct_event_init(state, NULL, NULL);
 	if ((rv = ct_ssl_connect(state)) != 0)

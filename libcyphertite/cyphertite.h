@@ -202,7 +202,7 @@ struct ct_global_state {
 	void				*ct_userptr;
 };
 
-struct ct_global_state *ct_setup_state(struct ct_config *);
+int		 ct_setup_state(struct ct_global_state **, struct ct_config *);
 
 /* Simplified API */
 int
