@@ -891,6 +891,10 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 		if ((trans = ct_lookup_inflight(state, hdr->c_tag)) == NULL)
 			CFATALX("%d: %s", hdr->c_tag,
 			    ct_strerror(CTE_UNEXPECTED_TRANS));
+	} else {
+		/* for now this is bogus */
+		CABORTX("got a message that wasn't a reply opcode: %d",
+		    hdr->c_opcode);
 	}
 
 	if (trans)
