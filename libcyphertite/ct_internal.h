@@ -47,4 +47,7 @@ void	ct_set_reconnect_timeout(struct ct_event_state *, int);
 
 void ctfile_extract_handle_eof(struct ct_global_state *, struct ct_trans *);
 
+struct ct_trans *ct_fatal_alloc_trans(struct ct_global_state *);
+void		 ct_fatal(struct ct_global_state *, const char *, int);
+
 #endif /* ! CT_INTERNAL_H */

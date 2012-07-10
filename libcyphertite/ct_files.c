@@ -709,7 +709,10 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 	int			error;
 	int			nextlvl = 0;
 
+	if (state->ct_dying != 0)
+		goto dying;
 	CNDBG(CT_LOG_TRANS, "processing");
+
 	switch (ct_get_file_state(state)) {
 	case CT_S_STARTING:
 		if (*filelist == NULL) {
@@ -1057,8 +1060,36 @@ done:
 	ct_flnode_cleanup(&cap->cap_flist);
 	/* cws is cleaned up by the completion handler */
 	e_free(&cap);
+	op->op_priv = NULL;
 
 	ct_queue_first(state, ct_trans);
+
+	return;
+
+dying:
+	/* Only if we hadn't send off the final transaction yet */
+	if (cap != NULL) {
+		if (cap->cap_include)
+			ct_match_unwind(cap->cap_include);
+		if (cap->cap_exclude)
+			ct_match_unwind(cap->cap_exclude);
+		ct_flnode_cleanup(&cap->cap_flist);
+		if (cap->cap_curnode)
+			ct_free_fnode(cap->cap_curnode);
+		/* this doesn't race with completiona handler because
+		 * for now they are in the same thread
+		 */
+		if (cap->cap_cws)
+			ctfile_write_abort(cap->cap_cws);
+		e_free(&cap);
+		op->op_priv = NULL;
+	}
+
+	if (state->archive_state) {
+		ct_archive_cleanup(state->archive_state);
+		state->archive_state = NULL;
+	}
+	return;
 }
 
 static void

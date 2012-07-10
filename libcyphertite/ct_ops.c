@@ -27,6 +27,7 @@
 #include <ct_ctfile.h>
 #include <ct_match.h>
 #include <cyphertite.h>
+#include <ct_internal.h>
 
 const uint8_t	 zerosha[SHA_DIGEST_LENGTH];
 
@@ -292,6 +293,10 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 	int			ret;
 	struct ct_trans		*trans;
 	char			shat[SHA_DIGEST_STRING_LENGTH];
+
+	/* if we were woken up due to fatal, just clean up local state */
+	if (state->ct_dying != 0)
+		goto dying;
 
 	CNDBG(CT_LOG_TRANS, "entry");
 	switch (ct_get_file_state(state)) {
@@ -574,6 +579,26 @@ we_re_done_here:
 			break;
 		}
 	}
+
+	return;
+
+dying:
+	/* only if we hadn't sent the final transaction yet */
+	if (ex_priv != NULL) {
+		ct_extract_cleanup_queue(&ex_priv->extract_head);
+		if (ex_priv->inc_match)
+			ct_match_unwind(ex_priv->inc_match);
+		if (ex_priv->ex_match)
+			ct_match_unwind(ex_priv->ex_match);
+		if (ex_priv->rb_match)
+			ct_match_unwind(ex_priv->rb_match);
+		/* XXX what about ex_priv->xdr_ctx ? */
+		e_free(&ex_priv);
+		/* if ex_priv is gone then the trans will clean this up */
+		if (state->extract_state)
+			ct_file_extract_cleanup(state->extract_state);	
+	}
+	return;
 }
 
 struct ct_file_extract_priv {
@@ -593,6 +618,9 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 	struct ct_trans			*trans;
 	int				 ret;
 	char				 shat[SHA_DIGEST_STRING_LENGTH];
+
+	if (state->ct_dying != 0)
+		goto dying;
 
 	CNDBG(CT_LOG_TRANS, "entry");
 	switch (ct_get_file_state(state)) {
@@ -635,6 +663,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			CNDBG(CT_LOG_CTFILE, "Hit end of ctfile");
 			ctfile_parse_close(&ex_priv->xdr_ctx);
 			e_free(&ex_priv);
+			op->op_priv = NULL;
 			trans->tr_state = TR_S_DONE;
 			trans->tr_complete = ct_extract_complete_done;
 			trans->tr_cleanup = ct_extract_cleanup_done;
@@ -737,6 +766,17 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 		}
 		ct_queue_first(state, trans);
 	}
+	return;
+
+dying:
+	if (ex_priv) {
+		ctfile_parse_close(&ex_priv->xdr_ctx);
+		e_free(&ex_priv);
+		/* will be cleaned up by trans if ex_priv already gone */
+		if (state->extract_state)
+			ct_file_extract_cleanup(state->extract_state);	
+	}
+	return;
 }
 
 void

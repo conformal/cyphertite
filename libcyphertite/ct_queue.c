@@ -41,6 +41,8 @@ void ct_handle_write_reply(struct ct_global_state *, struct ct_trans *,
 void ct_handle_read_reply(struct ct_global_state *, struct ct_trans *,
     struct ct_header *, void *);
 
+static struct ct_trans *ct_trans_alloc_local(struct ct_global_state *);
+
 /* RedBlack completion queue, also used for wait queue. */
 
 int ct_cmp_trans(struct ct_trans *c1, struct ct_trans *c2);
@@ -371,8 +373,82 @@ ct_lookup_inflight(struct ct_global_state *state, uint32_t tag)
 void
 ct_queue_first(struct ct_global_state *state, struct ct_trans *trans)
 {
+	/* XXX locking ? */
+	if (state->ct_dying && trans->tr_state != TR_S_CYANIDE_CAPSULE)
+		CABORTX("bad juju");
 	trans->tr_trans_id = state->ct_trans_id++;
 	ct_queue_transfer(state, trans);
+}
+
+void
+ct_cyanide_cleanup(struct ct_global_state *state, struct ct_trans *trans)
+{
+	/*
+	 * all other transactions have been cleaned up now. we can kill the
+	 * event loop
+	 */
+	/*
+	 * clear out pending operations, all are gone now
+	 * XXX leak of data from operation arguments if nothing happened to
+	 * free then?
+	 */
+	ct_clear_operation(state);
+
+	ct_shutdown(state);
+}
+
+struct ct_trans *
+ct_fatal_alloc_trans(struct ct_global_state *state)
+{
+	return (ct_trans_alloc_local(state));
+}
+
+void
+ct_fatal(struct ct_global_state *state, const char *msg, int ct_errno) 
+{
+	struct ct_trans		*trans;
+	/* XXX lock */
+	/* don't fatal twice! */
+	if (state->ct_dying)
+		return;
+	state->ct_dying = 1;
+
+	trans = state->ct_fatal_trans;
+	state->ct_fatal_trans = NULL;
+	if (trans == NULL)
+		CABORTX("no cyanide capsule, jumping off bridge");
+	/* XXX unlock */
+
+	/*
+	 * Wake up all threads. all threads should free all local data after
+	 * waking up to see  ct_dying set.
+	 */
+	ct_set_file_state(state, CT_S_FINISHED);
+	state->ct_errno = ct_errno;
+	if (msg) {
+		strlcpy(state->ct_errmsg, msg, sizeof(state->ct_errmsg));
+	} else {
+		state->ct_errmsg[0] = '\0';
+	}
+	
+	trans->tr_state = TR_S_CYANIDE_CAPSULE;
+	trans->tr_complete = NULL;
+	trans->tr_cleanup = ct_cyanide_cleanup;
+
+	CWARNX("ct_fatal called with %s", ct_strerror(ct_errno));
+	ct_queue_first(state, trans);
+
+	/*
+	 * Wake up everything so that they hustle their transactions along
+	 * then free any thread-local data they had.
+	 */
+	ct_wakeup_file(state->event_state);
+	ct_wakeup_sha(state->event_state);
+	ct_wakeup_compress(state->event_state);
+	ct_wakeup_encrypt(state->event_state);
+	ct_wakeup_csha(state->event_state);
+	ct_wakeup_write(state->event_state);
+	ct_wakeup_complete(state->event_state);
 }
 
 /*
@@ -383,6 +459,12 @@ ct_queue_transfer(struct ct_global_state *state, struct ct_trans *trans)
 {
 	CNDBG(CT_LOG_TRANS, "queuing transaction %" PRIu64 " %d",
 	    trans->tr_trans_id, trans->tr_state);
+
+	/* If we are dying, everyone gets to complete right now */
+	if (state->ct_dying && trans->tr_state != TR_S_CYANIDE_CAPSULE) {
+		ct_queue_complete(state, trans);
+	}
+
 	switch (trans->tr_state) {
 	case TR_S_READ:
 	case TR_S_WRITTEN: /* written goes back to this queue for local db */
@@ -453,6 +535,7 @@ skip_csha:
 	case TR_S_XML_CLOSE:
 	case TR_S_XML_CLOSED:
 	case TR_S_XML_CULL_REPLIED:
+	case TR_S_CYANIDE_CAPSULE:
 		ct_queue_complete(state, trans);
 		break;
 	case TR_S_XML_OPEN:
@@ -1040,7 +1123,8 @@ ct_process_completions(void *vctx)
 		CNDBG(CT_LOG_TRANS,
 		    "completing trans %" PRIu64 " pkt id: %" PRIu64"",
 		    trans->tr_trans_id, state->ct_packet_id);
-		if (trans->tr_complete(state, trans) != 0) {
+		if (state->ct_dying == 0 &&
+		    trans->tr_complete(state, trans) != 0) {
 			/* do we have more operations queued up? */
 			if (ct_op_complete(state) != 0)
 				ct_shutdown(state);

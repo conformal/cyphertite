@@ -121,6 +121,9 @@ ctfile_archive(struct ct_global_state *state, struct ct_op *op)
 	ssize_t				 rsz, rlen;
 	int				 error;
 
+	if (state->ct_dying)
+		goto dying;
+
 	switch (ct_get_file_state(state)) {
 	case CT_S_STARTING:
 		cas = e_calloc(1, sizeof(*cas));
@@ -288,6 +291,18 @@ loop:
 
 
 	goto loop;
+
+dying:
+	/* Clean up */
+	if (cas != NULL) {
+		if (cas->cas_fnode != NULL)
+			e_free(&cas->cas_fnode);
+		if (cas->cas_handle != NULL)
+			fclose(cas->cas_handle);
+		e_free(&cas);
+		op->op_priv = NULL;
+	}
+	return;
 }
 
 void
@@ -415,6 +430,9 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 	struct ct_header		*hdr;
 	int				 ret;
 
+	if (state->ct_dying != 0)
+		goto dying;
+
 	switch (ct_get_file_state(state)) {
 	case CT_S_STARTING:
 		ces = e_calloc(1, sizeof(*ces));
@@ -489,6 +507,24 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 		CFATALX("ctfile iv for %d: %s",
 		    trans->tr_ctfile_chunkno, ct_strerror(ret));
 	ct_queue_first(state, trans);
+
+	return;
+
+dying:
+	if (ces != NULL) {
+		/*
+		 * XXX can't free fnode,don't know if we're done with it
+		 * or not...
+		 */
+		e_free(&ces);
+		op->op_priv = NULL;
+		if (state->extract_state != NULL) {
+			ct_file_extract_cleanup(state->extract_state);
+			state->extract_state = NULL;
+		}
+	}
+	/* XXX can't free rname if we originally allocated it... */
+	return;
 }
 
 int
@@ -554,6 +590,8 @@ ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 	struct ct_trans			*trans;
 	int				 ret;
 
+	if (ct_get_file_state(state) == CT_S_FINISHED)
+		return;
 	ct_set_file_state(state, CT_S_FINISHED);
 
 	trans = ct_trans_alloc(state);
@@ -610,6 +648,9 @@ ctfile_delete(struct ct_global_state *state, struct ct_op *op)
 	const char			*rname = op->op_args;
 	struct ct_trans			*trans;
 	int				 ret;
+
+	if (ct_get_file_state(state) == CT_S_FINISHED)
+		return;
 
 	trans = ct_trans_alloc(state);
 	trans->tr_state = TR_S_XML_DELETE;
@@ -937,6 +978,12 @@ ct_cull_setup(struct ct_global_state *state, struct ct_op *op)
 	struct ct_trans			*trans;
 	int				 ret;
 
+	if (ct_get_file_state(state) == CT_S_FINISHED)
+		return;
+
+	if (state->ct_dying != 0)
+		goto dying;
+
 	arc4random_buf(&cull_uuid, sizeof(cull_uuid));
 
 	CNDBG(CT_LOG_TRANS, "cull_setup");
@@ -962,18 +1009,25 @@ ct_cull_setup(struct ct_global_state *state, struct ct_op *op)
 	ct_queue_first(state, trans);
 
 	ct_set_file_state(state, CT_S_FINISHED);
+
+	return;
+
+dying:
+	/* nothing to do here */
+	return;
 }
 
-int sent_complete;
 void
 ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_trans			*trans;
 	int				 ret;
 
-	if (sent_complete) {
+	if (ct_get_file_state(state) == CT_S_FINISHED)
 		return;
-	}
+
+	if (state->ct_dying != 0)
+		goto dying;
 
 	CNDBG(CT_LOG_TRANS, "send cull_complete");
 	trans = ct_trans_alloc(state);
@@ -982,7 +1036,6 @@ ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
-	sent_complete = 1;
 
 	if ((ret = ct_create_xml_cull_complete(&trans->hdr,
 	    (void **)&trans->tr_data[2], cull_uuid, CT_CULL_PROCESS)) != 0)
@@ -996,6 +1049,11 @@ ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 	ct_set_file_state(state, CT_S_FINISHED);
 
 	ct_queue_first(state, trans);
+	return;
+
+dying:
+	/* nothing to clean up here */
+	return;
 }
 
 
@@ -1005,11 +1063,13 @@ ct_cull_send_shas(struct ct_global_state *state, struct ct_op *op)
 	struct ct_trans			*trans;
 	int				 sha_add, ret;
 
-	CNDBG(CT_LOG_TRANS, "cull_send_shas");
-	if (shacnt == 0 || RB_EMPTY(&ct_sha_rb_head)) {
-		ct_set_file_state(state, CT_S_FINISHED);
+	if (ct_get_file_state(state) == CT_S_FINISHED)
 		return;
-	}
+
+	if (state->ct_dying != 0)
+		goto dying;
+
+	CNDBG(CT_LOG_TRANS, "cull_send_shas");
 	ct_set_file_state(state, CT_S_RUNNING);
 
 	trans = ct_trans_alloc(state);
@@ -1041,6 +1101,12 @@ ct_cull_send_shas(struct ct_global_state *state, struct ct_op *op)
 		CNDBG(CT_LOG_SHA, "shacnt %" PRIu64, shacnt);
 	}
 	ct_queue_first(state, trans);
+
+	return;
+
+dying:
+	/* XXX free all remaining shas */
+	return;
 }
 
 /*
@@ -1108,6 +1174,12 @@ ct_cull_collect_ctfiles(struct ct_global_state *state, struct ct_op *op)
 	char			buf[TIMEDATA_LEN];
 	time_t			now;
 	int			keep_files = 0;
+
+	if (ct_get_file_state(state) == CT_S_FINISHED)
+		return;
+
+	if (state->ct_dying != 0)
+		goto dying;
 
 	if (state->ct_config->ct_ctfile_keep_days == 0)
 		CFATALX("cull: ctfile_cull_keep_days must be specified in "
@@ -1184,6 +1256,12 @@ prev_ct_file:
 		/* XXX - name  */
 	}
 	ct_op_complete(state);
+
+	return;
+
+dying:
+	/* XXX cleanup the cull tree */
+	return;
 }
 
 void

@@ -37,6 +37,7 @@
 #include <ct_match.h>
 #include <ct_ctfile.h>
 #include <cyphertite.h>
+#include <ct_internal.h>
 
 ct_op_cb	ctfile_find_for_extract;
 ct_op_cb	ctfile_find_for_extract_complete;
@@ -176,6 +177,11 @@ ctfile_find_for_extract(struct ct_global_state *state, struct ct_op *op)
 	const char			*ctfile = ccfa->ccfa_tag;
 	struct ct_op			*list_fakeop;
 	struct ct_ctfile_list_args	*ccla;
+
+	if (state->ct_dying != 0) {
+		/* nothing to clean up */
+		return;
+	}
 
 	/* cook the ctfile so we only search for the actual tag */
 	if ((ctfile = ctfile_cook_name(ctfile)) == NULL)

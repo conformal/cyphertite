@@ -323,6 +323,7 @@ ct_init_eventloop(struct ct_global_state *state,
 	if ((ret = ct_setup_wakeup_complete(state->event_state, state,
 	    ct_process_completions)) != 0)
 		goto fail;
+	state->ct_fatal_trans = ct_fatal_alloc_trans(state);
 	return (0);
 
 fail:
@@ -337,6 +338,10 @@ fail:
 void
 ct_cleanup_eventloop(struct ct_global_state *state)
 {
+	if (state->ct_fatal_trans != NULL) {
+		ct_trans_free(state, state->ct_fatal_trans);
+		state->ct_fatal_trans = NULL;
+	}
 	ct_trans_cleanup(state);
 	ct_ssl_cleanup(state);
 	ctdb_shutdown(state->ct_db_state);
@@ -412,6 +417,26 @@ ct_do_operation(struct ct_config *conf,  ct_op_cb *start, ct_op_cb *complete,
 	ct_cleanup(state);
 
 	return (ret);
+}
+
+/*
+ * Clean up after all operations in a chain because we are about to pull
+ * the event loop out from under them.
+ */
+void
+ct_clear_operation(struct ct_global_state *state)
+{
+	struct ct_op *op;
+
+	while ((op = TAILQ_FIRST(&state->ct_operations)) != NULL) {
+		TAILQ_REMOVE(&state->ct_operations, op, op_link);
+		/*
+		 * XXX op_complete with a ``this is fatal flag? to cleanup
+		 * the arguments?
+		 */
+		e_free(&op);
+	}
+
 }
 
 void

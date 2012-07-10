@@ -200,6 +200,12 @@ struct ct_global_state {
 
 	/* User data (opaque). */
 	void				*ct_userptr;
+
+	int				 ct_dying;
+	struct ct_trans			*ct_fatal_trans;
+	int				 ct_errno;
+	/* XXX reasonable size? */
+	char				 ct_errmsg[1024];
 };
 
 int		 ct_setup_state(struct ct_global_state **, struct ct_config *);
@@ -356,6 +362,7 @@ struct ct_trans {
 #define TR_S_XML_CULL_SHA_SEND	(29)
 #define TR_S_XML_CULL_COMPLETE_SEND	(30)
 #define TR_S_XML_CULL_REPLIED	(31)
+#define TR_S_CYANIDE_CAPSULE	(32)	/* event loop dying */
 
 	char			tr_dataslot;
 	char			tr_eof;
@@ -468,6 +475,7 @@ struct ct_op	*ct_add_operation_after(struct ct_global_state *,
 		     struct ct_op *, ct_op_cb *, ct_op_cb *, void *);
 int		 ct_do_operation(struct ct_config *, ct_op_cb *, ct_op_cb *,
 		     void *, int);
+void		 ct_clear_operation(struct ct_global_state *);
 void		 ct_nextop(void *);
 int		 ct_op_complete(struct ct_global_state *state);
 ct_op_cb	 ct_archive;
