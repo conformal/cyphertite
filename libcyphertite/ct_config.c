@@ -249,16 +249,17 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 	xmlsd_unwind(&xel);
 }
 
-struct ct_config *
-ct_load_config(char **configfile)
+int
+ct_load_config(struct ct_config **config, char **configfile)
 {
-	struct ct_config	 conf, *config;
+	struct ct_config	 conf;
 	char			*ct_compression_type = NULL;
 	char			*ct_polltype = NULL;
 	char			*ctfile_mode_str = NULL;
 	char			*config_path = NULL;
 	char			 ct_fullcachedir[PATH_MAX];
 	int			 config_try = 0;
+	int			 s_errno;
 	struct ct_settings	 settings[] = {
 		{ "queue_depth", CT_S_INT, &conf.ct_max_trans, NULL, NULL,
 		    NULL },
@@ -324,8 +325,7 @@ ct_load_config(char **configfile)
 	ct_default_config(&conf);
 	if (*configfile != NULL) {
 		if (ct_config_parse(settings, *configfile))
-			CFATALX("Unable to open specified config file %s",
-			   *configfile);
+			return (CTE_UNABLE_TO_OPEN_CONFIG);
 	} else {
 
 		for (;;) {
@@ -343,7 +343,7 @@ ct_load_config(char **configfile)
 				config_path = ct_system_config();
 				break;
 			default:
-				return (NULL);
+				return (CTE_CONFIG_NOT_FOUND);
 				break;
 			}
 			if (ct_config_parse(settings, config_path) == 0) {
@@ -354,21 +354,29 @@ ct_load_config(char **configfile)
 		}
 	}
 
-	if (conf.ct_cert == NULL)
-		CFATALX("cert: %s", ct_strerror(CTE_MISSING_CONFIG_VALUE));
-	if (conf.ct_ca_cert == NULL)
-		CFATALX("ca_cert: %s", ct_strerror(CTE_MISSING_CONFIG_VALUE));
-	if (conf.ct_key == NULL)
-		CFATALX("key: %s", ct_strerror(CTE_MISSING_CONFIG_VALUE));
+	if (conf.ct_cert == NULL) {
+		CWARNX("cert: %s", ct_strerror(CTE_MISSING_CONFIG_VALUE));
+		return (CTE_MISSING_CONFIG_VALUE);
+	}
+	if (conf.ct_ca_cert == NULL) {
+		CWARNX("ca_cert: %s", ct_strerror(CTE_MISSING_CONFIG_VALUE));
+		return (CTE_MISSING_CONFIG_VALUE);
+	}
+	if (conf.ct_key == NULL) {
+		CWARNX("key: %s", ct_strerror(CTE_MISSING_CONFIG_VALUE));
+		return (CTE_MISSING_CONFIG_VALUE);
+	}
 
 	if (ctfile_mode_str != NULL) {
 		if (strcmp(ctfile_mode_str, "remote") == 0)
 			conf.ct_ctfile_mode = CT_MDMODE_REMOTE;
 		else if (strcmp(ctfile_mode_str, "local") == 0)
 			conf.ct_ctfile_mode = CT_MDMODE_LOCAL;
-		else
-			CFATALX("ctfile_mode: %s",
+		else {
+			CWARNX("ctfile_mode: %s",
 			    ct_strerror(CTE_INVALID_CONFIG_VALUE));
+			return (CTE_INVALID_CONFIG_VALUE);
+		}
 	}
 
 	/* Fix up cachedir: code requires it to end with a slash. */
@@ -379,27 +387,37 @@ ct_load_config(char **configfile)
 
 		if ((rv = snprintf(ct_fullcachedir, sizeof(ct_fullcachedir),
 		    "%s%c", conf.ct_ctfile_cachedir, CT_PATHSEP)) == -1 ||
-		    rv > PATH_MAX)
-			CFATALX("ctfile_cachedir: %s",
+		    rv > PATH_MAX) {
+			CWARNX("ctfile_cachedir: %s",
 			    ct_strerror(CTE_INVALID_CONFIG_VALUE));
+			return (CTE_INVALID_CONFIG_VALUE);
+		}
 		free(conf.ct_ctfile_cachedir);
 		conf.ct_ctfile_cachedir = strdup(ct_fullcachedir);
 		/* XXX Wtf is this? */
-		if (ct_fullcachedir == NULL)
-			CFATALX("can't allocate memory for cachedir");
+		if (ct_fullcachedir == NULL) {
+			errno = ENOMEM;
+			return (CTE_ERRNO);
+		}
 
 	}
 
 	if (conf.ct_ctfile_mode == CT_MDMODE_REMOTE &&
-	    conf.ct_ctfile_cachedir == NULL)
-		CFATALX("ctfile_cachedir: %s",
+	    conf.ct_ctfile_cachedir == NULL) {
+		CWARNX("ctfile_cachedir: %s",
 		    ct_strerror(CTE_MISSING_CONFIG_VALUE));
+		return (CTE_MISSING_CONFIG_VALUE);
+	}
 
 	/* And make sure it exists. */
 	if (conf.ct_ctfile_cachedir != NULL &&
-	    ct_make_full_path(conf.ct_ctfile_cachedir, 0700) != 0)
-		CFATALX("%s: %s", conf.ct_ctfile_cachedir,
+	    ct_make_full_path(conf.ct_ctfile_cachedir, 0700) != 0) {
+		s_errno = errno;
+		CWARNX("%s: %s", conf.ct_ctfile_cachedir,
 		    ct_strerror(CTE_ERRNO));
+		errno = s_errno;
+		return (CTE_ERRNO);
+	}
 
 	/* Apply compression from config. */
 	if (ct_compression_type == NULL) {
@@ -411,8 +429,9 @@ ct_load_config(char **configfile)
 	} else if (strcmp("lzw", ct_compression_type) == 0) {
 		conf.ct_compress = C_HDR_F_COMP_LZW;
 	} else {
-		CFATAL("session_compression: %s",
+		CWARNX("session_compression: %s",
 		    ct_strerror(CTE_MISSING_CONFIG_VALUE));
+		return (CTE_MISSING_CONFIG_VALUE);
 	}
 
 	/*
@@ -425,12 +444,12 @@ ct_load_config(char **configfile)
 	/* set polltype used by libevent */
 	ct_polltype_setup(ct_polltype);
 
-	config = e_calloc(1, sizeof(*config));
+	*config = e_calloc(1, sizeof(**config));
 
-	memcpy(config, &conf, sizeof(*config));
-	config->ct_config_file = e_strdup(*configfile);
+	memcpy(*config, &conf, sizeof(**config));
+	(*config)->ct_config_file = e_strdup(*configfile);
 
-	return (config);
+	return (0);
 }
 
 void

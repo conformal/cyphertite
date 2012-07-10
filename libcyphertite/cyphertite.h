@@ -60,7 +60,7 @@ struct ct_config {
 	int	ct_io_bw_limit;
 };
 
-struct ct_config	*ct_load_config(char **);
+int			 ct_load_config(struct ct_config **, char **);
 void			 ct_unload_config(char *, struct ct_config *);
 char *ct_system_config(void);
 char *ct_user_config(void);

@@ -379,10 +379,8 @@ ct_main(int argc, char **argv)
 	}
 
 
-	if ((conf = ct_load_config(&config_file)) == NULL) {
-		CFATALX("config file not found.  Use the -F option to "
-		    "specify its path or run \"cyphertitectl config generate\" "
-		    "to generate one.");
+	if ((ret = ct_load_config(&conf, &config_file)) != 0) {
+		CFATALX("%s", ct_strerror(ret));
 	}
 
 	/* ct -A or ct -a force allfiles on and off and cancel each other */

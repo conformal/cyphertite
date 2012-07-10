@@ -325,9 +325,8 @@ ctfb_main(int argc, char *argv[])
 		config_file = e_strdup(configfile);
 
 	/* load config */
-	if ((conf = ct_load_config(&config_file)) == NULL)
-		CFATALX("config file not found.  Use the -F option to "
-		    "specify its path.");
+	if ((ret = ct_load_config(&conf, &config_file)) != 0)
+		CFATALX("%s", ct_strerror(ret));
 
 	ct_prompt_for_login_password(conf);
 

@@ -119,6 +119,11 @@ const char *ct_errmsgs[] = {
 	[CTE_INVALID_CTFILE_NAME] = "Invalid ctfile name",
 	[CTE_FILELIST_MISMATCH]	 = "List of files provided does not match that in previous backup",
 	[CTE_CWD_MISMATCH]	 = "Current working directory differs from previous backup and not all paths are absolute",
+	[CTE_CULL_EVERYTHING]	 = "All ctfiles are old and would be deleted, aborting.",
+	[CTE_CONFIG_NOT_FOUND] = "config file not found.  Use the -F option to "
+	    "specify its path or run \"cyphertitectl config generate\" to "
+	    "generate one.",
+	[CTE_UNABLE_TO_OPEN_CONFIG] = "Unable to open specified configuration file",
 };
 
 const char *

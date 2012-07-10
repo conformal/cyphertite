@@ -221,6 +221,7 @@ ctctl_main(int argc, char *argv[])
 	char			*debugstring = NULL;
 	uint64_t		debug_mask = 0;
 	uint32_t		cflags = CLOG_F_ENABLE | CLOG_F_STDERR;
+	int			ret;
 
 	while ((c = getopt(argc, argv, "D:F:")) != -1) {
 		switch (c) {
@@ -264,10 +265,9 @@ ctctl_main(int argc, char *argv[])
 	/* load config XXX ick... unless we're generating one. */
 	if (!(argc == 2 && strcmp(argv[0], "config") == 0 && strcmp(argv[1],
 	    "generate") == 0) &&
-	    (ctctl_config = ct_load_config(&ctctl_configfile)) == NULL)
-		CFATALX("config file not found.  Use the -F option to "
-		    "specify its path or run \"%s config generate\" to create "
-		    "one.", __progname);
+	    (ret = ct_load_config(&ctctl_config, &ctctl_configfile)) != 0) {
+		CFATALX("%s", ct_strerror(ret));
+	}
 
 	if ((cc = ct_cli_validate(cmd_list, &argc, &argv)) == NULL)
 		ct_cli_usage(cmd_list, NULL);

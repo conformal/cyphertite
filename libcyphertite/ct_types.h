@@ -162,7 +162,10 @@ struct ctfile_list_file {
 #define CTE_INVALID_CTFILE_NAME		50
 #define CTE_FILELIST_MISMATCH		51
 #define CTE_CWD_MISMATCH		52
-#define CTE_MAX				53
+#define CTE_CULL_EVERYTHING		53
+#define CTE_CONFIG_NOT_FOUND		54
+#define CTE_UNABLE_TO_OPEN_CONFIG	55
+#define CTE_MAX				56
 
 const char	*ct_strerror(int);
 

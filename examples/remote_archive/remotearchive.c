@@ -126,9 +126,8 @@ main(int argc, char **argv)
 	for(i = 0; i < filecount; i++)
 		flist[i] = e_strdup(argv[i+2]);
 
-	if ((conf = ct_load_config(&config_file)) == NULL) {
-		CFATALX("config file not found. Run \"cyphertitectl config "
-		    "generate\" to generate one.");
+	if ((ret = ct_load_config(&conf, &config_file)) != 0) {
+		CFATALX("Can't load config file: %s", ct_strerror(ret));
 	}
 
 	ct_prompt_for_login_password(conf);

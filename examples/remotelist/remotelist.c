@@ -119,10 +119,8 @@ main(int argc, char **argv)
 
 	ct_setup(CT_INIT_ASSL|CT_INIT_CLOG|CT_INIT_EXUDE, cflags, debug_mask);
 
-	if ((conf = ct_load_config(&config_file)) == NULL) {
-		CFATALX("config file not found.  Use the -F option to "
-		    "specify its path or run \"cyphertitectl config generate\" "
-		    "to generate one.");
+	if ((rslt = ct_load_config(&conf, &config_file)) != 0) {
+		CFATALX("Can not load config file: %s", ct_strerror(rslt));
 	}
 
 	ct_prompt_for_login_password(conf);
