@@ -1791,7 +1791,7 @@ link_out:
 				safe_mode = ~0;
 		}
 
-		if (ct_chown(ces, fnode, fnode->fl_mode & safe_mode) != 0) {
+		if (ct_chmod(ces, fnode, fnode->fl_mode & safe_mode) != 0) {
 			CWARN("chmod failed on %s", fnode->fl_sname);
 		} else if (ces->ces_attr) {
 			if (ct_utimes(ces, fnode) != 0)
