@@ -580,7 +580,7 @@ ct_compare_secrets(struct ct_global_state *state, struct ct_op *op)
 	char				 buf[1024], tbuf[1024];
 	size_t				 rsz;
 	off_t				 sz;
-	int				 ret = 0, s_errno;
+	int				 ret = 0, s_errno = 0;
 
 	/* cachedir is '/' terminated */
 	strlcpy(temp_path, cca->cca_tdir, sizeof(temp_path));
