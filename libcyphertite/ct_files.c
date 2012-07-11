@@ -66,7 +66,7 @@ RB_HEAD(fl_tree, flist);
 TAILQ_HEAD(flist_head, flist);
 
 /* tree for hardlink calculations */
-int		 	 fl_inode_sort(struct flist *, struct flist *);
+int			 fl_inode_sort(struct flist *, struct flist *);
 RB_PROTOTYPE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 RB_GENERATE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 
@@ -420,7 +420,7 @@ ct_archive_init(struct ct_archive_state **casp, const char *tdir)
 #ifndef CT_NO_OPENAT
 	if ((cas->cas_rootdir.d_fd = open(tdir ? tdir : ".",
 	    O_RDONLY | O_DIRECTORY)) == -1) {
-		int  s_errno = errno;
+		int s_errno = errno;
 
 		e_free(&cas->cas_rootdir.d_name);
 		e_free(&cas);
@@ -438,6 +438,7 @@ ct_archive_get_rootdir(struct ct_archive_state *cas)
 {
 	return (&cas->cas_rootdir);
 }
+
 struct dnode *
 ct_archive_lookup_dir(struct ct_archive_state *cas, const char *name)
 {
@@ -452,7 +453,6 @@ ct_archive_insert_dir(struct ct_archive_state *cas, struct dnode *dir)
 {
 	return (RB_INSERT(d_name_tree, &cas->cas_dname_head, dir));
 }
-
 
 void
 ct_archive_cleanup(struct ct_archive_state *cas)
@@ -513,7 +513,7 @@ ct_sched_backup_file(struct ct_archive_state *cas, struct stat *sb,
 			return;
 		} else
 			CNDBG(CT_LOG_CTFILE, "inserted %s", filename);
-		/* The rest of the intialisation happens below */
+		/* The rest of the initialisation happens below */
 	}
 
 	//ct_numalloc++;
@@ -1001,7 +1001,7 @@ loop:
 	ct_trans->hdr.c_flags = caa->caa_encrypted ? C_HDR_F_ENCRYPTED : 0;
 	/* update offset */
 	if (rsz != rlen || rlen == 0 || ((cap->cap_curnode->fl_offset + rlen) ==
-	        cap->cap_curnode->fl_size)) {
+	    cap->cap_curnode->fl_size)) {
 		/* short read, file truncated, or end of file */
 		/* restat file for modifications */
 		error = fstat(cap->cap_fd, &sb);
@@ -1109,7 +1109,6 @@ dying:
 		ct_archive_cleanup(state->archive_state);
 		state->archive_state = NULL;
 	}
-	return;
 }
 
 static int
@@ -1441,7 +1440,7 @@ try_again:
 		    mkdir(tdir, 0777) == 0)
 			goto try_again;
 		s_errno = errno;
-		
+
 		e_free(&ces->ces_rootdir);
 		e_free(&ces);
 		errno = s_errno;
@@ -1498,7 +1497,6 @@ ct_file_extract_cleanup(struct ct_extract_state *ces)
 	e_free(&ces->ces_rootdir);
 	e_free(&ces);
 }
-
 
 #ifndef CT_NO_OPENAT
 #define TEMPCHARS	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
