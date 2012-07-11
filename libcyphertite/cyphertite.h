@@ -508,7 +508,7 @@ int		 ct_have_remote_secrets_file(struct ct_config *);
  * For remote mode, adds the operations obtain the provided ctfile from the
  * server then calls the callback to add your dependant op.
  */
-typedef void	(ctfile_find_callback)(struct ct_global_state *,
+typedef int	(ctfile_find_callback)(struct ct_global_state *,
 		    char *, void *);
 void		 ctfile_find_for_operation(struct ct_global_state *, char *,
 		    ctfile_find_callback *, void *, int, int);

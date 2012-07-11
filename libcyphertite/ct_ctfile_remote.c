@@ -357,7 +357,8 @@ ctfile_extract_nextop(struct ct_global_state *state, struct ct_op *op)
 	} else {
 		cachename = NULL;
 	}
-	ccffa->ccffa_nextop(state, cachename, ccffa->ccffa_nextop_args);
+	ret = ccffa->ccffa_nextop(state, cachename, ccffa->ccffa_nextop_args);
+	
 out:
 	if (ccffa->ccffa_base.cca_localname)
 		e_free(&ccffa->ccffa_base.cca_localname);
@@ -433,13 +434,15 @@ out:
 	return (ret);
 }
 
-void
+int
 ctfile_nextop_extract(struct ct_global_state *state, char *ctfile, void *args)
 {
 	struct ct_extract_args	*cea = args;
 
 	cea->cea_local_ctfile = ctfile;
 	ct_add_operation(state, ct_extract, ctfile_nextop_extract_cleanup, cea);
+
+	return (0);
 }
 
 int
@@ -453,7 +456,7 @@ ctfile_nextop_extract_cleanup(struct ct_global_state *state, struct ct_op *op)
 	return (0);
 }
 
-void
+int
 ctfile_nextop_archive(struct ct_global_state *state, char *basis, void *args)
 {
 	struct ct_archive_args	*caa = args;
@@ -469,12 +472,17 @@ ctfile_nextop_archive(struct ct_global_state *state, char *basis, void *args)
 	 * We now have the basis found for us, cook and prepare the tag
 	 * we wish to create then add the operation.
 	 */
-	if ((ctfile = ctfile_cook_name(caa->caa_tag)) == NULL)
-		CFATALX("%s: %s", caa->caa_tag,
+	if ((ctfile = ctfile_cook_name(caa->caa_tag)) == NULL) {
+		CWARNX("%s: %s", caa->caa_tag,
 		    ct_strerror(CTE_INVALID_CTFILE_NAME));
+		return (CTE_INVALID_CTFILE_NAME);
+	}
 
-	if (ctfile_is_fullname(ctfile) != 0)
-		CFATALX("%s", ct_strerror(CTE_ARCHIVE_FULLNAME));
+	if (ctfile_is_fullname(ctfile) != 0) {
+		CWARNX("%s", ct_strerror(CTE_ARCHIVE_FULLNAME));
+		e_free(&ctfile);
+		return (CTE_ARCHIVE_FULLNAME);
+	}
 
 	now = time(NULL);
 	if (strftime(buf, TIMEDATA_LEN, "%Y%m%d-%H%M%S",
@@ -486,9 +494,14 @@ ctfile_nextop_archive(struct ct_global_state *state, char *basis, void *args)
 	/* check it isn't already in the cache */
 	cachename = ctfile_get_cachename(fullname,
 	    state->ct_config->ct_ctfile_cachedir);
-	if (ctfile_in_cache(fullname, state->ct_config->ct_ctfile_cachedir))
-		CFATALX("%s: %s", fullname,
+	if (ctfile_in_cache(fullname, state->ct_config->ct_ctfile_cachedir)) {
+		CWARNX("%s: %s", fullname,
 		    ct_strerror(CTE_BACKUP_ALREADY_EXISTS));
+		e_free(&ctfile);
+		e_free(&fullname);
+		e_free(&cachename);
+		return (CTE_BACKUP_ALREADY_EXISTS);
+	}
 
 	e_free(&ctfile);
 	e_free(&fullname);
@@ -505,6 +518,7 @@ ctfile_nextop_archive(struct ct_global_state *state, char *basis, void *args)
 	cca->cca_ctfile = 1;
 	ct_add_operation(state, ctfile_archive, ctfile_nextop_archive_cleanup,
 	    cca);
+	return (0);
 }
 
 int
@@ -521,13 +535,15 @@ ctfile_nextop_archive_cleanup(struct ct_global_state *state, struct ct_op *op)
 	return (0);
 }
 
-void
+int
 ctfile_nextop_justdl(struct ct_global_state *state, char *ctfile, void *args)
 {
 	char		**filename = args;
 
 	*filename = ctfile;
+
 	/* done here, no more ops */
+	return (0);
 }
 
 ct_op_complete_cb	ct_compare_secrets;
@@ -601,7 +617,7 @@ ct_compare_secrets(struct ct_global_state *state, struct ct_op *op)
 	if ((tf = fopen(temp_path, "rb")) == NULL) {
 		s_errno = errno;
 		ret = CTE_ERRNO;
-		CFATAL("temp_path: %s", ct_strerror(ret));
+		CWARNX("temp_path: %s", ct_strerror(ret));
 		goto close_current;
 	}
 	/* read then throw away */
