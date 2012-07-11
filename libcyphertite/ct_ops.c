@@ -808,7 +808,7 @@ dying:
 	return;
 }
 
-void
+int
 ct_extract_file_cleanup(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_extract_file_args	*cefa = op->op_args;
@@ -816,5 +816,7 @@ ct_extract_file_cleanup(struct ct_global_state *state, struct ct_op *op)
 	e_free(&cefa->cefa_filename);
 	e_free(&cefa->cefa_ctfile);
 	e_free(&cefa);
+
+	return (0);
 }
 

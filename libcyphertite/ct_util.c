@@ -390,7 +390,7 @@ ct_cleanup(struct ct_global_state *state)
 
 struct ct_op *
 ct_add_operation(struct ct_global_state *state, ct_op_cb *start,
-    ct_op_cb *complete, void *args)
+    ct_op_complete_cb *complete, void *args)
 {
 	struct ct_op	*op;
 
@@ -406,7 +406,7 @@ ct_add_operation(struct ct_global_state *state, ct_op_cb *start,
 
 struct ct_op *
 ct_add_operation_after(struct ct_global_state *state, struct ct_op *after,
-    ct_op_cb *start, ct_op_cb *complete, void *args)
+    ct_op_cb *start, ct_op_complete_cb *complete, void *args)
 {
 	struct ct_op	*op;
 
@@ -422,8 +422,8 @@ ct_add_operation_after(struct ct_global_state *state, struct ct_op *after,
 
 /* Do a complete ct operation from start to finish */
 int
-ct_do_operation(struct ct_config *conf,  ct_op_cb *start, ct_op_cb *complete,
-    void *args, int need_secrets)
+ct_do_operation(struct ct_config *conf,  ct_op_cb *start,
+    ct_op_complete_cb *complete, void *args, int need_secrets)
 {
 	struct ct_global_state	*state;
 	int		 	 ret;
@@ -477,14 +477,22 @@ ct_nextop(void *vctx)
 int
 ct_op_complete(struct ct_global_state *state)
 {
-	struct ct_op *op;
+	struct ct_op	*op;
+	int		 ret, s_errno;;
 
 	op = TAILQ_FIRST(&state->ct_operations);
 	if (op == NULL)
 		CABORTX("no operation in queue");
 
-	if (op->op_complete)
-		op->op_complete(state, op);
+	if (op->op_complete != NULL && (ret = op->op_complete(state, op)) != 0)
+	{
+		s_errno = errno;
+		state->ct_errno = ret;
+		ct_clear_operation(state);
+		errno = s_errno;
+
+		return (1);
+	}
 
 	TAILQ_REMOVE(&state->ct_operations, op, op_link);
 	e_free(&op);

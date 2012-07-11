@@ -66,7 +66,7 @@ printtime(time_t ftime)
 }
 
 
-void
+int
 ctfile_list_print(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfile_list_args	*ccla = op->op_args;
@@ -74,10 +74,13 @@ ctfile_list_print(struct ct_global_state *state, struct ct_op *op)
 	struct ctfile_list_file		*file;
 	int64_t				 maxsz = 8;
 	int				 numlen;
+	int				 ret = 0;
 
 	RB_INIT(&results);
-	ctfile_list_complete(&state->ctfile_list_files, ccla->ccla_matchmode,
-	    ccla->ccla_search, ccla->ccla_exclude, &results);
+	if ((ret = ctfile_list_complete(&state->ctfile_list_files,
+	    ccla->ccla_matchmode, ccla->ccla_search, ccla->ccla_exclude,
+	    &results)) != 0)
+		return (ret);
 	RB_FOREACH(file, ctfile_list_tree, &results) {
 		if (maxsz < (int64_t)file->mlf_size)
 			maxsz  = (int64_t)file->mlf_size;
@@ -93,6 +96,8 @@ ctfile_list_print(struct ct_global_state *state, struct ct_op *op)
 		printf("%s\n", file->mlf_name);
 		e_free(&file);
 	}
+
+	return (ret);
 }
 
 

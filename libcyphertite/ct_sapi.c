@@ -49,7 +49,7 @@
 int
 ct_do_remotelist(struct ct_global_state *state, char **search, char **exclude,
     int matchmode,
-    void (*printfn) (struct ct_global_state *state, struct ct_op *op))
+    int (*printfn) (struct ct_global_state *state, struct ct_op *op))
 {
 	struct ct_ctfile_list_args	ccla;
 	int				ret;

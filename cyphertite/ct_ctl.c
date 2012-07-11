@@ -316,8 +316,8 @@ cull(struct ct_cli_cmd *c, int argc, char **argv)
 }
 
 /* Make sure we don't overwrite the file without permission */
-ct_op_cb ct_check_secrets_upload;
-void
+ct_op_complete_cb ct_check_secrets_upload;
+int
 ct_check_secrets_upload(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfileop_args	*cca = op->op_args;
@@ -335,6 +335,7 @@ ct_check_secrets_upload(struct ct_global_state *state, struct ct_op *op)
 
 	ct_add_operation_after(state, op, ctfile_archive, NULL, cca);
 
+	return (0);
 }
 
 void

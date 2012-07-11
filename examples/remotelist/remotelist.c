@@ -54,7 +54,7 @@ ct_info_sig(evutil_socket_t fd, short event, void *vctx)
 	CINFO("signalled");
 }
 
-void
+int
 remotelist_print(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ctfile_list_file         *file;
@@ -72,6 +72,8 @@ remotelist_print(struct ct_global_state *state, struct ct_op *op)
 		printf("%s\n", file->mlf_name);
 		e_free(&file);
 	}
+
+	return (0);
 }
 
 

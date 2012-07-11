@@ -39,12 +39,12 @@
 #include <cyphertite.h>
 #include <ct_internal.h>
 
-ct_op_cb	ctfile_find_for_extract;
-ct_op_cb	ctfile_find_for_extract_complete;
-ct_op_cb	ctfile_extract_nextop;
-ct_op_cb	ctfile_download_next;
-ct_op_cb	ctfile_nextop_extract_cleanup;
-ct_op_cb	ctfile_nextop_archive_cleanup;
+ct_op_cb		ctfile_find_for_extract;
+ct_op_complete_cb	ctfile_find_for_extract_complete;
+ct_op_complete_cb	ctfile_extract_nextop;
+ct_op_complete_cb	ctfile_download_next;
+ct_op_complete_cb	ctfile_nextop_extract_cleanup;
+ct_op_complete_cb	ctfile_nextop_archive_cleanup;
 
 char *
 ctfile_cook_name(const char *path)
@@ -214,6 +214,8 @@ ctfile_find_for_extract(struct ct_global_state *state, struct ct_op *op)
 
 	op->op_priv = list_fakeop;
 	ctfile_list_start(state, list_fakeop);
+
+	return;
 }
 
 /*
@@ -221,7 +223,7 @@ ctfile_find_for_extract(struct ct_global_state *state, struct ct_op *op)
  *
  * Select the best filename for download, and download it if missing.
  */
-void
+int
 ctfile_find_for_extract_complete(struct ct_global_state *state,
     struct ct_op *op)
 {
@@ -232,6 +234,7 @@ ctfile_find_for_extract_complete(struct ct_global_state *state,
 	struct ctfile_list_tree			 result;
 	struct ctfile_list_file			*tmp;
 	char	 				*best = NULL;
+	int					 ret = 0;
 
 	RB_INIT(&result);
 	ctfile_list_complete(&state->ctfile_list_files, ccla->ccla_matchmode,
@@ -255,16 +258,20 @@ ctfile_find_for_extract_complete(struct ct_global_state *state,
 	if ((tmp = RB_MAX(ctfile_list_tree, &result)) == NULL) {
 		if (ccfa->ccfa_empty_ok)
 			goto do_operation;
-		else
-			CFATALX("%s: %s", ccfa->ccfa_tag,
+		else {
+			CWARNX("%s: %s", ccfa->ccfa_tag,
 			    ct_strerror(CTE_NO_SUCH_BACKUP));
+			ret = CTE_NO_SUCH_BACKUP;
+			e_free(&ccffa);
+			goto out;
+		}
 	}
 
 	/* pick the newest one */
 	best = e_strdup(tmp->mlf_name);
 	CNDBG(CT_LOG_CTFILE, "backup file is %s", best);
 
-	while((tmp = RB_ROOT(&result)) != NULL) {
+	while ((tmp = RB_ROOT(&result)) != NULL) {
 		RB_REMOVE(ctfile_list_tree, &result, tmp);
 		e_free(&tmp);
 	}
@@ -295,19 +302,23 @@ do_operation:
 		op->op_args = ccffa;
 		ctfile_extract_nextop(state, op);
 	}
+out:
 	e_free(&ccfa);
+
+	return (ret);
 }
 
 /*
  * now the operation has completed we can kick off the next operation knowing
  * that everything has been set up for it.
  */
-void
+int
 ctfile_extract_nextop(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfile_find_fileop_args	*ccffa = op->op_args;
 	struct ct_ctfileop_args			*cca;
 	char					*cachename;
+	int					 ret = 0;
 
 	/*
 	 * If this is an operation that needs the full incremental chain
@@ -328,7 +339,9 @@ ctfile_extract_nextop(struct ct_global_state *state, struct ct_op *op)
 		cca->cca_tdir = ccffa->ccffa_base.cca_tdir;
 		cca->cca_ctfile = ccffa->ccffa_base.cca_ctfile;
 		op->op_args = cca;
-		ctfile_download_next(state, op);
+		/* we give up ownership of cca here */
+		if ((ret = ctfile_download_next(state, op)) != 0)
+			goto out;
 	}
 
 	/*
@@ -345,18 +358,21 @@ ctfile_extract_nextop(struct ct_global_state *state, struct ct_op *op)
 		cachename = NULL;
 	}
 	ccffa->ccffa_nextop(state, cachename, ccffa->ccffa_nextop_args);
+out:
 	if (ccffa->ccffa_base.cca_localname)
 		e_free(&ccffa->ccffa_base.cca_localname);
 	if (ccffa->ccffa_base.cca_remotename)
 		e_free(&ccffa->ccffa_base.cca_remotename);
 	e_free(&ccffa);
+
+	return (ret);
 }
 
 /*
  * Download all dependant ctfiles of the current ctfile.
  * (called repeatedly until all are fetched).
  */
-void
+int
 ctfile_download_next(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfileop_args	*cca = op->op_args, *nextcca;
@@ -365,6 +381,7 @@ ctfile_download_next(struct ct_global_state *state, struct ct_op *op)
 	char			*prevfile;
 	char			*cookedname;
 	char			*cachename;
+	int			 ret = 0;
 
 again:
 	CNDBG(CT_LOG_CTFILE, "ctfile %s", ctfile);
@@ -378,7 +395,10 @@ again:
 
 	if (prevfile[0] != '\0') {
 		if ((cookedname = ctfile_cook_name(prevfile)) == NULL) {
-			ct_fatal(state, ctfile, CTE_INVALID_CTFILE_NAME);
+			CWARNX("%s: %s", prevfile,
+			    ct_strerror(CTE_INVALID_CTFILE_NAME));
+			ret = CTE_INVALID_CTFILE_NAME;
+			e_free(&prevfile);
 			goto out;
 		}
 		CNDBG(CT_LOG_CTFILE, "prev file %s cookedname %s", prevfile,
@@ -409,6 +429,8 @@ out:
 	if (rfile)
 		e_free(&rfile);
 	e_free(&cca);
+
+	return (ret);
 }
 
 void
@@ -420,13 +442,15 @@ ctfile_nextop_extract(struct ct_global_state *state, char *ctfile, void *args)
 	ct_add_operation(state, ct_extract, ctfile_nextop_extract_cleanup, cea);
 }
 
-void
+int
 ctfile_nextop_extract_cleanup(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_extract_args	*cea = op->op_args;
 
 	if (cea->cea_local_ctfile)
 		e_free(&cea->cea_local_ctfile);
+
+	return (0);
 }
 
 void
@@ -483,7 +507,7 @@ ctfile_nextop_archive(struct ct_global_state *state, char *basis, void *args)
 	    cca);
 }
 
-void
+int
 ctfile_nextop_archive_cleanup(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfileop_args	*cca = op->op_args;
@@ -493,6 +517,8 @@ ctfile_nextop_archive_cleanup(struct ct_global_state *state, struct ct_op *op)
 	if (cca->cca_remotename)
 		e_free(&cca->cca_remotename);
 	e_free(&cca);
+
+	return (0);
 }
 
 void
@@ -504,14 +530,14 @@ ctfile_nextop_justdl(struct ct_global_state *state, char *ctfile, void *args)
 	/* done here, no more ops */
 }
 
-ct_op_cb	ct_compare_secrets;
-void
+ct_op_complete_cb	ct_compare_secrets;
+int
 ct_check_secrets_extract(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfileop_args	*cca;
 
 	if (!ct_file_on_server(state, "crypto.secrets"))
-		CFATALX("%s", ct_strerror(CTE_NO_SECRETS_ON_SERVER));
+		return (CTE_NO_SECRETS_ON_SERVER);
 
 	cca = e_calloc(1, sizeof(*cca));
 	/* XXX temporary name? */
@@ -524,9 +550,11 @@ ct_check_secrets_extract(struct ct_global_state *state, struct ct_op *op)
 	    cca);
 	/* start download of secrets with finish file being the comparison */
 
+	return (0);
+
 }
 
-void
+int
 ct_compare_secrets(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfileop_args		*cca = op->op_args;
@@ -536,27 +564,46 @@ ct_compare_secrets(struct ct_global_state *state, struct ct_op *op)
 	char				 buf[1024], tbuf[1024];
 	size_t				 rsz;
 	off_t				 sz;
+	int				 ret = 0, s_errno;
 
 	/* cachedir is '/' terminated */
 	strlcpy(temp_path, cca->cca_tdir, sizeof(temp_path));
 	strlcat(temp_path, cca->cca_localname, sizeof(temp_path));
-	if (stat(state->ct_config->ct_crypto_secrets, &sb) != 0)
-		CFATALX("\"%s\": %s", state->ct_config->ct_crypto_secrets,
-		    ct_strerror(CTE_ERRNO));
-	if (stat(temp_path, &tsb) != 0)
-		CFATAL("\"%s\": %s", temp_path, ct_strerror(CTE_ERRNO));
+	if (stat(state->ct_config->ct_crypto_secrets, &sb) != 0) {
+		s_errno = errno;
+		ret = CTE_ERRNO;
+		CWARNX("\"%s\": %s", state->ct_config->ct_crypto_secrets,
+		    ct_strerror(ret));
+		goto free;
+	}
+	if (stat(temp_path, &tsb) != 0) {
+		s_errno = errno;
+		ret = CTE_ERRNO;
+		CWARNX("\"%s\": %s", temp_path, ct_strerror(ret));
+		goto free;
+	}
 
 	/* Compare size first */
-	if (tsb.st_size != sb.st_size)
-		CFATALX("%" PRId64 " vs %" PRId64 ": %s", (int64_t)tsb.st_size,
-		    (int64_t)sb.st_size,
-		    ct_strerror(CTE_SECRETS_FILE_SIZE_MISMATCH));
+	if (tsb.st_size != sb.st_size) {
+		ret = CTE_SECRETS_FILE_SIZE_MISMATCH;
+		CWARNX("%" PRId64 " vs %" PRId64 ": %s", (int64_t)tsb.st_size,
+		    (int64_t)sb.st_size, ct_strerror(ret));
+		goto free;
+	}
 
-	if ((f = fopen(state->ct_config->ct_crypto_secrets, "rb")) == NULL)
-		CFATALX("\"%s\": %s", state->ct_config->ct_crypto_secrets,
-		    ct_strerror(CTE_ERRNO));
-	if ((tf = fopen(temp_path, "rb")) == NULL)
-		CFATAL("temp_path: %s", ct_strerror(CTE_ERRNO));
+	if ((f = fopen(state->ct_config->ct_crypto_secrets, "rb")) == NULL) {
+		s_errno = errno;
+		ret = CTE_ERRNO;
+		CWARNX("\"%s\": %s", state->ct_config->ct_crypto_secrets,
+		    ct_strerror(ret));
+		goto free;
+	}
+	if ((tf = fopen(temp_path, "rb")) == NULL) {
+		s_errno = errno;
+		ret = CTE_ERRNO;
+		CFATAL("temp_path: %s", ct_strerror(ret));
+		goto close_current;
+	}
 	/* read then throw away */
 	unlink(temp_path);
 	while (sb.st_size > 0) {
@@ -569,23 +616,35 @@ ct_compare_secrets(struct ct_global_state *state, struct ct_op *op)
 		if ((rsz = fread(buf, 1, sz, f)) != sz) {
 			CNDBG(CT_LOG_CRYPTO, "short read on secrets file (%"
 			    PRId64 " %" PRId64 ")", (int64_t)sz, (int64_t)rsz);
-			CFATALX("%s: %s", state->ct_config->ct_crypto_secrets,
-			    ct_strerror(CTE_SECRETS_FILE_SHORT_READ));
+			ret = CTE_SECRETS_FILE_SHORT_READ;
+			CWARNX("%s: %s", state->ct_config->ct_crypto_secrets,
+			    ct_strerror(ret));
+			goto out;
 		}
 		if ((rsz = fread(tbuf, 1, sz, tf)) != sz) {
 			CNDBG(CT_LOG_CRYPTO, "short read on temporary secrets "
 			    "file (%" PRId64 " %" PRId64 ")", (int64_t)sz,
 			    (int64_t)rsz);
-			CFATALX("%s: %s", temp_path,
-			    ct_strerror(CTE_SECRETS_FILE_SHORT_READ));
+			ret = CTE_SECRETS_FILE_SHORT_READ;
+			CWARNX("%s: %s", temp_path, ct_strerror(ret));
+			goto out;
 		}
 
-		if (memcmp(buf, tbuf, sz) != 0)
-			CFATALX("%s", ct_strerror(CTE_SECRETS_FILE_DIFFERS));
+		if (memcmp(buf, tbuf, sz) != 0) {
+			ret = CTE_SECRETS_FILE_DIFFERS;
+			goto out;
+		}
 	}
+out:
 	fclose(f);
+close_current:
 	fclose(tf);
+free:
 	e_free(&cca);
+
+	if (ret == CTE_ERRNO)
+		errno = s_errno;
+	return (ret);
 }
 
 
@@ -619,12 +678,14 @@ ct_file_on_server(struct ct_global_state *state, char *filename)
 	return (exists);
 }
 
-void
+int
 ct_secrets_exists(struct ct_global_state *state, struct ct_op *op)
 {
 	int *exists = op->op_args;
 
 	*exists = ct_file_on_server(state, "crypto.secrets");
+
+	return (0);
 }
 
 int

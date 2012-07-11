@@ -1272,7 +1272,7 @@ next_file:
 	return (0);
 }
 
-ct_op_cb ctfile_nextop_list_cleanup;
+ct_op_complete_cb ctfile_nextop_list_cleanup;
 void
 ctfile_nextop_list(struct ct_global_state *state, char *ctfile, void *args)
 {
@@ -1282,12 +1282,13 @@ ctfile_nextop_list(struct ct_global_state *state, char *ctfile, void *args)
 	ct_add_operation(state, ct_list_op, ctfile_nextop_list_cleanup, cea);
 }
 
-void
+int
 ctfile_nextop_list_cleanup(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_extract_args	*cea = op->op_args;
 
 	if (cea->cea_local_ctfile)
 		e_free(&cea->cea_local_ctfile);
+	return (0);
 }
 

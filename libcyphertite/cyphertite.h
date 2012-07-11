@@ -214,7 +214,7 @@ int		 ct_setup_state(struct ct_global_state **, struct ct_config *);
 int
 ct_do_remotelist(struct ct_global_state *state, char **search, char **exclude,
     int matchmode,
-    void (*printfn) (struct ct_global_state *state, struct ct_op *op));
+    int (*printfn) (struct ct_global_state *state, struct ct_op *op));
 
 int
 ct_do_remotearchive(struct ct_global_state *state, char *ctfile, char **flist,
@@ -405,10 +405,11 @@ void			 ct_normalize_filelist(char **);
 
 /* Operation API */
 typedef void (ct_op_cb)(struct ct_global_state *, struct ct_op *);
+typedef int (ct_op_complete_cb)(struct ct_global_state *, struct ct_op *);
 struct ct_op {
 	TAILQ_ENTRY(ct_op)	 op_link;
 	ct_op_cb		*op_start;
-	ct_op_cb		*op_complete;
+	ct_op_complete_cb	*op_complete;
 	void			*op_args;
 	void			*op_priv;	/* operation private data */
 };
@@ -471,11 +472,11 @@ struct ct_ctfileop_args {
 };
 
 struct ct_op	*ct_add_operation(struct ct_global_state *, ct_op_cb *,
-		     ct_op_cb *, void *);
+		     ct_op_complete_cb *, void *);
 struct ct_op	*ct_add_operation_after(struct ct_global_state *,
-		     struct ct_op *, ct_op_cb *, ct_op_cb *, void *);
-int		 ct_do_operation(struct ct_config *, ct_op_cb *, ct_op_cb *,
-		     void *, int);
+		     struct ct_op *, ct_op_cb *, ct_op_complete_cb *, void *);
+int		 ct_do_operation(struct ct_config *, ct_op_cb *,
+		     ct_op_complete_cb *, void *, int);
 void		 ct_clear_operation(struct ct_global_state *);
 void		 ct_nextop(void *);
 int		 ct_op_complete(struct ct_global_state *state);
@@ -483,17 +484,16 @@ ct_op_cb	 ct_archive;
 ct_op_cb	 ct_extract;
 ct_op_cb	 ctfile_archive;
 ct_op_cb	 ctfile_extract;
-ct_op_cb	 ctfile_op_cleanup;
+ct_op_complete_cb	 ctfile_op_cleanup;
 ct_op_cb	 ctfile_list_start;
-ct_op_cb	 ctfile_list_print;
-void		 ctfile_list_complete(struct ctfile_list *, int, char **,
+ct_op_complete_cb	 ctfile_list_print;
+int		 ctfile_list_complete(struct ctfile_list *, int, char **,
 		     char **, struct ctfile_list_tree *);
-ct_op_cb	 ct_check_secrets_extract;
+ct_op_complete_cb	 ct_check_secrets_extract;
 ct_op_cb	 ctfile_delete;
-ct_op_cb	 ct_free_remotename;
 
 ct_op_cb	ct_extract_file;
-ct_op_cb	ct_extract_file_cleanup;
+ct_op_complete_cb	ct_extract_file_cleanup;
 
 /* return boolean whether or not the last ctfile_list contained the filename */
 int	ct_file_on_server(struct ct_global_state *, char *);

@@ -45,26 +45,28 @@
 #include <ct_ext.h>
 #include <ct_internal.h>
 
-ct_op_cb ct_cull_send_shas;
-ct_op_cb ct_cull_setup;
-ct_op_cb ct_cull_start_shas;
-ct_op_cb ct_cull_start_complete;
-ct_op_cb ct_cull_send_complete;
-ct_op_cb ct_cull_complete;
-ct_op_cb ct_cull_collect_ctfiles;
-ct_op_cb ct_cull_fetch_all_ctfiles;
+ct_op_cb		ct_cull_send_shas;
+ct_op_cb		ct_cull_setup;
+ct_op_cb		ct_cull_start_shas;
+ct_op_cb		ct_cull_start_complete;
+ct_op_cb		ct_cull_send_complete;
+ct_op_complete_cb	ct_cull_complete;
+ct_op_cb		ct_cull_collect_ctfiles;
+ct_op_complete_cb	ct_cull_fetch_all_ctfiles;
 
 void	 ct_xml_file_open(struct ct_global_state *, struct ct_trans *,
 	     const char *, int, uint32_t, ct_complete_fn);
 /*
  * clean up after a ctfile archive/extract operation by freeing the remotename
  */
-void
+int
 ctfile_op_cleanup(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfileop_args	*cca = op->op_args;
 
 	e_free(&cca->cca_remotename);
+
+	return (0);
 }
 
 int
@@ -654,23 +656,44 @@ ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 	ct_queue_first(state, trans);
 }
 
-void
+/*
+ * To be used in a completion handler for an operation.
+ * 
+ * The operation which we are completing did a ctfile_list_start, the result of
+ * this are in *files. perform any matching on this necessary using matchmode
+ * with pattern flist and excludelist excludelist.  and place the results in
+ * *results.
+ * 
+ * If we return non-zero a fatal error occured..
+ */
+int
 ctfile_list_complete(struct ctfile_list *files,  int matchmode, char **flist,
     char **excludelist, struct ctfile_list_tree *results)
 {
 	struct ct_match		*match, *ex_match = NULL;
 	struct ctfile_list_file	*file;
-	int			 ret;
+	int			 ret, s_errno;
 
 	if (SIMPLEQ_EMPTY(files))
-		return;
+		return (0);
 
-	if ((ret = ct_match_compile(&match, matchmode, flist)) != 0)
-		CFATALX("couldn't compile match pattern: %s", ct_strerror(ret));
+	if ((ret = ct_match_compile(&match, matchmode, flist)) != 0) {
+		s_errno = errno; /* save in case WARNX clobbers */
+		CWARNX("couldn't compile match pattern: %s", ct_strerror(ret));
+		errno = s_errno;
+		return (ret);
+	}
 	if (excludelist && (ret = ct_match_compile(&ex_match, matchmode,
-	    excludelist)) != 0)
-		CFATALX("couldn't compile exclude pattern: %s",
+	    excludelist)) != 0) {
+		s_errno = errno; /* save in case WARNX clobbers */
+		CWARNX("couldn't compile exclude pattern: %s",
 		    ct_strerror(ret));
+		ct_match_unwind(match);
+		errno = s_errno;
+
+		/* XXX free list too? */
+		return (ret);
+	}
 
 	while ((file = SIMPLEQ_FIRST(files)) != NULL) {
 		SIMPLEQ_REMOVE_HEAD(files, mlf_link);
@@ -684,6 +707,8 @@ ctfile_list_complete(struct ctfile_list *files,  int matchmode, char **flist,
 	if (ex_match != NULL)
 		ct_match_unwind(ex_match);
 	ct_match_unwind(match);
+
+	return(0);
 }
 
 void
@@ -1032,11 +1057,13 @@ next_file:
 	return (0);
 }
 
-void
+int
 ct_cull_complete(struct ct_global_state *state, struct ct_op *op)
 {
 	CNDBG(CT_LOG_SHA, "shacnt %" PRIu64 " shapayload %" PRIu64, shacnt,
 	    sha_payload_sz);
+
+	return (0);
 }
 
 uint64_t cull_uuid; /* set up with random number in ct_cull_setup() */
@@ -1197,18 +1224,20 @@ char		*all_ctfiles_pattern[] = {
 			NULL,
 		 };
 
-ct_op_cb	ct_cull_extract_cleanup;
-void
+ct_op_complete_cb	ct_cull_extract_cleanup;
+int
 ct_cull_fetch_all_ctfiles(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfileop_args	*cca;
 	struct ctfile_list_tree	 results;
 	struct ctfile_list_file	*file;
 	char			*cachename;
+	int			 ret;
 
 	RB_INIT(&results);
-	ctfile_list_complete(&state->ctfile_list_files, CT_MATCH_REGEX,
-	    all_ctfiles_pattern, NULL, &results);
+	if ((ret = ctfile_list_complete(&state->ctfile_list_files,
+	    CT_MATCH_REGEX, all_ctfiles_pattern, NULL, &results)) != 0)
+		return (ret);
 	while ((file = RB_ROOT(&results)) != NULL) {
 		RB_REMOVE(ctfile_list_tree, &results, file);
 		CNDBG(CT_LOG_CTFILE, "looking for file %s ", file->mlf_name);
@@ -1230,18 +1259,21 @@ ct_cull_fetch_all_ctfiles(struct ct_global_state *state, struct ct_op *op)
 		}
 		RB_INSERT(ctfile_list_tree, &ct_cull_all_ctfiles, file);
 	}
+	return (0);
 }
 
-void
+int
 ct_cull_extract_cleanup(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfileop_args *cca = op->op_args;
 
 	e_free(&cca->cca_localname);
 	e_free(&cca);
+
+	return (0);
 }
 
-ct_op_cb	ct_cull_delete_cleanup;
+ct_op_complete_cb	ct_cull_delete_cleanup;
 void
 ct_cull_collect_ctfiles(struct ct_global_state *state, struct ct_op *op)
 {
@@ -1346,10 +1378,12 @@ dying:
 	return;
 }
 
-void
+int
 ct_cull_delete_cleanup(struct ct_global_state *state, struct ct_op *op)
 {
 	char	*ctfile = op->op_args;
 
 	e_free(&ctfile);
+
+	return (0);
 }
