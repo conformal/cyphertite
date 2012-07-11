@@ -229,8 +229,7 @@ ct_rb_unwind(struct ct_match_tree *head)
 {
 	struct ct_match_node	*n;
 
-	while (!RB_EMPTY(head)) {
-		n = RB_MIN(ct_match_tree, head);
+	while ((n = RB_ROOT(head)) != NULL) {
 		RB_REMOVE(ct_match_tree, head, n);
 		e_free(&n->cmn_string);
 		e_free(&n);
