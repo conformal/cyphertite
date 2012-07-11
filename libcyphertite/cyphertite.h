@@ -498,8 +498,6 @@ ct_op_cb	ct_extract_file_cleanup;
 /* return boolean whether or not the last ctfile_list contained the filename */
 int	ct_file_on_server(struct ct_global_state *, char *);
 
-int	ct_cull_add_shafile(const char *, const char *);
-void	ct_cull_sha_insert(const uint8_t *);
 void	ct_cull_kick(struct ct_global_state *);
 
 

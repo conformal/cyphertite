@@ -223,8 +223,14 @@ ct_extract_complete_file_read(struct ct_global_state *state,
 		    trans->tr_size[slot]);
 		if ((ret = ct_file_extract_write(state->extract_state,
 		    trans->tr_fl_node, trans->tr_data[slot],
-		    trans->tr_size[slot])) != 0)
-			CFATALX("failed to write file: %s", ct_strerror(ret));
+		    trans->tr_size[slot])) != 0) {
+			/*
+			 * XXX really this shouldn't be fatal, just make us skip
+			 * the file in future and CWARNX.
+			 */
+			ct_fatal(state, "Failed to write file", ret);
+			return (0);
+		}
 		state->ct_stats->st_bytes_written +=
 		    trans->tr_size[slot];
 	}
@@ -306,29 +312,37 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			TAILQ_INIT(&ex_priv->extract_head);
 
 			if ((ret = ct_match_compile(&ex_priv->inc_match,
-			    match_mode, filelist)) != 0)
-				CFATALX("failed to compile include pattern: %s",
-				    ct_strerror(ret));
+			    match_mode, filelist)) != 0) {
+				ct_fatal(state,
+				    "failed to compile include pattern", ret);
+				goto dying;
+			}
 			if (cea->cea_excllist != NULL &&
 			    (ret = ct_match_compile(&ex_priv->ex_match,
-			    match_mode, cea->cea_excllist)) != 0)
-				CFATALX("failed to compile exclude pattern: %s",
-				    ct_strerror(ret));
+			    match_mode, cea->cea_excllist)) != 0) {
+				ct_fatal(state,
+				    "failed to compile exclude pattern", ret);
+				goto dying;
+			}
 			op->op_priv = ex_priv;
 		}
 		if ((ret = ct_extract_setup(&ex_priv->extract_head,
 		    &ex_priv->xdr_ctx, ctfile, cea->cea_ctfile_basedir,
-		    &ex_priv->allfiles)) != 0)
-			CFATALX("can't setup queue: %s", ct_strerror(ret));
+		    &ex_priv->allfiles)) != 0) {
+			ct_fatal(state, "can't setup extract queue", ret);
+			goto dying;
+		}
 		state->ct_print_ctfile_info(state->ct_print_state,
 		    ex_priv->xdr_ctx.xs_filename, &ex_priv->xdr_ctx.xs_gh);
 		
 		if ((ret = ct_file_extract_init(&state->extract_state,
 		    cea->cea_tdir, cea->cea_attr,  cea->cea_follow_symlinks,
 		    ex_priv->allfiles, cea->cea_log_state,
-		    cea->cea_log_chown_failed)) != 0)
-			CFATALX("Can not initialise extract state: %s",
-			    ct_strerror(ret));
+		    cea->cea_log_chown_failed)) != 0) {
+			ct_fatal(state, "Can not initialize extract state",
+			    ret);
+			goto dying;
+		}
 		/* XXX we should handle this better */
 		if (state->ct_max_block_size <
 		    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size)
@@ -340,9 +354,11 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 		if (ex_priv->allfiles) {
 			char *nothing = NULL;
 			if ((ret = ct_match_compile(&ex_priv->rb_match,
-			    CT_MATCH_RB, &nothing)) != 0)
-				CFATALX("couldn't create match tree: %s",
-				    ct_strerror(ret));
+			    CT_MATCH_RB, &nothing)) != 0) {
+				ct_fatal(state, "Couldn't create match tree",
+				    ret);
+				goto dying;
+			}
 			ex_priv->fillrb = 1;
 		}
 		break;
@@ -428,10 +444,11 @@ skip:
 		case XS_RET_SHA:
 			if (ex_priv->doextract == 0 ||
 			    trans->tr_fl_node->fl_skip_file != 0) {
-				if (ctfile_parse_seek(&ex_priv->xdr_ctx))
-					CFATALX("can't seek past shas: %s",
-					    ct_strerror(
-					    ex_priv->xdr_ctx.xs_errno));
+				if (ctfile_parse_seek(&ex_priv->xdr_ctx)) {
+					ct_fatal(state, "Can't seek past shas",
+					    ex_priv->xdr_ctx.xs_errno);
+					goto dying;
+				}
 				ct_trans_free(state, trans);
 				continue;
 			}
@@ -440,10 +457,12 @@ skip:
 				SHA_DIGEST_LENGTH) == 0) {
 				CWARNX("\"%s\" truncated during backup",
 				    trans->tr_fl_node->fl_sname);
-				if (ctfile_parse_seek(&ex_priv->xdr_ctx))
-					CFATALX("can't seek past trunctation "
-					    "shas: %s", ct_strerror(
-					    ex_priv->xdr_ctx.xs_errno));
+				if (ctfile_parse_seek(&ex_priv->xdr_ctx)) {
+					ct_fatal(state, "Can't seek past "
+					    "truncation shas",
+					    ex_priv->xdr_ctx.xs_errno);
+					goto dying;
+				}
 				ct_trans_free(state, trans);
 				continue;
 			}
@@ -531,9 +550,11 @@ skip:
 				/* reinits ex_priv->xdr_ctx */
 				if ((ret =
 				    ct_extract_open_next(&ex_priv->extract_head,
-				    &ex_priv->xdr_ctx)) != 0)
-					CFATALX("can't open next file: %s",
-					    ct_strerror(ret));
+				    &ex_priv->xdr_ctx)) != 0) {
+					ct_fatal(state,
+					    "Can't open next ctfile", ret);
+					goto dying;
+				}
 				state->ct_print_ctfile_info(
 				    state->ct_print_state,
 				    ex_priv->xdr_ctx.xs_filename,
@@ -574,8 +595,9 @@ we_re_done_here:
 			return;
 			break;
 		case XS_RET_FAIL:
-			CFATALX("failed to parse metadata file: %s",
-			    ct_strerror(ex_priv->xdr_ctx.xs_errno));
+			ct_fatal(state, "Failed to parse ctfile",
+			    ex_priv->xdr_ctx.xs_errno);
+			goto dying;
 			break;
 		}
 	}
@@ -628,10 +650,13 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 		CNDBG(CT_LOG_TRANS, "starting");
 		ex_priv = e_calloc(1, sizeof(*ex_priv));
 		/* open file and seek to beginning of file */
-		if (ctfile_parse_init_at(&ex_priv->xdr_ctx,
-		    cefa->cefa_ctfile, NULL, cefa->cefa_ctfile_off) != 0)
-			CFATALX("can't open metadata file %s",
-			    cefa->cefa_ctfile);
+		if ((ret = ctfile_parse_init_at(&ex_priv->xdr_ctx,
+		    cefa->cefa_ctfile, NULL, cefa->cefa_ctfile_off)) != 0) {
+			/* XXX add pathname */
+			ct_fatal(state, "Can't open ctfile", ret);
+			e_free(&ex_priv);
+			goto dying;
+		}
 		 /* XXX we should handle this better */
 		if (state->ct_max_block_size <
 		    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size)
@@ -640,9 +665,12 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			    state->ct_max_block_size,
 			    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size);
 		if ((ret = ct_file_extract_init(&state->extract_state,
-		    NULL, 0, 0, 0, NULL, NULL)) != 0)
-			CFATALX("Can not initialise extract state: %s",
-			    ct_strerror(ret));
+		    NULL, 0, 0, 0, NULL, NULL)) != 0) {
+			ct_fatal(state, "Can not initialise extract state",
+			    ret);
+			e_free(&ex_priv);
+			goto dying;
+		}
 		op->op_priv = ex_priv;
 		break;
 	case CT_S_FINISHED:
@@ -758,8 +786,9 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			ex_priv->done = 1;
 			break;
 		case XS_RET_FAIL:
-			CFATALX("failed to parse metadata file: %s",
-			    ct_strerror(ex_priv->xdr_ctx.xs_errno));
+			ct_fatal(state, "Failed to parse ctfile",
+			    ex_priv->xdr_ctx.xs_errno);
+			goto dying;
 			break;
 		default:
 			CABORTX("%s: invalid state %d", __func__, ret);

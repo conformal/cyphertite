@@ -207,8 +207,9 @@ ct_init(struct ct_global_state **statep, struct ct_config *conf,
 		if ((ret = ct_unlock_secrets(conf->ct_crypto_passphrase,
 		    conf->ct_crypto_secrets,
 		    state->ct_crypto_key, sizeof(state->ct_crypto_key),
-		    state->ct_iv, sizeof(state->ct_iv))) != 0)
+		    state->ct_iv, sizeof(state->ct_iv))) != 0) {
 			goto fail;
+		}
 	}
 
 	if ((ret = ct_init_eventloop(state, info_cb)) != 0)

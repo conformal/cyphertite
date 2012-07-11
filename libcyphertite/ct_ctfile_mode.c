@@ -136,25 +136,42 @@ ctfile_archive(struct ct_global_state *state, struct ct_op *op)
 			strlcpy(tpath, ctfile, sizeof(tpath));
 		}
 		CNDBG(CT_LOG_FILE, "opening ctfile for archive %s", ctfile);
-		if ((cas->cas_handle = fopen(tpath, "rb")) == NULL)
-			CFATAL("%s: %s", ctfile, ct_strerror(CTE_ERRNO));
+		if ((cas->cas_handle = fopen(tpath, "rb")) == NULL) {
+			ct_fatal(state, ctfile, CTE_ERRNO);
+			goto dying;
+		}
 		if (cca->cca_ctfile) {
 			struct ctfile_parse_state	 xs_ctx;
-			int				 ret;
+			int				 ret, s_errno;
 			if ((error = ctfile_parse_init_f(&xs_ctx,
-			    cas->cas_handle, NULL)) != 0)
-				CFATALX("%s: %s", tpath, ct_strerror(error));
+			    cas->cas_handle, NULL)) != 0) {
+				ct_fatal(state, tpath, error);
+				goto dying;
+			}
 			while ((ret = ctfile_parse(&xs_ctx)) != XS_RET_EOF) {
 				if (ret == XS_RET_SHA)  {
-					if (ctfile_parse_seek(&xs_ctx)) {
-						CFATALX("%s can't seek: %s",
-						    tpath, ct_strerror(
-						    xs_ctx.xs_errno));
+					if (ctfile_parse_seek(&xs_ctx)) { 
+						s_errno = errno;
+						ret = xs_ctx.xs_errno;
+						ctfile_parse_close(&xs_ctx);
+
+						errno = s_errno;
+						ct_fatal(state,
+						    "Can't seek in ctfile",
+						    ret);
+						goto dying;
 					}
 				} else if (ret == XS_RET_FAIL) {
-					CFATALX("%s is not a valid ctfile, %s",
-					    tpath,
-					    ct_strerror(xs_ctx.xs_errno));
+					s_errno = errno;
+					ret = xs_ctx.xs_errno;
+					ctfile_parse_close(&xs_ctx);
+
+					errno = s_errno;
+					/* XXX include name */
+					ct_fatal(state,
+					    "Not a valid ctfile",
+					    ret);
+					goto dying;
 				}
 
 			}
@@ -162,15 +179,19 @@ ctfile_archive(struct ct_global_state *state, struct ct_op *op)
 			fseek(cas->cas_handle, 0L, SEEK_SET);
 		}
 
-		if (fstat(fileno(cas->cas_handle), &sb) == -1)
-			CFATALX("%s: %s", ctfile, ct_strerror(CTE_ERRNO));
+		if (fstat(fileno(cas->cas_handle), &sb) == -1) {
+			ct_fatal(state, ctfile, CTE_ERRNO);
+			goto dying;
+		}
 		cas->cas_size = sb.st_size;
 		cas->cas_fnode = e_calloc(1, sizeof(*cas->cas_fnode));
 
 		if (rname == NULL) {
-			if ((rname = ctfile_cook_name(ctfile)) == NULL)
-				CFATALX("%s: %s", ctfile,
-				    ct_strerror(CTE_INVALID_CTFILE_NAME));
+			if ((rname = ctfile_cook_name(ctfile)) == NULL) {
+				ct_fatal(state, ctfile,
+				    CTE_INVALID_CTFILE_NAME);
+				goto dying;
+			}
 			cca->cca_remotename = (char *)rname;
 		}
 		break;
@@ -316,8 +337,11 @@ ct_xml_file_open(struct ct_global_state *state, struct ct_trans *trans,
 	trans->tr_cleanup = NULL;
 
 	if ((ret = ct_create_xml_open(&trans->hdr, (void **)&trans->tr_data[2],
-	    file, mode, chunkno)) != 0)
-		CFATALX("can't create xml open packet: %s", ct_strerror(ret));
+	    file, mode, chunkno)) != 0) {
+		ct_fatal(state, "can't create xml open packet: %s", ret);
+		ct_trans_free(state, trans);
+		return;
+	}
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = trans->hdr.c_size;
 
@@ -387,13 +411,20 @@ int
 ctfile_extract_complete_open(struct ct_global_state *state,
     struct ct_trans *trans)
 {
+	char	buffer[PATH_MAX]; /* XXX size? */
 	int	ret;
 
-	ret = ctfile_xml_open_complete(state, trans);
+	if ((ret = ctfile_xml_open_complete(state, trans)) != 0)
+		goto done;
 
-	if (ct_file_extract_open(state->extract_state, trans->tr_fl_node) != 0)
-		CFATALX("unable to open file %s", trans->tr_fl_node->fl_name);
+	if ((ret = ct_file_extract_open(state->extract_state,
+	    trans->tr_fl_node)) != 0) {
+		snprintf(buffer, sizeof(buffer), "unable to open file %s",
+		    trans->tr_fl_node->fl_name);
+		ct_fatal(state, buffer, ret);
+	}
 
+done:
 	return (ret);
 }
 
@@ -408,7 +439,8 @@ ctfile_extract_complete_read(struct ct_global_state *state, struct ct_trans
 	if ((ret = ct_file_extract_write(state->extract_state,
 	    trans->tr_fl_node, trans->tr_data[(int)trans->tr_dataslot],
 	    trans->tr_size[(int)trans->tr_dataslot])) != 0)
-		CFATALX("failed to write file: %s", ct_strerror(ret));
+		/* fatal and return. we are done here */
+		ct_fatal(state, "failed to write file", ret);
 	return (0);
 }
 
@@ -439,15 +471,19 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 		op->op_priv = ces;
 
 		if (rname == NULL) {
-			if ((rname = ctfile_cook_name(ctfile)) == NULL)
-				CFATALX("%s: %s", ctfile,
-				    ct_strerror(CTE_INVALID_CTFILE_NAME));
+			if ((rname = ctfile_cook_name(ctfile)) == NULL) {
+				ct_fatal(state, ctfile,
+				    CTE_INVALID_CTFILE_NAME);
+				goto dying;
+			}
 			cca->cca_remotename = (char *)rname;
 		}
 		if ((ret = ct_file_extract_init(&state->extract_state,
-		    cca->cca_tdir, 0, 0, 0, NULL, NULL)) != 0)
-			CFATALX("can't initialise extract state: %s",
-			    ct_strerror(ret));
+		    cca->cca_tdir, 0, 0, 0, NULL, NULL)) != 0) {
+			ct_fatal(state, "Can't initialize extract state",
+			    ret);
+			goto dying;
+		}
 		break;
 	case CT_S_WAITING_SERVER:
 		CNDBG(CT_LOG_FILE, "waiting on remote open");
@@ -503,9 +539,11 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 	hdr->c_flags |= C_HDR_F_METADATA;
 
 	if ((ret = ct_create_iv_ctfile(trans->tr_ctfile_chunkno, trans->tr_iv,
-	    sizeof(trans->tr_iv))) != 0)
-		CFATALX("ctfile iv for %d: %s",
-		    trans->tr_ctfile_chunkno, ct_strerror(ret));
+	    sizeof(trans->tr_iv))) != 0) {
+		/* XXX add tr_ctfile_chunkno */
+		ct_fatal(state, "ctfile iv", ret);
+		goto dying;
+	}
 	ct_queue_first(state, trans);
 
 	return;
@@ -562,9 +600,13 @@ ctfile_extract_handle_eof(struct ct_global_state *state, struct ct_trans *trans)
 		trans->tr_cleanup = ctfile_extract_cleanup_eof;
 
 		if ((ret = ct_create_xml_close(&trans->hdr,
-		    (void **)&trans->tr_data[2])) != 0)
-			CFATALX("Could not create xml close packet: %s",
-			    ct_strerror(ret));
+		    (void **)&trans->tr_data[2])) != 0) {
+			ct_fatal(state, "Could not create xml close packet",
+			    ret);
+			trans->tr_state = TR_S_XML_CLOSED;
+			/* we still return here so that tr_cleanup will run */
+			return;
+		}
 		trans->tr_dataslot = 2;
 		trans->tr_size[2] = trans->hdr.c_size;
 	} else {
@@ -599,9 +641,11 @@ ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 	trans->tr_state = TR_S_XML_LIST;
 
 	if ((ret = ct_create_xml_list(&trans->hdr,
-	    (void **)&trans->tr_data[2])) != 0)
-		CFATALX("Could not create xml list packet: %s",
-		    ct_strerror(ret));
+	    (void **)&trans->tr_data[2])) != 0) {
+		ct_fatal(state, "Could not create xml list packet", ret);
+		ct_trans_free(state, trans);
+		return;
+	}
 	trans->tr_dataslot = 2;
 	trans->tr_complete = ctfile_complete_noop_final;
 	trans->tr_cleanup = NULL;
@@ -655,14 +699,19 @@ ctfile_delete(struct ct_global_state *state, struct ct_op *op)
 	trans = ct_trans_alloc(state);
 	trans->tr_state = TR_S_XML_DELETE;
 
-	if ((rname = ctfile_cook_name(rname)) == NULL)
-		CFATALX("%s: %s", rname,
-		    ct_strerror(CTE_INVALID_CTFILE_NAME));
+	if ((rname = ctfile_cook_name(rname)) == NULL) {
+		ct_fatal(state, rname, CTE_INVALID_CTFILE_NAME);
+		ct_trans_free(state, trans);
+		return;
+	}
 
 	if ((ret = ct_create_xml_delete(&trans->hdr,
-	     (void **)&trans->tr_data[2], rname)) != 0)
-		CFATALX("Could not create xml delete packet for %s: %s",
-		    rname, ct_strerror(ret));
+	     (void **)&trans->tr_data[2], rname)) != 0) {
+		ct_fatal(state, "Could not create xml delete packet", ret);
+		ct_trans_free(state, trans);
+		e_free(&rname);
+		return;
+	}
 	trans->tr_dataslot = 2;
 	trans->tr_complete = ctfile_complete_noop_final;
 	trans->tr_cleanup = NULL;
@@ -684,34 +733,42 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 
 	switch (trans->tr_state) {
 	case TR_S_XML_OPEN:
-		if ((ret = ct_parse_xml_open_reply(hdr, vbody, &filename)) != 0)
-			CFATALX("failed to parse xml open reply: %s",
-			    ct_strerror(ret));
-		if (filename == NULL)
-			CFATALX("%s", ct_strerror(CTE_CANT_OPEN_REMOTE));
+		if ((ret = ct_parse_xml_open_reply(hdr, vbody,
+		    &filename)) != 0) {
+			ct_fatal(state, "failed to parse xml open reply", ret);
+			goto just_queue;
+		}
+		if (filename == NULL) {
+			ct_fatal(state, NULL, CTE_CANT_OPEN_REMOTE);
+			goto just_queue;
+		}
 		CNDBG(CT_LOG_FILE, "%s opened\n",
 		    filename);
 		e_free(&filename);
 		trans->tr_state = TR_S_XML_OPENED;
 		break;
 	case TR_S_XML_CLOSING:
-		if ((ret = ct_parse_xml_close_reply(hdr, vbody)) != 0)
-			CFATALX("failed to parse xml close reply: %s",
-			    ct_strerror(ret));
+		if ((ret = ct_parse_xml_close_reply(hdr, vbody)) != 0) {
+			ct_fatal(state, "failed to parse xml close reply", ret);
+			goto just_queue;
+		}
 		trans->tr_state = TR_S_DONE;
 		break;
 	case TR_S_XML_LIST:
 		if ((ret = ct_parse_xml_list_reply(hdr, vbody,
-		    &state->ctfile_list_files)) != 0)
-			CFATALX("failed to parse xml list reply: %s",
-			    ct_strerror(ret));
+		    &state->ctfile_list_files)) != 0) {
+			ct_fatal(state, "failed to parse xml list reply", ret);
+			goto just_queue;
+		}
 		trans->tr_state = TR_S_DONE;
 		break;
 	case TR_S_XML_DELETE:
 		if ((ret = ct_parse_xml_delete_reply(hdr, vbody,
-		    &filename)) != 0)
-			CFATALX("failed to parse xml delete reply: %s",
-			    ct_strerror(ret));
+		    &filename)) != 0) {
+			ct_fatal(state, "failed to parse xml delete reply",
+			    ret);
+			goto just_queue;
+		}
 		if (filename == NULL)
 			printf("specified archive does not exist\n");
 		else
@@ -720,24 +777,30 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 		break;
 	case TR_S_XML_CULL_SEND:
 		/* XXX this is for both complete and setup */
-		if ((ret = ct_parse_xml_cull_setup_reply(hdr, vbody)) != 0)
-			CFATALX("failed to parse cull setup reply: %s",
-			    ct_strerror(ret));
+		if ((ret = ct_parse_xml_cull_setup_reply(hdr, vbody)) != 0) {
+			ct_fatal(state, "failed to parse cull setup reply",
+			    ret);
+			goto just_queue;
+		}
 		trans->tr_state = TR_S_DONE;
 		break;
 	case TR_S_XML_CULL_SHA_SEND:
-		if ((ret = ct_parse_xml_cull_shas_reply(hdr, vbody)) != 0)
-			CFATALX("failed to parse cull shas reply: %s",
-			    ct_strerror(ret));
+		if ((ret = ct_parse_xml_cull_shas_reply(hdr, vbody)) != 0) {
+			ct_fatal(state, "failed to parse cull shas reply",
+			    ret);
+			goto just_queue;
+		}
 		if (trans->tr_eof == 1)
 			trans->tr_state = TR_S_DONE;
 		else
 			trans->tr_state = TR_S_XML_CULL_REPLIED;
 		break;
 	case TR_S_XML_CULL_COMPLETE_SEND:
-		if ((ret = ct_parse_xml_cull_complete_reply(hdr, vbody)) != 0)
-			CFATALX("failed to parse cull complete reply: %s",
-			    ct_strerror(ret));
+		if ((ret = ct_parse_xml_cull_complete_reply(hdr, vbody)) != 0) {
+			ct_fatal(state, "failed to parse cull complete reply",
+			    ret);
+			goto just_queue;
+		}
 		trans->tr_state = TR_S_DONE;
 		break;
 	default:
@@ -747,6 +810,7 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 		CABORTX("unexpected transaction state %d", trans->tr_state);
 	}
 
+just_queue:
 	ct_queue_transfer(state, trans);
 	ct_body_free(state, vbody, hdr);
 	ct_header_free(state, hdr);
@@ -875,8 +939,13 @@ ct_cull_kick(struct ct_global_state *state)
 	ct_add_operation(state, ct_cull_send_complete, ct_cull_complete, NULL);
 }
 
+int	ct_cull_add_shafile(struct ct_global_state *, const char *,
+	    const char *);
+void	ct_cull_sha_insert(const uint8_t *);
+
 int
-ct_cull_add_shafile(const char *file, const char *cachedir)
+ct_cull_add_shafile(struct ct_global_state *state, const char *file,
+    const char *cachedir)
 {
 	struct ctfile_parse_state	xs_ctx;
 	char				*ct_next_filename;
@@ -908,8 +977,10 @@ next_file:
 	e_free(&cachename);
 	CNDBG(CT_LOG_CTFILE, "opening [%s]", file);
 
-	if (ret)
-		CFATALX("%s: %s", file, ct_strerror(ret));
+	if (ret) {
+		ct_fatal(state, file, ret);
+		return (1);
+	}
 
 	if (ct_filename_free) {
 		e_free(&ct_filename_free);
@@ -997,9 +1068,11 @@ ct_cull_setup(struct ct_global_state *state, struct ct_op *op)
 	}
 
 	if ((ret = ct_create_xml_cull_setup(&trans->hdr,
-	    (void **)&trans->tr_data[2], cull_uuid, CT_CULL_PRECIOUS)) != 0)
-		CFATALX("Could not create xml cull setup packet: %s",
-		    ct_strerror(ret));
+	    (void **)&trans->tr_data[2], cull_uuid, CT_CULL_PRECIOUS)) != 0) {
+		ct_fatal(state, "Could not create xml cull setup packet",
+		    ret);
+		goto dying;
+	}
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = trans->hdr.c_size;
 	trans->tr_state = TR_S_XML_CULL_SEND;
@@ -1038,9 +1111,11 @@ ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 	}
 
 	if ((ret = ct_create_xml_cull_complete(&trans->hdr,
-	    (void **)&trans->tr_data[2], cull_uuid, CT_CULL_PROCESS)) != 0)
-		CFATALX("Could not create xml cull setup packet: %s",
-		    ct_strerror(ret));
+	    (void **)&trans->tr_data[2], cull_uuid, CT_CULL_PROCESS)) != 0) {
+		ct_fatal(state, "Could not create xml cull setup packet",
+		    ret);
+		goto dying;
+	}
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = trans->hdr.c_size;
 	trans->tr_state = TR_S_XML_CULL_COMPLETE_SEND;
@@ -1082,8 +1157,10 @@ ct_cull_send_shas(struct ct_global_state *state, struct ct_op *op)
 	trans->tr_state = TR_S_XML_CULL_SHA_SEND;
 	if ((ret = ct_create_xml_cull_shas(&trans->hdr,
 	    (void **)&trans->tr_data[2], cull_uuid, &ct_sha_rb_head,
-	    sha_per_packet, &sha_add)) != 0)
-		CFATALX("can't create cull shas packet: %s", ct_strerror(ret));
+	    sha_per_packet, &sha_add)) != 0) {
+		ct_fatal(state, "can't create cull shas packet", ret);
+		goto dying;
+	}
 	shacnt -= sha_add;
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = trans->hdr.c_size;
@@ -1181,9 +1258,11 @@ ct_cull_collect_ctfiles(struct ct_global_state *state, struct ct_op *op)
 	if (state->ct_dying != 0)
 		goto dying;
 
-	if (state->ct_config->ct_ctfile_keep_days == 0)
-		CFATALX("cull: ctfile_cull_keep_days must be specified in "
-		    "config");
+	if (state->ct_config->ct_ctfile_keep_days == 0) {
+		ct_fatal(state, "cull: ctfile_cull_keep_days",
+		    CTE_MISSING_CONFIG_VALUE); 
+		goto dying;
+	}
 
 	now = time(NULL);
 	now -= (24 * 60 * 60 * state->ct_config->ct_ctfile_keep_days);
@@ -1202,8 +1281,10 @@ ct_cull_collect_ctfiles(struct ct_global_state *state, struct ct_op *op)
 		}
 	}
 
-	if (keep_files == 0)
-		CFATALX("All ctfiles are old and would be deleted, aborting.");
+	if (keep_files == 0) {
+		ct_fatal(state, NULL, CTE_CULL_EVERYTHING);
+		goto dying;
+	}
 
 	RB_FOREACH(file, ctfile_list_tree, &ct_cull_all_ctfiles) {
 		if (file->mlf_keep == 0)
@@ -1244,8 +1325,9 @@ prev_ct_file:
 		} else {
 			CNDBG(CT_LOG_CTFILE, "adding %s to keep list",
 			    file->mlf_name);
-			ct_cull_add_shafile(file->mlf_name,
-			    state->ct_config->ct_ctfile_cachedir);
+			if (ct_cull_add_shafile(state, file->mlf_name,
+			    state->ct_config->ct_ctfile_cachedir) != 0)
+				goto dying;
 		}
 	}
 

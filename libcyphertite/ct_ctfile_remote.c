@@ -184,8 +184,10 @@ ctfile_find_for_extract(struct ct_global_state *state, struct ct_op *op)
 	}
 
 	/* cook the ctfile so we only search for the actual tag */
-	if ((ctfile = ctfile_cook_name(ctfile)) == NULL)
-		CFATALX("%s: %s", ctfile, ct_strerror(CTE_INVALID_CTFILE_NAME));
+	if ((ctfile = ctfile_cook_name(ctfile)) == NULL) {
+		ct_fatal(state, ccfa->ccfa_tag, CTE_INVALID_CTFILE_NAME);
+		return;
+	}
 
 	list_fakeop = e_calloc(1, sizeof(*list_fakeop));
 	ccla = e_calloc(1, sizeof(*ccla));
@@ -375,9 +377,10 @@ again:
 		goto out;
 
 	if (prevfile[0] != '\0') {
-		if ((cookedname = ctfile_cook_name(prevfile)) == NULL)
-			CFATALX("%s: %s", prevfile,
-			    ct_strerror(CTE_INVALID_CTFILE_NAME));
+		if ((cookedname = ctfile_cook_name(prevfile)) == NULL) {
+			ct_fatal(state, ctfile, CTE_INVALID_CTFILE_NAME);
+			goto out;
+		}
 		CNDBG(CT_LOG_CTFILE, "prev file %s cookedname %s", prevfile,
 		    cookedname);
 		if (!ctfile_in_cache(cookedname, cca->cca_tdir)) {

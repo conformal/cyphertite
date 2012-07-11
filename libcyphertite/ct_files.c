@@ -71,7 +71,8 @@ RB_PROTOTYPE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 RB_GENERATE(fl_tree, flist, fl_inode_entry, fl_inode_sort);
 
 /* Directory traversal and transformation of generated data */
-static void		 ct_traverse(struct ct_archive_state *, char **,
+static int		 ct_traverse(struct ct_global_state *,
+			     struct ct_archive_state *, char **,
 			     struct flist_head *, int, int, int, int,
 			     struct ct_statistics *);
 static void		 ct_sched_backup_file(struct ct_archive_state *,
@@ -716,7 +717,8 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 	switch (ct_get_file_state(state)) {
 	case CT_S_STARTING:
 		if (*filelist == NULL) {
-			CFATALX("%s", ct_strerror(CTE_NO_FILES_SPECIFIED));
+			ct_fatal(state, NULL, CTE_NO_FILES_SPECIFIED);
+			return;
 		}
 
 		cap = e_calloc(1, sizeof(*cap));
@@ -725,50 +727,64 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		op->op_priv = cap;
 		if (caa->caa_includelist) {
 			if ((error = ct_match_compile(&cap->cap_include,
-			    caa->caa_matchmode, caa->caa_includelist)) != 0)
-				CFATALX("can't compile include list: %s",
-				    ct_strerror(error));
+			    caa->caa_matchmode, caa->caa_includelist)) != 0) {
+				ct_fatal(state, "can't compile include list",
+				    error);
+				goto dying;
+			}
 		}
 		if (caa->caa_excllist) {
 			if ((error = ct_match_compile(&cap->cap_exclude,
-			    caa->caa_matchmode, caa->caa_excllist)) != 0)
-				CFATALX("can't compile exclude list: %s",
-				    ct_strerror(error));
+			    caa->caa_matchmode, caa->caa_excllist)) != 0) {
+				ct_fatal(state, "can't compile exclude list",
+				    error);
+				goto dying;
+			}
 		}
 
-		if (getcwd(cwd, PATH_MAX) == NULL)
-			CFATALX("getcwd: %s", ct_strerror(CTE_ERRNO));
+		if (getcwd(cwd, PATH_MAX) == NULL) {
+			ct_fatal(state, "getcwd", CTE_ERRNO);
+			goto dying;
+		}
 
 		if (basisbackup != NULL) {
 			if ((error = ct_basis_setup(&nextlvl, basisbackup,
 			    filelist, caa->caa_max_incrementals,
-			    &cap->cap_prev_backup_time, cwd)) != 0)
-				CFATALX("Can't setup incremental backup: %s",
-				    ct_strerror(error));
+			    &cap->cap_prev_backup_time, cwd)) != 0) {
+				ct_fatal(state,
+				    "Can't setup incrememtal backup", error);
+				goto dying;
+			}
 
 			if (nextlvl == 0)
 				e_free(&basisbackup);
 		}
 
-		if (getcwd(cwd, PATH_MAX) == NULL)
-			CFATALX("getcwd: %s", ct_strerror(CTE_ERRNO));
-
 		if ((error = ct_archive_init(&state->archive_state,
-		    caa->caa_tdir)) != 0)
-			CFATALX("can't initialize archive mode: %s",
-			    ct_strerror(error));
-		if (caa->caa_tdir && chdir(caa->caa_tdir) != 0)
-			CFATALX("can't chdir to %s: %s", caa->caa_tdir,
-			    ct_strerror(CTE_ERRNO));
+		    caa->caa_tdir)) != 0) {
+			ct_fatal(state, "Can't initialize archive mode",
+			    error);
+			goto dying;
+		}
+		if (caa->caa_tdir && chdir(caa->caa_tdir) != 0) {
+			ct_fatal(state, "can't chdir to tmpdir",
+			    CTE_ERRNO);
+			goto dying;
+		}
 		state->ct_print_traverse_start(state->ct_print_state, filelist);
-		ct_traverse(state->archive_state, filelist, &cap->cap_flist,
-		    caa->caa_no_cross_mounts, caa->caa_strip_slash,
-		    caa->caa_follow_root_symlink, caa->caa_follow_symlinks,
-		    state->ct_stats);
+		/* ct_traverse does ct_fatal for us if it fails */
+		if (ct_traverse(state, state->archive_state, filelist,
+		    &cap->cap_flist, caa->caa_no_cross_mounts,
+		    caa->caa_strip_slash, caa->caa_follow_root_symlink,
+		    caa->caa_follow_symlinks, state->ct_stats) != 0)
+			goto dying;
 		state->ct_print_traverse_end(state->ct_print_state, filelist);
-		if (caa->caa_tdir && chdir(cwd) != 0)
-			CFATALX("can't chdir back to %s: %s", cwd,
-			    ct_strerror(CTE_ERRNO));
+		if (caa->caa_tdir && chdir(cwd) != 0) {
+			/* XXX build tmp string n stack and pass to fatal */
+			ct_fatal(state, "can't chdir back from tmpdir",
+			   CTE_ERRNO);
+			goto dying;
+		}
 		/*
 		 * Get the first file we must operate on.
 		 * Do this before we open the ctfile for writing so
@@ -778,8 +794,10 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		if ((cap->cap_curnode = ct_get_next_fnode(state->archive_state,
 		    &cap->cap_flist, &cap->cap_curlist, cap->cap_include,
 		    cap->cap_exclude, caa->caa_strip_slash,
-		    caa->caa_follow_symlinks)) == NULL)
-			CFATALX("%s", ct_strerror(CTE_ALL_FILES_EXCLUDED));
+		    caa->caa_follow_symlinks)) == NULL) {
+			ct_fatal(state, NULL, CTE_ALL_FILES_EXCLUDED);
+			goto dying;
+		}
 
 
 		/* XXX - deal with stdin */
@@ -787,9 +805,11 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		if ((error = ctfile_write_init(&cap->cap_cws, ctfile,
 		    caa->caa_ctfile_basedir, CT_MD_REGULAR, basisbackup,
 		    nextlvl, cwd, filelist, caa->caa_encrypted,
-		    caa->caa_allfiles, state->ct_max_block_size)) != 0)
-			CFATAL("can't create %s: %s", ctfile,
-			    ct_strerror(error));
+		    caa->caa_allfiles, state->ct_max_block_size)) != 0) {
+			/* XXX put name in string */
+			ct_fatal(state, "can't create ctfile %s", error);
+			goto dying;
+		}
 
 		if (basisbackup != NULL)
 			e_free(&basisbackup);
@@ -1092,10 +1112,10 @@ dying:
 	return;
 }
 
-static void
-ct_traverse(struct ct_archive_state *cas, char **paths,
-    struct flist_head *files, int no_cross_mounts, int strip_slash,
-    int follow_root_symlink, int follow_symlinks,
+static int
+ct_traverse(struct ct_global_state *state, struct ct_archive_state *cas,
+    char **paths, struct flist_head *files, int no_cross_mounts,
+    int strip_slash, int follow_root_symlink, int follow_symlinks,
     struct ct_statistics *ct_stats)
 {
 	FTS			*ftsp;
@@ -1117,8 +1137,10 @@ ct_traverse(struct ct_archive_state *cas, char **paths,
 		fts_options |= FTS_XDEV;
 	CDBG("options =  %d", fts_options);
 	ftsp = fts_open(paths, fts_options, NULL);
-	if (ftsp == NULL)
-		CFATALX("fts_open: %s", ct_strerror(CTE_ERRNO));
+	if (ftsp == NULL) {
+		ct_fatal(state, "fts_open", CTE_ERRNO);
+		return (1);
+	}
 
 	cnt = 0;
 	while ((fe = fts_read(ftsp)) != NULL) {
@@ -1134,9 +1156,10 @@ ct_traverse(struct ct_archive_state *cas, char **paths,
 			/* FALLTHROUGH */
 		case FTS_DP: /* Setup for close dir, no stats */
 			/* sanitize path */
-			if (eat_double_dots(fe->fts_path, clean) == NULL)
-				CFATALX("%s: %s", fe->fts_path,
-				    ct_strerror(CTE_CRAZY_PATH));
+			if (eat_double_dots(fe->fts_path, clean) == NULL) {
+				ct_fatal(state, fe->fts_path, CTE_CRAZY_PATH);
+				return (1);
+			}
 			if (fe->fts_info == FTS_DP)
 				goto sched;
 			break;
@@ -1158,9 +1181,10 @@ ct_traverse(struct ct_archive_state *cas, char **paths,
 			if (follow_root_symlink && fe->fts_info == FTS_D)
 				forcedir = 1;
 			if ((ret = backup_prefix(cas, clean, files, &ino_tree,
-			    strip_slash, ct_stats)) != 0)
-				CFATALX("backup_prefix: %s",
-				    ct_strerror(ret));
+			    strip_slash, ct_stats)) != 0) {
+				ct_fatal(state, "backup_prefix", ret);
+				return (1);
+			}
 		}
 
 		CNDBG(CT_LOG_FILE, "scheduling backup of %s", clean);
@@ -1172,14 +1196,22 @@ sched:
 
 	}
 
-	if (cnt == 0)
-		CFATALX("%s", ct_strerror(CTE_NO_FILES_ACCESSIBLE));
+	if (cnt == 0) {
+		ct_fatal(state, NULL, CTE_NO_FILES_ACCESSIBLE);
+		return (1);
+	}
 
-	if (fe == NULL && errno)
-		CFATALX("fts_read: %s", ct_strerror(CTE_ERRNO));
-	if (fts_close(ftsp))
-		CFATALX("fts_close: %s", ct_strerror(CTE_ERRNO));
+	if (fe == NULL && errno) {
+		ct_fatal(state, "fts_read", CTE_ERRNO);
+		return (1);
+	}
+	if (fts_close(ftsp)) {
+		ct_fatal(state, "fts_close", CTE_ERRNO);
+		return (1);
+	}
 	gettimeofday(&ct_stats->st_time_scan_end, NULL);
+
+	return (0);
 }
 
 static char *

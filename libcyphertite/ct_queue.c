@@ -419,10 +419,7 @@ ct_fatal(struct ct_global_state *state, const char *msg, int ct_errno)
 		CABORTX("no cyanide capsule, jumping off bridge");
 	/* XXX unlock */
 
-	/*
-	 * Wake up all threads. all threads should free all local data after
-	 * waking up to see  ct_dying set.
-	 */
+	/* we are quite obviously done here */
 	ct_set_file_state(state, CT_S_FINISHED);
 	state->ct_errno = ct_errno;
 	if (msg) {
@@ -435,12 +432,11 @@ ct_fatal(struct ct_global_state *state, const char *msg, int ct_errno)
 	trans->tr_complete = NULL;
 	trans->tr_cleanup = ct_cyanide_cleanup;
 
-	CWARNX("ct_fatal called with %s", ct_strerror(ct_errno));
 	ct_queue_first(state, trans);
 
 	/*
-	 * Wake up everything so that they hustle their transactions along
-	 * then free any thread-local data they had.
+	 * Wake up all threads. all threads should free all local data after
+	 * waking up to see ct_dying set.
 	 */
 	ct_wakeup_file(state->event_state);
 	ct_wakeup_sha(state->event_state);
@@ -718,8 +714,8 @@ ct_reconnect_internal(struct ct_global_state *state)
 
 	if ((ret = ct_ssl_connect(state)) == 0) {
 		if ((ret = ct_assl_negotiate_poll(state)) != 0) {
-			CFATALX("negotiate failed on reconnect: %s",
-			    ct_strerror(ret));
+			ct_fatal(state, "negotiate failed on reconnect", ret);
+			goto out;
 		}
 
 		if (state->ct_disconnected > 2)
@@ -783,9 +779,11 @@ ct_reconnect_internal(struct ct_global_state *state)
 				 */
 				if ((ret = ct_xml_file_open_polled(state,
 				    trans->tr_ctfile_name, MD_O_APPEND,
-				    trans->tr_ctfile_chunkno)) != 0)
-					CFATALX("can't reopen metadata file: %s",
-					    ct_strerror(ret));
+				    trans->tr_ctfile_chunkno)) != 0) {
+					ct_fatal(state,
+					    "can't reopen metadata file", ret);
+					goto unlock;
+				}
 				break;
 			} else if (trans->tr_state == TR_S_EX_SHA) {
 				CNDBG(CT_LOG_NET, "read in queue chunkno %d",
@@ -797,12 +795,15 @@ ct_reconnect_internal(struct ct_global_state *state)
 				 */
 				if (ct_xml_file_open_polled(state,
 				    trans->tr_ctfile_name, MD_O_READ,
-				    trans->tr_ctfile_chunkno))
-					CFATALX("can't reopen metadata file: %s",
-					    ct_strerror(ret));
+				    trans->tr_ctfile_chunkno)) {
+					ct_fatal(state,
+					    "can't reopen metadata file", ret);
+					goto unlock;
+				}
 				break;
 			}
 		}
+unlock:
 		CT_UNLOCK(&state->ct_write_lock);
 	} else {
 		CNDBG(CT_LOG_NET, "failed to reconnect to server: %s",
@@ -817,6 +818,7 @@ ct_reconnect_internal(struct ct_global_state *state)
 		}
 		state->ct_disconnected++;
 	}
+out:
 	return (state->ct_disconnected > 0);
 }
 
@@ -872,6 +874,7 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 {
 	struct ct_global_state	*state = ctx;
 	struct ct_trans		*trans = NULL;
+	char			 tagc[11]; /* 32bit number as string */
 
 	if (hdr == NULL) {
 		ct_handle_disconnect(state);
@@ -888,9 +891,11 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 		CNDBG(CT_LOG_NET,
 		    "handle message iotrans %u opcode %u status %u",
 		    hdr->c_tag, hdr->c_opcode, hdr->c_status);
-		if ((trans = ct_lookup_inflight(state, hdr->c_tag)) == NULL)
-			CFATALX("%d: %s", hdr->c_tag,
-			    ct_strerror(CTE_UNEXPECTED_TRANS));
+		if ((trans = ct_lookup_inflight(state, hdr->c_tag)) == NULL) {
+			snprintf(tagc, sizeof(tagc), "%" PRIu32, hdr->c_tag);
+			ct_fatal(state, tagc, CTE_UNEXPECTED_TRANS); 
+			return;
+		}
 	} else {
 		/* for now this is bogus */
 		CABORTX("got a message that wasn't a reply opcode: %d",
@@ -914,9 +919,17 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 		ct_handle_xml_reply(state, trans, hdr, vbody);
 		break;
 	default:
-		CFATALX("0x%x: %s", hdr->c_opcode,
-		    ct_strerror(CTE_UNEXPECTED_OPCODE));
+		snprintf(tagc, sizeof(tagc), "%" PRIu32,
+		    (uint32_t)hdr->c_opcode);
+		ct_fatal(state, tagc, CTE_UNEXPECTED_OPCODE);
+		goto dying;
 	}
+
+	return;
+
+dying:
+	/* just transfer the trans so that it'll complete */
+	ct_queue_transfer(state, trans);
 }
 
 int
@@ -1242,9 +1255,10 @@ ct_handle_exists_reply(struct ct_global_state *state, struct ct_trans *trans,
 
 	CNDBG(CT_LOG_NET, "exists_reply %" PRIu64 " status %u",
 	    trans->tr_trans_id, hdr->c_status);
-	if ((ret = ct_parse_exists_reply(hdr, vbody, &exists)) != 0)
-		CFATALX("invalid exists reply from server: %s",
-		    ct_strerror(ret) );
+	if ((ret = ct_parse_exists_reply(hdr, vbody, &exists)) != 0) {
+		ct_fatal(state, "invalid exists reply from server", ret);
+		goto transfer; /* get rid of transaction still */
+	}
 	if (exists) {
 		/* enter shas into local db */
 		trans->tr_state = TR_S_EXISTS;
@@ -1254,6 +1268,7 @@ ct_handle_exists_reply(struct ct_global_state *state, struct ct_trans *trans,
 		trans->tr_fl_node->fl_comp_size +=
 		    trans->tr_size[(int)trans->tr_dataslot];
 	}
+transfer:
 	ct_queue_transfer(state, trans);
 
 	if (vbody != NULL) {
@@ -1268,17 +1283,21 @@ void
 ct_handle_write_reply(struct ct_global_state *state, struct ct_trans *trans,
     struct ct_header *hdr, void *vbody)
 {
+	int	ret;
 	CNDBG(CT_LOG_NET, "handle_write_reply");
 	CNDBG(CT_LOG_NET, "hdr op %u status %u size %u",
 	    hdr->c_opcode, hdr->c_status, hdr->c_size);
 
-	if (ct_parse_write_reply(hdr, vbody) != 0)
-		CFATALX("chunk write failed: %s", ct_header_strerror(hdr));
+	if ((ret = ct_parse_write_reply(hdr, vbody)) != 0) {
+		ct_fatal(state, "chunk write failed", ret);
+		goto transfer; /* just transfer so trans will complete */
+	}
 
 	if (trans->hdr.c_flags & C_HDR_F_METADATA)
 		trans->tr_state = TR_S_WMD_READY; /* XXX */
 	else
 		trans->tr_state = TR_S_WRITTEN;
+transfer:
 	ct_queue_transfer(state, trans);
 	ct_header_free(NULL, hdr);
 }
@@ -1297,9 +1316,11 @@ ct_handle_read_reply(struct ct_global_state *state, struct ct_trans *trans,
 		trans->tr_state = TR_S_EX_READ;
 		if ((hdr->c_flags & C_HDR_F_METADATA) &&
 		    (ret = ct_parse_read_ctfile_chunk_info(hdr, vbody,
-			trans->tr_ctfile_chunkno)) != 0) 
-				CFATALX("invalid ctfile read packet: %s",
-				    ct_strerror(ret));
+			trans->tr_ctfile_chunkno)) != 0)  {
+				ct_fatal(state, "invalid ctfile read packet",
+				    ret);
+				goto out;
+		}
 	} else {
 		CNDBG(CT_LOG_NET, "c_flags on reply %x", hdr->c_flags);
 		/* read failure for ctfiles just means eof */
@@ -1307,10 +1328,14 @@ ct_handle_read_reply(struct ct_global_state *state, struct ct_trans *trans,
 			ctfile_extract_handle_eof(state, trans);
 			goto out;
 		} else {
+			char errstr[SHA_DIGEST_STRING_LENGTH + 27];
 			/* any other read failure is bad */
 			ct_sha1_encode(trans->tr_sha, shat);
-			CFATALX("Data missing on server sha %s: %s",
-			    shat, ct_strerror(ret));
+			strlcpy(errstr, "Data missing on server sha ",
+			    sizeof(errstr));
+			strlcat(errstr, shat, sizeof(errstr));
+			ct_fatal(state, errstr, ret);
+			goto out;
 		}
 	} 
 
@@ -1370,8 +1395,11 @@ ct_compute_compress(void *vctx)
 				    state->ct_compress_state);
 			if ((state->ct_compress_state =
 			    ct_init_compression(ncompmode)) == NULL) {
-				CFATALX("%d: %s", ncompmode,
-				    ct_strerror(CTE_SHRINK_INIT));
+				char errstr[11]; /* 32 bit int as str */
+				snprintf(errstr, sizeof(errstr), "%" PRIu32,
+				    ncompmode);
+				ct_fatal(state, errstr, CTE_SHRINK_INIT);
+				goto out;
 			}
 		}
 
@@ -1413,9 +1441,10 @@ ct_compute_compress(void *vctx)
 			newlen = state->ct_max_block_size;
 			rv = ct_uncompress(state->ct_compress_state, src, dst,
 			    len, &newlen);
-			if (rv)
-				CFATALX("%s",
-				    ct_strerror(CTE_DECOMPRESS_FAILED));
+			if (rv) {
+				ct_fatal(state, NULL, CTE_DECOMPRESS_FAILED);
+				goto out;
+			}
 		}
 
 		CNDBG(CT_LOG_TRANS, "compress block of %d to %lu, rv %d", len,
@@ -1431,6 +1460,7 @@ ct_compute_compress(void *vctx)
 			trans->tr_state = TR_S_COMPRESSED;
 		else
 			trans->tr_state = TR_S_EX_UNCOMPRESSED;
+out:
 		ct_queue_transfer(state, trans);
 	}
 }
@@ -1488,15 +1518,21 @@ ct_compute_encrypt(void *vctx)
 			if ((trans->hdr.c_flags & C_HDR_F_METADATA) == 0) {
 				if ((ret = ct_create_iv(state->ct_iv,
 				    sizeof(state->ct_iv), src, len, iv,
-				    ivlen)) != 0)
-					CFATALX("can't create iv: %s",
-					    ct_strerror(ret));
+				    ivlen)) != 0) {
+					ct_fatal(state, "can't create iv", ret);
+					goto out;
+				}
 			} else {
 				if ((ret = ct_create_iv_ctfile(
-				    trans->tr_ctfile_chunkno, iv, ivlen)) != 0)
-					CFATALX("can't create iv for ctfile %d:"
-					    "%s", trans->tr_ctfile_chunkno,
-					    ct_strerror(ret));
+				    trans->tr_ctfile_chunkno, iv,
+				    ivlen)) != 0) {
+					char errstr[27 + 11];
+					snprintf(errstr, sizeof(errstr),
+					   "can't create iv for crtfile %"
+					   PRIu32, trans->tr_ctfile_chunkno);
+					ct_fatal(state, errstr, ret);
+					goto out;
+				}
 			}
 
 			newlen = ct_encrypt(key, keysz, iv, ivlen, src,
@@ -1507,9 +1543,11 @@ ct_compute_encrypt(void *vctx)
 			    src, len, dst, state->ct_alloc_block_size);
 		}
 
-		if (newlen < 0)
-			CFATALX("%s", ct_strerror(encr ? CTE_ENCRYPT_FAILED :
-			    CTE_DECRYPT_FAILED));
+		if (newlen < 0) {
+			ct_fatal(state, NULL, encr ? CTE_ENCRYPT_FAILED :
+			    CTE_DECRYPT_FAILED);
+			goto out;
+		}
 
 		CNDBG(CT_LOG_TRANS,
 		    "%scrypt block of %d to %lu", encr ? "en" : "de",
@@ -1524,6 +1562,7 @@ ct_compute_encrypt(void *vctx)
 			trans->tr_state = TR_S_ENCRYPTED;
 		else
 			trans->tr_state = TR_S_EX_DECRYPTED;
+out:
 		ct_queue_transfer(state, trans);
 	}
 }
