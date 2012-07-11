@@ -1930,9 +1930,14 @@ ct_file_extract_opento(struct ct_extract_state *ces, struct dnode *parent,
 	int			ret;
 #endif
 
+	if (child == NULL)
+		CABORTX("no child");
+
 	if (child == parent)
 		return;
 
+	if (child->d_parent == NULL)
+		CABORTX("%s: no parent", __func__);
 	ct_file_extract_opento(ces, parent, child->d_parent);
 	/* check it exists, if it does not, create it */
 try_again:
