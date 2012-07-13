@@ -46,7 +46,7 @@
 #include <ct_match.h>
 #include <ct_ext.h>
 
-int 
+int
 ct_do_remotelist(struct ct_global_state *state, char **search, char **exclude,
     int matchmode,
     void (*printfn) (struct ct_global_state *state, struct ct_op *op))
@@ -71,7 +71,7 @@ ct_do_remotelist(struct ct_global_state *state, char **search, char **exclude,
 	return 0;
 }
 
-int 
+int
 ct_do_remotearchive(struct ct_global_state *state, char *ctfile, char **flist,
     char *tdir, char **excludelist, char **includelist, int match_mode,
     int no_cross_mounts, int strip_slash, int follow_root_symlink,
@@ -87,7 +87,7 @@ ct_do_remotearchive(struct ct_global_state *state, char *ctfile, char **flist,
 	caa.caa_matchmode = match_mode;
 	caa.caa_includelist = includelist;
 	caa.caa_tdir = tdir;
-	caa.caa_tag = ctfile; 
+	caa.caa_tag = ctfile;
 	caa.caa_ctfile_basedir = conf->ct_ctfile_cachedir;
 	/* we want to encrypt as long as we have keys */
 	caa.caa_encrypted = (conf->ct_crypto_secrets != NULL);
@@ -120,7 +120,7 @@ ct_do_remotearchive(struct ct_global_state *state, char *ctfile, char **flist,
 	return ret;
 }
 
-int 
+int
 ct_do_remoteextract(struct ct_global_state *state, char *ctfile, char *tdir,
     char **excludelist, char **includelist, int match_mode, int strip_slash,
     int follow_symlinks, int preserve_attr,  struct ct_config *conf)
