@@ -64,7 +64,7 @@ check_external_libs()
 	EXTERNAL_LIBS="$EXTERNAL_LIBS ncurses curl"
 
 	# standard lib dirs - override below if needed
-	LIB_DIRS="/usr/lib /usr/local/lib"
+	LIB_DIRS="/usr/lib /usr/lib64 /usr/local/lib /usr/local/lib64"
 
 	# linux flavor
 	if [ "$OS" = "Linux" ]; then
