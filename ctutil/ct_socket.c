@@ -786,13 +786,13 @@ ct_assl_connect(struct ct_assl_io_ctx *ctx, const char *host, const char *port,
 	if ((rv = assl_connect(ctx->c, host, port, flags)) != 0)
 		return (rv);
 
-	ctx->io_ev_rd = event_new(ev_base, ctx->c->as_sock, EV_READ|EV_PERSIST,
+	ctx->io_ev_rd = event_new(ev_base, assl_fd(ctx->c), EV_READ|EV_PERSIST,
 	    ct_event_assl_read, ctx);
 	if (ctx->io_ev_rd == NULL) {
 		return (-1);
 	}
 
-	ctx->io_ev_wr = event_new(ev_base, ctx->c->as_sock, EV_WRITE|EV_PERSIST,
+	ctx->io_ev_wr = event_new(ev_base, assl_fd(ctx->c), EV_WRITE|EV_PERSIST,
 	    ct_event_assl_write, ctx);
 	if (ctx->io_ev_wr == NULL) {
 		event_free(ctx->io_ev_rd);
