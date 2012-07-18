@@ -45,6 +45,7 @@ make
 make install DESTDIR=$RPM_BUILD_ROOT LOCALBASE=/usr
 rm -rf $RPM_BUILD_ROOT/usr/include/cyphertite
 rm -f $RPM_BUILD_ROOT/usr/lib/libctutil.a
+rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 
 %files
 %defattr(-,root,root)
