@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.2.2
+%define version		1.3.0
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,12 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Tue Jul 17 2012 - davec 1.3.0-1
+- Significant internal reorganization to split core cyphertite
+  functionality into a library (libcyphertite)
+- Add and update man pages for new library
+- Improve error reporting
+- Various bug fixes and code cleanup
 * Tue May 08 2012 - drahn 1.2.2-1
 - Fix bug to prevent crash after disconnect
 - Massive internal restructuring in preparation for additional changes
