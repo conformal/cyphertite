@@ -20,15 +20,12 @@ LIBDIR?=${LOCALBASE}/lib
 .PATH: ${.CURDIR}/../ctutil
 
 LIB=	cyphertite
-SRCS=	ct_match.c ct_proto.c ct_xdr.c ct_db.c ct_trees.c ct_crypto.c
-SRCS+=	ct_aes_xts.c
-
 SRCS=	ct_aes_xts.c ct_bw_lim.c ct_config.c ct_config_paths.c ct_crypto.c
 SRCS+=	ct_ctfile_mode.c ct_ctfile_remote.c ct_ctfile_traverse.c ct_db.c
 SRCS+=	ct_event.c ct_files.c ct_match.c ct_ops.c ct_proto.c ct_sapi.c
 SRCS+=	ct_queue.c ct_trees.c ct_util.c ct_xdr.c
-INCS=	ct_crypto.h ct_ctfile.h ct_db.h ct_ext.h cyphertite.h ct_match.h
-INCS+=	ct_proto.h ct_types.h
+HDRS=	ct_crypto.h ct_ctfile.h ct_db.h ct_ext.h cyphertite.h ct_match.h
+HDRS+=	ct_proto.h ct_types.h
 MAN= ct.3 simplect.3
 MLINKS+=ct.3 ct_create_secrets.3
 MLINKS+=ct.3 ct_unlock_secrets.3
@@ -125,5 +122,25 @@ CFLAGS+= ${INCFLAGS} ${WARNFLAGS}
 
 analyze: all
 clang: all
+
+afterinstall:
+	mkdir -p  ${DESTDIR}${INCDIR}/cyphertite
+	@cd ${.CURDIR}; for i in ${HDRS}; do \
+	cmp -s $$i ${DESTDIR}${INCDIR}/cyphertite/$$i || \
+	${INSTALL} ${INSTALL_COPY} -m 444 -o $(BINOWN) -g $(BINGRP) $$i ${DESTDIR}${INCDIR}/cyphertite/; \
+	echo ${INSTALL} ${INSTALL_COPY} -m 444 -o $(BINOWN) -g $(BINGRP) $$i ${DESTDIR}${INCDIR}/cyphertite/; \
+	done
+
+uninstall:
+	@for i in ${HDRS}; do \
+	echo rm -f ${INCDIR}/cyphertite/$$i; \
+	rm -f ${INCDIR}/cyphertite/$$i; \
+	done
+	rmdir ${INCDIR}/cyphertite
+
+	@for i in ${_LIBS}; do \
+	echo rm -f ${LIBDIR}/$$i; \
+	rm -f ${LIBDIR}/$$i; \
+	done
 
 .include <bsd.lib.mk>
