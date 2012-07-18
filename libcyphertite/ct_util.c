@@ -37,7 +37,6 @@
 #include <clog.h>
 #include <assl.h>
 #include <exude.h>
-#include <xmlsd.h>
 #include <sqlite3.h>
 
 #include <ctutil.h>

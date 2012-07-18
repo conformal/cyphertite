@@ -22,6 +22,7 @@
 #include <util.h>
 #endif
 
+#include <shrink.h>
 #include <clog.h>
 
 #include "ctutil.h"

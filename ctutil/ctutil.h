@@ -22,7 +22,6 @@
 #endif
 
 #include <sys/types.h>
-#include <shrink.h>
 #include <openssl/sha.h>
 
 #define CT_CHUNK_MAXSZ		(1024 * 1024)

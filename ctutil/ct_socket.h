@@ -20,6 +20,7 @@
 #include <ct_threads.h>
 
 #include <event2/event.h>
+#include <sys/queue.h>
 
 #ifndef evutil_socket_t
 #define evutil_socket_t int

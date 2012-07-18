@@ -29,12 +29,11 @@
 #include <errno.h>
 #include <locale.h>
 #include <libgen.h>
+#include <inttypes.h>
 
 #include <assl.h>
 #include <clog.h>
 #include <exude.h>
-#include <shrink.h>
-#include <xmlsd.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
