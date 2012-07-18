@@ -1,13 +1,11 @@
---- cyphertite/Makefile.orig	2012-03-06 02:42:09.000000000 -0600
-+++ cyphertite/Makefile	2012-03-06 02:41:30.000000000 -0600
-@@ -12,8 +12,8 @@ CC=clang
+--- cyphertite/Makefile.orig	Tue Jul 17 21:00:17 2012
++++ cyphertite/Makefile	Tue Jul 17 21:00:22 2012
+@@ -13,7 +13,7 @@ CC=clang
  .endif
  
  LOCALBASE?=/usr/local
 -BINDIR?=${LOCALBASE}/bin
--INCDIR?=${LOCALBASE}/include
 +BINDIR=${LOCALBASE}/bin
-+INCDIR=${LOCALBASE}/include
+ INCDIR?=${LOCALBASE}/include
  .PATH: ${.CURDIR}/../ctutil
  
- PROG= cyphertite

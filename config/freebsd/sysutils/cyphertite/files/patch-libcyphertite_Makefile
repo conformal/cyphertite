@@ -1,0 +1,14 @@
+--- libcyphertite/Makefile.orig	Tue Jul 17 20:34:25 2012
++++ libcyphertite/Makefile	Tue Jul 17 20:34:54 2012
+@@ -14,9 +14,9 @@ CC=clang
+ .endif
+ 
+ LOCALBASE?=/usr/local
+-BINDIR?=${LOCALBASE}/bin
++BINDIR=${LOCALBASE}/bin
+ INCDIR?=${LOCALBASE}/include
+-LIBDIR?=${LOCALBASE}/lib
++LIBDIR=${LOCALBASE}/lib
+ .PATH: ${.CURDIR}/../ctutil
+ 
+ LIB=	cyphertite

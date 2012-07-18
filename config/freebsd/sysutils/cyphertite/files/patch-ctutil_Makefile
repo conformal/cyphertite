@@ -1,6 +1,6 @@
 --- ctutil/Makefile.orig	2012-02-27 17:00:23.000000000 -0600
 +++ ctutil/Makefile	2012-03-06 02:43:10.000000000 -0600
-@@ -5,8 +5,8 @@ SYSTEM != uname -s
+@@ -6,8 +6,8 @@ SYSTEM != uname -s
  .endif
  
  LOCALBASE?=/usr/local
