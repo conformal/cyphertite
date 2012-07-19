@@ -123,6 +123,7 @@ const char *ct_errmsgs[] = {
 	    "specify its path or run \"cyphertitectl config generate\" to "
 	    "generate one.",
 	[CTE_UNABLE_TO_OPEN_CONFIG] = "Unable to open specified configuration file",
+	[CTE_XMLSD_FAILURE]= "Failed to handle xml",
 };
 
 const char *

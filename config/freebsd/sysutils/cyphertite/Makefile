@@ -22,7 +22,7 @@ LIB_DEPENDS+=	sqlite3.8:${PORTSDIR}/databases/sqlite3
 LIB_DEPENDS+=	assl.5:${PORTSDIR}/security/assl
 LIB_DEPENDS+=	exude.3:${PORTSDIR}/devel/libexude
 LIB_DEPENDS+=	shrink.2:${PORTSDIR}/archivers/libshrink
-LIB_DEPENDS+=	xmlsd.2:${PORTSDIR}/textproc/libxmlsd
+LIB_DEPENDS+=	xmlsd.3:${PORTSDIR}/textproc/libxmlsd
 LIB_DEPENDS+=	clog.2:${PORTSDIR}/devel/libclog
 
 LICENSE=        ISCL

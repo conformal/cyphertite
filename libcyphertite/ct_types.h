@@ -165,7 +165,8 @@ struct ctfile_list_file {
 #define CTE_CULL_EVERYTHING		53
 #define CTE_CONFIG_NOT_FOUND		54
 #define CTE_UNABLE_TO_OPEN_CONFIG	55
-#define CTE_MAX				56
+#define CTE_XMLSD_FAILURE		56
+#define CTE_MAX				57
 
 const char	*ct_strerror(int);
 

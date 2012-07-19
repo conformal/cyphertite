@@ -183,24 +183,36 @@ int
 ct_create_xml_negotiate(struct ct_header *hdr, void **vbody,
     int32_t dbgenid)
 {
-	struct xmlsd_element_list	 xl;
+	struct xmlsd_document		*xl;
 	struct xmlsd_element		*xe;
 	char				*body;
 	size_t				 orig_size;
+	int				 ret = CTE_XMLSD_FAILURE;
 
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
 	hdr->c_tag = 0;
 
-	xe = xmlsd_create(&xl, "ct_negotiate");
-	xe = xmlsd_add_element(&xl, xe, "clientdbgenid");
-	xmlsd_set_attr_int32(xe, "value", dbgenid);
+	if ((xmlsd_doc_alloc(&xl)) != XMLSD_ERR_SUCCES)
+		return (CTE_XMLSD_FAILURE);
 
-	body = xmlsd_generate(&xl, ct_body_alloc_xml, &orig_size, 1);
+	if ((xe = xmlsd_doc_add_elem(xl, NULL, "ct_negotiate")) == NULL)
+		goto out;
+	if ((xe = xmlsd_doc_add_elem(xl, xe, "clientdbgenid")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr_int32(xe, "value", dbgenid) != 0)
+		goto out;
+
+	if ((body = xmlsd_generate(xl, ct_body_alloc_xml, &orig_size,
+	    XMLSD_GEN_ADD_HEADER)) == NULL) 
+		goto out;
+	ret = 0;
 	hdr->c_size = orig_size;
 
 	*vbody = body;
-	return (0);
+out:
+	xmlsd_doc_free(xl);
+	return (ret);
 
 }
 
@@ -208,18 +220,18 @@ int
 ct_parse_xml_negotiate_reply(struct ct_header *hdr, void *body,
     struct ctdb_state *ctdb)
 {
-	struct xmlsd_element_list xl;
-	struct xmlsd_element	*xe;
-	char			*attrval;
+	struct xmlsd_document	*xl;
+	struct xmlsd_element	*xe, *xc;
 	char			*xml_body = body;
 	const char		*err;
 	int			attrval_i = -1;
 	int			r, rv;
 
-	TAILQ_INIT(&xl);
+	if ((xmlsd_doc_alloc(&xl)) != XMLSD_ERR_SUCCES)
+		return (CTE_XMLSD_FAILURE);
 
-	r = xmlsd_parse_mem(xml_body, hdr->c_size - 1, &xl);
-	if (r != XMLSD_ERR_SUCCES) {
+	if ((r = xmlsd_parse_mem(xml_body, hdr->c_size - 1,
+	    xl)) != XMLSD_ERR_SUCCES) {
 		CNDBG(CT_LOG_NET, "xml reply '[%s]'", xml_body ? xml_body :
 		    "<NULL>");
 		rv = CTE_XML_PARSE_FAIL;
@@ -235,22 +247,23 @@ ct_parse_xml_negotiate_reply(struct ct_header *hdr, void *body,
 	 *   elements must be ignored.
 	 */
 
-	xe = TAILQ_FIRST(&xl);
-	if (strcmp (xe->name, "ct_negotiate_reply") != 0) {
-		CNDBG(CT_LOG_XML, "invalid xml type %s", xe->name);
+	xe = xmlsd_doc_get_first_elem(xl);
+	if (strcmp(xmlsd_elem_get_name(xe), "ct_negotiate_reply") != 0) {
+		CNDBG(CT_LOG_XML, "invalid xml type %s",
+		    xmlsd_elem_get_name(xe));
 		rv = CTE_INVALID_XML_TYPE;
 		goto done;
 	}
 
-	TAILQ_FOREACH(xe, &xl, entry) {
-		if (strcmp (xe->name, "clientdbgenid") == 0) {
-			attrval = xmlsd_get_attr(xe, "value");
+	XMLSD_ELEM_FOREACH_CHILDREN(xc, xe) {
+		if (strcmp(xmlsd_elem_get_name(xc), "clientdbgenid") == 0) {
 			err = NULL;
-			attrval_i = strtonum(attrval, -1, INT_MAX, &err);
+			attrval_i = xmlsd_elem_get_attr_strtonum(xc, "value",
+			    -1, INT_MAX, &err);
 			if (err) {
 				CNDBG(CT_LOG_XML,
 				    "unable to parse clientdbgenid [%s]",
-				    attrval);
+				    xmlsd_elem_get_attr(xe, "value"));
 				rv = CTE_XML_PARSE_FAIL;
 				goto done;
 			}
@@ -267,9 +280,9 @@ ct_parse_xml_negotiate_reply(struct ct_header *hdr, void *body,
 	}
 
 
-	xmlsd_unwind(&xl);
 	rv = 0;
 done:
+	xmlsd_doc_free(xl);
 	return rv; /* success */
 }
 
@@ -471,39 +484,47 @@ static struct xmlsd_v_elements ct_xml_cull_complete_cmds[] = {
 
 int
 ct_parse_xml_prepare(struct ct_header *hdr, void *vbody,
-    struct xmlsd_v_elements *x_cmds, struct xmlsd_element_list *xl)
+    struct xmlsd_v_elements *x_cmds, struct xmlsd_document **xl)
 {
+#if 0
 	struct xmlsd_attribute	*xa;
 	struct xmlsd_element	*xe;
+#endif
 	char			*body = vbody;
 	int			 r;
 
 	CNDBG(CT_LOG_XML, "xml [%s]", (char *)vbody);
 
 	/* Dispose of last parsed command. */
-	TAILQ_INIT(xl);
+	if ((xmlsd_doc_alloc(xl)) != XMLSD_ERR_SUCCES)
+		return (CTE_XMLSD_FAILURE);
 
-	r = xmlsd_parse_mem(body, hdr->c_size - 1, xl);
+	r = xmlsd_parse_mem(body, hdr->c_size - 1, *xl);
 	if (r) {
 		CNDBG(CT_LOG_XML, "XML parse failed! (%d)", r);
+		xmlsd_doc_free(*xl);
 		return (CTE_XML_PARSE_FAIL);
 	}
 
+#if 0
 	TAILQ_FOREACH(xe, xl, entry) {
 		CNDBG(CT_LOG_XML, "%d %s = %s (parent = %s)",
-		    xe->depth, xe->name, xe->value ? xe->value : "NOVAL",
+		    xe->depth, xmsld_elem_get_name(xe), xe->value ? xe->value : "NOVAL",
 		    xe->parent ? xe->parent->name : "NOPARENT");
 		TAILQ_FOREACH(xa, &xe->attr_list, entry)
 			CNDBG(CT_LOG_XML, "\t%s = %s", xa->name, xa->value);
 	}
+#endif
 
-	if ((r = xmlsd_validate(xl, x_cmds)) != 0) {
+	if ((r = xmlsd_validate(*xl, x_cmds)) != 0) {
 		CNDBG(CT_LOG_XML, "XML validate of '%s' failed! (%d)", body, r);
+		xmlsd_doc_free(*xl);
 		return (CTE_INVALID_XML_TYPE);
 	}
 
-	if (TAILQ_EMPTY(xl)) {
+	if (xmlsd_doc_is_empty(*xl)) {
 		CNDBG(CT_LOG_XML, "parse command: No XML");
+		xmlsd_doc_free(*xl);
 		return (CTE_EMPTY_XML);
 	}
 
@@ -519,11 +540,12 @@ int
 ct_create_xml_open(struct ct_header *hdr, void **vbody, const char *file, 
     int mode, uint32_t chunkno)
 {
-	struct xmlsd_element_list	 xl;
+	struct xmlsd_document		*xl;
 	struct xmlsd_element		*xe;
 	char				*body = NULL;
 	char			 	 b64[CT_MAX_MD_FILENAME];
 	size_t			 	 sz;
+	int				 rv = CTE_XMLSD_FAILURE;
 
 	CNDBG(CT_LOG_XML, "settting up XML open for %s", file);
 	if (ct_base64_encode(CT_B64_M_ENCODE, (uint8_t *)file, strlen(file),
@@ -532,21 +554,37 @@ ct_create_xml_open(struct ct_header *hdr, void **vbody, const char *file,
 		return (CTE_CANT_BASE64);
 	}
 
+	if ((xmlsd_doc_alloc(&xl)) != XMLSD_ERR_SUCCES)
+		return (CTE_XMLSD_FAILURE);
+
 	if (mode == MD_O_WRITE || mode == MD_O_APPEND) {
-		xe = xmlsd_create(&xl, "ct_md_open_create");
-		xmlsd_set_attr(xe, "version", CT_MD_OPEN_CREATE_VERSION);
+		if ((xe = xmlsd_doc_add_elem(xl, NULL,
+		    "ct_md_open_create")) == NULL)
+			goto out;
+		if (xmlsd_elem_set_attr(xe, "version",
+		    CT_MD_OPEN_CREATE_VERSION) != 0)
+			goto out;
 	} else {	/* mode == MD_O_READ */
-		xe = xmlsd_create(&xl, "ct_md_open_read");
-		xmlsd_set_attr(xe, "version", CT_MD_OPEN_READ_VERSION);
+		if ((xe = xmlsd_doc_add_elem(xl, NULL,
+		    "ct_md_open_read")) == NULL)
+			goto out;
+		if (xmlsd_elem_set_attr(xe, "version",
+		    CT_MD_OPEN_READ_VERSION) != 0)
+			goto out;
 	}
 
-	xe = xmlsd_add_element(&xl, xe, "file");
-	xmlsd_set_attr(xe, "name", b64);
-	if (mode == MD_O_APPEND || chunkno)
-		xmlsd_set_attr_uint32(xe, "chunkno", chunkno);
+	if ((xe = xmlsd_doc_add_elem(xl, xe, "file")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr(xe, "name", b64) != 0)
+		goto out;
+	if (mode == MD_O_APPEND || chunkno) {
+		if (xmlsd_elem_set_attr_uint32(xe, "chunkno", chunkno) != 0)
+			goto out;
+	}
 
-	body = xmlsd_generate(&xl, ct_body_alloc_xml, &sz, 1);
-	xmlsd_unwind(&xl);
+	if ((body = xmlsd_generate(xl, ct_body_alloc_xml, &sz,
+	    XMLSD_GEN_ADD_HEADER))  == NULL)
+		goto out;
 
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
@@ -554,24 +592,29 @@ ct_create_xml_open(struct ct_header *hdr, void **vbody, const char *file,
 	hdr->c_size = sz;
 
 	*vbody = body;
-	return (0);
+	rv = 0;
+out:
+	xmlsd_doc_free(xl);
+	return (rv);
 }
 
 int
 ct_parse_xml_open_reply(struct ct_header *hdr, void *vbody, char **filename)
 {
-	struct xmlsd_element_list	 xl;
-	struct xmlsd_element		*xe;
+	struct xmlsd_document		*xl;
+	struct xmlsd_element		*xe, *xc;
 	int				 rv;
 
 	if ((rv = ct_parse_xml_prepare(hdr, vbody, ct_xml_open_cmds, &xl)) != 0)
 		return (rv);
 
-	xe = TAILQ_FIRST(&xl);
-	if (strncmp(xe->name, "ct_md_open", strlen("ct_md_open")) == 0) {
-		TAILQ_FOREACH(xe, &xl, entry) {
-			if (strcmp(xe->name, "file") == 0) {
-				*filename = e_strdup(xmlsd_get_attr(xe, "name"));
+	xe = xmlsd_doc_get_first_elem(xl);
+	if (strncmp(xmlsd_elem_get_name(xe), "ct_md_open",
+	    strlen("ct_md_open")) == 0) {
+		XMLSD_ELEM_FOREACH_CHILDREN(xc, xe) {
+			if (strcmp(xmlsd_elem_get_name(xc), "file") == 0) {
+				*filename =
+				    e_strdup(xmlsd_elem_get_attr(xc, "name"));
 				if (*filename[0] == '\0')
 					e_free(filename);
 			}
@@ -581,24 +624,30 @@ ct_parse_xml_open_reply(struct ct_header *hdr, void *vbody, char **filename)
 		rv = CTE_INVALID_XML_TYPE;
 	}
 
-	xmlsd_unwind(&xl);
+	xmlsd_doc_free(xl);
 	return (rv);
 }
 
 int
 ct_create_xml_close(struct ct_header *hdr, void **vbody)
 {
-	struct xmlsd_element_list	 xl;
+	struct xmlsd_document		*xl;
 	struct xmlsd_element		*xe;
 	char				*body;
 	size_t				 sz;
+	int				 rv = CTE_XMLSD_FAILURE;
 
 	CNDBG(CT_LOG_XML, "creating xml close packet");
-	xe = xmlsd_create(&xl, "ct_md_close");
-	xmlsd_set_attr(xe, "version", CT_MD_CLOSE_VERSION);
+	if ((xmlsd_doc_alloc(&xl)) != XMLSD_ERR_SUCCES)
+		return (CTE_XMLSD_FAILURE);
 
-	body = xmlsd_generate(&xl, ct_body_alloc_xml, &sz, 1);
-	xmlsd_unwind(&xl);
+	if ((xe = xmlsd_doc_add_elem(xl, NULL, "ct_md_close")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr(xe, "version", CT_MD_CLOSE_VERSION) != 0)
+		goto out;
+	if ((body = xmlsd_generate(xl, ct_body_alloc_xml, &sz,
+	    XMLSD_GEN_ADD_HEADER)) == NULL)
+		goto out;
 
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
@@ -606,45 +655,56 @@ ct_create_xml_close(struct ct_header *hdr, void **vbody)
 	hdr->c_size = sz;
 
 	*vbody = body;
-	return (0);
+	rv = 0;
+out:
+	xmlsd_doc_free(xl);
+	return (rv);
 }
 
 int
 ct_parse_xml_close_reply(struct ct_header *hdr, void *vbody)
 {
-	struct xmlsd_element_list xl;
-	struct xmlsd_element *xe;
-	int rv;
+	struct xmlsd_document	*xl;
+	struct xmlsd_element	*xe;
+	int			 rv;
 
 	if ((rv = ct_parse_xml_prepare(hdr, vbody,
 	    ct_xml_close_cmds, &xl)) != 0)
 		return (rv);
 
-	xe = TAILQ_FIRST(&xl);
-	if (strcmp(xe->name, "ct_md_close") == 0) {
+	xe = xmlsd_doc_get_first_elem(xl);
+	if (strcmp(xmlsd_elem_get_name(xe), "ct_md_close") == 0) {
 		rv = 0;
 	} else {
 		rv = CTE_INVALID_XML_TYPE;
 	}
 
-	xmlsd_unwind(&xl);
+	xmlsd_doc_free(xl);
 	return (rv);
 }
 
 int
 ct_create_xml_list(struct ct_header *hdr, void **vbody)
 {
-	struct xmlsd_element_list	 xl;
+	struct xmlsd_document	 	*xl;
 	struct xmlsd_element		*xe;
 	char				*body;
 	size_t				 sz;
+	int				 rv = CTE_XMLSD_FAILURE;
 
 	CNDBG(CT_LOG_XML, "creating xml list packet");
-	xe = xmlsd_create(&xl, "ct_md_list");
-	xmlsd_set_attr(xe, "version", CT_MD_LIST_VERSION);
 
-	body = xmlsd_generate(&xl, ct_body_alloc_xml, &sz, 1);
-	xmlsd_unwind(&xl);
+	if ((xmlsd_doc_alloc(&xl)) != XMLSD_ERR_SUCCES)
+		return (CTE_XMLSD_FAILURE);
+
+	if ((xe = xmlsd_doc_add_elem(xl, NULL, "ct_md_list")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr(xe, "version", CT_MD_LIST_VERSION) != 0)
+		goto out;
+
+	if ((body = xmlsd_generate(xl, ct_body_alloc_xml, &sz,
+	    XMLSD_GEN_ADD_HEADER)) == NULL)
+		goto out;
 
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
@@ -652,7 +712,10 @@ ct_create_xml_list(struct ct_header *hdr, void **vbody)
 	hdr->c_size = sz;
 
 	*vbody = body;
-	return (0);
+	rv = 0;
+out:
+	xmlsd_doc_free(xl);
+	return (rv);
 }
 
 
@@ -660,24 +723,23 @@ int
 ct_parse_xml_list_reply(struct ct_header *hdr, void *vbody,
     struct ctfile_list *head)
 {
-	struct xmlsd_element_list xl;
-	struct xmlsd_element *xe;
-	int rv;
+	struct xmlsd_document	*xl;
+	struct xmlsd_element	*xe, *xc;
+	int			 rv;
 
 	if ((rv = ct_parse_xml_prepare(hdr, vbody,
 	    ct_xml_list_cmds, &xl)) != 0)
 		return (rv);
 
-	xe = TAILQ_FIRST(&xl);
-	if (strcmp(xe->name, "ct_md_list") == 0) {
+	xe = xmlsd_doc_get_first_elem(xl);
+	if (strcmp(xmlsd_elem_get_name(xe), "ct_md_list") == 0) {
 		struct ctfile_list_file	*file;
-		const char		*errstr;
-		char			*tmp;
+		const char		*errstr, *tmp;
 
-		TAILQ_FOREACH(xe, &xl, entry) {
-			if (strcmp(xe->name, "file") == 0) {
+		XMLSD_ELEM_FOREACH_CHILDREN(xc, xe) {
+			if (strcmp(xmlsd_elem_get_name(xc), "file") == 0) {
 				file = e_malloc(sizeof(*file));
-				tmp = xmlsd_get_attr(xe, "name");
+				tmp = xmlsd_elem_get_attr(xc, "name");
 				if (tmp == NULL) {
 					e_free(&file);
 					continue;
@@ -691,7 +753,7 @@ ct_parse_xml_list_reply(struct ct_header *hdr, void *vbody,
 					    continue;
 				}
 
-				tmp = xmlsd_get_attr(xe, "size");
+				tmp = xmlsd_elem_get_attr(xc, "size");
 				file->mlf_size = strtonum(tmp, 0, LLONG_MAX,
 				    &errstr);
 				if (errstr != NULL) {
@@ -701,7 +763,7 @@ ct_parse_xml_list_reply(struct ct_header *hdr, void *vbody,
 					continue;
 				}
 
-				tmp = xmlsd_get_attr(xe, "mtime");
+				tmp = xmlsd_elem_get_attr(xc, "mtime");
 				file->mlf_mtime = strtonum(tmp, 0, LLONG_MAX,
 				    &errstr);
 				if (errstr != NULL) {
@@ -718,18 +780,19 @@ ct_parse_xml_list_reply(struct ct_header *hdr, void *vbody,
 	} else  {
 		rv = CTE_INVALID_XML_TYPE;
 	}
-	xmlsd_unwind(&xl);
+	xmlsd_doc_free(xl);
 	return (rv);
 }
 
 int
 ct_create_xml_delete(struct ct_header *hdr, void **vbody, const char *name)
 {
-	struct xmlsd_element_list	 xl;
+	struct xmlsd_document		*xl;
 	struct xmlsd_element		*xe;
 	char				*body;
 	char				 b64[CT_MAX_MD_FILENAME * 2];
 	size_t				 sz;
+	int				 rv = CTE_XMLSD_FAILURE;
 
 	CNDBG(CT_LOG_XML, "creating xml delete for %s", name);
 	if (ct_base64_encode(CT_B64_M_ENCODE, (uint8_t *)name, strlen(name),
@@ -738,13 +801,21 @@ ct_create_xml_delete(struct ct_header *hdr, void **vbody, const char *name)
 		return (CTE_CANT_BASE64);
 	}
 
-	xe = xmlsd_create(&xl, "ct_md_delete");
-	xmlsd_set_attr(xe, "version", CT_MD_DELETE_VERSION);
-	xe = xmlsd_add_element(&xl, xe, "file");
-	xmlsd_set_attr(xe, "name", b64);
+	if (xmlsd_doc_alloc(&xl) != XMLSD_ERR_SUCCES)
+		return (CTE_XMLSD_FAILURE);
 
-	body = xmlsd_generate(&xl, ct_body_alloc_xml, &sz, 1);
-	xmlsd_unwind(&xl);
+	if ((xe = xmlsd_doc_add_elem(xl, NULL, "ct_md_delete")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr(xe, "version", CT_MD_DELETE_VERSION) != 0) 
+		goto out;
+	if ((xe = xmlsd_doc_add_elem(xl, xe, "file")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr(xe, "name", b64))
+		goto out;
+
+	if ((body = xmlsd_generate(xl, ct_body_alloc_xml, &sz,
+	    XMLSD_GEN_ADD_HEADER)) == NULL)
+		goto out;
 
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
@@ -752,32 +823,36 @@ ct_create_xml_delete(struct ct_header *hdr, void **vbody, const char *name)
 	hdr->c_size = sz;
 
 	*vbody = body;
-	return (0);
+	rv = 0;
+out:
+	xmlsd_doc_free(xl);
+	return (rv);
 }
 
 int
 ct_parse_xml_delete_reply(struct ct_header *hdr, void *vbody, char **filename)
 {
-	struct xmlsd_element_list xl;
-	struct xmlsd_element *xe;
-	char b64[CT_MAX_MD_FILENAME * 2];
-	int rv;
+	struct xmlsd_document	*xl;
+	struct xmlsd_element	*xe, *xc;
+	char			 b64[CT_MAX_MD_FILENAME * 2];
+	int			 rv;
+	const char		*fname;
 
 	if ((rv = ct_parse_xml_prepare(hdr, vbody,
 	    ct_xml_delete_cmds, &xl)) != 0)
 		return (rv);
 
-	xe = TAILQ_FIRST(&xl);
-	if (strcmp(xe->name, "ct_md_delete") == 0) {
-		TAILQ_FOREACH(xe, &xl, entry) {
-			if (strcmp(xe->name, "file") == 0) {
-				*filename = xmlsd_get_attr(xe, "name");
-				if (*filename[0] == '\0') {
-					*filename = NULL;
+	xe = xmlsd_doc_get_first_elem(xl);
+	if (strcmp(xmlsd_elem_get_name(xe), "ct_md_delete") == 0) {
+		XMLSD_ELEM_FOREACH_CHILDREN(xc, xe) {
+			if (strcmp(xmlsd_elem_get_name(xc), "file") == 0) {
+				fname = xmlsd_elem_get_attr(xc, "name");
+				if (fname[0] == '\0') {
+					fname = NULL;
 					continue;
 				}
 				if (ct_base64_encode(CT_B64_M_DECODE,
-				    (uint8_t *)*filename, strlen(*filename),
+				    (uint8_t *)fname, strlen(fname),
 				    (uint8_t *)b64, sizeof(b64))) {
 					CNDBG(CT_LOG_XML,
 					    "cant base64 decode %s",
@@ -791,7 +866,7 @@ ct_parse_xml_delete_reply(struct ct_header *hdr, void *vbody, char **filename)
 		rv = CTE_INVALID_XML_TYPE;
 	}
 
-	xmlsd_unwind(&xl);
+	xmlsd_doc_free(xl);
 	return (0);
 }
 
@@ -799,11 +874,12 @@ int
 ct_create_xml_cull_setup(struct ct_header *hdr, void **vbody,
     uint64_t cull_uuid, int mode)
 {
-	struct xmlsd_element_list	 xl;
+	struct xmlsd_document		*xl;
 	struct xmlsd_element		*xp, *xe;
 	char				*body;
 	char				*type;
 	size_t				 sz;
+	int				 rv = CTE_XMLSD_FAILURE;
 
 	CNDBG(CT_LOG_XML, "creating xml cull setup");
 
@@ -815,14 +891,24 @@ ct_create_xml_cull_setup(struct ct_header *hdr, void **vbody,
 		CABORTX("invalid cull type %d", mode);
 	};
 
-	xp = xmlsd_create(&xl, "ct_cull_setup");
-	xmlsd_set_attr(xp, "version", CT_CULL_SETUP_VERSION);
-	xe = xmlsd_add_element(&xl, xp, "cull");
-	xmlsd_set_attr(xe, "type", type);
-	xmlsd_set_attr_uint64(xe, "uuid", cull_uuid);
+	if ((xmlsd_doc_alloc(&xl)) != XMLSD_ERR_SUCCES)
+		return (CTE_XMLSD_FAILURE);
 
-	body = xmlsd_generate(&xl, ct_body_alloc_xml, &sz, 1);
-	xmlsd_unwind(&xl);
+	if ((xp = xmlsd_doc_add_elem(xl, NULL,
+	    "ct_cull_setup")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr(xp, "version", CT_CULL_SETUP_VERSION) != 0)
+		goto out;
+	if ((xe = xmlsd_doc_add_elem(xl, xp, "cull")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr(xe, "type", type) != 0)
+		goto out;
+	if (xmlsd_elem_set_attr_uint64(xe, "uuid", cull_uuid) != 0)
+		goto out;
+
+	if ((body = xmlsd_generate(xl, ct_body_alloc_xml, &sz,
+	    XMLSD_GEN_ADD_HEADER)) == NULL)
+		goto out;
 
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
@@ -830,28 +916,32 @@ ct_create_xml_cull_setup(struct ct_header *hdr, void **vbody,
 	hdr->c_size = sz;
 
 	*vbody = body;
-	return (0);
+	rv = 0;
+
+out:
+	xmlsd_doc_free(xl);
+	return (rv);
 }
 
 int
 ct_parse_xml_cull_setup_reply(struct ct_header *hdr, void *vbody)
 {
-	struct xmlsd_element_list xl;
-	struct xmlsd_element *xe;
-	int rv;
+	struct xmlsd_document	*xl;
+	struct xmlsd_element	*xe;
+	int			 rv;
 
 	if ((rv = ct_parse_xml_prepare(hdr, vbody,
 	    ct_xml_cull_setup_cmds, &xl)) != 0)
 		return (rv);
 
-	xe = TAILQ_FIRST(&xl);
-	if (strcmp(xe->name, "ct_cull_setup_reply") == 0) {
+	xe = xmlsd_doc_get_first_elem(xl);
+	if (strcmp(xmlsd_elem_get_name(xe), "ct_cull_setup_reply") == 0) {
 		CNDBG(CT_LOG_XML, "cull_setup_reply");
 	} else  {
 		rv = CTE_INVALID_XML_TYPE;
 	}
 
-	xmlsd_unwind(&xl);
+	xmlsd_doc_free(xl);
 	return (0);
 }
 
@@ -859,34 +949,46 @@ int
 ct_create_xml_cull_shas(struct ct_header *hdr, void **vbody, uint64_t cull_uuid,
  struct ct_sha_lookup *head, int sha_per_packet, int *no_shas)
 {
-	struct xmlsd_element_list	xl;
+	struct xmlsd_document		*xl;
 	struct xmlsd_element		*xe, *xp;
 	struct sha_entry		*node;
 	char				*body;
 	char				shat[SHA_DIGEST_STRING_LENGTH];
 	size_t				sz;
 	int				shas_in_packet = 0;
+	int				rv = CTE_XMLSD_FAILURE;
 
-	xp = xmlsd_create(&xl, "ct_cull_shas");
-	xmlsd_set_attr(xp, "version", CT_CULL_SHA_VERSION);
+	if ((xmlsd_doc_alloc(&xl)) != XMLSD_ERR_SUCCES)
+		return (CTE_XMLSD_FAILURE);
 
-	xe = xmlsd_add_element(&xl, xp, "uuid");
-	xmlsd_set_attr_uint64(xe, "value", cull_uuid);
+	if ((xp = xmlsd_doc_add_elem(xl, NULL,
+	    "ct_cull_shas")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr(xp, "version", CT_CULL_SHA_VERSION) != 0)
+		goto out;
+
+	if ((xe = xmlsd_doc_add_elem(xl, xp, "uuid")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr_uint64(xe, "value", cull_uuid) != 0)
+		goto out;
 
 	while ((node = RB_ROOT(head)) != NULL &&
 	    shas_in_packet < sha_per_packet) {
-		xe = xmlsd_add_element(&xl, xp, "sha");
+		if ((xe = xmlsd_doc_add_elem(xl, xp, "sha")) == NULL)	
+			goto out;
 		ct_sha1_encode(node->sha, shat);
 		//CNDBG(CT_LOG_SHA, "adding sha %s\n", shat);
-		xmlsd_set_attr(xe, "sha", shat);
+		if (xmlsd_elem_set_attr(xe, "sha", shat) != 0)
+			goto out;
 		shas_in_packet++;
 
 		RB_REMOVE(ct_sha_lookup, head, node);
 		e_free(&node);
 	}
 
-	body = xmlsd_generate(&xl, ct_body_alloc_xml, &sz, 1);
-	xmlsd_unwind(&xl);
+	if ((body = xmlsd_generate(xl, ct_body_alloc_xml, &sz,
+	    XMLSD_GEN_ADD_HEADER)) == NULL)
+		goto out;
 
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
@@ -896,28 +998,31 @@ ct_create_xml_cull_shas(struct ct_header *hdr, void **vbody, uint64_t cull_uuid,
 	if (no_shas)
 		*no_shas = shas_in_packet;
 	*vbody = body;
-	return (0);
+	rv = 0;
+out:
+	xmlsd_doc_free(xl);
+	return (rv);
 }
 
 int
 ct_parse_xml_cull_shas_reply(struct ct_header *hdr, void *vbody)
 {
-	struct xmlsd_element_list xl;
-	struct xmlsd_element *xe;
-	int rv;
+	struct xmlsd_document	*xl;
+	struct xmlsd_element	*xe;
+	int			 rv;
 
 	if ((rv = ct_parse_xml_prepare(hdr, vbody,
 	    ct_xml_cull_shas_cmds, &xl)) != 0)
 		return (rv);
 
-	xe = TAILQ_FIRST(&xl);
-	if (strcmp(xe->name, "ct_cull_shas_reply") == 0) {
+	xe = xmlsd_doc_get_first_elem(xl);
+	if (strcmp(xmlsd_elem_get_name(xe), "ct_cull_shas_reply") == 0) {
 		CNDBG(CT_LOG_XML, "cull_shas_reply");
 	} else  {
 		rv = CTE_INVALID_XML_TYPE;
 	}
 
-	xmlsd_unwind(&xl);
+	xmlsd_doc_free(xl);
 	return (0);
 }
 
@@ -925,11 +1030,12 @@ int
 ct_create_xml_cull_complete(struct ct_header *hdr, void **vbody,
     uint64_t cull_uuid, int mode)
 {
-	struct xmlsd_element_list	 xl;
+	struct xmlsd_document		*xl;
 	struct xmlsd_element		*xp, *xe;
 	char				*body;
 	char				*type;
 	size_t				 sz;
+	int				 rv = CTE_XMLSD_FAILURE;
 
 	CNDBG(CT_LOG_XML, "creating xml cull setup");
 
@@ -941,14 +1047,24 @@ ct_create_xml_cull_complete(struct ct_header *hdr, void **vbody,
 		CABORTX("invalid cull type %d", mode);
 	};
 
-	xp = xmlsd_create(&xl, "ct_cull_complete");
-	xmlsd_set_attr(xp, "version", CT_CULL_COMPLETE_VERSION);
-	xe = xmlsd_add_element(&xl, xp, "cull");
-	xmlsd_set_attr(xe, "type", type);
-	xmlsd_set_attr_uint64(xe, "uuid", cull_uuid);
+	if ((xmlsd_doc_alloc(&xl)) != XMLSD_ERR_SUCCES)
+		return (CTE_XMLSD_FAILURE);
 
-	body = xmlsd_generate(&xl, ct_body_alloc_xml, &sz, 1);
-	xmlsd_unwind(&xl);
+	if ((xp = xmlsd_doc_add_elem(xl, NULL,
+	    "ct_cull_complete")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr(xp, "version", CT_CULL_COMPLETE_VERSION) != 0)
+		goto out;
+	if ((xe = xmlsd_doc_add_elem(xl, xp, "cull")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr(xe, "type", type) != 0)
+		goto out;
+	if (xmlsd_elem_set_attr_uint64(xe, "uuid", cull_uuid) != 0)
+		goto out;
+
+	if ((body = xmlsd_generate(xl, ct_body_alloc_xml, &sz,
+	    XMLSD_GEN_ADD_HEADER)) == NULL)
+		goto out;
 
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
@@ -956,28 +1072,31 @@ ct_create_xml_cull_complete(struct ct_header *hdr, void **vbody,
 	hdr->c_size = sz;
 
 	*vbody = body;
-	return (0);
+	rv = 0;
+out:
+	xmlsd_doc_free(xl);
+	return (rv);
 }
 
 int
 ct_parse_xml_cull_complete_reply(struct ct_header *hdr, void *vbody)
 {
-	struct xmlsd_element_list xl;
-	struct xmlsd_element *xe;
-	int rv;
+	struct xmlsd_document	*xl;
+	struct xmlsd_element	*xe;
+	int			 rv;
 
 	if ((rv = ct_parse_xml_prepare(hdr, vbody,
 	    ct_xml_cull_complete_cmds, &xl)) != 0)
 		return (rv);
 
-	xe = TAILQ_FIRST(&xl);
-	if (strcmp(xe->name, "ct_cull_complete_reply") == 0) {
+	xe = xmlsd_doc_get_first_elem(xl);
+	if (strcmp(xmlsd_elem_get_name(xe), "ct_cull_complete_reply") == 0) {
 		CNDBG(CT_LOG_XML, "cull_complete_reply");
 	} else  {
 		rv = CTE_INVALID_XML_TYPE;
 	}
 
-	xmlsd_unwind(&xl);
+	xmlsd_doc_free(xl);
 	return (0);
 }
 

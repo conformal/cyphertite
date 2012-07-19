@@ -128,9 +128,10 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 	int			 rv, fd;
 	uint8_t			 pwd_digest[SHA512_DIGEST_LENGTH];
 	char			 b64[2048];
-	char			*xml, *xml_val;
+	char			*xml;
+	const char		*xml_val;
 	size_t			 xml_size;
-	struct			 xmlsd_element_list xel;
+	struct			 xmlsd_document	*xd;
 	char			*ca_cert, *user_cert, *user_key;
 	FILE			*f = NULL;
 	struct stat		sb;
@@ -151,14 +152,15 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 			CFATALX("unable to get cert bundle, rv %d", rv);
 	}
 
-	TAILQ_INIT(&xel);
-	if ((rv = xmlsd_parse_mem(xml, xml_size, &xel))) {
+	if (xmlsd_doc_alloc(&xd) != XMLSD_ERR_SUCCES)
+		CFATALX("unable to alloc xml document");
+	if ((rv = xmlsd_parse_mem(xml, xml_size, xd))) {
 		CFATALX("unable to parse cert bundle xml, rv %d", rv);
 	}
 
 	/* ca cert */
 	if (stat(config->ct_ca_cert , &sb) != 0) {
-		xml_val = xmlsd_get_value(&xel, "ca_cert", NULL);
+		xml_val = xmlsd_doc_find_value(xd, "ca_cert", NULL);
 		if (xml_val == NULL) {
 			CFATALX("unable to get ca cert xml");
 		}
@@ -188,7 +190,7 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 
 	/* user cert */
 	if (stat(config->ct_cert , &sb) != 0) {
-		xml_val = xmlsd_get_value(&xel, "user_cert", NULL);
+		xml_val = xmlsd_doc_find_value(xd, "user_cert", NULL);
 		if (xml_val == NULL) {
 			CFATALX("unable to get user cert xml");
 		}
@@ -218,7 +220,7 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 
 	/* user key */
 	if (stat(config->ct_key, &sb) != 0) {
-		xml_val = xmlsd_get_value(&xel, "user_key", NULL);
+		xml_val = xmlsd_doc_find_value(xd, "user_key", NULL);
 		if (xml_val == NULL) {
 			CFATALX("unable to get user key xml");
 		}
@@ -246,7 +248,7 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 		}
 	}
 
-	xmlsd_unwind(&xel);
+	xmlsd_doc_free(xd);
 }
 
 int
