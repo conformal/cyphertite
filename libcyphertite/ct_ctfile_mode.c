@@ -828,10 +828,18 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 		}
 		trans->tr_state = TR_S_DONE;
 		break;
-	default:
+	case TR_S_XML_EXT:
 #if defined (CT_EXT_XML_REPLY_HANDLER)
-		CT_EXT_XML_REPLY_HANDLER(trans, hdr, vbody);
+		ret = CT_EXT_XML_REPLY_HANDLER(trans, hdr, vbody);
+		if (ret) {
+			ct_fatal(state, "failed to parse xml ext reply", ret);
+		}
+		trans->tr_state = TR_S_DONE;
+		break;
+#else
+		/* FALLTHROUGH */
 #endif
+	default:
 		CABORTX("unexpected transaction state %d", trans->tr_state);
 	}
 

@@ -433,11 +433,6 @@ ct_parse_read_ctfile_chunk_info(struct ct_header *hdr, void *vbody,
 	return (0);
 }
 
-/* XXX this needs a home now */
-#ifdef CT_EXT_XML_CMDS
-	CT_EXT_XML_CMDS
-#endif
-
 static struct xmlsd_v_elements ct_xml_open_cmds[] = {
 	{ "ct_md_open_read", xe_ct_md_open_read },
 	{ "ct_md_open_create", xe_ct_md_open_create },

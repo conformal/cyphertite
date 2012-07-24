@@ -541,6 +541,7 @@ skip_csha:
 	case TR_S_XML_CULL_SEND:
 	case TR_S_XML_CULL_SHA_SEND:
 	case TR_S_XML_CULL_COMPLETE_SEND:
+	case TR_S_XML_EXT:
 		ct_queue_write(state, trans);
 		break;
 	default:
@@ -1222,6 +1223,7 @@ ct_process_write(void *vctx)
 		case TR_S_XML_CULL_SEND:
 		case TR_S_XML_CULL_SHA_SEND:
 		case TR_S_XML_CULL_COMPLETE_SEND:
+		case TR_S_XML_EXT:
 			/* hdr populated previously */
 			data = trans->tr_data[2];
 			break;

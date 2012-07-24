@@ -364,6 +364,7 @@ struct ct_trans {
 #define TR_S_XML_CULL_COMPLETE_SEND	(30)
 #define TR_S_XML_CULL_REPLIED	(31)
 #define TR_S_CYANIDE_CAPSULE	(32)	/* event loop dying */
+#define TR_S_XML_EXT		(33)
 
 	char			tr_dataslot;
 	char			tr_eof;
