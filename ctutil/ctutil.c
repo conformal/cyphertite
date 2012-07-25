@@ -90,7 +90,7 @@ ct_getbyteval(char c)
 }
 
 int
-ct_text2sha(char *shat, uint8_t *sha)
+ct_text2sha(const char *shat, uint8_t *sha)
 {
 	int			i, x;
 	uint8_t			v1, v2;

@@ -201,7 +201,7 @@ size_t		ct_compress_bounds(struct ct_compress_ctx *, size_t);
 /* digest */
 void		ct_sha1(uint8_t *, uint8_t *, size_t);
 void		ct_sha1_encode(uint8_t *, char *);
-int		ct_text2sha(char *, uint8_t *);
+int		ct_text2sha(const char *, uint8_t *);
 void		ct_sha512(uint8_t *, uint8_t *, size_t);
 void		ct_sha512_encode(uint8_t *, char *);
 
