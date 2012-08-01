@@ -386,9 +386,13 @@ ct_matchlist_free(char **flist)
 }
 
 #if 0
+#include <err.h>
+#include <unistd.h>
+
 int
 main(int argc, char *argv[])
 {
+	struct ct_match		*ctm = NULL;
 	uint32_t		cflags;
 	int			c, imode;
 	char			*mode = NULL, *match = NULL;
@@ -433,14 +437,14 @@ main(int argc, char *argv[])
 
 	CDBG("mode: %s", mode);
 
-	ct_match_compile(imode, argv);
+	ct_match_compile(&ctm, imode, argv);
 
-	if (ct_match(imode, match))
+	if (ct_match(ctm, match))
 		printf("%s not matched\n", match);
 	else
 		printf("%s matched\n", match);
 
-	ct_match_unwind(imode);
+	ct_match_unwind(ctm);
 
 	e_check_memory();
 
