@@ -21,7 +21,6 @@
 #include <sys/types.h>
 #include <sys/tree.h>
 #include <regex.h>
-#include <fnmatch.h>
 #include <clog.h>
 #include <exude.h>
 
@@ -139,24 +138,6 @@ ct_glob_unwind(char **g)
 			break;
 		e_free(&g[i]);
 	}
-}
-
-int
-ct_glob_match(char **g, char *file)
-{
-	int			i;
-
-	if (g == NULL)
-		return (0); /* no pattern means everything matches */
-
-	for (i = 0; g[i] != NULL; i++) {
-		if (g[i] == NULL)
-			break;
-		if (fnmatch(g[i], file, 0) == 0)
-			return (0); /* match */
-	}
-
-	return (1); /* no match */
 }
 
 void
