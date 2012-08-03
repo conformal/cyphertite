@@ -167,12 +167,13 @@ ctdb_check_db_mode(struct ctdb_state *state)
 	if (rc == SQLITE_DONE) {
 		CNDBG(CT_LOG_DB, "ctdb mode not found");
 		goto fail;
-	} else if (rc != SQLITE_ROW)
+	} else if (rc != SQLITE_ROW) {
 		CNDBG(CT_LOG_DB, "could not step(%d) %d %d %s",
 		    __LINE__, rc,
 		    sqlite3_extended_errcode(state->ctdb_db),
 		    sqlite3_errmsg(state->ctdb_db));
 		goto fail;
+	}
 	p = (char *)sqlite3_column_text(stmt, 0);
 	if (p) {
 		wanted =  state->ctdb_crypt ? 'Y' : 'N';
@@ -187,8 +188,10 @@ ctdb_check_db_mode(struct ctdb_state *state)
 			goto fail;
 		}
 	}
-	if (sqlite3_finalize(stmt))
+	if (sqlite3_finalize(stmt)) {
+		CNDBG(CT_LOG_DB, "can't finalise statement");
 		goto fail;
+	}
 
 	if (sqlite3_prepare_v2(state->ctdb_db, "SELECT value FROM genid",
 	    -1, &stmt, NULL)) {
@@ -215,6 +218,7 @@ ctdb_check_db_mode(struct ctdb_state *state)
 		goto fail;
 	}
 
+	CNDBG(CT_LOG_DB, "Mode check successful");
 	rv = 1;
 fail:
 	/* not much we can do if this fails */
