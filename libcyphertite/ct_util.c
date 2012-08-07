@@ -180,7 +180,7 @@ ct_log_traverse_end_default(void *state, char **filelist)
 
 int
 ct_init(struct ct_global_state **statep, struct ct_config *conf,
-    int need_secrets, void (*info_cb)(evutil_socket_t, short, void *))
+    int flags, void (*info_cb)(evutil_socket_t, short, void *))
 {
 	struct ct_global_state *state = NULL;
 	extern void		ct_reconnect(evutil_socket_t, short, void *);
@@ -198,7 +198,7 @@ ct_init(struct ct_global_state **statep, struct ct_config *conf,
 	    NULL)) != 0)
 		goto fail;
 
-	if (need_secrets != 0 && conf->ct_crypto_secrets != NULL) {
+	if ((flags & CT_NEED_SECRETS) != 0 && conf->ct_crypto_secrets != NULL) {
 		if (stat(conf->ct_crypto_secrets, &sb) == -1) {
 			ret = CTE_NO_SECRETS_FILE;
 			goto fail;
@@ -212,7 +212,7 @@ ct_init(struct ct_global_state **statep, struct ct_config *conf,
 		}
 	}
 
-	if ((ret = ct_init_eventloop(state, info_cb)) != 0)
+	if ((ret = ct_init_eventloop(state, info_cb, flags)) != 0)
 		goto fail;
 
 	*statep = state;
@@ -271,7 +271,7 @@ ct_set_log_fns(struct ct_global_state *state, void *logst,
 
 int
 ct_init_eventloop(struct ct_global_state *state,
-    void (*info_cb)(evutil_socket_t, short, void *))
+    void (*info_cb)(evutil_socket_t, short, void *), int flags)
 {
 	int ret, s_errno;
 
@@ -281,8 +281,12 @@ ct_init_eventloop(struct ct_global_state *state,
 	CT_EXT_INIT(state);
 #endif
 
-	state->ct_db_state = ctdb_setup(state->ct_config->ct_localdb,
-	    state->ct_config->ct_crypto_secrets != NULL);
+	if ((flags & CT_NEED_DB) != 0) {	
+		state->ct_db_state = ctdb_setup(state->ct_config->ct_localdb,
+		    state->ct_config->ct_crypto_secrets != NULL);
+	} else {
+		state->ct_db_state = NULL;
+	}
 
 	gettimeofday(&state->ct_stats->st_time_start, NULL);
 	if ((ret = ct_ssl_connect(state)) != 0)
@@ -423,14 +427,14 @@ ct_add_operation_after(struct ct_global_state *state, struct ct_op *after,
 /* Do a complete ct operation from start to finish */
 int
 ct_do_operation(struct ct_config *conf,  ct_op_cb *start,
-    ct_op_complete_cb *complete, void *args, int need_secrets)
+    ct_op_complete_cb *complete, void *args, int flags)
 {
 	struct ct_global_state	*state;
 	int		 	 ret;
 
 	ct_prompt_for_login_password(conf);
 
-	if ((ret = ct_init(&state, conf, need_secrets, NULL)) != 0)
+	if ((ret = ct_init(&state, conf, flags, NULL)) != 0)
 		return (ret);
 
 	ct_add_operation(state, start, complete, args);

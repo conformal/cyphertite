@@ -229,7 +229,6 @@ ct_main(int argc, char **argv)
 	int				 ret = 0;
 	int				 level0 = 0;
 	int				 freeincludes = 0;
-	int				 need_secrets;
 	int				 force_allfiles = -1;
 	int				 no_cross_mounts = 0;
 	int				 strip_slash = 1;
@@ -237,6 +236,7 @@ ct_main(int argc, char **argv)
 	int				 follow_symlinks = 0;
 	int				 attr = 0;
 	int				 verbose_ratios = 0;
+	int				 ct_flags = 0;
 
 	while ((c = getopt(argc, argv,
 	    "AB:C:D:E:F:HI:PRVXacdef:hmprtvx0")) != -1) {
@@ -416,11 +416,15 @@ ct_main(int argc, char **argv)
 
 	ct_prompt_for_login_password(conf);
 
-	need_secrets = (ct_action == CT_A_EXTRACT ||
+	if (ct_action == CT_A_EXTRACT ||
 	    ct_action == CT_A_ARCHIVE || (ct_action == CT_A_LIST &&
-	    conf->ct_ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0));
+	    conf->ct_ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0))
+		ct_flags |= CT_NEED_SECRETS;
+	if (ct_action == CT_A_ARCHIVE)
+		ct_flags |= CT_NEED_DB;
 
-	if ((ret = ct_init(&state, conf, need_secrets, ct_info_sig)) != 0)
+
+	if ((ret = ct_init(&state, conf, ct_flags, ct_info_sig)) != 0)
 		CFATALX("failed to initialise cyphertite: %s",
 		    ct_strerror(ret));
 

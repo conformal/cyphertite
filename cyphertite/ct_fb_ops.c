@@ -331,7 +331,8 @@ ctfb_main(int argc, char *argv[])
 	ct_prompt_for_login_password(conf);
 
 	/* We may have to download files later, always set up */
-	if ((ret = ct_init(&ctfb_state, conf, 1, ct_info_sig)) != 0)
+	if ((ret = ct_init(&ctfb_state, conf, CT_NEED_SECRETS,
+	    ct_info_sig)) != 0)
 		CFATALX("failed to initialize: %s", ct_strerror(ret));
 	state = ctfb_state;
 

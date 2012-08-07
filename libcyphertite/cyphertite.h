@@ -254,6 +254,8 @@ void			ct_ssl_cleanup(struct ct_global_state *);
 void			ct_reconnect(evutil_socket_t, short, void *);
 int			ct_assl_negotiate_poll(struct ct_global_state *);
 
+#define CT_NEED_SECRETS	(1<<0)
+#define CT_NEED_DB	(1<<1)
 int			ct_init(struct ct_global_state **, struct ct_config *,
 			     int,
 			     void  (*info_cb)(evutil_socket_t, short, void *));
@@ -264,7 +266,8 @@ int			ct_set_log_fns(struct ct_global_state *, void *,
 			     ct_log_traverse_end_fn *);
 void			ct_cleanup(struct ct_global_state *);
 int			ct_init_eventloop(struct ct_global_state *,
-			     void (*info_cb)(evutil_socket_t, short, void *));
+			     void (*info_cb)(evutil_socket_t, short, void *),
+			     int);
 int			ct_run_eventloop(struct ct_global_state *);
 void			ct_cleanup_eventloop(struct ct_global_state *);
 

@@ -597,7 +597,7 @@ ctfb_get(int argc, const char **argv)
 		goto out;
 	}
 
-	ct_init_eventloop(ctfb_state, ct_info_sig);
+	ct_init_eventloop(ctfb_state, ct_info_sig, CT_NEED_SECRETS);
 
 	if (argc == 3 && stat(argv[2], &sb) == 0 && (S_ISDIR(sb.st_mode)))
 		isdir = 1;
