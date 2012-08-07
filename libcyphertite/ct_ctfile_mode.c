@@ -993,7 +993,7 @@ ct_cull_add_shafile(struct ct_global_state *state, const char *file,
 	char				*cachename;
 	int				ret, s_errno = 0, ct_errno = 0;
 
-	CNDBG(CT_LOG_TRANS, "processing [%s]", file);
+	CNDBG(CT_LOG_SHA, "processing [%s]", file);
 
 	/*
 	 * XXX - should we keep a list of added files,
@@ -1099,7 +1099,7 @@ ct_cull_setup(struct ct_global_state *state, struct ct_op *op)
 
 	arc4random_buf(&cull_uuid, sizeof(cull_uuid));
 
-	CNDBG(CT_LOG_TRANS, "cull_setup");
+	CNDBG(CT_LOG_SHA, "cull_setup");
 	ct_set_file_state(state, CT_S_RUNNING);
 
 	trans = ct_trans_alloc(state);
@@ -1144,7 +1144,7 @@ ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 	if (state->ct_dying != 0)
 		goto dying;
 
-	CNDBG(CT_LOG_TRANS, "send cull_complete");
+	CNDBG(CT_LOG_SHA, "send cull_complete");
 	trans = ct_trans_alloc(state);
 
 	if (trans == NULL) {
@@ -1186,7 +1186,7 @@ ct_cull_send_shas(struct ct_global_state *state, struct ct_op *op)
 	if (state->ct_dying != 0)
 		goto dying;
 
-	CNDBG(CT_LOG_TRANS, "cull_send_shas");
+	CNDBG(CT_LOG_SHA, "cull_send_shas");
 	ct_set_file_state(state, CT_S_RUNNING);
 
 	trans = ct_trans_alloc(state);
@@ -1310,6 +1310,7 @@ ct_cull_collect_ctfiles(struct ct_global_state *state, struct ct_op *op)
 		    CTE_MISSING_CONFIG_VALUE); 
 		goto dying;
 	}
+	CNDBG(CT_LOG_SHA, "collecting ctfiles");
 
 	now = time(NULL);
 	now -= (24 * 60 * 60 * state->ct_config->ct_ctfile_keep_days);
@@ -1384,6 +1385,7 @@ prev_ct_file:
 		e_free(&file);
 		/* XXX - name  */
 	}
+	CNDBG(CT_LOG_SHA, "collected ctfiles");
 	ct_op_complete(state);
 
 	return;
