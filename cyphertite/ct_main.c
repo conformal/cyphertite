@@ -700,7 +700,10 @@ ct_print_scaled_stat(FILE *outfh, const char *label, int64_t val,
 {
 	char rslt[FMT_SCALED_STRSIZE];
 
-	fprintf(outfh, "%s%12" PRId64, label, val);
+	bzero(rslt, sizeof(rslt));
+	rslt[0] = '?';
+	fmt_scaled(val, rslt);
+	fprintf(outfh, "%s\t%s", label, rslt);
 	if (val == 0 || sec == 0) {
 		if (newline)
 			fprintf(outfh, "\n");
@@ -709,7 +712,6 @@ ct_print_scaled_stat(FILE *outfh, const char *label, int64_t val,
 
 	bzero(rslt, sizeof(rslt));
 	rslt[0] = '?';
-
 	fmt_scaled(val / sec, rslt);
 	fprintf(outfh, "\t(%s/sec)%s", rslt, newline ? "\n": "");
 }
@@ -732,39 +734,39 @@ ct_dump_stats(struct ct_global_state *state, FILE *outfh)
 	    &state->ct_stats->st_time_start, &scan_delta);
 
 	if (ct_action == CT_A_ARCHIVE) {
-		fprintf(outfh, "Files scanned\t\t\t%12" PRIu64 "\n",
+		fprintf(outfh, "Files scanned\t\t%12" PRIu64 "\n",
 		    state->ct_stats->st_files_scanned);
 
-		ct_print_scaled_stat(outfh, "Total bytes\t\t\t",
+		ct_print_scaled_stat(outfh, "Total data\t\t",
 		    (int64_t)state->ct_stats->st_bytes_tot, sec, 1);
 	}
 
 	if (ct_action == CT_A_ARCHIVE &&
 	    state->ct_stats->st_bytes_tot != state->ct_stats->st_bytes_read)
-		ct_print_scaled_stat(outfh, "Bytes read\t\t\t",
+		ct_print_scaled_stat(outfh, "Data read\t\t",
 		    (int64_t)state->ct_stats->st_bytes_read, sec, 1);
 
 	if (ct_action == CT_A_EXTRACT)
-		ct_print_scaled_stat(outfh, "Bytes written\t\t\t",
+		ct_print_scaled_stat(outfh, "Data written\t\t",
 		    (int64_t)state->ct_stats->st_bytes_written, sec, 1);
 
 	if (ct_action == CT_A_ARCHIVE) {
-		ct_print_scaled_stat(outfh, "Bytes compressed\t\t",
+		ct_print_scaled_stat(outfh, "Data compressed\t\t",
 		    (int64_t)state->ct_stats->st_bytes_compressed, sec, 0);
 		fprintf(outfh, "\t(%" PRId64 "%%)\n",
 		    (state->ct_stats->st_bytes_uncompressed == 0) ? (int64_t)0 :
 		    (int64_t)(state->ct_stats->st_bytes_compressed * 100 /
 		    state->ct_stats->st_bytes_uncompressed));
 
-		fprintf(outfh,
-		    "Bytes exists\t\t\t%12" PRIu64 "\t(%" PRId64 "%%)\n",
-		    state->ct_stats->st_bytes_exists,
+		ct_print_scaled_stat(outfh, "Data exists\t\t",
+		    (int64_t)state->ct_stats->st_bytes_exists, sec, 0);
+		fprintf(outfh, "\t(%" PRId64 "%%)\n",
 		    (state->ct_stats->st_bytes_exists == 0) ? (int64_t)0 :
 		    (int64_t)(state->ct_stats->st_bytes_exists * 100 /
 		    state->ct_stats->st_bytes_tot));
 
-		fprintf(outfh, "Bytes sent\t\t\t%12" PRIu64 "\n",
-		    state->ct_stats->st_bytes_sent);
+		ct_print_scaled_stat(outfh, "Data sent\t\t",
+		    state->ct_stats->st_bytes_sent, sec, 1);
 
 		sign = " ";
 		if (state->ct_stats->st_bytes_tot != 0) {
@@ -780,30 +782,29 @@ ct_dump_stats(struct ct_global_state *state, FILE *outfh)
 			}
 		} else
 			val = 0;
-		fprintf(outfh, "Reduction ratio\t\t\t\t%s%" PRId64 "%%\n",
+		fprintf(outfh, "Reduction ratio\t\t%s%10" PRId64 "%%\n",
 		    sign, val);
 	}
-	print_time_scaled(outfh, "Total Time\t\t\t    ",  &time_delta);
+	print_time_scaled(outfh, "Total Time\t\t    ",  &time_delta);
 
 	if (ct_verbose > 2) {
-		fprintf(outfh, "Total chunks\t\t\t%12" PRIu64 "\n",
+		fprintf(outfh, "Total chunks\t\t%12" PRIu64 "\n",
 		    state->ct_stats->st_chunks_tot);
-		fprintf(outfh, "Bytes crypted\t\t\t%12" PRIu64 "\n",
-		    state->ct_stats->st_bytes_crypted);
-
-		fprintf(outfh, "Bytes sha\t\t\t%12" PRIu64 "\n",
-		    state->ct_stats->st_bytes_sha);
-		fprintf(outfh, "Bytes crypt\t\t\t%12" PRIu64 "\n",
-		    state->ct_stats->st_bytes_crypt);
-		fprintf(outfh, "Bytes csha\t\t\t%12" PRIu64 "\n",
-		    state->ct_stats->st_bytes_csha);
-		fprintf(outfh, "Chunks completed\t\t%12" PRIu64 "\n",
+		ct_print_scaled_stat(outfh, "Data cryptedt\t\t",
+		    (int64_t)state->ct_stats->st_bytes_crypted, 0, 1);
+		ct_print_scaled_stat(outfh, "Data sha\t\t",
+		    (int64_t)state->ct_stats->st_bytes_sha, 0, 1);
+		ct_print_scaled_stat(outfh, "Data crypt\t\t",
+		    state->ct_stats->st_bytes_crypt, 0, 1);
+		ct_print_scaled_stat(outfh, "Data csha\t\t",
+		    state->ct_stats->st_bytes_csha, 0, 1);
+		fprintf(outfh, "Chunks completed\t%12" PRIu64 "\n",
 		    state->ct_stats->st_chunks_completed);
-		fprintf(outfh, "Files completed\t\t\t%12" PRIu64 "\n",
+		fprintf(outfh, "Files completed\t\t%12" PRIu64 "\n",
 		    state->ct_stats->st_files_completed);
 
 		if (ct_action == CT_A_ARCHIVE)
-			print_time_scaled(outfh, "Scan Time\t\t\t    ",
+			print_time_scaled(outfh, "Scan Time\t\t    ",
 			    &scan_delta);
 		ct_display_assl_stats(state, outfh);
 	}
@@ -815,19 +816,19 @@ ct_display_assl_stats(struct ct_global_state *state, FILE *outfh)
 	if (state->ct_assl_ctx == NULL)
 		return;
 
-	fprintf(outfh, "ssl bytes written %" PRIu64 "\n",
-	    state->ct_assl_ctx->io_write_bytes);
-	fprintf(outfh, "ssl writes        %" PRIu64 "\n",
+	ct_print_scaled_stat(outfh, "SSL data written\t",
+	    (int64_t)state->ct_assl_ctx->io_write_bytes, 0, 1);
+	fprintf(outfh, "SSL writes\t\t%12" PRIu64 "\n",
 	    state->ct_assl_ctx->io_write_count);
-	fprintf(outfh, "avg write len     %" PRIu64 "\n",
+	fprintf(outfh, "Avg write len\t\t%12" PRIu64 "\n",
 	    state->ct_assl_ctx->io_write_count == 0 ?  (int64_t)0 :
 	    state->ct_assl_ctx->io_write_bytes /
 	    state->ct_assl_ctx->io_write_count);
-	fprintf(outfh, "ssl bytes read    %" PRIu64 "\n",
-	    state->ct_assl_ctx->io_read_bytes);
-	fprintf(outfh, "ssl reads         %" PRIu64 "\n",
+	ct_print_scaled_stat(outfh, "SSL data read\t\t",
+	    (int64_t)state->ct_assl_ctx->io_read_bytes, 0 , 1);
+	fprintf(outfh, "SSL reads\t\t%12" PRIu64 "\n",
 	    state->ct_assl_ctx->io_read_count);
-	fprintf(outfh, "avg read len      %" PRIu64 "\n",
+	fprintf(outfh, "Avg read len\t\t%12" PRIu64 "\n",
 	    state->ct_assl_ctx->io_read_count == 0 ?  (int64_t)0 :
 	    state->ct_assl_ctx->io_read_bytes /
 	    state->ct_assl_ctx->io_read_count);
