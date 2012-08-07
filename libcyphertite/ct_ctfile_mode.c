@@ -1119,6 +1119,7 @@ ct_cull_setup(struct ct_global_state *state, struct ct_op *op)
 	trans->tr_size[2] = trans->hdr.c_size;
 	trans->tr_state = TR_S_XML_CULL_SEND;
 	trans->tr_complete = ct_cull_handle_complete;
+	trans->tr_eof = 1;
 	trans->tr_cleanup = NULL;
 
 	ct_queue_first(state, trans);
@@ -1161,6 +1162,7 @@ ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 	trans->tr_dataslot = 2;
 	trans->tr_size[2] = trans->hdr.c_size;
 	trans->tr_state = TR_S_XML_CULL_COMPLETE_SEND;
+	trans->tr_eof = 1;
 	trans->tr_complete = ct_cull_handle_complete;
 	trans->tr_cleanup = NULL;
 	ct_set_file_state(state, CT_S_FINISHED);
