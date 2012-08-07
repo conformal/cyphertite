@@ -78,6 +78,7 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 		    (int64_t)c_pid, wlen, (long) len);
 		if (len == 0) {
 			/* lost socket */
+			CNDBG(CTUTIL_LOG_SOCKET, "socket disconnected");
 			ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
 			    NULL, NULL, 0);
 			return;
@@ -131,6 +132,7 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 
 		if (len == 0 && wlen != 0) {
 			/* lost socket */
+			CNDBG(CTUTIL_LOG_SOCKET, "socket disconnected");
 			ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
 			    NULL, NULL, 0);
 			goto done;
@@ -232,6 +234,7 @@ ct_event_assl_read(evutil_socket_t fd, short events, void *arg)
 
 		if (len == 0) {
 			/* lost socket */
+			CNDBG(CTUTIL_LOG_SOCKET, "socket disconnected");
 			ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
 			return;
 		} else if (len == -1) {
@@ -276,6 +279,7 @@ ct_event_assl_read(evutil_socket_t fd, short events, void *arg)
 
 		if (len == 0 && rlen != 0) {
 			/* lost socket */
+			CNDBG(CTUTIL_LOG_SOCKET, "socket disconnected");
 			ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
 			return;
 		} else if (len == -1) {
@@ -354,6 +358,7 @@ ct_event_io_write(evutil_socket_t fd, short events, void *arg)
 
 		if (len == 0) {
 			/* lost socket */
+			CNDBG(CTUTIL_LOG_SOCKET, "socket disconnected");
 			ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
 			    NULL, NULL, 0);
 			return;
@@ -403,6 +408,7 @@ write_next_iov:
 
 		if (len == 0 && wlen != 0) {
 			/* lost socket */
+			CNDBG(CTUTIL_LOG_SOCKET, "socket disconnected");
 			ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
 			    NULL, NULL, 0);
 			goto done;
@@ -501,6 +507,7 @@ ct_event_io_read(evutil_socket_t fd, short events, void *arg)
 
 		if (len == 0) {
 			/* lost socket */
+			CNDBG(CTUTIL_LOG_SOCKET, "socket disconnected");
 			ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
 			return;
 		} else if (len == -1) {
@@ -543,6 +550,7 @@ ct_event_io_read(evutil_socket_t fd, short events, void *arg)
 
 		if (len == 0 && rlen != 0) {
 			/* lost socket */
+			CNDBG(CTUTIL_LOG_SOCKET, "socket disconnected");
 			ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
 			return;
 		} else if (len == -1) {

@@ -851,6 +851,7 @@ ct_handle_disconnect(struct ct_global_state *state)
 	struct ct_trans		*trans = NULL;
 	int			 idle = 1;
 
+	CNDBG(CT_LOG_NET, "disconnected!");
 	state->ct_disconnected = 1;
 	ct_ssl_cleanup(state);
 
