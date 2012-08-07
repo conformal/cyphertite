@@ -758,6 +758,7 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 
 	switch (trans->tr_state) {
 	case TR_S_XML_OPEN:
+		CNDBG(CT_LOG_NET, "got xml open reply");
 		if ((ret = ct_parse_xml_open_reply(hdr, vbody,
 		    &filename)) != 0) {
 			ct_fatal(state, "failed to parse xml open reply", ret);
@@ -773,6 +774,7 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 		trans->tr_state = TR_S_XML_OPENED;
 		break;
 	case TR_S_XML_CLOSING:
+		CNDBG(CT_LOG_NET, "got xml close reply");
 		if ((ret = ct_parse_xml_close_reply(hdr, vbody)) != 0) {
 			ct_fatal(state, "failed to parse xml close reply", ret);
 			goto just_queue;
@@ -780,6 +782,7 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 		trans->tr_state = TR_S_DONE;
 		break;
 	case TR_S_XML_LIST:
+		CNDBG(CT_LOG_NET, "got xml list reply");
 		if ((ret = ct_parse_xml_list_reply(hdr, vbody,
 		    &state->ctfile_list_files)) != 0) {
 			ct_fatal(state, "failed to parse xml list reply", ret);
@@ -788,6 +791,7 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 		trans->tr_state = TR_S_DONE;
 		break;
 	case TR_S_XML_DELETE:
+		CNDBG(CT_LOG_NET, "got xml delete reply");
 		if ((ret = ct_parse_xml_delete_reply(hdr, vbody,
 		    &filename)) != 0) {
 			ct_fatal(state, "failed to parse xml delete reply",
@@ -802,6 +806,7 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 		break;
 	case TR_S_XML_CULL_SEND:
 		/* XXX this is for both complete and setup */
+		CNDBG(CT_LOG_NET, "got cull send reply");
 		if ((ret = ct_parse_xml_cull_setup_reply(hdr, vbody)) != 0) {
 			ct_fatal(state, "failed to parse cull setup reply",
 			    ret);
@@ -810,6 +815,7 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 		trans->tr_state = TR_S_DONE;
 		break;
 	case TR_S_XML_CULL_SHA_SEND:
+		CNDBG(CT_LOG_NET, "got cull shas reply");
 		if ((ret = ct_parse_xml_cull_shas_reply(hdr, vbody)) != 0) {
 			ct_fatal(state, "failed to parse cull shas reply",
 			    ret);
@@ -821,6 +827,7 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 			trans->tr_state = TR_S_XML_CULL_REPLIED;
 		break;
 	case TR_S_XML_CULL_COMPLETE_SEND:
+		CNDBG(CT_LOG_NET, "got cull complete reply");
 		if ((ret = ct_parse_xml_cull_complete_reply(hdr, vbody)) != 0) {
 			ct_fatal(state, "failed to parse cull complete reply",
 			    ret);
