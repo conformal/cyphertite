@@ -1299,7 +1299,7 @@ ct_cull_collect_ctfiles(struct ct_global_state *state, struct ct_op *op)
 	int			timelen;
 	char			buf[TIMEDATA_LEN];
 	time_t			now;
-	int			keep_files = 0;
+	int			keep_files = 0, total_files = 0;
 
 	if (ct_get_file_state(state) == CT_S_FINISHED)
 		return;
@@ -1323,6 +1323,7 @@ ct_cull_collect_ctfiles(struct ct_global_state *state, struct ct_op *op)
 	timelen = strlen(buf);
 
 	RB_FOREACH(file, ctfile_list_tree, &ct_cull_all_ctfiles) {
+		total_files++;
 		if (strncmp (file->mlf_name, buf, timelen) < 0) {
 			file->mlf_keep = 0;
 		} else {
@@ -1331,7 +1332,12 @@ ct_cull_collect_ctfiles(struct ct_global_state *state, struct ct_op *op)
 		}
 	}
 
-	if (keep_files == 0) {
+	/*
+	 * It is ok to have no ctfiles at all and want to nuke all data.
+	 * but we assume that if you are culling all your data then you
+	 * probably didn't want to do that.
+	 */
+	if (keep_files == 0 && total_files != 0) {
 		ct_fatal(state, NULL, CTE_CULL_EVERYTHING);
 		goto dying;
 	}
