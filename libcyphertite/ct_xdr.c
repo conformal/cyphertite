@@ -140,7 +140,7 @@ int
 ct_xdr_gheader(XDR *xdrs, struct ctfile_gheader *objp,
     int direction, const char *ctfile_basedir)
 {
-	char	 *basep, base[PATH_MAX], *prevlvl;
+	char	 *prevlvl = NULL;
 	int	 i;
 
 	if (!xdr_int(xdrs, &objp->cmg_beacon))
@@ -155,35 +155,32 @@ ct_xdr_gheader(XDR *xdrs, struct ctfile_gheader *objp,
 		return (CTE_XDR);
 	if (!xdr_int(xdrs, &objp->cmg_flags))
 		return (CTE_XDR);
-	if (direction  == XDR_ENCODE && ctfile_basedir != NULL &&
-	    objp->cmg_prevlvl_filename != NULL &&
-	    objp->cmg_prevlvl_filename[0] != '\0') {
-		/* XXX technically should just remove basedir if present */
-		strlcpy(base, objp->cmg_prevlvl_filename, sizeof(base));
-		if ((basep = basename(base)) == NULL) {
-			CNDBG(CT_LOG_CTFILE, "can't basename %s",
-			    objp->cmg_prevlvl_filename);
-			return (CTE_INVALID_PATH);
+	if (direction  == XDR_ENCODE) {
+		if (ctfile_basedir != NULL &&
+		    objp->cmg_prevlvl_filename != NULL &&
+		    objp->cmg_prevlvl_filename[0] != '\0') {
+			/* XXX technically should just remove basedir if present */
+			prevlvl = ct_basename(objp->cmg_prevlvl_filename);
+		} else {
+			prevlvl = e_strdup(objp->cmg_prevlvl_filename);
 		}
-		prevlvl = basep;
-	} else {
-		prevlvl = objp->cmg_prevlvl_filename;
-	}
-	if (!xdr_string(xdrs, &prevlvl, PATH_MAX))
-		return (CTE_XDR);
-	if (direction == XDR_DECODE && ctfile_basedir != NULL &&
-	    prevlvl != NULL && prevlvl[0] != '\0') {
-		strlcpy(base, prevlvl, sizeof(base));
-		if ((basep = basename(base)) == NULL) {
-			CNDBG(CT_LOG_CTFILE, "can't basename %s", prevlvl);
-			return (CTE_INVALID_PATH);
+		if (!xdr_string(xdrs, &prevlvl, PATH_MAX)) {
+			e_free(&prevlvl);
+			return (CTE_XDR);
 		}
-		if (asprintf(&objp->cmg_prevlvl_filename, "%s%s",
-		    ctfile_basedir, basep) == -1) {
-			return (CTE_ERRNO);
+		e_free(&prevlvl);
+	} else if (direction == XDR_DECODE) {
+		if (!xdr_string(xdrs, &prevlvl, PATH_MAX))
+			return (CTE_XDR);
+		if (ctfile_basedir != NULL && prevlvl != NULL &&
+		    prevlvl[0] != '\0') {
+			if (asprintf(&objp->cmg_prevlvl_filename, "%s%s",
+			    ctfile_basedir, prevlvl) == -1) {
+				return (CTE_ERRNO);
+			}
+		} else {
+			objp->cmg_prevlvl_filename = prevlvl;
 		}
-	} else {
-		objp->cmg_prevlvl_filename = prevlvl;
 	}
 	if (objp->cmg_version >= CT_MD_V2) {
 		if (!xdr_int(xdrs, &objp->cmg_cur_lvl))
@@ -292,10 +289,14 @@ void
 ctfile_cleanup_gheader(struct ctfile_gheader *gh)
 {
 	int	 i;
-	if (gh->cmg_prevlvl_filename)
+	if (gh->cmg_prevlvl_filename) {
 		free(gh->cmg_prevlvl_filename);
-	if (gh->cmg_cwd != NULL)
+		gh->cmg_prevlvl_filename = NULL;
+	}
+	if (gh->cmg_cwd != NULL) {
 		free(gh->cmg_cwd);
+		gh->cmg_cwd = NULL;
+	}
 	if (gh->cmg_paths != NULL) {
 		for (i = 0; i < gh->cmg_num_paths; i++)
 			free(gh->cmg_paths[i]);
