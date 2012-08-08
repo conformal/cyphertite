@@ -289,13 +289,11 @@ void
 cull(struct ct_cli_cmd *c, int argc, char **argv)
 {
 	struct ct_global_state	*state;
-	int			 need_secrets, ret;
+	int			 ret;
 
 	/* XXX */
 
 	ct_prompt_for_login_password(ctctl_config);
-
-	need_secrets = 1;
 
 	if ((ret = ct_init(&state, ctctl_config,
 	    CT_NEED_SECRETS | CT_NEED_DB, ct_info_sig)) != 0)
