@@ -47,7 +47,7 @@ bool_t		ct_xdr_dedup_sha_crypto(XDR *, uint8_t *, uint8_t *,
 bool_t          ct_xdr_header(XDR *, struct ctfile_header *, int);
 bool_t          ct_xdr_trailer(XDR *, struct ctfile_trailer *);
 bool_t          ct_xdr_stdin(XDR *, struct ctfile_stdin *);
-int          	ct_xdr_gheader(XDR *, struct ctfile_gheader *, int,
+int		ct_xdr_gheader(XDR *, struct ctfile_gheader *, int,
 		    const char *);
 
 static int	 ctfile_open(const char *, const char *,
@@ -242,7 +242,7 @@ int
 ctfile_open_f(FILE *f, const char *ctfile_basedir, struct ctfile_gheader *gh,
     XDR *xdr)
 {
-	int 	ret;
+	int	ret;
 
 	xdrstdio_create(xdr, f, XDR_DECODE);
 
@@ -312,7 +312,7 @@ ct_basis_setup(int *nextlvlp, const char *basisbackup, char **filelist,
 	struct ctfile_parse_state	 xs_ctx;
 	char				**fptr;
 	time_t				 prev_backup_time = 0;
-	int			 	 nextlvl, i, rooted = 1, ret, s_errno;
+	int				 nextlvl, i, rooted = 1, ret, s_errno;
 
 	if ((ret = ctfile_parse_init(&xs_ctx, basisbackup, NULL)))
 		return (ret);
@@ -631,7 +631,7 @@ ctfile_parse_seek(struct ctfile_parse_state *ctx)
 				return 1;
 			}
 		} else if (ct_xdr_dedup_sha(&ctx->xs_xdr,
-		    ctx->xs_sha) == FALSE) { 
+		    ctx->xs_sha) == FALSE) {
 			ctx->xs_errno = CTE_CTFILE_CORRUPT;
 			ctx->xs_state = XS_STATE_FAIL;
 			return 1;
