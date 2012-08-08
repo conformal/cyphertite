@@ -42,7 +42,40 @@ struct ctdb_state {
 	int			 ctdb_trans_commit_rem;
 };
 
+static int
+ctdb_begin_transaction(struct ctdb_state *state)
+{
+	int			 rc;
+	char			*errmsg = NULL;
 
+	CNDBG(CT_LOG_DB, "beginning transaction");
+	if ((rc = sqlite3_exec(state->ctdb_db, "BEGIN TRANSACTION", NULL,
+	     0, &errmsg)) != 0) {
+		CNDBG(CT_LOG_DB, "can't begin transaction: %s",
+		    errmsg);
+		return (rc);
+	}
+	state->ctdb_in_transaction = 1;
+	return (0);
+
+}
+
+static void
+ctdb_end_transaction(struct ctdb_state *state)
+{
+	char			*errmsg = NULL;
+
+	CNDBG(CT_LOG_DB, "commiting transaction");
+	if (sqlite3_exec(state->ctdb_db, "COMMIT", NULL,
+	    0, &errmsg) != 0) {
+		/* this isn't a failure case because ctdb is a cache */
+		CNDBG(CT_LOG_DB, "can't commit %s", errmsg);
+		/* sqlite tells us to rollback just in case */
+		(void)sqlite3_exec(state->ctdb_db, "ROLLBACK", NULL, 0,
+		    &errmsg);
+	}
+	state->ctdb_in_transaction = 0;
+}
 
 struct ctdb_state *
 ctdb_setup(const char *path, int crypt_enabled)
@@ -308,14 +341,10 @@ do_retry:
 void
 ctdb_cleanup(struct ctdb_state *state)
 {
-	char			*errmsg;
-
 	CNDBG(CT_LOG_DB, "cleaning up ctdb");
 	if (state->ctdb_in_transaction) {
 		CNDBG(CT_LOG_DB, "finalising transactions");
-		state->ctdb_in_transaction = 0;
-		if (sqlite3_exec(state->ctdb_db, "commit", NULL, 0, &errmsg))
-			CNDBG(CT_LOG_DB, "can't commit %s", errmsg);
+		ctdb_end_transaction(state);
 	}
 	if (state->ctdb_stmt_lookup != NULL) {
 		CNDBG(CT_LOG_DB, "finalising stmt_lookup");
@@ -349,7 +378,6 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 	char			shat[SHA_DIGEST_STRING_LENGTH];
 	int			rv, rc;
 	uint8_t			*p;
-	char			*errmsg;
 	sqlite3_stmt		*stmt;
 
 	rv = 0;
@@ -360,14 +388,8 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 	stmt = state->ctdb_stmt_lookup;
 
 	if (state->ctdb_in_transaction == 0) {
-		rc = sqlite3_exec(state->ctdb_db, "begin transaction", NULL,
-		     0, &errmsg);
-		if (rc) {
-			CNDBG(CT_LOG_DB, "can't begin transaction: %s",
-			    errmsg);
+		if (ctdb_begin_transaction(state) != 0)
 			return (rv);
-		}
-		state->ctdb_in_transaction = 1;
 		state->ctdb_trans_commit_rem = OPS_PER_TRANSACTION;
 	}
 
@@ -440,10 +462,7 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 
 	state->ctdb_trans_commit_rem--;
 	if (state->ctdb_trans_commit_rem <= 0) {
-		rc = sqlite3_exec(state->ctdb_db, "commit", NULL, 0, &errmsg);
-		if (rc)
-			CNDBG(CT_LOG_DB, "can't commit %s", errmsg);
-		state->ctdb_in_transaction = 0;
+		ctdb_end_transaction(state);
 	}
 
 	return rv;
@@ -455,7 +474,6 @@ ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v, uint8_
 	char			shatk[SHA_DIGEST_STRING_LENGTH];
 	char			shatv[SHA_DIGEST_STRING_LENGTH];
 	int			rv, rc;
-	char			*errmsg;
 	sqlite3_stmt		*stmt;
 
 	rv = 0;
@@ -487,15 +505,8 @@ ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v, uint8_
 		stmt = state->ctdb_stmt_insert;
 
 	if (state->ctdb_in_transaction == 0) {
-		CNDBG(CT_LOG_DB, "NEW transaction");
-		rc = sqlite3_exec(state->ctdb_db, "begin transaction", NULL,
-		    0, &errmsg);
-		if (rc) {
-			CNDBG(CT_LOG_DB, "can not begin %s", errmsg);
-			return rv;
-		}
-
-		state->ctdb_in_transaction = 1;
+		if (ctdb_begin_transaction(state) != 0)
+			return (rv);
 		state->ctdb_trans_commit_rem = OPS_PER_TRANSACTION;
 	}
 
@@ -546,13 +557,8 @@ ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v, uint8_
 
 	/* inserts are more 'costly' than reads */
 	state->ctdb_trans_commit_rem -= 4;
-	if (state->ctdb_trans_commit_rem <= 0) {
-		if ((rc = sqlite3_exec(state->ctdb_db, "commit", NULL,
-		    0, &errmsg)) != 0)
-			CNDBG(CT_LOG_DB, "can't commit %s", errmsg);
-		/* ctdb is just a cache, succeed anyway */
-		state->ctdb_in_transaction = 0;
-	}
+	if (state->ctdb_trans_commit_rem <= 0)
+		ctdb_end_transaction(state);
 
 	return rv;
 }
