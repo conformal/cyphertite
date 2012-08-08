@@ -2,7 +2,8 @@
 
 COMMENT =		tar-like secure remote deduplicating archiver
 
-DISTNAME =		cyphertite-1.3.0
+V!=cd ../../../.. && version.sh
+DISTNAME =		cyphertite-$V
 CATEGORIES =		sysutils archivers security
 
 HOMEPAGE =		https://www.cyphertite.com/
