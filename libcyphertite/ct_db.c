@@ -481,28 +481,7 @@ ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v, uint8_
 	if (state == NULL)
 		return rv;
 
-	if (state->ctdb_stmt_insert == NULL) {
-		if (state->ctdb_crypt) {
-			if (sqlite3_prepare_v2(state->ctdb_db,
-			    "insert into digests(sha, csha, iv)"
-			    " values(?, ?, ?)",
-			    -1, &stmt, NULL)) {
-				CNDBG(CT_LOG_DB, "can not prepare insert "
-				    "statement");
-				return rv;
-			}
-		} else {
-			if (sqlite3_prepare_v2(state->ctdb_db,
-			    "insert into digests(sha) values(?)",
-			    -1, &stmt, NULL)) {
-				CNDBG(CT_LOG_DB, "can not prepare insert "
-				    "statement");
-				return rv;
-			}
-		}
-		state->ctdb_stmt_insert = stmt;
-	} else
-		stmt = state->ctdb_stmt_insert;
+	stmt = state->ctdb_stmt_insert;
 
 	if (state->ctdb_in_transaction == 0) {
 		if (ctdb_begin_transaction(state) != 0)
