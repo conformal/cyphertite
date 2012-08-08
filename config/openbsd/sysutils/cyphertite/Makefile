@@ -2,7 +2,7 @@
 
 COMMENT =		tar-like secure remote deduplicating archiver
 
-V!=cd ../../../.. && version.sh
+V!=cd ../../../.. && ksh ./version.sh
 DISTNAME =		cyphertite-$V
 CATEGORIES =		sysutils archivers security
 
