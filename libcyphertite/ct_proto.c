@@ -13,6 +13,11 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+
+#ifdef NEED_LIBCLENS
+#include <clens.h>
+#endif
+
 #include <unistd.h>
 #include <inttypes.h>
 #include <limits.h>
@@ -23,14 +28,18 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#include <assl.h>
 #include <clog.h>
 #include <exude.h>
 #include <xmlsd.h>
+#include <shrink.h>
 
 #include <ctutil.h>
 #include <ct_socket.h>
 #include "ct_xml.h"
 #include "ct_proto.h"
+#include <cyphertite.h>
+#include "ct_internal.h"
 
 void	*ct_body_alloc_xml(size_t);
 
@@ -179,15 +188,36 @@ ct_parse_login_reply(struct ct_header *hdr, void *body)
 	return (0);
 }
 
+#include <sys/utsname.h>
+char *
+ct_os_version(void)
+{
+	struct utsname	 u;
+	char		*os_string;
+
+	if (uname(&u) == -1)
+		e_asprintf(&os_string, "INVALID");
+	else
+		e_asprintf(&os_string, "%s-%s-%s %s\n",
+		    u.sysname, u.machine, u.release, u.version);
+	return (os_string);
+}
+
 int
 ct_create_xml_negotiate(struct ct_header *hdr, void **vbody,
     int32_t dbgenid)
 {
 	struct xmlsd_document		*xl;
-	struct xmlsd_element		*xe;
+	struct xmlsd_element		*root, *xe;
 	char				*body;
+	char				*os_version = NULL;
 	size_t				 orig_size;
 	int				 ret = CTE_XMLSD_FAILURE;
+#ifdef BUILDSTR
+	static const char *vertag = CT_VERSION " " BUILDSTR;
+#else
+	static const char *vertag = CT_VERSION;
+#endif
 
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
@@ -196,11 +226,51 @@ ct_create_xml_negotiate(struct ct_header *hdr, void **vbody,
 	if ((xmlsd_doc_alloc(&xl)) != XMLSD_ERR_SUCCES)
 		return (CTE_XMLSD_FAILURE);
 
-	if ((xe = xmlsd_doc_add_elem(xl, NULL, "ct_negotiate")) == NULL)
+	if ((root = xmlsd_doc_add_elem(xl, NULL, "ct_negotiate")) == NULL)
 		goto out;
-	if ((xe = xmlsd_doc_add_elem(xl, xe, "clientdbgenid")) == NULL)
+	if ((xe = xmlsd_doc_add_elem(xl, root, "clientdbgenid")) == NULL)
 		goto out;
 	if (xmlsd_elem_set_attr_int32(xe, "value", dbgenid) != 0)
+		goto out;
+	/* Send library version. */
+	if ((xe = xmlsd_doc_add_elem(xl, root, "libcyphertite_version")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr(xe, "value", vertag) != 0)
+		goto out;
+	/*
+	 * Add version for all libraries we care about so we can be warned
+	 * about incompatibilities.
+	 */
+	if ((xe = xmlsd_doc_add_elem(xl, root, "assl_version")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr(xe, "value", assl_verstring()) != 0)
+		goto out;
+#ifdef NEED_LIBCLENS
+	if ((xe = xmlsd_doc_add_elem(xl, root, "clens_version")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr(xe, "value", clens_verstring()) != 0)
+		goto out;
+#endif /* NEED_LIBCLENS */
+	if ((xe = xmlsd_doc_add_elem(xl, root, "clog_version")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr(xe, "value", clog_verstring()) != 0)
+		goto out;
+	if ((xe = xmlsd_doc_add_elem(xl, root, "exude_version")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr(xe, "value", exude_verstring()) != 0)
+		goto out;
+	if ((xe = xmlsd_doc_add_elem(xl, root, "shrink_version")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr(xe, "value", shrink_verstring()) != 0)
+		goto out;
+	if ((xe = xmlsd_doc_add_elem(xl, root, "xmlsd_version")) == NULL)
+		goto out;
+	if (xmlsd_elem_set_attr(xe, "value", xmlsd_verstring()) != 0)
+		goto out;
+	if ((xe = xmlsd_doc_add_elem(xl, root, "os_version")) == NULL)
+		goto out;
+	os_version = ct_os_version();
+	if (xmlsd_elem_set_attr(xe, "value", os_version) != 0)
 		goto out;
 
 	if ((body = xmlsd_generate(xl, ct_body_alloc_xml, &orig_size,
@@ -211,6 +281,8 @@ ct_create_xml_negotiate(struct ct_header *hdr, void **vbody,
 
 	*vbody = body;
 out:
+	if (os_version)
+		e_free(&os_version);
 	xmlsd_doc_free(xl);
 	return (ret);
 
