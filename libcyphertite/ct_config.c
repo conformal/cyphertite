@@ -131,7 +131,8 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 	char			*xml;
 	const char		*xml_val;
 	size_t			 xml_size;
-	struct			 xmlsd_document	*xd;
+	struct xmlsd_document	*xd;
+	struct xmlsd_element	*root, *xe;
 	char			*ca_cert, *user_cert, *user_key;
 	FILE			*f = NULL;
 	struct stat		sb;
@@ -157,12 +158,17 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 	if ((rv = xmlsd_parse_mem(xml, xml_size, xd))) {
 		CFATALX("unable to parse cert bundle xml, rv %d", rv);
 	}
+	root = xmlsd_doc_get_first_elem(xd);
 
 	/* ca cert */
 	if (stat(config->ct_ca_cert , &sb) != 0) {
-		xml_val = xmlsd_doc_find_value(xd, "ca_cert", NULL);
+		xe = xmlsd_elem_find_child(root, "ca_cert");
+		if (xe == NULL) {
+			CFATALX("unable to get ca_cert xml node");
+		}
+		xml_val = xmlsd_elem_get_value(xe);
 		if (xml_val == NULL) {
-			CFATALX("unable to get ca cert xml");
+			CFATALX("unable to get ca cert xml value");
 		}
 		bzero(b64, sizeof b64);
 		if (ct_base64_encode(CT_B64_M_DECODE, (uint8_t *)xml_val,
@@ -190,7 +196,11 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 
 	/* user cert */
 	if (stat(config->ct_cert , &sb) != 0) {
-		xml_val = xmlsd_doc_find_value(xd, "user_cert", NULL);
+		xe = xmlsd_elem_find_child(root, "user_cert");
+		if (xe == NULL) {
+			CFATALX("unable to get user cert xml node");
+		}
+		xml_val = xmlsd_elem_get_value(xe);
 		if (xml_val == NULL) {
 			CFATALX("unable to get user cert xml");
 		}
@@ -220,7 +230,11 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 
 	/* user key */
 	if (stat(config->ct_key, &sb) != 0) {
-		xml_val = xmlsd_doc_find_value(xd, "user_key", NULL);
+		xe = xmlsd_elem_find_child(root, "user_key");
+		if (xe == NULL) {
+			CFATALX("unable to get user key xml node");
+		}
+		xml_val = xmlsd_elem_get_value(xe);
 		if (xml_val == NULL) {
 			CFATALX("unable to get user key xml");
 		}
