@@ -6,11 +6,20 @@ NO_OBJ=
 CFLAGS+= -fdiagnostics-show-option -fno-strict-aliasing
 CFLAGS+= -DNEED_LIBCLENS
 CFLAGS+= -I${INCDIR}/clens -I${LOCALBASE}/ssl/include
+CFLAGS+= -I${LOCALBASE}/include/event2
 LDFLAGS+= -L${LOCALBASE}/ssl/lib
+LDFLAGS+= -L${LOCALBASE}/lib/event2
 LDADDLATE+= -lclens
 LDADDSSL+= -Wl,-Bstatic -lssl -lcrypto -Wl,-Bdynamic
 
 .if defined(ENABLE_THREADS) && ${ENABLE_THREADS} == 1
-CFLAGS += -pthread
+# XXX
+# From GCC:
+# `-pthread'
+# Adds support for multithreading with the "pthreads" library.  This
+# option sets flags for both the preprocessor and linker.
+#
+# Which means -D_REENTRANT is defined everywhere besides FreeBSD.
+CFLAGS += -pthread -D_REENTRANT
 LDFLAGS += -pthread
 .endif
