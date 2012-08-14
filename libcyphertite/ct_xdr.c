@@ -85,7 +85,7 @@ ct_xdr_header(XDR *xdrs, struct ctfile_header *objp, int version)
 {
 	if (!xdr_int(xdrs, &objp->cmh_beacon))
 		return (FALSE);
-	if (!xdr_u_int64_t(xdrs, &objp->cmh_nr_shas))
+	if (!xdr_int64_t(xdrs, &objp->cmh_nr_shas))
 		return (FALSE);
 	if (version >= CT_MD_V3) {
 		if (!xdr_int64_t(xdrs, &objp->cmh_parent_dir))
@@ -467,7 +467,7 @@ ctfile_parse_read_header(struct ctfile_parse_state *ctx,
 		return 1;
 
 	CNDBG(CT_LOG_CTFILE,
-	    "header beacon 0x%08x 0x%08x shas %" PRIu64 " name %s",
+	    "header beacon 0x%08x 0x%08x shas %" PRIi64 " name %s",
 	    hdr->cmh_beacon, CT_HDR_BEACON, hdr->cmh_nr_shas,
 	    hdr->cmh_filename);
 
@@ -703,7 +703,7 @@ static int	ctfile_alloc_dirnum(struct ctfile_write_state *,
 static int	ctfile_write_header(struct ctfile_write_state *,
 		    struct fnode *, char *, int);
 static int	 ctfile_write_header_entry(struct ctfile_write_state *, char *,
-		    int, uint64_t, uint32_t, uint32_t, int, dev_t, int64_t,
+		    int, int64_t, uint32_t, uint32_t, int, dev_t, int64_t,
 		    int64_t, struct dnode *, int);
 
 /*
@@ -814,7 +814,7 @@ int
 ctfile_write_header(struct ctfile_write_state *ctx, struct fnode *fnode,
     char *filename, int base)
 {
-	uint64_t nr_shas = 0;
+	int64_t nr_shas = 0;
 
 	CNDBG(CT_LOG_CTFILE, "writing file header %s %s", fnode->fl_sname,
 	    filename);
@@ -845,7 +845,7 @@ ctfile_write_header(struct ctfile_write_state *ctx, struct fnode *fnode,
 
 int
 ctfile_write_header_entry(struct ctfile_write_state *ctx, char *filename,
-    int type, uint64_t nr_shas, uint32_t uid, uint32_t gid, int mode,
+    int type, int64_t nr_shas, uint32_t uid, uint32_t gid, int mode,
     dev_t rdev, int64_t atime, int64_t mtime, struct dnode *parent_dir,
     int base)
 {

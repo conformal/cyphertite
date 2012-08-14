@@ -52,7 +52,7 @@ struct ct_fb_key {
 
 struct ct_fb_file {
 	struct ct_fb_key	 cfb_base;
-	uint64_t		 cfb_nr_shas;	/* total shas */
+	int64_t		 	 cfb_nr_shas;	/* total shas */
 	struct ct_fb_ctfile	*cfb_file;	/* file containing shas */
 	off_t			 cfb_sha_offs;	/* offset into file */
 	uint64_t		 cfb_file_size;

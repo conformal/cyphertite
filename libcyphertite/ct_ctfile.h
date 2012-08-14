@@ -48,7 +48,7 @@ struct ctfile_header {
 	int			cmh_beacon;	/* magic marker */
 #define CT_HDR_BEACON		(0x4d4f306f)
 #define CT_HDR_EOF		(0x454f4621)
-	uint64_t		cmh_nr_shas;	/* total shas */
+	int64_t			cmh_nr_shas;	/* total shas */
 	int64_t			cmh_parent_dir;	/* path file num */
 	uint32_t		cmh_uid;	/* user id */
 	uint32_t		cmh_gid;	/* group id */
@@ -108,7 +108,7 @@ struct ctfile_parse_state {
 	int			 xs_dnum;
 	int			 xs_state;
 	int			 xs_wasfile;
-	int			 xs_sha_cnt;
+	int64_t			 xs_sha_cnt;
 	size_t			 xs_sha_sz;
 
 	uint8_t			 xs_sha[SHA_DIGEST_LENGTH];
