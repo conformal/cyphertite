@@ -174,10 +174,17 @@ ct_xdr_gheader(XDR *xdrs, struct ctfile_gheader *objp,
 			return (CTE_XDR);
 		if (ctfile_basedir != NULL && prevlvl != NULL &&
 		    prevlvl[0] != '\0') {
+			char *baseprev;
+			baseprev = ct_basename(prevlvl);
+
 			if (asprintf(&objp->cmg_prevlvl_filename, "%s%s",
-			    ctfile_basedir, prevlvl) == -1) {
+			    ctfile_basedir, baseprev) == -1) {
+				int s_errno = errno;
+				e_free(&baseprev);
+				errno = s_errno;
 				return (CTE_ERRNO);
 			}
+			e_free(&baseprev);
 		} else {
 			objp->cmg_prevlvl_filename = prevlvl;
 		}
