@@ -50,7 +50,6 @@ extern struct xmlsd_v_elem xe_ct_cull_shas_reply[];
 extern struct xmlsd_v_elem xe_ct_cull_complete_reply[];
 
 #define CT_NEGOTIATE_VERSION		"V1"
-extern struct xmlsd_v_elem xe_ct_negotiate[];
 
 #define CT_NEGOTIATE_REPLY_VERSION	"V1"
 extern struct xmlsd_v_elem xe_ct_negotiate_reply[];
