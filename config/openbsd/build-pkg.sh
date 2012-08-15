@@ -37,6 +37,7 @@ rev_file=${PACKAGE_DATA_DIR}/${name}.rev
 VERSION=$(cd ../.. && sh version.sh)
 
 EPOCH=$(grep EPOCH ${category}/${port}/Makefile | sed -e 's/.*=[^0-9]*//g' -e 's/[ \t]*//g')
+DISTNAME=$(grep DISTNAME ${category}/${port}/Makefile | sed -e 's/.*=[^0-9]*//g' -e 's/[ \t]*//g')
 
 if [ "${EPOCH}" = "" ]
 then
@@ -50,6 +51,12 @@ then
     . ${rev_file} 
 else
     version=-1.-1.-1
+fi
+
+if [ ${DISTNAME} != "${VERSION}" ]
+then
+	echo "VERSION does not match distfile ver: ${VERSION} ${DISTNAME}"
+	exit 8
 fi
 
 if [ "${PORTSDIR}" = "" ]
