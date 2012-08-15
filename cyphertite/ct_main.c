@@ -34,6 +34,7 @@
 
 #include <assl.h>
 #include <clog.h>
+#include <curl/curl.h>
 #include <exude.h>
 #include <shrink.h>
 #include <xmlsd.h>
@@ -138,7 +139,10 @@ show_version(void)
 	fprintf(stderr, fmt, "clens", clens_verstring());
 #endif /* NEED_LIBCLENS */
 	fprintf(stderr, fmt, "clog", clog_verstring());
+	fprintf(stderr, fmt, "curl: version", curl_version());
+	fprintf(stderr, fmt, "event: version", event_get_version());
 	fprintf(stderr, fmt, "exude", exude_verstring());
+	fprintf(stderr, fmt, "openssl: version", OPENSSL_VERSION_TEXT);
 	fprintf(stderr, fmt, "shrink", shrink_verstring());
 	fprintf(stderr, fmt, "xmlsd", xmlsd_verstring());
 
