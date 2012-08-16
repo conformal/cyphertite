@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.3.0
+%define version		1.3.4
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,14 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Thu Aug 16 2012 - davec 1.3.4-1
+- Add support for FreeBSD 9
+- Add support for Bitrig
+- Allow cull to delete all data when all ctfiles have been removed
+- Only open the local database when required
+- Fix crash on FreeBSD - BZ#23
+- Fix bug causing cull to hang indefinitely
+- Other minor bug fixes and code cleanup
 * Tue Jul 17 2012 - davec 1.3.0-1
 - Significant internal reorganization to split core cyphertite
   functionality into a library (libcyphertite)
