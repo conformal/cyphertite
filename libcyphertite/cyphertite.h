@@ -401,7 +401,8 @@ int			 ctfile_in_cache(const char *, const char *);
 char			*ctfile_get_cachename(const char *, const char *);
 int			 ctfile_verify_name(char *);
 int			 ctfile_trim_cache(const char *, long long);
-
+int			 ctfile_cache_remove(const char *,
+			     const char *);
 void			 ct_prompt_for_login_password(struct ct_config *);
 void			 ct_normalize_username(char *);
 char			*ct_normalize_path(char *);

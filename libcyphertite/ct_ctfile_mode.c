@@ -1051,33 +1051,12 @@ ctfile_delete_from_cache(struct ct_global_state *state, struct ct_op *op)
 {
 	char	*filename = op->op_args;
 
-	/* XXX delete any cachefile here */
+	/* remove the deleted file from cachedir. */
+	(void)ctfile_cache_remove(filename,
+	    state->ct_config->ct_ctfile_cachedir);
 	e_free(&filename);
 	return (0);
 }
-#if 0
-/*
- * Delete all metadata files that were found by the preceding list operation.
- */
-void
-ctfile_trigger_delete(struct ct_op *op)
-{
-	struct ctfile_list_tree	 results;
-	struct ctfile_list_file	*file = NULL;
-
-	RB_INIT(&results);
-	ctfile_list_complete(op->op_matchmode, op->op_filelist,
-	    op->op_excludelist, &results);
-	while((file = RB_ROOT(&results)) != NULL) {
-		CNDBG(CT_LOG_CRYPTO, "deleting remote crypto secrets file %s",
-		    file->mlf_name);
-		ct_add_operation_after(op, ctfile_delete, NULL, NULL,
-		    e_strdup(file->mlf_name), NULL, NULL, NULL, 0, 0);
-		RB_REMOVE(ctfile_list_tree, &results, file);
-		e_free(&file);
-	}
-}
-#endif
 
 /*
  * Verify that the ctfile name is kosher for remote mode.
@@ -1485,7 +1464,6 @@ ct_cull_extract_cleanup(struct ct_global_state *state, struct ct_op *op)
 	return (0);
 }
 
-ct_op_complete_cb	ct_cull_delete_cleanup;
 void
 ct_cull_collect_ctfiles(struct ct_global_state *state, struct ct_op *op)
 {
@@ -1586,7 +1564,7 @@ prev_ct_file:
 			CNDBG(CT_LOG_CTFILE, "adding %s to delete list",
 			    file->mlf_name);
 			ct_add_operation(state, ctfile_delete,
-			    ct_cull_delete_cleanup, e_strdup(file->mlf_name));
+			    ctfile_delete_from_cache, e_strdup(file->mlf_name));
 		} else {
 			CNDBG(CT_LOG_CTFILE, "adding %s to keep list",
 			    file->mlf_name);
@@ -1610,14 +1588,4 @@ prev_ct_file:
 dying:
 	/* XXX cleanup the cull tree */
 	return;
-}
-
-int
-ct_cull_delete_cleanup(struct ct_global_state *state, struct ct_op *op)
-{
-	char	*ctfile = op->op_args;
-
-	e_free(&ctfile);
-
-	return (0);
 }

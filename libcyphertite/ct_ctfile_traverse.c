@@ -226,3 +226,23 @@ ctfile_trim_cache(const char *cachedir, long long max_size)
 
 	return (0);
 }
+
+int
+ctfile_cache_remove(const char *file, const char *cachedir)
+{
+	
+	char		*cachename;
+	int		 s_errno = 0, ret = 0;
+
+	cachename = ctfile_get_cachename(file, cachedir);
+
+	if (unlink(cachename) == -1) {
+		ret = CTE_ERRNO;
+		s_errno = errno;
+	}
+
+	e_free(&cachename);
+
+	errno = s_errno;
+	return (ret);
+}
