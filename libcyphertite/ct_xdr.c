@@ -396,7 +396,11 @@ ctfile_get_previous(const char *path)
 	XDR			 xdr;
 	struct ctfile_gheader	 gh;
 
-	if (ctfile_open(path, NULL, &ctfile, &gh, &xdr) == 0) {
+	/*
+	 * We pass "" as basedir because this is a remote mode function and
+	 * thus we want the name to be basenamed.
+	 */
+	if (ctfile_open(path, "", &ctfile, &gh, &xdr) == 0) {
 		if (gh.cmg_prevlvl_filename)
 			ret = e_strdup(gh.cmg_prevlvl_filename);
 
