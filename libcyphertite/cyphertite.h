@@ -475,6 +475,11 @@ struct ct_ctfileop_args {
 	int		 cca_ctfile; /* is ctfile or other data */
 };
 
+struct ct_ctfile_delete_args {
+	char			*ccda_pattern;
+	int			 ccda_matchmode;
+};
+
 struct ct_op	*ct_add_operation(struct ct_global_state *, ct_op_cb *,
 		     ct_op_complete_cb *, void *);
 struct ct_op	*ct_add_operation_after(struct ct_global_state *,
@@ -494,7 +499,8 @@ ct_op_complete_cb	 ctfile_list_print;
 int		 ctfile_list_complete(struct ctfile_list *, int, char **,
 		     char **, struct ctfile_list_tree *);
 ct_op_complete_cb	 ct_check_secrets_extract;
-ct_op_cb	 ctfile_delete;
+ct_op_cb	 	 ctfile_delete;
+ct_op_complete_cb	 ctfile_process_delete; /* list postprocesser */
 
 ct_op_cb	ct_extract_file;
 ct_op_complete_cb	ct_extract_file_cleanup;

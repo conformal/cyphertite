@@ -209,6 +209,7 @@ ct_main(int argc, char **argv)
 	struct ct_archive_args		 caa;
 	struct ct_ctfileop_args 	 cca;
 	struct ct_ctfile_list_args	 ccla;
+	struct ct_ctfile_delete_args	 ccda;
 	struct ct_global_state		*state = NULL;
 	struct ct_config		*conf;
 	char				*ct_tdir = NULL;
@@ -418,7 +419,8 @@ ct_main(int argc, char **argv)
 
 	if (ct_action == CT_A_EXTRACT ||
 	    ct_action == CT_A_ARCHIVE || (ct_action == CT_A_LIST &&
-	    conf->ct_ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0))
+	    conf->ct_ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0) ||
+	    ct_action == CT_A_ERASE)
 		ct_flags |= CT_NEED_SECRETS;
 	if (ct_action == CT_A_ARCHIVE)
 		ct_flags |= CT_NEED_DB;
@@ -512,7 +514,10 @@ ct_main(int argc, char **argv)
 			    ctfile_archive : ctfile_extract),
 			    ctfile_op_cleanup, &cca);
 		} else if (ct_action == CT_A_ERASE) {
-			ct_add_operation(state, ctfile_delete, NULL, ctfile);
+			ccda.ccda_pattern = ctfile;
+			ccda.ccda_matchmode = ct_match_mode;
+			ct_add_operation(state, ctfile_list_start,
+			    ctfile_process_delete, &ccda);
 		} else if (ct_action == CT_A_LIST) {
 			ccla.ccla_search = includelist;
 			ccla.ccla_exclude = excludelist;

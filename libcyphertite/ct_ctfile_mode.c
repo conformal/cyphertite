@@ -56,6 +56,11 @@ ct_op_complete_cb	ct_cull_fetch_all_ctfiles;
 
 void	 ct_xml_file_open(struct ct_global_state *, struct ct_trans *,
 	     const char *, int, uint32_t, ct_complete_fn);
+
+char		*all_ctfiles_pattern[] = {
+			"^[[:digit:]]{8}-[[:digit:]]{6}-.*",
+			NULL,
+		 };
 /*
  * clean up after a ctfile archive/extract operation by freeing the remotename
  */
@@ -856,6 +861,200 @@ just_queue:
 	ct_header_free(state, hdr);
 }
 
+/*
+ * 1 - get list of ctfiles.
+ * 2 - if we are checking them, grab *all* of them (silly, i know)
+ * 3 - go through list sorting into ``to delete'' and ``not to delete''
+ * 4 - go throug the not to delete file and check none of them have
+ *     dependancies on files in the ``to delete'' list. fatal if so.
+ * 4 - schedule deletions.
+ * 5 - on completion of deletion, remove cachefile.
+ */
+struct ctfile_delete_args {
+	char		*pattern;
+	int		 matchmode;
+};
+
+ct_op_complete_cb	ctfile_process_delete;
+ct_op_complete_cb	ctfile_delete_extract_cleanup;
+ct_op_cb 		ctfile_delete_check_required;
+ct_op_complete_cb	ctfile_delete_from_cache;
+
+int
+ctfile_process_delete(struct ct_global_state *state, struct ct_op *op)
+{
+	struct ct_ctfile_delete_args	*ccda = op->op_args;
+	struct ctfile_list_tree		*results;
+	struct ctfile_list_file		*file;
+	struct ct_ctfileop_args		*cca;
+	int				 ret;
+
+	/*
+	 * XXX In some way make sure we filter out crypto.secrets unless
+	 * specifically mentioned.
+	 */
+	results = e_calloc(1, sizeof(*results));
+	RB_INIT(results);
+	if ((ret = ctfile_list_complete(&state->ctfile_list_files,
+	    CT_MATCH_REGEX, all_ctfiles_pattern, NULL, results)) != 0)
+		return (ret);
+
+	RB_FOREACH(file, ctfile_list_tree, results) {
+		if (!ctfile_in_cache(file->mlf_name,
+		    state->ct_config->ct_ctfile_cachedir)) {
+			cca = e_calloc(1, sizeof(*cca));
+			cca->cca_localname =  e_strdup(file->mlf_name);
+			cca->cca_remotename = cca->cca_localname;
+			cca->cca_tdir = state->ct_config->ct_ctfile_cachedir;
+			cca->cca_ctfile = 1;
+			ct_add_operation_after(state, op, ctfile_extract,
+			    ctfile_delete_extract_cleanup, cca);
+		}
+	}
+
+	op = ct_add_operation(state, ctfile_delete_check_required, NULL, ccda);
+	op->op_priv = results;
+
+	return (0);
+}
+
+int
+ctfile_delete_extract_cleanup(struct ct_global_state *state, struct ct_op *op)
+{
+	struct ct_ctfileop_args *cca = op->op_args;
+
+	e_free(&cca->cca_localname);
+	e_free(&cca);
+
+	return (0);
+}
+
+void
+ctfile_delete_check_required(struct ct_global_state *state, struct ct_op *op)
+{
+	struct ct_ctfile_delete_args	*ccda = op->op_args;
+	/* XXX pass this in as op->op_priv; */
+	struct ctfile_list_tree		*results = op->op_priv;
+	struct ctfile_list_tree		 del_tree;
+	struct ctfile_list_file		*file, search, *prevfile, *tmp;
+	struct ct_match			*match;
+	char				*pattern[] = { ccda->ccda_pattern,
+					     NULL };
+	char				*prev_filename;
+	int				 fail = 0, ret;
+
+	RB_INIT(&del_tree);
+
+	if (ct_get_file_state(state) == CT_S_FINISHED)
+		return;
+
+	if (state->ct_dying != 0)
+		goto dying;
+
+
+	if ((ret = ct_match_compile(&match, ccda->ccda_matchmode,
+	    pattern)) != 0) { 
+		ct_fatal(state, NULL, ret);
+		goto dying;
+	}
+
+	/* two passes. */
+	/* pass 1: separate out the files we intend to delete into del_tree */
+	RB_FOREACH_SAFE(file, ctfile_list_tree, results, tmp) {
+		if (ct_match(match, file->mlf_name) == 0) {
+			RB_REMOVE(ctfile_list_tree, results, file);
+			RB_INSERT(ctfile_list_tree, &del_tree, file);
+		} 
+	}
+
+	ct_match_unwind(match);
+
+	if (RB_EMPTY(&del_tree)) {
+		ct_fatal(state, NULL, CTE_NOTHING_TO_DELETE);
+		goto dying;
+	}
+
+		
+	/*
+	 * pass 2: go over the list of files we don't intend to delete and
+	 * ensure that none of them depend on files in del_tree
+	 */
+	RB_FOREACH(file, ctfile_list_tree, results) {
+		if ((ret = ctfile_get_previous(file->mlf_name,
+		    state->ct_config->ct_ctfile_cachedir,
+		    &prev_filename)) != 0) {
+			CWARNX("can not get previous file for %s: %s",
+			    file->mlf_name, ct_strerror(ret));
+			continue;
+		}
+		if (prev_filename != NULL) {
+			/* XXX basename? */
+			strlcpy(search.mlf_name, prev_filename,
+			    sizeof(search.mlf_name));
+			if ((prevfile = RB_FIND(ctfile_list_tree, &del_tree,
+			    &search)) != NULL) {
+				CWARNX("Can not delete %s, it is depended upon "
+				    "by %s which is not scheduled for deletion",
+				    prev_filename, file->mlf_name);
+				/* continue until all are checked */
+				fail = 1;
+			}
+			e_free(&prev_filename);
+		} 
+
+	}
+	if (fail) {
+		ct_fatal(state, NULL, CTE_CAN_NOT_DELETE);
+		goto dying;
+	}
+	while ((file = RB_ROOT(&del_tree)) != NULL) {
+		RB_REMOVE(ctfile_list_tree, &del_tree, file);
+
+		ct_add_operation(state, ctfile_delete, ctfile_delete_from_cache,
+		    e_strdup(file->mlf_name));
+		e_free(&file);
+		
+	}
+	while ((file = RB_ROOT(results)) != NULL) {
+		RB_REMOVE(ctfile_list_tree, results, file);
+		e_free(&file);
+		
+	}
+	e_free(&results);
+	op->op_args = NULL;
+
+	/* done with operation. next! */
+	ct_set_file_state(state, CT_S_FINISHED);
+	ct_op_complete(state);
+
+
+	return;
+
+dying:
+	/* He's dead, Jim. Clean up*/
+	if (results != NULL) {
+		while ((file = RB_ROOT(results)) != NULL) {
+			RB_REMOVE(ctfile_list_tree, results, file);
+			e_free(&file);
+		}
+	}
+	while ((file = RB_ROOT(&del_tree)) != NULL) {
+		RB_REMOVE(ctfile_list_tree, &del_tree, file);
+		e_free(&file);
+		
+	}
+
+}
+
+int
+ctfile_delete_from_cache(struct ct_global_state *state, struct ct_op *op)
+{
+	char	*filename = op->op_args;
+
+	/* XXX delete any cachefile here */
+	e_free(&filename);
+	return (0);
+}
 #if 0
 /*
  * Delete all metadata files that were found by the preceding list operation.
@@ -1236,10 +1435,6 @@ dying:
  */
 struct ctfile_list_tree ct_cull_all_ctfiles =
     RB_INITIALIZER(&ct_cull_all_ctfiles);
-char		*all_ctfiles_pattern[] = {
-			"^[[:digit:]]{8}-[[:digit:]]{6}-.*",
-			NULL,
-		 };
 
 ct_op_complete_cb	ct_cull_extract_cleanup;
 int

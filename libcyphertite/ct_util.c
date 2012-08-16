@@ -124,6 +124,8 @@ const char *ct_errmsgs[] = {
 	    "generate one.",
 	[CTE_UNABLE_TO_OPEN_CONFIG] = "Unable to open specified configuration file",
 	[CTE_XMLSD_FAILURE]= "Failed to handle xml",
+	[CTE_NOTHING_TO_DELETE] = "Nothing to delete",
+	[CTE_CAN_NOT_DELETE] = "Can not delete specified files",
 };
 
 const char *
