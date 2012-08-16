@@ -459,6 +459,7 @@ ct_queue_transfer(struct ct_global_state *state, struct ct_trans *trans)
 	/* If we are dying, everyone gets to complete right now */
 	if (state->ct_dying && trans->tr_state != TR_S_CYANIDE_CAPSULE) {
 		ct_queue_complete(state, trans);
+		return;
 	}
 
 	switch (trans->tr_state) {
