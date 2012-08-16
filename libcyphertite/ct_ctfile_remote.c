@@ -381,17 +381,18 @@ ctfile_download_next(struct ct_global_state *state, struct ct_op *op)
 	const char		*rfile = cca->cca_remotename;
 	char			*prevfile;
 	char			*cookedname;
-	char			*cachename;
 	int			 ret = 0;
 
 again:
 	CNDBG(CT_LOG_CTFILE, "ctfile %s", ctfile);
 
-	cachename = ctfile_get_cachename(ctfile, cca->cca_tdir);
-	/* this will provide us the path that we need to use */
-	prevfile = ctfile_get_previous(cachename);
-	e_free(&cachename);
-	if (prevfile == NULL)
+	if ((ret = ctfile_get_previous(ctfile, cca->cca_tdir, 
+	    &prevfile)) != 0) {
+		CWARNX("can not get previous filename for %s", ctfile);
+		/* error output will happen when even loop returns */
+		goto out;
+	}
+	if (prevfile == NULL) /* done with this chain */
 		goto out;
 
 	if (prevfile[0] != '\0') {

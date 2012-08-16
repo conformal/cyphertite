@@ -1299,7 +1299,7 @@ ct_cull_collect_ctfiles(struct ct_global_state *state, struct ct_op *op)
 	int			timelen;
 	char			buf[TIMEDATA_LEN];
 	time_t			now;
-	int			keep_files = 0, total_files = 0;
+	int			keep_files = 0, total_files = 0, ret = 0;
 
 	if (ct_get_file_state(state) == CT_S_FINISHED)
 		return;
@@ -1346,7 +1346,14 @@ ct_cull_collect_ctfiles(struct ct_global_state *state, struct ct_op *op)
 		if (file->mlf_keep == 0)
 			continue;
 
-		prev_filename = ctfile_get_previous(file->mlf_name);
+		if ((ret = ctfile_get_previous(file->mlf_name,
+		    state->ct_config->ct_ctfile_cachedir,
+		    &prev_filename)) != 0) {
+			CWARNX("can not get previous file for %s",
+			    file->mlf_name);
+			ct_fatal(state, NULL, ret);
+			goto dying;
+		}
 prev_ct_file:
 		if (prev_filename != NULL) {
 			CINFO("prev filename %s", prev_filename);
@@ -1365,8 +1372,15 @@ prev_ct_file:
 				prevfile->mlf_keep++;
 				e_free(&prev_filename);
 
-				prev_filename = ctfile_get_previous(
-				    prevfile->mlf_name);
+				if ((ret =
+				    ctfile_get_previous(prevfile->mlf_name, 
+				    state->ct_config->ct_ctfile_cachedir,
+				    &prev_filename)) != 0) {
+					/* XXX Fail? */
+					CWARNX("can not get previous file for"
+					    "%s", prevfile->mlf_name);
+					goto dying;
+				}
 				goto prev_ct_file;
 			}
 			e_free(&prev_filename);

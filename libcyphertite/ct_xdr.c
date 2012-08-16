@@ -388,25 +388,42 @@ ct_basis_setup(int *nextlvlp, const char *basisbackup, char **filelist,
 	return (0);
 }
 
-char *
-ctfile_get_previous(const char *path)
+/*
+ * Gets the previous filename for `file' stored in `basedir'.
+ * returns non zero ct_errno on error, 0 on success. Previous filename is in
+ * prev_filename.
+ *
+ * Note that prev_filename does NOT have basedir prepended.
+ */
+int
+ctfile_get_previous(const char *file, const char *basedir, char **prev_filename)
 {
 	FILE			*ctfile;
-	char			*ret = NULL;
 	XDR			 xdr;
 	struct ctfile_gheader	 gh;
+	char			*ctfile_path;
+	int			 ret;
+
+	ctfile_path = ctfile_get_cachename(file, basedir);
 
 	/*
 	 * We pass "" as basedir because this is a remote mode function and
 	 * thus we want the name to be basenamed.
 	 */
-	if (ctfile_open(path, "", &ctfile, &gh, &xdr) == 0) {
-		if (gh.cmg_prevlvl_filename)
-			ret = e_strdup(gh.cmg_prevlvl_filename);
+	ret = ctfile_open(ctfile_path, "", &ctfile, &gh, &xdr);
 
-		ctfile_cleanup_gheader(&gh);
-		ctfile_close(ctfile, &xdr);
-	}
+	e_free(&ctfile_path);
+
+	if (ret)
+		return (ret);
+
+	if (gh.cmg_prevlvl_filename)
+		*prev_filename = e_strdup(gh.cmg_prevlvl_filename);
+	else
+		*prev_filename = NULL;
+
+	ctfile_cleanup_gheader(&gh);
+	ctfile_close(ctfile, &xdr);
 
 	return ret;
 }
