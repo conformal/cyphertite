@@ -639,7 +639,8 @@ ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 	struct ct_trans			*trans;
 	int				 ret;
 
-	if (ct_get_file_state(state) == CT_S_FINISHED)
+	if (ct_get_file_state(state) == CT_S_FINISHED ||
+	    state->ct_dying != 0)
 		return;
 
 	trans = ct_trans_alloc(state);
@@ -730,7 +731,8 @@ ctfile_delete(struct ct_global_state *state, struct ct_op *op)
 	struct ct_trans			*trans;
 	int				 ret;
 
-	if (ct_get_file_state(state) == CT_S_FINISHED)
+	if (ct_get_file_state(state) == CT_S_FINISHED ||
+	    state->ct_dying != 0)
 		return;
 
 	trans = ct_trans_alloc(state);
