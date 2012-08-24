@@ -47,9 +47,12 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 	ssize_t			len;
 	int			body_len;
 	int			wlen;
-	int			write_complete = 0;
+	int			write_complete;
 	int			s_errno;
 	int			ctxgone;
+
+send_another:
+	write_complete = 0;
 
 	c = ioctx->c;
 	CT_LOCK(&ioctx->io_lock);
@@ -192,6 +195,9 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 	}
 	if (ioctx->io_over_bw_check != NULL)
 		ioctx->io_over_bw_check(ioctx->io_cb_arg, ioctx);
+	if (write_complete && ioctx->io_write_io_enabled != 0 &&
+	    !TAILQ_EMPTY(&ioctx->io_o_q))
+		goto send_another;
 }
 
 void
@@ -213,6 +219,7 @@ ct_event_assl_read(evutil_socket_t fd, short events, void *arg)
 	    (int64_t)c_pid, ioctx->io_i_state, ioctx->io_i_off,
 	    hdr != NULL ? hdr->c_size : -1);
 
+again:
 	switch (ioctx->io_i_state) {
 	case 0: /* between packets */
 		hdr = ioctx->io_header_alloc(ioctx->io_cb_arg);
@@ -310,6 +317,7 @@ ct_event_assl_read(evutil_socket_t fd, short events, void *arg)
 		CFATALX("invalid io state %d fd %"PRId64, ioctx->io_i_state,
 		    (int64_t)fd);
 	}
+	goto again;
 }
 
 void
@@ -322,9 +330,12 @@ ct_event_io_write(evutil_socket_t fd, short events, void *arg)
 	ssize_t			len;
 	int			body_len;
 	int			wlen;
-	int			write_complete = 0;
+	int			write_complete;
 	int			s_errno;
 	int			ctxgone;
+
+send_another:
+	write_complete = 0;
 
 	CT_LOCK(&ioctx->io_lock);
 	iob = TAILQ_FIRST(&ioctx->io_o_q);
@@ -463,6 +474,9 @@ write_next_iov:
 		}
 		CT_UNLOCK(&ioctx->io_lock);
 	}
+	if (write_complete && ioctx->io_write_io_enabled != 0 &&
+	    !TAILQ_EMPTY(&ioctx->io_o_q))
+		goto send_another;
 }
 
 void
@@ -482,6 +496,7 @@ ct_event_io_read(evutil_socket_t fd, short events, void *arg)
 	    (int64_t)c_pid, ioctx->io_i_state, ioctx->io_i_off,
 	    hdr != NULL ? hdr->c_size : -1);
 
+again:
 	switch (ioctx->io_i_state) {
 	case 0: /* between packets */
 		hdr = ioctx->io_header_alloc(ioctx->io_cb_arg);
@@ -577,6 +592,7 @@ ct_event_io_read(evutil_socket_t fd, short events, void *arg)
 		CFATALX("invalid io state %d fd %"PRId64, ioctx->io_i_state,
 		    (int64_t)fd);
 	}
+	goto again;
 }
 
 void
