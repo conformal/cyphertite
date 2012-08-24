@@ -616,6 +616,7 @@ dying:
 			ct_match_unwind(ex_priv->rb_match);
 		/* XXX what about ex_priv->xdr_ctx ? */
 		e_free(&ex_priv);
+		op->op_priv = NULL;
 		/* if ex_priv is gone then the trans will clean this up */
 		if (state->extract_state)
 			ct_file_extract_cleanup(state->extract_state);	
