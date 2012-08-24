@@ -918,6 +918,7 @@ ct_pr_fmt_file(void *state, struct fnode *fnode)
 		} else if (C_ISREG(fnode->fl_type)) {
 		}
 	}
+	fflush(stdout);
 }
 
 void
