@@ -767,10 +767,13 @@ ct_dump_stats(struct ct_global_state *state, FILE *outfh)
 
 		ct_print_scaled_stat(outfh, "Data exists\t\t",
 		    (int64_t)state->ct_stats->st_bytes_exists, sec, 0);
-		fprintf(outfh, "\t(%" PRId64 "%%)\n",
-		    (state->ct_stats->st_bytes_exists == 0) ? (int64_t)0 :
-		    (int64_t)(state->ct_stats->st_bytes_exists * 100 /
-		    state->ct_stats->st_bytes_tot));
+		if (state->ct_stats->st_bytes_tot != 0) {
+			fprintf(outfh, "\t(%" PRId64 "%%)\n",
+			    (state->ct_stats->st_bytes_exists == 0) ?
+			    (int64_t)0 :
+			    (int64_t)(state->ct_stats->st_bytes_exists * 100 /
+			    state->ct_stats->st_bytes_tot));
+		}
 
 		ct_print_scaled_stat(outfh, "Data sent\t\t",
 		    state->ct_stats->st_bytes_sent, sec, 1);
