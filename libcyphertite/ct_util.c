@@ -705,7 +705,6 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 		goto done;
 
 	if (ct_skip_xml_negotiate) {
-		rv = 0;
 		goto out;
 	}
 
@@ -741,7 +740,6 @@ ct_assl_negotiate_poll(struct ct_global_state *state)
 	ct_unwire_header(&hdr);
 
 	if (hdr.c_size == 0) {
-		rv = 0;
 		goto out;
 	}
 	/* get server reply body */
