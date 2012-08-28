@@ -122,7 +122,7 @@ ct_prompt_password(char *prompt, char *answer, size_t answer_len,
 	return (0);
 }
 
-void
+int
 ct_download_decode_and_save_certs(struct ct_config *config)
 {
 	int			 rv, fd;
@@ -141,22 +141,25 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 	    strlen(config->ct_password));
 	if (ct_base64_encode(CT_B64_ENCODE, pwd_digest, sizeof pwd_digest,
 	    (uint8_t *)b64, sizeof b64)) {
-		CFATALX("can't base64 encode password");
+		return CTE_CANT_BASE64;
 	}
 
 	if ((rv = ct_get_cert_bundle(config->ct_username, b64, &xml,
 	    &xml_size))) {
-		if (rv == CT_CERT_BUNDLE_LOGIN_FAILED)
-			CFATALX("Invalid login credentials.  Please check "
-			    "your username and password.");
-		else
-			CFATALX("unable to get cert bundle, rv %d", rv);
+		CNDBG(CT_LOG_CONFIG, "ct_get_cert_bundle returned %d", rv);
+		if (rv == CT_CERT_BUNDLE_LOGIN_FAILED) {
+			rv = CTE_INVALID_CREDENTIALS;
+		} else {
+			rv = CTE_OPERATION_FAILED;
+		}
+		return rv;
 	}
 
-	if (xmlsd_doc_alloc(&xd) != XMLSD_ERR_SUCCES)
-		CFATALX("unable to alloc xml document");
+	if (xmlsd_doc_alloc(&xd) != XMLSD_ERR_SUCCES) {
+		return CTE_XMLSD_FAILURE;
+	}
 	if ((rv = xmlsd_parse_mem(xml, xml_size, xd))) {
-		CFATALX("unable to parse cert bundle xml, rv %d", rv);
+		goto out;
 	}
 	root = xmlsd_doc_get_first_elem(xd);
 
@@ -164,28 +167,40 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 	if (stat(config->ct_ca_cert , &sb) != 0) {
 		xe = xmlsd_elem_find_child(root, "ca_cert");
 		if (xe == NULL) {
-			CFATALX("unable to get ca_cert xml node");
+			CNDBG(CT_LOG_XML, "unable to get ca_cert xml node");
+			rv = CTE_XML_PARSE_FAIL;
+			goto out;
 		}
 		xml_val = xmlsd_elem_get_value(xe);
 		if (xml_val == NULL) {
-			CFATALX("unable to get ca cert xml value");
+			CNDBG(CT_LOG_XML, "unable to get ca_cert xml value");
+			rv = CTE_XML_PARSE_FAIL;
+			goto out;
 		}
 		bzero(b64, sizeof b64);
 		if (ct_base64_encode(CT_B64_M_DECODE, (uint8_t *)xml_val,
 		    strlen(xml_val), (uint8_t *)b64, sizeof b64)) {
-			CFATALX("failed to decode ca cert xml");
+			CDBG("failed to decode ca cert xml");
+			rv = CTE_CANT_BASE64;
+			goto out;
 		}
 		e_asprintf(&ca_cert, "%s", b64);
 		if (ct_make_full_path(config->ct_ca_cert, 0700)) {
-			CFATAL("failed to make path to %s", config->ct_ca_cert);
+			CDBG("failed to make path to %s", config->ct_ca_cert);
+			rv = CTE_ERRNO;
+			goto out;
 		}
 		if ((fd = open(config->ct_ca_cert, O_RDWR | O_CREAT | O_TRUNC,
 				    0644)) == -1) {
-			CFATAL("unable to open file for writing %s",
+			CDBG("unable to open file for writing %s",
 			    config->ct_ca_cert);
+			rv = CTE_ERRNO;
+			goto out;
 		}
 		if ((f = fdopen(fd, "r+")) == NULL) {
-			CFATAL("unable to open file %s", config->ct_ca_cert);
+			CDBG("unable to open file %s", config->ct_ca_cert);
+			rv = CTE_ERRNO;
+			goto out;
 		}
 		fprintf(f, "%s", ca_cert);
 		fclose(f);
@@ -198,28 +213,39 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 	if (stat(config->ct_cert , &sb) != 0) {
 		xe = xmlsd_elem_find_child(root, "user_cert");
 		if (xe == NULL) {
-			CFATALX("unable to get user cert xml node");
+			CNDBG(CT_LOG_XML, "unable to get user cert xml node");
+			rv = CTE_XML_PARSE_FAIL;
+			goto out;
 		}
 		xml_val = xmlsd_elem_get_value(xe);
 		if (xml_val == NULL) {
-			CFATALX("unable to get user cert xml");
+			CNDBG(CT_LOG_XML, "unable to get user cert xml");
+			rv = CTE_XML_PARSE_FAIL;
+			goto out;
 		}
 		bzero(b64, sizeof b64);
 		if (ct_base64_encode(CT_B64_M_DECODE, (uint8_t *)xml_val,
 		    strlen(xml_val), (uint8_t *)b64, sizeof b64)) {
-			CFATALX("failed to decode user cert xml");
+			rv = CTE_CANT_BASE64;
+			goto out;
 		}
 		e_asprintf(&user_cert, "%s", b64);
 		if (ct_make_full_path(config->ct_cert, 0700)) {
-			CFATAL("failed to make path to %s", config->ct_cert);
+			CDBG("failed to make path to %s", config->ct_cert);
+			rv = CTE_ERRNO;
+			goto out;
 		}
 		if ((fd = open(config->ct_cert, O_RDWR | O_CREAT | O_TRUNC,
 				    0644)) == -1) {
-			CFATAL("unable to open file for writing %s",
+			CDBG("unable to open file for writing %s",
 			    config->ct_cert);
+			rv = CTE_ERRNO;
+			goto out;
 		}
 		if ((f = fdopen(fd, "r+")) == NULL) {
-			CFATAL("unable to open file %s", config->ct_cert);
+			CDBG("unable to open file %s", config->ct_cert);
+			rv = CTE_ERRNO;
+			goto out;
 		}
 		fprintf(f, "%s", user_cert);
 		fclose(f);
@@ -232,28 +258,39 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 	if (stat(config->ct_key, &sb) != 0) {
 		xe = xmlsd_elem_find_child(root, "user_key");
 		if (xe == NULL) {
-			CFATALX("unable to get user key xml node");
+			CNDBG(CT_LOG_XML, "unable to get user key xml node");
+			rv = CTE_XML_PARSE_FAIL;
+			goto out;
 		}
 		xml_val = xmlsd_elem_get_value(xe);
 		if (xml_val == NULL) {
-			CFATALX("unable to get user key xml");
+			CNDBG(CT_LOG_XML, "unable to get user key xml");
+			rv = CTE_XML_PARSE_FAIL;
+			goto out;
 		}
 		bzero(b64, sizeof b64);
 		if (ct_base64_encode(CT_B64_M_DECODE, (uint8_t *)xml_val,
 		    strlen(xml_val), (uint8_t *)b64, sizeof b64)) {
-			CFATALX("failed to decode user key xml");
+			rv = CTE_CANT_BASE64;
+			goto out;
 		}
 		e_asprintf(&user_key, "%s", b64);
 		if (ct_make_full_path(config->ct_key, 0700)) {
-			CFATAL("failed to make path to %s", config->ct_key);
+			CDBG("failed to make path to %s", config->ct_key);
+			rv = CTE_ERRNO;
+			goto out;
 		}
 		if ((fd = open(config->ct_key, O_RDWR | O_CREAT | O_TRUNC,
 				    0600)) == -1) {
-			CFATAL("unable to open file for writing %s",
+			CDBG("unable to open file for writing %s",
 			    config->ct_key);
+			rv = CTE_ERRNO;
+			goto out;
 		}
 		if ((f = fdopen(fd, "r+")) == NULL) {
-			CFATAL("unable to open file %s", config->ct_key);
+			CDBG("unable to open file %s", config->ct_key);
+			rv = CTE_ERRNO;
+			goto out;
 		}
 		fprintf(f, "%s", user_key);
 		fclose(f);
@@ -262,7 +299,9 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 		}
 	}
 
+out:
 	xmlsd_doc_free(xd);
+	return (rv);
 }
 
 int
@@ -490,6 +529,15 @@ void
 ct_write_config(struct ct_config *config, FILE *f, int save_password,
     int save_crypto_passphrase)
 {
+	if (config->ct_host)
+		fprintf(f, "host\t\t\t\t\t= %s\n", config->ct_host);
+	else
+		fprintf(f, "host\t\t\t\t=\n");
+	if (config->ct_hostport)
+		fprintf(f, "hostport\t\t\t\t= %s\n", config->ct_hostport);
+	else
+		fprintf(f, "hostport\t\t\t\t=\n");
+
 	fprintf(f, "username\t\t\t\t= %s\n", config->ct_username);
 	if (save_password && config->ct_password)
 		fprintf(f, "password\t\t\t\t= %s\n", config->ct_password);

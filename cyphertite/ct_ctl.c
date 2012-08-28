@@ -512,7 +512,11 @@ config_generate(struct ct_cli_cmd *c, int argc, char **argv)
 	    (stat(config.ct_ca_cert , &sb) != 0) ||
 	    (stat(config.ct_key, &sb) != 0)) {
 		CWARNX("Downloading certificates...");
-		ct_download_decode_and_save_certs(&config);
+		rv = ct_download_decode_and_save_certs(&config);
+		if (rv) {
+			CFATALX("Unable to get cert bundle (%d): %s", rv,
+			    ct_strerror(rv));
+		}
 	}
 
 	/* Verify username and password are correct before continuing. */

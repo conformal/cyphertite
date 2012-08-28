@@ -45,6 +45,7 @@ ct_op_complete_cb	ctfile_extract_nextop;
 ct_op_complete_cb	ctfile_download_next;
 ct_op_complete_cb	ctfile_nextop_extract_cleanup;
 ct_op_complete_cb	ctfile_nextop_archive_cleanup;
+ct_op_complete_cb	ctfile_check_secrets_upload;
 
 char *
 ctfile_cook_name(const char *path)
@@ -708,10 +709,81 @@ ct_secrets_exists(struct ct_global_state *state, struct ct_op *op)
 int
 ct_have_remote_secrets_file(struct ct_config *conf)
 {
-	int have;
+	int have = 0;
 
 	ct_do_operation(conf, ctfile_list_start, ct_secrets_exists,
 	    &have, 0);
 
 	return (have);
+}
+
+int
+ct_upload_secrets(struct ct_config *config)
+{
+	struct ct_ctfileop_args	 cca;
+	int			 rv;
+
+	cca.cca_localname = config->ct_crypto_secrets;
+	cca.cca_remotename = "crypto.secrets";
+	cca.cca_tdir = NULL;
+	cca.cca_encrypted = 0;
+	cca.cca_ctfile = 0;
+
+	rv = ct_do_operation(config, ctfile_list_start,
+	    ctfile_check_secrets_upload, &cca, 0);
+
+	return (rv);
+}
+
+int
+ctfile_check_secrets_upload(struct ct_global_state *state, struct ct_op *op)
+{
+	struct ct_ctfileop_args	*cca = op->op_args;
+
+	/* Check to see if we already have a secrets file on the server */
+	if (ct_file_on_server(state, cca->cca_remotename)) {
+		return CTE_NO_SECRETS_ON_SERVER; // XXX: CTE_SECRETS_ON_SERVER;
+	}
+
+	ct_add_operation_after(state, op, ctfile_archive, NULL, cca);
+
+	return (0);
+}
+
+int
+ct_download_secrets(struct ct_config *config)
+{
+	struct ct_ctfileop_args	 cca;
+	char			*dirpath, *fname;
+	int			 rv;
+
+	dirpath = fname = NULL;
+	rv = 0;
+
+	dirpath = ct_dirname(config->ct_crypto_secrets);
+	if (dirpath == NULL) {
+		rv = CTE_INVALID_PATH;
+		goto out;
+	}
+	fname = ct_basename(config->ct_crypto_secrets);
+	if (fname == NULL) {
+		rv = CTE_INVALID_PATH;
+		goto out;
+
+	}
+
+	cca.cca_localname = fname;
+	cca.cca_remotename = "crypto.secrets";
+	cca.cca_tdir = dirpath;
+	cca.cca_encrypted = 0;
+	cca.cca_ctfile = 0;
+
+	rv = ct_do_operation(config, ctfile_extract, NULL, &cca, 0);
+
+out:
+	if (dirpath)
+		e_free(&dirpath);
+	if (fname)
+		e_free(&fname);
+	return (rv);
 }

@@ -67,7 +67,7 @@ char *ct_user_config(void);
 char *ct_user_config_old(void);
 void ct_write_config(struct ct_config *, FILE *, int, int);
 void ct_default_config(struct ct_config *);
-void ct_download_decode_and_save_certs(struct ct_config *);
+int ct_download_decode_and_save_certs(struct ct_config *);
 
 /* Statistics */
 struct ct_statistics {
@@ -525,7 +525,9 @@ int	ct_file_on_server(struct ct_global_state *, char *);
 void	ct_cull_kick(struct ct_global_state *);
 
 
-int		 ct_have_remote_secrets_file(struct ct_config *);
+int	ct_have_remote_secrets_file(struct ct_config *);
+int	ct_upload_secrets(struct ct_config *);
+int	ct_download_secrets(struct ct_config *);
 
 
 /*
