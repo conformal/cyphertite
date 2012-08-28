@@ -76,7 +76,7 @@ const char *ct_errmsgs[] = {
 	[CTE_INVALID_PASSPHRASE	] = "Invalid passphrase",
 	[CTE_INVALID_REPLY_VERSION] = "Invalid reply version",
 	[CTE_CANT_BASE64	] = "Can not base64",
-	[CTE_INVALID_CREDENTIALS] = "Invalid credentials",
+	[CTE_INVALID_CREDENTIALS] = "Invalid login credentials. Please check your username and password",
 	[CTE_ACCOUNT_DISABLED	] = "Account Disabled - Please log in to your "
 	    "cyphertite.com account or contact support@cyphertite.com",
 	[CTE_OUT_OF_SPACE	] = "Account has run out of space - Please log "
