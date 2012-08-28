@@ -767,4 +767,5 @@ crypto_passphrase:
 		e_free(&config.ct_ctfile_cachedir);
 	if (config.ct_localdb)
 		e_free(&config.ct_localdb);
+	ctctl_config = NULL; /* global no longer valid */
 }

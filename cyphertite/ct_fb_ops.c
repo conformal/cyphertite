@@ -398,6 +398,7 @@ ctfb_main(int argc, char *argv[])
 	history_end(hist);
 	el_end(el);
 	ct_cleanup_login_cache();
+	ctfb_cfs = NULL; /* XXX cleanup tree */
 
 	ct_unload_config(config_file, conf);
 
