@@ -55,12 +55,15 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 	CT_LOCK(&ioctx->io_lock);
 	iob = TAILQ_FIRST(&ioctx->io_o_q);
 	hdr = iob->io_hdr;
+	/* invalid to not have a header here */
+	if (hdr == NULL) 
+		CABORTX("NULL header");
 	CT_UNLOCK(&ioctx->io_lock);
 	body = NULL;
 
 	CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" hdr op %d state %d, off %d "
 	    "sz %d", (int64_t)c_pid, hdr->c_opcode, ioctx->io_o_state,
-	    ioctx->io_o_off, hdr != NULL ? hdr->c_size : -1);
+	    ioctx->io_o_off, hdr->c_size);
 
 	switch (ioctx->io_o_state) {
 	case 0: /* idle */
@@ -229,6 +232,8 @@ ct_event_assl_read(evutil_socket_t fd, short events, void *arg)
 
 		/* fallthru */
 	case 1: /* reading header */
+		if (hdr == NULL)
+			CABORTX("NULL header");
 		rlen = sizeof(*hdr) - ioctx->io_i_off;
 		len = assl_read(c, (uint8_t *)hdr + ioctx->io_i_off, rlen);
 
@@ -265,6 +270,8 @@ ct_event_assl_read(evutil_socket_t fd, short events, void *arg)
 
 		/* fall thru */
 	case 2: /* reading body */
+		if (hdr == NULL)
+			CABORTX("NULL header");
 		rlen = hdr->c_size - ioctx->io_i_off;
 		if (rlen == 0) {
 			len = 0;
@@ -335,12 +342,14 @@ ct_event_io_write(evutil_socket_t fd, short events, void *arg)
 	iob = TAILQ_FIRST(&ioctx->io_o_q);
 	CT_UNLOCK(&ioctx->io_lock);
 	hdr = iob->io_hdr;
+	/* invalid to not have a header here */
+	if (hdr == NULL) 
+		CABORTX("NULL header");
 	body = NULL;
 
 	CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" hdr op %d state %d, off %d "
-	    "sz %d", (int64_t)c_pid, hdr->c_opcode,
-	    ioctx->io_o_state, ioctx->io_o_off,
-	    hdr != NULL ? hdr->c_size : -1);
+	    "sz %d", (int64_t)c_pid, hdr->c_opcode, ioctx->io_o_state,
+	    ioctx->io_o_off, hdr->c_size);
 
 	switch (ioctx->io_o_state) {
 	case 0: /* idle */
@@ -502,6 +511,8 @@ ct_event_io_read(evutil_socket_t fd, short events, void *arg)
 
 		/* fallthru */
 	case 1: /* reading header */
+		if (hdr == NULL)
+			CABORTX("NULL header");
 		rlen = sizeof(*hdr) - ioctx->io_i_off;
 		len = read(fd, (uint8_t *)hdr + ioctx->io_i_off, rlen);
 
@@ -536,6 +547,8 @@ ct_event_io_read(evutil_socket_t fd, short events, void *arg)
 
 		/* fall thru */
 	case 2: /* reading body */
+		if (hdr == NULL)
+			CABORTX("NULL header");
 		rlen = hdr->c_size - ioctx->io_i_off;
 		if (rlen == 0) {
 			len = 0;
