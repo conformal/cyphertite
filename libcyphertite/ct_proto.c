@@ -934,12 +934,13 @@ ct_parse_xml_delete_reply(struct ct_header *hdr, void *vbody, char **filename)
 				*filename = e_strdup(b64);
 			}
 		}
+		rv = 0;
 	} else  {
 		rv = CTE_INVALID_XML_TYPE;
 	}
 
 	xmlsd_doc_free(xl);
-	return (0);
+	return (rv);
 }
 
 int
@@ -1009,12 +1010,13 @@ ct_parse_xml_cull_setup_reply(struct ct_header *hdr, void *vbody)
 	xe = xmlsd_doc_get_first_elem(xl);
 	if (strcmp(xmlsd_elem_get_name(xe), "ct_cull_setup_reply") == 0) {
 		CNDBG(CT_LOG_XML, "cull_setup_reply");
+		rv = 0;
 	} else  {
 		rv = CTE_INVALID_XML_TYPE;
 	}
 
 	xmlsd_doc_free(xl);
-	return (0);
+	return (rv);
 }
 
 int
@@ -1090,12 +1092,13 @@ ct_parse_xml_cull_shas_reply(struct ct_header *hdr, void *vbody)
 	xe = xmlsd_doc_get_first_elem(xl);
 	if (strcmp(xmlsd_elem_get_name(xe), "ct_cull_shas_reply") == 0) {
 		CNDBG(CT_LOG_XML, "cull_shas_reply");
+		rv = 0;
 	} else  {
 		rv = CTE_INVALID_XML_TYPE;
 	}
 
 	xmlsd_doc_free(xl);
-	return (0);
+	return (rv);
 }
 
 int
@@ -1164,12 +1167,13 @@ ct_parse_xml_cull_complete_reply(struct ct_header *hdr, void *vbody)
 	xe = xmlsd_doc_get_first_elem(xl);
 	if (strcmp(xmlsd_elem_get_name(xe), "ct_cull_complete_reply") == 0) {
 		CNDBG(CT_LOG_XML, "cull_complete_reply");
+		rv = 0;
 	} else  {
 		rv = CTE_INVALID_XML_TYPE;
 	}
 
 	xmlsd_doc_free(xl);
-	return (0);
+	return (rv);
 }
 
 /*
