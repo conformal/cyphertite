@@ -648,9 +648,11 @@ crypto_passphrase:
 		    config.ct_crypto_secrets, crypto_key,
 		    sizeof(crypto_key), iv, sizeof (iv))) {
 			CWARNX("password incorrect, try again");
-			bzero(config.ct_crypto_passphrase,
-			    strlen(config.ct_crypto_passphrase));
-			e_free(&config.ct_crypto_passphrase);
+			if (config.ct_crypto_passphrase) { 
+				bzero(config.ct_crypto_passphrase,
+				    strlen(config.ct_crypto_passphrase));
+				e_free(&config.ct_crypto_passphrase);
+			}
 		}
 	}
 
