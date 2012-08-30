@@ -215,7 +215,8 @@ ct_settings_add(struct ct_settings *settings, char *var, char *val)
 			continue;
 
 		if (cs->cs_secure == 0)
-			CNDBG(CTUTIL_LOG_CONFIG, "settings_add: %s=%s\n",var ,val);
+			CNDBG(CTUTIL_LOG_CONFIG, "settings_add: %s=%s\n", var,
+			    val);
 
 		if (cs->cs_s) {
 			if (cs->cs_s->csp_set(cs, val))
@@ -242,7 +243,7 @@ ct_settings_add(struct ct_settings *settings, char *var, char *val)
 				else
 					*s = strdup(val);
 
-				if (s == NULL)
+				if (*s == NULL)
 					CFATAL("no memory for %s", cs->cs_name);
 				rv = 0;
 				break;
