@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.3.4
+%define version		1.3.6
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,14 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Thu Aug 30 2012 - davec 1.3.6-1
+- Stats are now reported in a human-readable format
+- Removal of remote metadata files via the -mef flag combination will now
+  remove the local cachefile as well
+- Ctfiles that are referenced by other ctfiles may no longer be removed
+- Ensure the current file being processed is visible during archival
+- Significant internal changes and improvements
+- Other minor bug fixes
 * Thu Aug 16 2012 - davec 1.3.4-1
 - Add support for FreeBSD 9
 - Add support for Bitrig

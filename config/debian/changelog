@@ -1,3 +1,15 @@
+cyphertite (1.3.6-1) unstable; urgency=low
+
+  * Stats are now reported in a human-readable format
+  * Removal of remote metadata files via the -mef flag combination will now
+    remove the local cachefile as well
+  * Ctfiles that are referenced by other ctfiles may no longer be removed
+  * Ensure the current file being processed is visible during archival
+  * Significant internal changes and improvements
+  * Other minor bug fixes
+
+ -- Conformal Systems <package-discuss@conformal.com>  Thu, 30 Aug 2012 18:48:26 -0500
+
 cyphertite (1.3.4-1) unstable; urgency=low
 
   * Add support for FreeBSD 9
