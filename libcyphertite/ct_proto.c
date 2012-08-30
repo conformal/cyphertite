@@ -137,8 +137,8 @@ ct_parse_neg_reply(struct ct_header *hdr, void *body, int *max_trans,
 }
 
 int
-ct_create_login(struct ct_header *hdr, void **vbody, const char *username, const
-char *passphrase)
+ct_create_login(struct ct_header *hdr, void **vbody, const char *username,
+    const char *passphrase)
 {
 	int				 user_len, payload_sz;
 	char				 b64_digest[128];
@@ -1019,7 +1019,7 @@ ct_parse_xml_cull_setup_reply(struct ct_header *hdr, void *vbody)
 
 int
 ct_create_xml_cull_shas(struct ct_header *hdr, void **vbody, uint64_t cull_uuid,
- struct ct_sha_lookup *head, int sha_per_packet, int *no_shas)
+    struct ct_sha_lookup *head, int sha_per_packet, int *no_shas)
 {
 	struct xmlsd_document		*xl;
 	struct xmlsd_element		*xe, *xp;
