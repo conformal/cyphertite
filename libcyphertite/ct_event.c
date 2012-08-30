@@ -109,14 +109,16 @@ ct_setup_wakeup_pipe(struct event_base *base, struct ct_ctx *ctx, void *vctx,
 }
 
 int
-ct_setup_wakeup_file(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
+ct_setup_wakeup_file(struct ct_event_state *ev_st, void *vctx,
+    ct_func_cb *func_cb)
 {
 	return ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_file,
 	    vctx, func_cb);
 }
 
 int
-ct_setup_wakeup_sha(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
+ct_setup_wakeup_sha(struct ct_event_state *ev_st, void *vctx,
+    ct_func_cb *func_cb)
 {
 #if CT_ENABLE_THREADS
 	return ct_setup_wakeup_cv(&ev_st->ct_ctx_sha, vctx, func_cb);
@@ -127,7 +129,8 @@ ct_setup_wakeup_sha(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_c
 }
 
 int
-ct_setup_wakeup_compress(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
+ct_setup_wakeup_compress(struct ct_event_state *ev_st, void *vctx,
+    ct_func_cb *func_cb)
 {
 #if CT_ENABLE_THREADS
 	return ct_setup_wakeup_cv(&ev_st->ct_ctx_compress, vctx, func_cb);
@@ -138,7 +141,8 @@ ct_setup_wakeup_compress(struct ct_event_state *ev_st, void *vctx, ct_func_cb *f
 }
 
 int
-ct_setup_wakeup_csha(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
+ct_setup_wakeup_csha(struct ct_event_state *ev_st, void *vctx,
+    ct_func_cb *func_cb)
 {
 #if CT_ENABLE_THREADS
 	return ct_setup_wakeup_cv(&ev_st->ct_ctx_csha, vctx, func_cb);
@@ -149,7 +153,8 @@ ct_setup_wakeup_csha(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_
 }
 
 int
-ct_setup_wakeup_encrypt(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
+ct_setup_wakeup_encrypt(struct ct_event_state *ev_st, void *vctx,
+    ct_func_cb *func_cb)
 {
 #if CT_ENABLE_THREADS
 	return ct_setup_wakeup_cv(&ev_st->ct_ctx_encrypt, vctx, func_cb);
@@ -160,14 +165,16 @@ ct_setup_wakeup_encrypt(struct ct_event_state *ev_st, void *vctx, ct_func_cb *fu
 }
 
 int
-ct_setup_wakeup_complete(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
+ct_setup_wakeup_complete(struct ct_event_state *ev_st, void *vctx,
+    ct_func_cb *func_cb)
 {
 	return ct_setup_wakeup_pipe(ev_st->ct_evt_base,
 	    &ev_st->ct_ctx_complete, vctx, func_cb);
 }
 
 int
-ct_setup_wakeup_write(struct ct_event_state *ev_st, void *vctx, ct_func_cb *func_cb)
+ct_setup_wakeup_write(struct ct_event_state *ev_st, void *vctx,
+    ct_func_cb *func_cb)
 {
 	return ct_setup_wakeup_pipe(ev_st->ct_evt_base, &ev_st->ct_ctx_write,
 	    vctx, func_cb);

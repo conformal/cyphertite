@@ -2305,7 +2305,8 @@ ct_populate_fnode(struct ct_extract_state *ces, struct ctfile_parse_state *ctx,
 		    ctx->xs_hdr.cmh_parent_dir);
 		if (fnode->fl_parent_dir == NULL)
 			CABORTX("can't find parent dir %" PRId64 " for %s",
-			    ctx->xs_hdr.cmh_parent_dir, ctx->xs_hdr.cmh_filename);
+			    ctx->xs_hdr.cmh_parent_dir,
+			    ctx->xs_hdr.cmh_filename);
 		e_asprintf(&fnode->fl_sname, "%s/%s",
 		    fnode->fl_parent_dir->d_name, ctx->xs_hdr.cmh_filename);
 		CNDBG(CT_LOG_CTFILE,
@@ -2318,8 +2319,8 @@ ct_populate_fnode(struct ct_extract_state *ces, struct ctfile_parse_state *ctx,
 	fnode->fl_name = e_strdup(name);
 
 	CNDBG(CT_LOG_CTFILE,
-	    "name %s from %s %" PRId64, fnode->fl_sname, ctx->xs_hdr.cmh_filename,
-	    ctx->xs_hdr.cmh_parent_dir);
+	    "name %s from %s %" PRId64, fnode->fl_sname,
+	    ctx->xs_hdr.cmh_filename, ctx->xs_hdr.cmh_parent_dir);
 
 	if (C_ISDIR(ctx->xs_hdr.cmh_type)) {
 		dnode = e_calloc(1,sizeof (*dnode));

@@ -469,7 +469,8 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 }
 
 int
-ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v, uint8_t *iv)
+ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
+    uint8_t *iv)
 {
 	char			shatk[SHA_DIGEST_STRING_LENGTH];
 	char			shatv[SHA_DIGEST_STRING_LENGTH];
