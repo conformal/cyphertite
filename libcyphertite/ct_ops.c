@@ -287,6 +287,146 @@ struct ct_extract_priv {
 	int				 allfiles;
 };
 
+/*
+ * So that we can provide correct statistics we have to go through all ctfiles
+ * being extracted and sum the sizes to be extracted. This is kinda expensive,
+ * but not really avoidable if we want to provide the statistics.
+ *
+ * Failure means we have called ct fatal.
+ */
+int
+ct_extract_calculate_total(struct ct_global_state *state,
+    struct ct_extract_args *cea, struct ct_match *inc_match,
+    struct ct_match *ex_match)
+{
+	struct ct_extract_head		 extract_head;
+	struct ctfile_parse_state	 xdr_ctx;
+	struct ct_match			*rb_match = NULL;
+	struct fnode			*fnode;
+	int				 allfiles;
+	int				 fillrb = 0, haverb = 0;
+	int				 doextract = 0;
+	int				 tr_state;
+	int				 ret;
+	int				 retval = 1;
+
+	CWARNX("total before calculation: %lld", state->ct_stats->st_bytes_tot);
+	TAILQ_INIT(&extract_head);
+
+	if ((ret = ct_extract_setup(&extract_head,
+	    &xdr_ctx, cea->cea_local_ctfile, cea->cea_ctfile_basedir,
+	    &allfiles)) != 0) {
+		ct_fatal(state, "can't setup extract queue", ret);
+		goto done;
+	}
+	if (allfiles) {
+		char *nothing = NULL;
+		if ((ret = ct_match_compile(&rb_match,
+		    CT_MATCH_RB, &nothing)) != 0) {
+			ct_fatal(state, "Couldn't create match tree",
+			    ret);
+			goto done;
+		}
+		fillrb = 1;
+	}
+
+	while (1) {
+		switch ((ret = ctfile_parse(&xdr_ctx))) {
+		case XS_RET_FILE:
+			if (fillrb == 0 && xdr_ctx.xs_hdr.cmh_nr_shas == -1) {
+				continue;
+			}
+
+			fnode = e_calloc(1, sizeof(*fnode));
+			/* XXX need the fnode for the correct paths */
+			ct_populate_fnode(state->extract_state,
+			    &xdr_ctx, fnode, &tr_state, allfiles,
+			    cea->cea_strip_slash);
+			/* we don't care about individual shas */
+			if (C_ISREG(fnode->fl_type)) {
+				ctfile_parse_seek(&xdr_ctx);
+			}
+
+			doextract = !ct_match(inc_match,
+			    fnode->fl_sname);
+			if (doextract && ex_match != NULL &&
+			  !ct_match(ex_match, fnode->fl_sname))
+				doextract = 0;
+			/*
+			 * If we're on the first ctfile in an allfiles backup
+			 * put the matches with -1 on the rb tree so we'll
+			 * remember to extract it from older files.
+			 */
+			if (doextract == 1 && fillrb &&
+			    xdr_ctx.xs_hdr.cmh_nr_shas == -1) {
+				ct_match_insert_rb(rb_match, fnode->fl_sname);
+				doextract = 0;
+			}
+			ct_free_fnode(fnode);
+			break;
+		case XS_RET_FILE_END:
+			if (doextract == 0)
+				continue;
+			/* update statistics */
+			state->ct_stats->st_bytes_tot +=
+			    xdr_ctx.xs_trl.cmt_orig_size;
+			break;
+		case XS_RET_EOF:
+			ctfile_parse_close(&xdr_ctx);
+			/* if rb tree and rb is empty, goto end state */
+			if ((haverb && ct_match_rb_is_empty(inc_match)) ||
+			    (fillrb && ct_match_rb_is_empty(rb_match))) {
+				retval = 0;
+				goto done;
+			}
+
+			if (!TAILQ_EMPTY(&extract_head)) {
+				/*
+				 * if allfiles and this was the first pass.
+				 * free the current match lists
+				 * switch to rb tree mode
+				 */
+				if (fillrb) {
+					ex_match = NULL;
+					inc_match = rb_match;
+					rb_match = NULL;
+					haverb = 1;
+					fillrb = 0;
+				}
+				/* reinits xdr_ctx */
+				if ((ret = ct_extract_open_next(&extract_head,
+				    &xdr_ctx)) != 0) {
+					ct_fatal(state,
+					    "Can't open next ctfile", ret);
+					goto done;
+				}
+			}
+			retval = 0;
+			goto done;
+			break;
+		case XS_RET_FAIL:
+			ct_fatal(state, "Failed to parse ctfile",
+			    xdr_ctx.xs_errno);
+			goto done;
+			break;
+		}
+	}
+
+done:
+	/* empty unless we quit early */
+	ct_extract_cleanup_queue(&extract_head);
+	/* only have control of the rb tree we made */
+	if (haverb)
+		ct_match_unwind(inc_match);
+	if (rb_match != NULL)
+		ct_match_unwind(rb_match);
+	if (retval == 0)
+		CWARNX("total after calculation: %lld",
+		    state->ct_stats->st_bytes_tot);
+		
+	return (retval);
+}
+
 void
 ct_extract(struct ct_global_state *state, struct ct_op *op)
 {
@@ -326,14 +466,6 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			}
 			op->op_priv = ex_priv;
 		}
-		if ((ret = ct_extract_setup(&ex_priv->extract_head,
-		    &ex_priv->xdr_ctx, ctfile, cea->cea_ctfile_basedir,
-		    &ex_priv->allfiles)) != 0) {
-			ct_fatal(state, "can't setup extract queue", ret);
-			goto dying;
-		}
-		state->ct_print_ctfile_info(state->ct_print_state,
-		    ex_priv->xdr_ctx.xs_filename, &ex_priv->xdr_ctx.xs_gh);
 		
 		if ((ret = ct_file_extract_init(&state->extract_state,
 		    cea->cea_tdir, cea->cea_attr,  cea->cea_follow_symlinks,
@@ -343,6 +475,21 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			    ret);
 			goto dying;
 		}
+
+		if (ct_extract_calculate_total(state, cea, ex_priv->inc_match,
+		    ex_priv->ex_match) != 0) {
+			CWARNX("failed to calculate stats");
+			goto dying;
+		}
+
+		if ((ret = ct_extract_setup(&ex_priv->extract_head,
+		    &ex_priv->xdr_ctx, ctfile, cea->cea_ctfile_basedir,
+		    &ex_priv->allfiles)) != 0) {
+			ct_fatal(state, "can't setup extract queue", ret);
+			goto dying;
+		}
+		state->ct_print_ctfile_info(state->ct_print_state,
+		    ex_priv->xdr_ctx.xs_filename, &ex_priv->xdr_ctx.xs_gh);
 		/* XXX we should handle this better */
 		if (state->ct_max_block_size <
 		    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size)
