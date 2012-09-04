@@ -447,31 +447,16 @@ ct_fatal(struct ct_global_state *state, const char *msg, int ct_errno)
 	ct_wakeup_complete(state->event_state);
 }
 
-/*
- * Move a transaction to the next state.
- */
 void
-ct_queue_transfer(struct ct_global_state *state, struct ct_trans *trans)
+ct_state_archive(struct ct_global_state *state, struct ct_trans *trans)
 {
-	CNDBG(CT_LOG_TRANS, "queuing transaction %" PRIu64 " %d",
-	    trans->tr_trans_id, trans->tr_state);
-
-	/* If we are dying, everyone gets to complete right now */
-	if (state->ct_dying && trans->tr_state != TR_S_CYANIDE_CAPSULE) {
-		ct_queue_complete(state, trans);
-		return;
-	}
-
 	switch (trans->tr_state) {
 	case TR_S_READ:
 	case TR_S_WRITTEN: /* written goes back to this queue for local db */
 	case TR_S_EXISTS:
-		if (trans->hdr.c_flags & C_HDR_F_METADATA)
-			goto skip_sha;
 		ct_queue_sha(state, trans);
 		break;
 	case TR_S_UNCOMPSHA_ED:
-skip_sha:	/* metadata skips shas */
 		/* try to compress trans body, if compression enabled */
 		if (state->ct_config->ct_compress) {
 			ct_queue_compress(state, trans);
@@ -488,12 +473,9 @@ skip_sha:	/* metadata skips shas */
 	case TR_S_COMPSHA_ED:
 	case TR_S_NEXISTS:
 		/* packet is compressed/crypted/SHAed as necessary, send */
-skip_csha:
 		ct_queue_write(state, trans);
 		break;
 	case TR_S_ENCRYPTED:
-		if (trans->hdr.c_flags & C_HDR_F_METADATA)
-			goto skip_csha;
 		/* after encrypting packet, create csha */
 		ct_queue_csha(state, trans);
 		break;
@@ -501,10 +483,55 @@ skip_csha:
 	case TR_S_FILE_START:
 	case TR_S_SPECIAL:
 	case TR_S_WMD_READY:
+	case TR_S_DONE:
 		ct_queue_complete(state, trans);
 		break;
+	default:
+		CABORTX("state %d, not handled in %s()",
+		    trans->tr_state, __func__);
+	}
+}
 
+void
+ct_state_extract(struct ct_global_state *state, struct ct_trans *trans)
+{
+	switch (trans->tr_state) {
 	/* extract path */
+	case TR_S_EX_SHA:
+		/* XXX - atomic increment */
+		state->ct_stats->st_chunks_tot++;
+		ct_queue_write(state, trans);
+		break;
+	case TR_S_EX_READ:
+		if (trans->hdr.c_flags & C_HDR_F_ENCRYPTED) {
+			ct_queue_encrypt(state, trans);
+			break;
+		}
+		/* FALLTHRU */
+	case TR_S_EX_DECRYPTED:
+		if (trans->hdr.c_flags & C_HDR_F_COMPRESSED_MASK) {
+			ct_queue_compress(state, trans);
+			break;
+		}
+		/* FALLTHRU */
+	case TR_S_EX_UNCOMPRESSED:
+	case TR_S_EX_FILE_START:
+	case TR_S_EX_SPECIAL:
+	case TR_S_EX_FILE_END:
+	case TR_S_DONE:
+		ct_queue_complete(state, trans);
+		break;
+	default:
+		CABORTX("state %d, not handled in %s()",
+		    trans->tr_state, __func__);
+	}
+}
+
+void
+ct_state_ctfile_extract(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	switch (trans->tr_state) {
 	case TR_S_EX_SHA:
 		/* XXX - atomic increment */
 		state->ct_stats->st_chunks_tot++;
@@ -528,27 +555,139 @@ skip_csha:
 	case TR_S_EX_SPECIAL:
 	case TR_S_EX_FILE_END:
 	case TR_S_DONE:
-	case TR_S_XML_OPENED:
 	case TR_S_XML_CLOSE:
 	case TR_S_XML_CLOSED:
-	case TR_S_XML_CULL_REPLIED:
-	case TR_S_CYANIDE_CAPSULE:
+	case TR_S_XML_OPENED:
 		ct_queue_complete(state, trans);
 		break;
-	case TR_S_XML_OPEN:
-	case TR_S_XML_LIST:
 	case TR_S_XML_CLOSING:
-	case TR_S_XML_DELETE:
-	case TR_S_XML_CULL_SEND:
-	case TR_S_XML_CULL_SHA_SEND:
-	case TR_S_XML_CULL_COMPLETE_SEND:
-	case TR_S_XML_EXT:
+	case TR_S_XML_OPEN:
 		ct_queue_write(state, trans);
 		break;
 	default:
-		CABORTX("state %d, not handled in ct_queue_transfer()",
-		    trans->tr_state);
+		CABORTX("state %d, not handled in %s()",
+		    trans->tr_state, __func__);
 	}
+}
+
+/*
+ * Similar to the normal archive statemachine path, but we do not
+ * sha or csha (or use localdb) for ctfiles.
+ */
+void
+ct_state_ctfile_archive(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	switch (trans->tr_state) {
+	case TR_S_READ:
+	case TR_S_UNCOMPSHA_ED:
+		/* try to compress trans body, if compression enabled */
+		if (state->ct_config->ct_compress) {
+			ct_queue_compress(state, trans);
+			break;
+		}
+		/* fallthru if compress not enabled */
+	case TR_S_COMPRESSED:
+		/* try to encrypt trans body, if encryption enabled */
+		if (trans->hdr.c_flags & C_HDR_F_ENCRYPTED) {
+			ct_queue_encrypt(state, trans);
+			break;
+		}
+		/* fallthru if encrypt not enabled */
+	case TR_S_COMPSHA_ED:
+	case TR_S_ENCRYPTED:
+	case TR_S_XML_OPEN:
+		/* packet is compressed/crypted/SHAed as necessary, send */
+		ct_queue_write(state, trans);
+		break;
+
+	case TR_S_FILE_START:
+	case TR_S_SPECIAL:
+	case TR_S_WMD_READY:
+	case TR_S_WRITTEN: 
+	case TR_S_XML_OPENED:
+	case TR_S_XML_CLOSE:
+	case TR_S_DONE:
+		ct_queue_complete(state, trans);
+		break;
+
+	default:
+		CABORTX("state %d, not handled in %s()",
+		    trans->tr_state, __func__);
+	}
+}
+
+void
+ct_state_ctfile_list(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	switch (trans->tr_state) {
+	case TR_S_XML_LIST:
+		ct_queue_write(state, trans);
+		break;
+	case TR_S_DONE:
+		ct_queue_complete(state, trans);
+		break;
+	default:
+		CABORTX("state %d, not handled in %s()",
+		    trans->tr_state, __func__);
+	}
+}
+
+void
+ct_state_ctfile_delete(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	switch (trans->tr_state) {
+	case TR_S_XML_DELETE:
+		ct_queue_write(state, trans);
+		break;
+	case TR_S_DONE:
+		ct_queue_complete(state, trans);
+		break;
+	default:
+		CABORTX("state %d, not handled in %s()",
+		    trans->tr_state, __func__);
+	}
+}
+
+void
+ct_state_cull(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	switch (trans->tr_state) {
+	case TR_S_XML_CULL_SEND:
+	case TR_S_XML_CULL_SHA_SEND:
+	case TR_S_XML_CULL_COMPLETE_SEND:
+		ct_queue_write(state, trans);
+		break;
+	case TR_S_DONE:
+	case TR_S_XML_CULL_REPLIED:
+		ct_queue_complete(state, trans);
+		break;
+	default:
+		CABORTX("state %d, not handled in %s()",
+		    trans->tr_state, __func__);
+	}
+}
+
+
+/*
+ * Move a transaction to the next state.
+ */
+void
+ct_queue_transfer(struct ct_global_state *state, struct ct_trans *trans)
+{
+	CNDBG(CT_LOG_TRANS, "queuing transaction %" PRIu64 " %d",
+	    trans->tr_trans_id, trans->tr_state);
+
+	/* If we are dying, everyone gets to complete right now */
+	if (state->ct_dying) {
+		ct_queue_complete(state, trans);
+		return;
+	}
+
+	trans->tr_statemachine(state, trans);
 }
 
 /*
@@ -618,6 +757,12 @@ ct_trans_realloc_local(struct ct_global_state *state, struct ct_trans *trans)
 	 */
 	if ((tmp = ct_trans_alloc_local(state)) == NULL)
 		return (trans);
+	/* XXX maybe? */
+	tmp->tr_fl_node = trans->tr_fl_node; 
+	tmp->tr_statemachine = trans->tr_statemachine; 
+	tmp->tr_complete = trans->tr_complete; 
+	tmp->tr_cleanup = trans->tr_cleanup; 
+
 
 	ct_trans_free(state, trans);
 

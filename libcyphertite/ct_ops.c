@@ -522,6 +522,7 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 		}
 		/* Correct unless new file or EOF. Will fix in those cases  */
 		trans->tr_fl_node = ex_priv->fl_ex_node;
+		trans->tr_statemachine = ct_state_extract;
 
 		switch ((ret = ctfile_parse(&ex_priv->xdr_ctx))) {
 		case XS_RET_FILE:
@@ -830,6 +831,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			ct_set_file_state(state, CT_S_WAITING_TRANS);
 			return;
 		}
+		trans->tr_statemachine = ct_state_extract;
 
 		if (ex_priv->done) {
 			CNDBG(CT_LOG_CTFILE, "Hit end of ctfile");

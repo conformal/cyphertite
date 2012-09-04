@@ -308,14 +308,25 @@ void	ct_shutdown(struct ct_global_state *state);
 struct ct_trans;
 
 RB_HEAD(ct_trans_head, ct_trans);
+typedef void	(ct_state_fn)(struct ct_global_state *, struct ct_trans *);
 typedef int	(ct_complete_fn)(struct ct_global_state *, struct ct_trans *);
 typedef void	(ct_cleanup_fn)(struct ct_global_state *, struct ct_trans *);
+
+/* standard statemachine functions */
+ct_state_fn	ct_state_archive;
+ct_state_fn	ct_state_ctfile_archive;
+ct_state_fn	ct_state_extract;
+ct_state_fn	ct_state_ctfile_extract;
+ct_state_fn	ct_state_ctfile_delete;
+ct_state_fn	ct_state_ctfile_list;
+ct_state_fn	ct_state_cull;
 
 
 struct ct_trans {
 	struct ct_header	hdr;		/* must be first element */
 	TAILQ_ENTRY(ct_trans)	tr_next;
 	RB_ENTRY(ct_trans)	tr_trans_rbnode;
+	ct_state_fn		*tr_statemachine;
 	ct_complete_fn		*tr_complete;
 	ct_cleanup_fn		*tr_cleanup;
 

@@ -222,6 +222,7 @@ loop:
 		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
+	ct_trans->tr_statemachine = ct_state_ctfile_archive;
 
 	if (cas->cas_open_sent == 0) {
 		cas->cas_open_sent = 1;
@@ -509,6 +510,7 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
+	trans->tr_statemachine = ct_state_ctfile_extract;
 	if (ces->ces_open_sent == 0) {
 		ces->ces_fnode = e_calloc(1, sizeof(*ces->ces_fnode));
 		ces->ces_fnode->fl_type = C_TY_REG;
@@ -651,6 +653,7 @@ ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 		return;
 	}
 
+	trans->tr_statemachine = ct_state_ctfile_list;
 	trans->tr_state = TR_S_XML_LIST;
 
 	if ((ret = ct_create_xml_list(&trans->hdr,
@@ -761,6 +764,7 @@ ctfile_delete(struct ct_global_state *state, struct ct_op *op)
 		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
+	trans->tr_statemachine = ct_state_ctfile_delete;
 	trans->tr_state = TR_S_XML_DELETE;
 
 	if ((rname = ctfile_cook_name(cda->cda_name)) == NULL) {
@@ -1318,6 +1322,7 @@ ct_cull_setup(struct ct_global_state *state, struct ct_op *op)
 		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
+	trans->tr_statemachine = ct_state_cull;
 
 	if ((ret = ct_create_xml_cull_setup(&trans->hdr,
 	    (void **)&trans->tr_data[2], cull_uuid, CT_CULL_PRECIOUS)) != 0) {
@@ -1363,6 +1368,7 @@ ct_cull_send_complete(struct ct_global_state *state, struct ct_op *op)
 		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
+	trans->tr_statemachine = ct_state_cull;
 
 	if ((ret = ct_create_xml_cull_complete(&trans->hdr,
 	    (void **)&trans->tr_data[2], cull_uuid, CT_CULL_PROCESS)) != 0) {
@@ -1410,6 +1416,7 @@ ct_cull_send_shas(struct ct_global_state *state, struct ct_op *op)
 		return;
 	}
 
+	trans->tr_statemachine = ct_state_cull;
 	trans->tr_state = TR_S_XML_CULL_SHA_SEND;
 	if ((ret = ct_create_xml_cull_shas(&trans->hdr,
 	    (void **)&trans->tr_data[2], cull_uuid, &ct_sha_rb_head,

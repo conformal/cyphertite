@@ -836,6 +836,7 @@ loop:
 		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
+	ct_trans->tr_statemachine = ct_state_archive;
 
 	/*
 	 * Only regular files that haven't just been opened need to talk
@@ -1064,6 +1065,7 @@ done:
 		ct_set_file_state(state, CT_S_WAITING_TRANS);
 		return;
 	}
+	ct_trans->tr_statemachine = ct_state_archive;
 	ct_trans->tr_ctfile = cap->cap_cws;
 	ct_trans->tr_fl_node = NULL;
 	ct_trans->tr_state = TR_S_DONE;
