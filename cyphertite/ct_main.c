@@ -1143,28 +1143,14 @@ void
 ct_list_op(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_extract_args	*cea = op->op_args;
-	struct ct_trans		*trans;
 
 	ct_list(cea->cea_local_ctfile, cea->cea_filelist, cea->cea_excllist,
 	    cea->cea_matchmode, cea->cea_ctfile_basedir, cea->cea_strip_slash,
 	    ct_verbose);
-	/*
-	 * Technicaly should be a local transaction.
-	 * However, since this is just so that list can fit into the normal
-	 * state machine for async operations and there should be none
-	 * others allocated it doesn't really matter.
-	 */
-	trans = ct_trans_alloc(state);
-	if (trans == NULL) {
-		/* system busy, return (should never happen) */
-		CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
-		ct_set_file_state(state, CT_S_WAITING_TRANS);
-		return;
-	}
-	trans->tr_state = TR_S_DONE;
-	trans->tr_complete = ct_list_complete_done;
-	ct_queue_first(state, trans);
-	ct_set_file_state(state, CT_S_FINISHED);
+
+	/* short circuit state machine */
+	if (ct_op_complete(state))
+		ct_shutdown(state);
 }
 
 int
