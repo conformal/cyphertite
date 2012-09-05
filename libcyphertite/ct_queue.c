@@ -1414,8 +1414,9 @@ ct_handle_exists_reply(struct ct_global_state *state, struct ct_trans *trans,
 		state->ct_stats->st_bytes_exists += trans->tr_chsize;
 	} else {
 		trans->tr_state = TR_S_NEXISTS;
-		trans->tr_fl_node->fl_comp_size +=
-		    trans->tr_size[(int)trans->tr_dataslot];
+		if (trans->tr_fl_node)
+			trans->tr_fl_node->fl_comp_size +=
+			    trans->tr_size[(int)trans->tr_dataslot];
 	}
 transfer:
 	ct_queue_transfer(state, trans);
