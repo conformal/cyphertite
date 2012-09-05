@@ -310,7 +310,6 @@ ct_extract_calculate_total(struct ct_global_state *state,
 	int				 ret;
 	int				 retval = 1;
 
-	CWARNX("total before calculation: %lld", state->ct_stats->st_bytes_tot);
 	TAILQ_INIT(&extract_head);
 
 	if ((ret = ct_extract_setup(&extract_head,
@@ -420,9 +419,6 @@ done:
 		ct_match_unwind(inc_match);
 	if (rb_match != NULL)
 		ct_match_unwind(rb_match);
-	if (retval == 0)
-		CWARNX("total after calculation: %lld",
-		    state->ct_stats->st_bytes_tot);
 		
 	return (retval);
 }
