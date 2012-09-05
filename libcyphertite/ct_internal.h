@@ -52,4 +52,12 @@ void		 ct_fatal(struct ct_global_state *, const char *, int);
 
 char		*ct_os_version(void);
 
+void	ct_queue_sha(struct ct_global_state *, struct ct_trans *);
+void	ct_queue_compress(struct ct_global_state *, struct ct_trans *);
+void	ct_queue_encrypt(struct ct_global_state *, struct ct_trans *);
+void	ct_queue_csha(struct ct_global_state *, struct ct_trans *);
+void	ct_queue_write(struct ct_global_state *, struct ct_trans *);
+void	ct_queue_queued(struct ct_global_state *, struct ct_trans *);
+void	ct_queue_complete(struct ct_global_state *, struct ct_trans *);
+
 #endif /* ! CT_INTERNAL_H */
