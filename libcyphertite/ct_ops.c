@@ -28,6 +28,7 @@
 #include <ct_match.h>
 #include <cyphertite.h>
 #include <ct_internal.h>
+#include <ct_db.h>
 
 const uint8_t	 zerosha[SHA_DIGEST_LENGTH];
 
@@ -966,3 +967,222 @@ ct_extract_file_cleanup(struct ct_global_state *state, struct ct_op *op)
 	return (0);
 }
 
+/* handlers for ct_exists_file. */
+void
+ct_state_exists(struct ct_global_state *state, struct ct_trans *trans)
+{
+	/*
+	 * State flow:
+	 * exists packets -> either EXISTS or NEXISTS.
+	 * when all exists done, S_DONE trans sent.
+	 */
+	switch (trans->tr_state) {
+	case TR_S_COMPSHA_ED:
+	case TR_S_UNCOMPSHA_ED:
+		/* do exists, will return with either S_EXISTS or S_NEXISTS */
+		ct_queue_write(state, trans);
+		break;
+
+	case TR_S_EXISTS:
+	case TR_S_NEXISTS:
+	case TR_S_DONE:
+		/* done here, complete */
+		ct_queue_complete(state, trans);
+		break;
+	default:
+		CABORTX("state %d, not handled in %s()",
+		    trans->tr_state, __func__);
+	}
+}
+
+/* completion handler for exists */
+int
+ct_exists_complete(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	struct ct_op		*op = ct_get_current_operation(state);
+	struct ct_exists_args	*ce = op->op_args;
+
+	if (trans->tr_state == TR_S_EXISTS) {
+		/* Insert to localdb to save some effort later */
+		ctdb_insert_sha(state->ct_db_state, trans->tr_sha,
+		    trans->tr_csha, trans->tr_iv);
+	} else {
+		/* Call callback so caller can decide what to do with it. */
+		ce->ce_nexists_cb(ce->ce_nexists_state, ce, trans);
+	}
+
+	return (0);
+}
+int
+ct_exists_complete_done(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	return (1);
+}
+
+struct ct_exists_priv {
+	struct ct_extract_head		 extract_head;
+	struct ctfile_parse_state	 xdr_ctx;
+};
+/*
+ * Perform EXISTS checking on every sha in a ctfile chain.
+ *
+ * We don't do any filtering. It is assumed that the localdb has been
+ * flushed/made good before this operation starts so that we can trust lookups.
+ */
+void
+ct_exists_file(struct ct_global_state *state, struct ct_op *op)
+{
+	struct ct_exists_args	*ce = op->op_args;
+	struct ct_exists_priv	*ex_priv = op->op_priv;
+	struct ct_trans		*trans;
+	int			 ret, allfiles;
+
+	/* if we were woken up due to fatal, just clean up local state */
+	if (state->ct_dying != 0)
+		goto dying;
+
+	CNDBG(CT_LOG_TRANS, "entry");
+	switch (ct_get_file_state(state)) {
+	case CT_S_STARTING:
+		if (ex_priv == NULL) {
+			ex_priv = e_calloc(1, sizeof(*ex_priv));
+			TAILQ_INIT(&ex_priv->extract_head);
+			op->op_priv = ex_priv;
+		}
+		if ((ret = ct_extract_setup(&ex_priv->extract_head,
+		    &ex_priv->xdr_ctx, ce->ce_ctfile, ce->ce_ctfile_basedir,
+		    &allfiles)) != 0) {
+			ct_fatal(state, "can't setup extract queue", ret);
+			goto dying;
+		}
+		
+		break;
+	case CT_S_FINISHED:
+		return;
+	default:
+		break;
+	}
+
+	ct_set_file_state(state, CT_S_RUNNING);
+	while (1) {
+		if ((trans = ct_trans_alloc(state)) == NULL) {
+			CNDBG(CT_LOG_TRANS, "ran out of transactions, waiting");
+			ct_set_file_state(state, CT_S_WAITING_TRANS);
+			return;
+		}
+		trans->tr_statemachine = ct_state_exists;
+
+		switch ((ret = ctfile_parse(&ex_priv->xdr_ctx))) {
+		case XS_RET_FILE:
+		case XS_RET_FILE_END:
+			ct_trans_free(state, trans);
+			break;
+		case XS_RET_SHA:
+			if (memcmp(zerosha, ex_priv->xdr_ctx.xs_sha,
+			    SHA_DIGEST_LENGTH) == 0) {
+				if (ctfile_parse_seek(&ex_priv->xdr_ctx)) {
+					ct_fatal(state, "Can't seek past "
+					    "truncation shas",
+					    ex_priv->xdr_ctx.xs_errno);
+					goto dying;
+				}
+				ct_trans_free(state, trans);
+				continue;
+			}
+
+			if (ex_priv->xdr_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO) {
+				/*
+				 * yes csha and sha are reversed, we want
+				 * to download csha, but putting it in sha
+				 * simplifies the code
+				 */
+				bcopy(ex_priv->xdr_ctx.xs_sha, trans->tr_sha,
+				    sizeof(trans->tr_csha));
+				bcopy(ex_priv->xdr_ctx.xs_csha, trans->tr_csha,
+				    sizeof(trans->tr_sha));
+				bcopy(ex_priv->xdr_ctx.xs_iv, trans->tr_iv,
+				    sizeof(trans->tr_iv));
+				trans->tr_state = TR_S_COMPSHA_ED;
+			} else {
+				trans->tr_state = TR_S_UNCOMPSHA_ED;
+				bcopy(ex_priv->xdr_ctx.xs_sha, trans->tr_sha,
+				    sizeof(trans->tr_sha));
+			}
+			if (clog_mask_is_set(CT_LOG_SHA)) {
+				char	 shat[SHA_DIGEST_STRING_LENGTH];
+
+				ct_sha1_encode(trans->tr_sha, shat);
+				CNDBG(CT_LOG_SHA, "EXISTSing sha %s", shat);
+			}
+			if (ctdb_lookup_sha(state->ct_db_state, trans->tr_sha,
+			    trans->tr_csha, trans->tr_iv)) {
+				CNDBG(CT_LOG_SHA, "sha already in localdb");
+				state->ct_stats->st_bytes_exists +=
+				    trans->tr_chsize;
+				ct_trans_free(state, trans);
+				continue;
+			}
+
+			trans->tr_complete = ct_exists_complete;
+			trans->tr_cleanup = NULL;
+			trans->tr_dataslot = 0;
+			ct_queue_first(state, trans);
+			break;
+		case XS_RET_EOF:
+			CNDBG(CT_LOG_CTFILE, "Hit end of ctfile");
+			ctfile_parse_close(&ex_priv->xdr_ctx);
+
+			if (!TAILQ_EMPTY(&ex_priv->extract_head)) {
+				/*
+				 * if allfiles and this was the first pass.
+				 * free the current match lists
+				 * switch to rb tree mode
+				 */
+				ct_trans_free(state, trans);
+				/* reinits ex_priv->xdr_ctx */
+				if ((ret =
+				    ct_extract_open_next(&ex_priv->extract_head,
+				    &ex_priv->xdr_ctx)) != 0) {
+					ct_fatal(state,
+					    "Can't open next ctfile", ret);
+					goto dying;
+				}
+			} else {
+				e_free(&ex_priv);
+				op->op_priv = NULL;
+				trans->tr_state = TR_S_DONE;
+				trans->tr_complete = ct_exists_complete_done;
+				trans->tr_cleanup = NULL;
+				/*
+				 * Technically this should be a local
+				 * transaction. However, since we are done
+				 * it doesn't really matter either way.
+				 */
+				ct_queue_first(state, trans);
+				CNDBG(CT_LOG_TRANS, "extract finished");
+				ct_set_file_state(state, CT_S_FINISHED);
+			}
+			return;
+			break;
+		case XS_RET_FAIL:
+			ct_fatal(state, "Failed to parse ctfile",
+			    ex_priv->xdr_ctx.xs_errno);
+			goto dying;
+			break;
+		}
+	}
+
+	return;
+
+dying:
+	/* only if we hadn't sent the final transaction yet */
+	if (ex_priv != NULL) {
+		ct_extract_cleanup_queue(&ex_priv->extract_head);
+		/* XXX what about ex_priv->xdr_ctx ? */
+		e_free(&ex_priv);
+		op->op_priv = NULL;
+	}
+	return;
+}

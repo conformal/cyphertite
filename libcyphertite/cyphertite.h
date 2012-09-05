@@ -487,6 +487,15 @@ struct ct_ctfileop_args {
 	int		 cca_ctfile; /* is ctfile or other data */
 };
 
+struct ct_exists_args {
+	char		*ce_ctfile;
+	char		*ce_ctfile_basedir;
+	void		(*ce_nexists_cb)(void *, struct ct_exists_args *,
+			    struct ct_trans *);
+	void		*ce_nexists_state;
+	
+};
+
 /* arguments for globa check and delete */
 struct ctfile_delete_args;
 typedef void ctfile_delete_complete_fn(struct ctfile_delete_args *,
@@ -529,6 +538,7 @@ ct_op_complete_cb	 ctfile_process_delete; /* list postprocesser */
 
 ct_op_cb	ct_extract_file;
 ct_op_complete_cb	ct_extract_file_cleanup;
+ct_op_cb	 ct_exists_file;
 
 /* return boolean whether or not the last ctfile_list contained the filename */
 int	ct_file_on_server(struct ct_global_state *, char *);
