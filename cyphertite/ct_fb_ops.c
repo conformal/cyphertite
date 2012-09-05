@@ -340,7 +340,6 @@ ctfb_main(int argc, char *argv[])
 	if (conf->ct_ctfile_mode == CT_MDMODE_REMOTE) {
 		ctfile_find_for_operation(state, ctfile,
 		    ctfile_nextop_justdl, &ct_fb_filename, 1, 0);
-		ct_wakeup_file(ctfb_state->event_state);
 		if ((ret = ct_run_eventloop(state)) != 0) {
 			if (state->ct_errmsg[0] != '\0')
 				CWARNX("%s: %s", state->ct_errmsg,

@@ -646,7 +646,6 @@ ctfb_get(int argc, const char **argv)
 	}
 
 	if (count > 0) {
-		ct_wakeup_file(ctfb_state->event_state);
 		if ((ret = ct_run_eventloop(ctfb_state)) != 0) {
 			if (ctfb_state->ct_errmsg[0] != '\0')
 				CWARNX("%s: %s", ctfb_state->ct_errmsg,

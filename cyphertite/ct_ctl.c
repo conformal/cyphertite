@@ -300,7 +300,6 @@ cull(struct ct_cli_cmd *c, int argc, char **argv)
 		CFATALX("failed to initialize: %s", ct_strerror(ret));
 
 	ct_cull_kick(state);
-	ct_wakeup_file(state->event_state);
 
 	if ((ret = ct_run_eventloop(state)) != 0) {
 		if (state->ct_errmsg[0] != '\0')

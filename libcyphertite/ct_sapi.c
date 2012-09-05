@@ -58,8 +58,6 @@ ct_do_remotelist(struct ct_global_state *state, char **search, char **exclude,
 	ct_add_operation(state, ctfile_list_start,
 	    printfn, &ccla);
 
-	ct_wakeup_file(state->event_state);
-
 	if ((ret = ct_run_eventloop(state)) != 0) {
 		if (state->ct_errmsg[0] != '\0')
 			CWARNX("%s: %s", state->ct_errmsg, ct_strerror(ret));
@@ -108,8 +106,6 @@ ct_do_remotearchive(struct ct_global_state *state, char *ctfile, char **flist,
 	}
 
 
-	ct_wakeup_file(state->event_state);
-
 	if ((ret = ct_run_eventloop(state)) != 0) {
 		if (state->ct_errmsg[0] != '\0')
 			CWARNX("%s: %s", state->ct_errmsg, ct_strerror(ret));
@@ -139,8 +135,6 @@ ct_do_remoteextract(struct ct_global_state *state, char *ctfile, char *tdir,
 	cea.cea_follow_symlinks = follow_symlinks;
 	ctfile_find_for_operation(state, ctfile,
 	    ctfile_nextop_extract, &cea, 1, 0);
-
-	ct_wakeup_file(state->event_state);
 
 	if ((ret = ct_run_eventloop(state)) != 0) {
 		if (state->ct_errmsg[0] != '\0')

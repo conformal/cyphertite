@@ -331,6 +331,9 @@ ct_init_eventloop(struct ct_global_state *state,
 	    ct_process_completions)) != 0)
 		goto fail;
 	state->ct_fatal_trans = ct_fatal_alloc_trans(state);
+
+	/* prepare file thread to start chugging */
+	ct_wakeup_file(state->event_state);
 	return (0);
 
 fail:
@@ -440,7 +443,6 @@ ct_do_operation(struct ct_config *conf,  ct_op_cb *start,
 		return (ret);
 
 	ct_add_operation(state, start, complete, args);
-	ct_wakeup_file(state->event_state);
 	ret = ct_event_dispatch(state->event_state);
 	ct_cleanup(state);
 
