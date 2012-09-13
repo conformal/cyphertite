@@ -83,7 +83,7 @@ ctfile_in_cache(const char *ctfile, const char *cachedir)
 		return (0);
 	while ((dp = readdir(dirp)) != NULL) {
 		if (strcmp(dp->d_name, ctfile) == 0) {
-			CNDBG(CT_LOG_CTFILE, "found in cachedir");
+			CNDBG(CT_LOG_CTFILE, "%s found in cachedir", ctfile);
 			found = 1;
 			break;
 		}
