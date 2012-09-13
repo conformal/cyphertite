@@ -928,6 +928,12 @@ ctfile_process_delete(struct ct_global_state *state, struct ct_op *op)
 	if ((ret = ctfile_list_complete(&state->ctfile_list_files,
 	    CT_MATCH_REGEX, all_ctfiles_pattern, NULL, results)) != 0)
 		return (ret);
+	/*
+	 * XXX could do this all in one pass by going through directory,
+	 * deleting any ctfiles that don't match the list and
+	 * removing/trimming others, then downloading all unmarked ones
+	 */
+	ctfile_cache_trim_aliens(state->ct_config->ct_ctfile_cachedir, results);
 
 	RB_FOREACH(file, ctfile_list_tree, results) {
 		if (!ctfile_in_cache(file->mlf_name,
@@ -1472,6 +1478,9 @@ ct_cull_fetch_all_ctfiles(struct ct_global_state *state, struct ct_op *op)
 	if ((ret = ctfile_list_complete(&state->ctfile_list_files,
 	    CT_MATCH_REGEX, all_ctfiles_pattern, NULL, &results)) != 0)
 		return (ret);
+
+	/* clean cachedir whle we have the list */
+	ctfile_cache_trim_aliens(state->ct_config->ct_ctfile_cachedir, &results);
 	while ((file = RB_ROOT(&results)) != NULL) {
 		RB_REMOVE(ctfile_list_tree, &results, file);
 		CNDBG(CT_LOG_CTFILE, "looking for file %s ", file->mlf_name);

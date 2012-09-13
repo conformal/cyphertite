@@ -92,6 +92,41 @@ ctfile_in_cache(const char *ctfile, const char *cachedir)
 
 	return (found);
 }
+/*
+ * Remove any files not in ``keepfiles'' from cachedir.
+ *
+ * This is best effort and returns no errors if we fail to remove a file.
+ */
+void
+ctfile_cache_trim_aliens(const char *cachedir,
+    struct ctfile_list_tree *keepfiles)
+{
+	struct ctfile_list_file	 sfile;
+	struct dirent		*dp;
+	DIR			*dirp;
+
+	CNDBG(CT_LOG_CTFILE, "triming files not found on server");
+
+	if ((dirp = opendir(cachedir)) == NULL)
+		return;
+	while ((dp = readdir(dirp)) != NULL) {
+		/* ignore . and ..  */
+		if (strcmp(dp->d_name, ".") == 0 ||
+		    strcmp(dp->d_name, "..") == 0)
+			continue;
+		strlcpy(sfile.mlf_name, dp->d_name, sizeof(sfile.mlf_name));
+		if ((RB_FIND(ctfile_list_tree, keepfiles, &sfile)) == NULL) {
+			CNDBG(CT_LOG_CTFILE, "Trimming %s from ctfile cache: "
+			    "not found on server", dp->d_name); 
+			(void)ctfile_cache_remove(dp->d_name, cachedir);
+		}
+	}
+	closedir(dirp);
+
+	CNDBG(CT_LOG_CTFILE, "done");
+
+	return;
+}
 
 /*
  * return the filename in the cache directory that a ctfile would have

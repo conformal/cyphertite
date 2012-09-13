@@ -414,6 +414,8 @@ int			 ctfile_verify_name(char *);
 int			 ctfile_trim_cache(const char *, long long);
 int			 ctfile_cache_remove(const char *,
 			     const char *);
+void			 ctfile_cache_trim_aliens(const char *,
+			     struct ctfile_list_tree *);
 void			 ct_prompt_for_login_password(struct ct_config *);
 void			 ct_normalize_username(char *);
 char			*ct_normalize_path(char *);
