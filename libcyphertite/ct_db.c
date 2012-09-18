@@ -30,6 +30,7 @@ static void		ctdb_cleanup(struct ctdb_state *);
 static int		ctdb_create(struct ctdb_state *);
 static int		ctdb_check_db_mode(struct ctdb_state *);
 
+#define CT_DB_VERSION	1
 #define OPS_PER_TRANSACTION	(100)
 struct ctdb_state {
 	sqlite3			*ctdb_db;
@@ -125,13 +126,13 @@ ctdb_create(struct ctdb_state *state)
 		snprintf(sql, sizeof sql,
 		    "CREATE TABLE digests (sha BLOB(%d)"
 		    " PRIMARY KEY UNIQUE,"
-		    " csha BLOB(%d), iv BLOB(%d));",
+		    " csha BLOB(%d), iv BLOB(%d), genid INTEGER);",
 		    SHA_DIGEST_LENGTH, SHA_DIGEST_LENGTH,
 		    CT_IV_LEN);
 	else
 		snprintf(sql, sizeof sql,
 		    "CREATE TABLE digests (sha BLOB(%d)"
-		    " PRIMARY KEY UNIQUE);",
+		    " PRIMARY KEY UNIQUE, genid INTEGER);",
 		    SHA_DIGEST_LENGTH);
 
 	CNDBG(CT_LOG_DB, "sql: %s", sql);
@@ -151,8 +152,8 @@ ctdb_create(struct ctdb_state *state)
 		return (rc);
 	}
 	snprintf(sql, sizeof sql,
-	    "insert into mode (crypto) VALUES ('%c');",
-		state->ctdb_crypt ? 'Y': 'N');
+	    "INSERT INTO mode (crypto, version) VALUES ('%c', %d);",
+		state->ctdb_crypt ? 'Y': 'N', CT_DB_VERSION);
 	rc = sqlite3_exec(state->ctdb_db, sql, NULL, 0, &errmsg);
 	if (rc) {
 		CNDBG(CT_LOG_DB, "mode table init failed");
@@ -184,15 +185,79 @@ ctdb_create(struct ctdb_state *state)
 }
 
 int
+ctdb_upgrade_db(struct ctdb_state *state, int oldversion)
+{
+	int		 newversion;
+	char		 sql[1024];
+	char		*errmsg;
+
+	CNDBG(CT_LOG_DB, "oldversion: %d", oldversion);
+	if (sqlite3_exec(state->ctdb_db, "BEGIN TRANSACTION", NULL, 0,
+	    &errmsg)) {
+		CNDBG(CT_LOG_DB, "can't begin %s", errmsg);
+	}
+
+	switch (oldversion) {
+	case -1:
+		if (sqlite3_exec(state->ctdb_db,
+		    "ALTER TABLE digests ADD COLUMN genid INTEGER", NULL, 0, &errmsg)) {
+			goto abort;
+		}
+
+		if (sqlite3_exec(state->ctdb_db,
+		    "UPDATE digests SET genid = (SELECT value FROM genid)",
+		    NULL, 0, &errmsg)) {
+			goto abort;
+		}
+		/* FALLTHROUGH */
+	case CT_DB_VERSION:
+		newversion = CT_DB_VERSION;
+		break;
+	default:
+		goto abort;
+	}
+
+	if (oldversion == newversion) {
+		if (sqlite3_exec(state->ctdb_db, "ROLLBACK", NULL, 0,
+		    &errmsg)) {
+			CNDBG(CT_LOG_DB, "can't rollback %s", errmsg);
+			return (1);
+		}
+		return (0);
+	}
+	CNDBG(CT_LOG_DB, "updated ct db from version %d to %d", oldversion,
+	    newversion);
+	snprintf(sql, sizeof(sql), "UPDATE mode SET version = %d;",
+	    CT_DB_VERSION);
+	if (sqlite3_exec(state->ctdb_db, sql, NULL, 0, &errmsg)) {
+		CNDBG(CT_LOG_DB, "sqlupdatedb failed set version: %s:", errmsg);
+		goto abort;
+	}
+
+	if (sqlite3_exec(state->ctdb_db, "COMMIT", NULL, 0, &errmsg)) {
+		CNDBG(CT_LOG_DB, "sqlupdatedb commit failed: %s:", errmsg);
+		return (1);
+	}
+	return (0);
+
+
+abort:
+	if (sqlite3_exec(state->ctdb_db, "ROLLBACK", NULL, 0, &errmsg))
+		CNDBG(CT_LOG_DB, "can't rollback %s", errmsg);
+
+	return (1);
+}
+
+int
 ctdb_check_db_mode(struct ctdb_state *state)
 {
 	sqlite3_stmt		*stmt;
 	char			*p, wanted;
-	int			rc, rv = 0, curgenid;
+	int			rc, rv = 0, curgenid, ver = -1;
 
 	CNDBG(CT_LOG_DB, "ctdb mode %d\n", state->ctdb_crypt);
-	if (sqlite3_prepare_v2(state->ctdb_db, "SELECT crypto FROM mode",
-	    -1, &stmt, NULL)) {
+	if (sqlite3_prepare_v2(state->ctdb_db,
+	    "SELECT crypto, version FROM mode", -1, &stmt, NULL)) {
 		CNDBG(CT_LOG_DB, "can't prepare mode query statement");
 		goto fail;
 	}
@@ -218,6 +283,15 @@ ctdb_check_db_mode(struct ctdb_state *state)
 		if (p[0] != wanted) {
 			CNDBG(CT_LOG_DB, "ctdb crypto mode differs %c %c",
 			    p[0], wanted);
+			goto fail;
+		}
+	}
+
+	/* early version of localdb didn't fill in version correctly */
+	if (sqlite3_column_type(stmt, 1) == SQLITE_NULL ||
+	    (ver = sqlite3_column_int(stmt, 1)) < CT_DB_VERSION) {
+		if (ctdb_upgrade_db(state, ver)) {
+			CNDBG(CT_LOG_DB,"failed to upgrade db!");
 			goto fail;
 		}
 	}
@@ -323,9 +397,10 @@ do_retry:
 	}
 	CNDBG(CT_LOG_DB, "ctdb_stmt_lookup %p", state->ctdb_stmt_lookup);
 	if (state->ctdb_crypt) {
-		psql = "INSERT INTO digests(sha, csha, iv) values(?, ?, ?)";
+		psql = "INSERT INTO digests(sha, csha, iv, genid) "
+		    "values(?, ?, ?, ?)";
 	} else {
-		psql = "INSERT INTO digests(sha) values(?)";
+		psql = "INSERT INTO digests(sha, genid) values(?, ?)";
 	}
 	if (sqlite3_prepare_v2(state->ctdb_db, psql,
 	    -1, &state->ctdb_stmt_insert, NULL)) {
@@ -519,6 +594,18 @@ ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 			sqlite3_reset(stmt);
 			return rv;
 		}
+		if (sqlite3_bind_int(stmt, 4, state->ctdb_genid) != 0) {
+			CNDBG(CT_LOG_DB, "could not bind genid");
+			sqlite3_reset(stmt);
+			return rv;
+		}
+	} else {
+		if (sqlite3_bind_int(stmt, 2, state->ctdb_genid) != 0) {
+			CNDBG(CT_LOG_DB, "could not bind genid");
+			sqlite3_reset(stmt);
+			return rv;
+		}
+
 	}
 
 	rc = sqlite3_step(stmt);
