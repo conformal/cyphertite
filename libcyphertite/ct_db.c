@@ -41,6 +41,7 @@ struct ctdb_state {
 	int			 ctdb_genid;
 	int			 ctdb_in_transaction;
 	int			 ctdb_trans_commit_rem;
+	int			 ctdb_in_cull;
 };
 
 static int
@@ -339,6 +340,7 @@ ctdb_reopendb(struct ctdb_state *state, int genid)
 {
 	if (state == NULL)
 		return;
+	CNDBG(CT_LOG_DB, "%d", genid);
 
 	ctdb_cleanup(state);
 	unlink(state->ctdb_dbfile);
@@ -628,4 +630,96 @@ ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 		ctdb_end_transaction(state);
 
 	return rv;
+}
+
+void
+ctdb_cull_start(struct ctdb_state *state)
+{
+	char		*errmsg;
+	if (state == NULL)
+		return;
+
+	CNDBG(CT_LOG_DB, "beginning cull");
+	/* Remove any shas marked -1, they are stale from a cull */
+	if (sqlite3_exec(state->ctdb_db,
+	    "DELETE FROM digests WHERE genid = -1;", NULL, 0, &errmsg) != 0) {
+		CNDBG(CT_LOG_DB, "Can't remove stale shas: %s", errmsg);
+		/* XXX delete db */
+		return;
+	}
+
+	if (sqlite3_exec(state->ctdb_db,
+	    "BEGIN TRANSACTION;", NULL, 0, &errmsg) != 0) {
+		CNDBG(CT_LOG_DB, "Can't begin transaction: %s", errmsg);
+		/* XXX delete db */
+		return;
+	}
+
+	/*
+	 * Start a write transaction to lock the database for the duration of
+	 * the cull
+	 */
+	state->ctdb_in_cull = 1;
+}
+
+void
+ctdb_cull_mark(struct ctdb_state *state, uint8_t *sha)
+{
+	sqlite3_stmt		*stmt;
+
+	if (state == NULL) {
+		CNDBG(CT_LOG_DB, "no state");
+		return;
+	}
+	if (state->ctdb_in_cull == 0) {
+		CNDBG(CT_LOG_DB, "not in cull");
+		return;
+	}
+
+	CNDBG(CT_LOG_DB, "marking sha");
+	if (sqlite3_prepare(state->ctdb_db,
+	    "UPDATE digests set genid = -1 where sha = ?", -1, &stmt, NULL)) {
+		CNDBG(CT_LOG_DB, "could not prepare stmt");
+		return;
+
+	}
+
+	if (sqlite3_bind_blob(stmt, 1, sha, SHA_DIGEST_LENGTH,
+	    SQLITE_STATIC)) {
+		CNDBG(CT_LOG_DB, "could not bind sha");
+		return;
+	}
+
+	if (sqlite3_step(stmt) != SQLITE_DONE) {
+		CNDBG(CT_LOG_DB, "could not step to mark sha");
+	}
+
+	sqlite3_finalize(stmt);
+
+}
+
+void
+ctdb_cull_end(struct ctdb_state *state, int32_t genid)
+{
+	char		*errmsg, sql[1024];
+
+	if (state == NULL || state->ctdb_in_cull == 0)
+		return;
+	state->ctdb_in_cull = 0; /* either way we are done now */
+	CNDBG(CT_LOG_DB, "ending cull new genid %d", genid);
+
+	snprintf(sql, sizeof(sql), "DELETE FROM digests WHERE genid != -1; "
+	    "UPDATE digests SET genid = %d; UPDATE genid SET value = %d;"
+	    "COMMIT", genid, genid);
+	if (sqlite3_exec(state->ctdb_db, sql, NULL, 0, &errmsg)) {
+		CNDBG(CT_LOG_DB, "update genid failed: %s:", errmsg);
+		goto failure;
+	}
+	return;
+failure:
+
+	if (sqlite3_exec(state->ctdb_db, "ROLLBACK", NULL, 0,
+	    &errmsg))
+		CNDBG(CT_LOG_DB, "Failed to rollback after cull: %s", errmsg);
+	/* maybe delete db in that case. */
 }

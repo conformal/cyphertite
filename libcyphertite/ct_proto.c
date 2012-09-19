@@ -1154,10 +1154,12 @@ out:
 }
 
 int
-ct_parse_xml_cull_complete_reply(struct ct_header *hdr, void *vbody)
+ct_parse_xml_cull_complete_reply(struct ct_header *hdr, void *vbody,
+    int32_t *newgenid)
 {
 	struct xmlsd_document	*xl;
 	struct xmlsd_element	*xe;
+	const char		*errstr;
 	int			 rv;
 
 	if ((rv = ct_parse_xml_prepare(hdr, vbody,
@@ -1167,6 +1169,13 @@ ct_parse_xml_cull_complete_reply(struct ct_header *hdr, void *vbody)
 	xe = xmlsd_doc_get_first_elem(xl);
 	if (strcmp(xmlsd_elem_get_name(xe), "ct_cull_complete_reply") == 0) {
 		CNDBG(CT_LOG_XML, "cull_complete_reply");
+		*newgenid = xmlsd_elem_get_attr_strtonum(xe, "clientdbgenid",
+		    INT32_MIN, INT32_MAX, &errstr);
+		if (errstr != NULL) {
+			CNDBG(CT_LOG_XML, "failed to get clientdbgenid: %s",
+			    errstr);
+			*newgenid = -1;
+		}
 		rv = 0;
 	} else  {
 		rv = CTE_INVALID_XML_TYPE;

@@ -802,6 +802,7 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
     struct ct_header *hdr, void *vbody)
 {
 	int	 ret;
+	int32_t	 newgenid;
 	char	*filename;
 
 	switch (trans->tr_state) {
@@ -873,11 +874,13 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 		break;
 	case TR_S_XML_CULL_COMPLETE_SEND:
 		CNDBG(CT_LOG_NET, "got cull complete reply");
-		if ((ret = ct_parse_xml_cull_complete_reply(hdr, vbody)) != 0) {
+		if ((ret = ct_parse_xml_cull_complete_reply(hdr, vbody,
+		    &newgenid)) != 0) {
 			ct_fatal(state, "failed to parse cull complete reply",
 			    ret);
 			goto just_queue;
 		}
+		ctdb_cull_end(state->ct_db_state, newgenid);
 		trans->tr_state = TR_S_DONE;
 		break;
 	case TR_S_XML_EXT:
@@ -1165,11 +1168,12 @@ ct_cull_handle_complete(struct ct_global_state *state, struct ct_trans *trans)
 	return (trans->tr_eof != 0);
 }
 
-void
+int
 ct_cull_sha_insert(const uint8_t *sha)
 {
 	//char			shat[SHA_DIGEST_STRING_LENGTH];
 	struct sha_entry	*node, *oldnode;
+	int			 exists = 0;
 
 	node = e_malloc(sizeof(*node));
 	bcopy (sha, node->sha, sizeof(node->sha));
@@ -1181,9 +1185,11 @@ ct_cull_sha_insert(const uint8_t *sha)
 	if (oldnode != NULL) {
 		/* already present, throw away copy */
 		e_free(&node);
+		exists = 1;
 	} else
 		shacnt++;
 
+	return (exists);
 }
 
 void
@@ -1203,7 +1209,7 @@ ct_cull_kick(struct ct_global_state *state)
 
 int	ct_cull_add_shafile(struct ct_global_state *, const char *,
 	    const char *);
-void	ct_cull_sha_insert(const uint8_t *);
+int	ct_cull_sha_insert(const uint8_t *);
 
 int
 ct_cull_add_shafile(struct ct_global_state *state, const char *file,
@@ -1213,7 +1219,7 @@ ct_cull_add_shafile(struct ct_global_state *state, const char *file,
 	char				*ct_next_filename;
 	char				*ct_filename_free = NULL;
 	char				*cachename;
-	int				ret, s_errno = 0, ct_errno = 0;
+	int				ret, s_errno = 0, ct_errno = 0, exists;
 
 	CNDBG(CT_LOG_SHA, "processing [%s]", file);
 
@@ -1266,9 +1272,12 @@ next_file:
 			break;
 		case XS_RET_SHA:
 			if (xs_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO)
-				ct_cull_sha_insert(xs_ctx.xs_csha);
+				exists = ct_cull_sha_insert(xs_ctx.xs_csha);
 			else
-				ct_cull_sha_insert(xs_ctx.xs_sha);
+				exists = ct_cull_sha_insert(xs_ctx.xs_sha);
+			if (!exists)
+				ctdb_cull_mark(state->ct_db_state,
+				    xs_ctx.xs_sha);
 			break;
 		case XS_RET_EOF:
 			break;
@@ -1613,6 +1622,8 @@ prev_ct_file:
 			e_free(&prev_filename);
 		}
 	}
+
+	ctdb_cull_start(state->ct_db_state);
 	RB_FOREACH(file, ctfile_list_tree, &ct_cull_all_ctfiles) {
 		if (file->mlf_keep == 0) {
 			struct ctfile_delete_args	*cda;

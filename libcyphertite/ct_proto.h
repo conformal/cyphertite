@@ -67,7 +67,7 @@ int	ct_create_xml_cull_shas(struct ct_header *hdr, void **vbody,
 int	ct_parse_xml_cull_shas_reply(struct ct_header *, void *);
 #define CT_CULL_PROCESS		0x10
 int	ct_create_xml_cull_complete(struct ct_header *, void **, uint64_t, int);
-int	ct_parse_xml_cull_complete_reply(struct ct_header *, void *);
+int	ct_parse_xml_cull_complete_reply(struct ct_header *, void *, int32_t *);
 
 void	ct_cleanup_packet(struct ct_header *, void *);
 

@@ -27,5 +27,9 @@ int				 ctdb_lookup_sha(struct ctdb_state *,
 				     uint8_t *, uint8_t *, uint8_t *);
 int				 ctdb_get_genid(struct ctdb_state *);
 void				 ctdb_reopendb(struct ctdb_state *, int);
+void				 ctdb_cull_start(struct ctdb_state *);
+void				 ctdb_cull_mark(struct ctdb_state *,
+				     uint8_t *);
+void				 ctdb_cull_end(struct ctdb_state *, int32_t);
 
 #endif /* ! CT_DB_H */
