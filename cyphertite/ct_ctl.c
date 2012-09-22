@@ -45,6 +45,7 @@ void cpasswd(struct ct_cli_cmd *, int , char **);
 void secrets_download(struct ct_cli_cmd *, int, char **);
 void secrets_upload(struct ct_cli_cmd *, int, char **);
 void secrets_generate(struct ct_cli_cmd *, int, char **);
+void secrets_delete(struct ct_cli_cmd *, int, char **);
 void config_generate(struct ct_cli_cmd *, int, char **);
 
 char		 *ctctl_configfile;
@@ -186,6 +187,7 @@ struct ct_cli_cmd	cmd_secrets[] = {
 	{ "download", NULL, 0, "", secrets_download },
 	{ "passwd", NULL, 0, "", cpasswd},
 	{ "generate", NULL, 0, "", secrets_generate },
+	{ "delete", NULL, 0, "", secrets_delete },
 	{ NULL, NULL, 0, NULL, NULL, 0}
 };
 
@@ -304,7 +306,7 @@ cull(struct ct_cli_cmd *c, int argc, char **argv)
 	if ((ret = ct_run_eventloop(state)) != 0) {
 		if (state->ct_errmsg[0] != '\0')
 			CWARNX("%s: %s", state->ct_errmsg, ct_strerror(ret));
-		else	
+		else
 			CWARNX("%s", ct_strerror(ret));
 	}
 
@@ -408,6 +410,7 @@ ctctl_secrets_generate_check_files(struct ct_global_state *state,
 
 	return (0);
 }
+
 void
 secrets_generate(struct ct_cli_cmd *c, int argc, char **argv)
 {
@@ -417,7 +420,7 @@ secrets_generate(struct ct_cli_cmd *c, int argc, char **argv)
 	if (stat(ctctl_config->ct_crypto_secrets, &sb) != -1)
 		CFATALX("A crypto secrets file already exists!\n"
 		    "Please check if it is valid before deleting.");
-	
+
 	if ((ret = ct_do_operation(ctctl_config, ctfile_list_start,
 	    ctctl_secrets_generate_check_files, NULL, 0)) != 0)
 		CFATALX("Can not check files on server: %s", ct_strerror(ret));
@@ -444,6 +447,47 @@ secrets_generate(struct ct_cli_cmd *c, int argc, char **argv)
 	if (ctctl_config->ct_secrets_upload != 0)
 		secrets_upload(NULL, 0, NULL);
 }
+
+int
+ctctl_secrets_delete_check_files(struct ct_global_state *state,
+    struct ct_op *op)
+{
+	char *ctfiles_glob = "[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-"
+	    "[0-9][0-9][0-9][0-9][0-9][0-9]-*";
+
+	/* Check to see if we already have ctfiles on the server */
+	if (ct_file_on_server(state, ctfiles_glob)) {
+		CFATALX("There are existing files on the server for this account.\n"
+		    "Deleting the secrets file will invalidate these files!\n"
+		    "If you really intend to do this, please delete all remote files\n"
+		    "then re-run this command");
+	}
+
+	return (0);
+}
+
+void
+secrets_delete(struct ct_cli_cmd *c, int argc, char **argv)
+{
+	int					 ret;
+	struct ctfile_delete_args		 cda;
+
+	if ((ret = ct_do_operation(ctctl_config, ctfile_list_start,
+	    ctctl_secrets_delete_check_files, NULL, 0)) != 0)
+		CFATALX("Can not check files on server: %s", ct_strerror(ret));
+	/*
+	 * if we get here it means that the check in the previous operation did
+	 * not fatal for us.
+	 */
+
+	CWARNX("Deleting secrets file from server...");
+
+	cda.cda_name = "crypto.secrets";
+	cda.cda_callback = NULL;
+
+	ct_do_operation(ctctl_config, ctfile_delete, NULL, &cda, 0);
+}
+
 
 void
 config_generate(struct ct_cli_cmd *c, int argc, char **argv)
@@ -696,7 +740,7 @@ crypto_passphrase:
 		    config.ct_crypto_secrets, crypto_key,
 		    sizeof(crypto_key), iv, sizeof (iv))) {
 			CWARNX("password incorrect, try again");
-			if (config.ct_crypto_passphrase) { 
+			if (config.ct_crypto_passphrase) {
 				bzero(config.ct_crypto_passphrase,
 				    strlen(config.ct_crypto_passphrase));
 				e_free(&config.ct_crypto_passphrase);
