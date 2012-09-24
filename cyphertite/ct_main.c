@@ -1187,6 +1187,8 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode,
 	int				 ret;
 	int				 s_errno = 0, ct_errno = 0;
 	char				 shat[SHA_DIGEST_STRING_LENGTH];
+	char				 cshat[SHA_DIGEST_STRING_LENGTH];
+	char				 iv[CT_IV_LEN*2+1];
 
 	if ((ret = ct_file_extract_init(&ces, NULL, 1, 1, 0, NULL, NULL)) != 0)
 		CFATALX("failed to initialise extract state: %s",
@@ -1272,8 +1274,21 @@ next_file:
 					CFATALX("seek failed");
 				}
 			} else {
+				int i;
 				ct_sha1_encode(xs_ctx.xs_sha, shat);
-				printf(" sha %s\n", shat);
+				switch (xs_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO) {
+				case 0:
+					printf(" sha %s\n", shat);
+					break;
+				case CT_MD_CRYPTO:
+					ct_sha1_encode(xs_ctx.xs_csha, cshat);
+					for (i = 0; i < CT_IV_LEN; i++)
+						snprintf(&iv[i * 2], 3, "%02x",
+						    xs_ctx.xs_iv[i]);
+
+					printf(" sha %s csha %s iv %s\n",
+					    shat, cshat, iv);
+				}
 			}
 			break;
 		case XS_RET_EOF:
