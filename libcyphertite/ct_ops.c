@@ -1020,8 +1020,14 @@ ct_exists_complete(struct ct_global_state *state,
 
 	if (trans->tr_state == TR_S_EXISTS) {
 		/* Insert to localdb to save some effort later */
-		ctdb_insert_sha(state->ct_db_state, trans->tr_sha,
-		    trans->tr_csha, trans->tr_iv);
+		if (trans->tr_old_genid != -1) {
+			ctdb_update_sha(state->ct_db_state,
+			    trans->tr_sha, trans->tr_current_genid);
+		} else {
+			ctdb_insert_sha(state->ct_db_state,
+			    trans->tr_sha, trans->tr_csha,
+			    trans->tr_iv, trans->tr_current_genid);
+		}
 	} else {
 		/* Call callback so caller can decide what to do with it. */
 		ce->ce_nexists_cb(ce->ce_nexists_state, ce, trans);
@@ -1131,8 +1137,10 @@ ct_exists_file(struct ct_global_state *state, struct ct_op *op)
 				ct_sha1_encode(trans->tr_sha, shat);
 				CNDBG(CT_LOG_SHA, "EXISTSing sha %s", shat);
 			}
+			trans->tr_old_genid = -1; /* XXX */
 			if (ctdb_lookup_sha(state->ct_db_state, trans->tr_sha,
-			    trans->tr_csha, trans->tr_iv)) {
+			    trans->tr_csha, trans->tr_iv,
+			    &trans->tr_old_genid)) {
 				CNDBG(CT_LOG_SHA, "sha already in localdb");
 				state->ct_stats->st_bytes_exists +=
 				    trans->tr_chsize;

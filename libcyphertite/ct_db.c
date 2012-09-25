@@ -37,6 +37,7 @@ struct ctdb_state {
 	char			*ctdb_dbfile;
 	sqlite3_stmt		*ctdb_stmt_lookup;
 	sqlite3_stmt		*ctdb_stmt_insert;
+	sqlite3_stmt		*ctdb_stmt_update;
 	int			 ctdb_crypt;
 	int			 ctdb_genid;
 	int			 ctdb_in_transaction;
@@ -317,9 +318,27 @@ ctdb_check_db_mode(struct ctdb_state *state)
 		goto fail;
 	}
 	curgenid = sqlite3_column_int(stmt, 0);
+	sqlite3_finalize(stmt);
+	stmt = NULL;
 
 	if (state->ctdb_genid == -1 || state->ctdb_genid == curgenid) {
 		state->ctdb_genid = curgenid;
+	} else if (state->ctdb_genid > curgenid) {
+		if (sqlite3_prepare(state->ctdb_db,
+		    "UPDATE genid SET value = ?", -1, &stmt, NULL)) {
+			CNDBG(CT_LOG_DB, "can't prepare update genid stmt");
+			goto fail;
+		}
+		if (sqlite3_bind_int(stmt, 1, state->ctdb_genid) != 0) {
+			CNDBG(CT_LOG_DB, "can't bind update genid stmt");
+			goto fail;
+		}
+		if (sqlite3_step(stmt) != SQLITE_DONE) {
+			CNDBG(CT_LOG_DB, "didn't get done on updating genid");
+			goto fail;
+		}
+		CNDBG(CT_LOG_DB, "updated genid from %d to %d",
+		    curgenid, state->ctdb_genid);
 	} else {
 		CNDBG(CT_LOG_DB, "ctdb genid is %d, wanted %d", curgenid,
 		    state->ctdb_genid);
@@ -330,26 +349,54 @@ ctdb_check_db_mode(struct ctdb_state *state)
 	rv = 1;
 fail:
 	/* not much we can do if this fails */
-	if (sqlite3_finalize(stmt))
+	if (stmt != NULL && sqlite3_finalize(stmt))
 		CNDBG(CT_LOG_DB, "can't finalize verification lookup");
 	return rv;
 }
 
 void
-ctdb_reopendb(struct ctdb_state *state, int genid)
+ctdb_set_genid(struct ctdb_state *state, int genid)
 {
+	sqlite3_stmt		*stmt;
+
 	if (state == NULL)
 		return;
-	CNDBG(CT_LOG_DB, "%d", genid);
+	if (genid == state->ctdb_genid)
+		return;
 
-	ctdb_cleanup(state);
-	unlink(state->ctdb_dbfile);
-	state->ctdb_genid = genid;
-	if (ctdb_open(state) != 0) {
-		/* XXX free this? */
-		e_free(&state->ctdb_dbfile);
-		e_free(&state);
+	CNDBG(CT_LOG_DB, "update genid from %d to %d", state->ctdb_genid,
+	    genid);
+
+	/*
+	 * If no crypt then we can't save any operations so best to just clear
+	 * the db out.
+	 */
+	if (state->ctdb_crypt == 0) {
+		ctdb_cleanup(state);
+		unlink(state->ctdb_dbfile);
+		state->ctdb_genid = genid;
+		(void)ctdb_open(state); /* this should not fail */
 	}
+
+	state->ctdb_genid = genid;
+	if (sqlite3_prepare(state->ctdb_db,
+	    "UPDATE genid SET value = ?", -1, &stmt, NULL)) {
+		CNDBG(CT_LOG_DB, "can't prepare update genid stmt");
+		goto fail;
+	}
+	if (sqlite3_bind_int(stmt, 1, state->ctdb_genid) != 0) {
+		CNDBG(CT_LOG_DB, "can't bind update genid stmt");
+		goto fail;
+	}
+	if (sqlite3_step(stmt) != SQLITE_DONE) {
+		CNDBG(CT_LOG_DB, "didn't get done on updating genid");
+		goto fail;
+	}
+
+fail:
+	/* not much we can do if we fail, probably means oom */
+	return;
+
 }
 
 int
@@ -386,9 +433,9 @@ do_retry:
 
 	/* prepare query here based on crypt mode */
 	if (state->ctdb_crypt) {
-		psql = "SELECT csha, iv FROM digests WHERE sha=?";
+		psql = "SELECT csha, iv, genid FROM digests WHERE sha=?";
 	} else {
-		psql = "SELECT sha FROM digests WHERE sha=?";
+		psql = "SELECT sha, genid FROM digests WHERE sha=?";
 	}
 
 	if (sqlite3_prepare(state->ctdb_db, psql,
@@ -412,6 +459,15 @@ do_retry:
 	}
 	CNDBG(CT_LOG_DB, "ctdb_stmt_insert %p", state->ctdb_stmt_insert);
 
+	psql = "UPDATE digests SET genid = ? where sha = ?";
+	if (sqlite3_prepare_v2(state->ctdb_db, psql,
+	    -1, &state->ctdb_stmt_update, NULL)) {
+		CNDBG(CT_LOG_DB, "can not prepare update statement %s", psql);
+		ctdb_cleanup(state);
+		return 1;
+	}
+	CNDBG(CT_LOG_DB, "ctdb_stmt_update %p", state->ctdb_stmt_update);
+
 	return 0;
 }
 
@@ -433,10 +489,16 @@ ctdb_cleanup(struct ctdb_state *state)
 		if (sqlite3_finalize(state->ctdb_stmt_insert))
 			CNDBG(CT_LOG_DB, "can't finalize insert");
 	}
+	if (state->ctdb_stmt_update != NULL) {
+		CNDBG(CT_LOG_DB, "finalising stmt_update");
+		if (sqlite3_finalize(state->ctdb_stmt_update))
+			CNDBG(CT_LOG_DB, "can't finalize update");
+	}
 
 	if (state->ctdb_db != NULL) {
 		CNDBG(CT_LOG_DB, "closing db");
 		sqlite3_close(state->ctdb_db);
+		state->ctdb_db = NULL;
 	}
 }
 
@@ -448,16 +510,18 @@ ctdb_get_genid(struct ctdb_state *state)
 	return (state->ctdb_genid);
 }
 
-int
+enum ctdb_lookup
 ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
-     uint8_t *iv)
+     uint8_t *iv, int32_t *old_genid)
 {
-	char			shat[SHA_DIGEST_STRING_LENGTH];
-	int			rv, rc;
+	char			 shat[SHA_DIGEST_STRING_LENGTH];
+	int			 rv, rc;
+	int32_t			 genid;
 	uint8_t			*p;
 	sqlite3_stmt		*stmt;
 
-	rv = 0;
+	rv = CTDB_SHA_NEXISTS;
+	*old_genid = -1;
 
 	if (state == NULL)
 		return rv;
@@ -477,21 +541,21 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 	if (sqlite3_bind_blob(stmt, 1, sha_k, SHA_DIGEST_LENGTH,
 	    SQLITE_STATIC)) {
 		CNDBG(CT_LOG_DB, "could not sha");
-		return (rv);
+		return (CTDB_SHA_NEXISTS);
 	}
 
 	rc = sqlite3_step(stmt);
 	if (rc == SQLITE_DONE) {
 		CNDBG(CT_LOG_DB, "not found");
 		sqlite3_reset(stmt);
-		return rv;
+		return CTDB_SHA_NEXISTS;
 	} else if (rc != SQLITE_ROW) {
 		CNDBG(CT_LOG_DB, "could not step(%d) %d %d %s",
 		    __LINE__, rc,
 		    sqlite3_extended_errcode(state->ctdb_db),
 		    sqlite3_errmsg(state->ctdb_db));
 		sqlite3_reset(stmt);
-		return rv;
+		return CTDB_SHA_NEXISTS;
 	}
 
 	CNDBG(CT_LOG_DB, "found");
@@ -510,7 +574,7 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 			CNDBG(CT_LOG_DB, "found bin %s", shat);
 		}
 
-		rv = 1;
+		rv = CTDB_SHA_EXISTS;
 		bcopy (p, sha_v, SHA_DIGEST_LENGTH);
 	} else {
 		CNDBG(CT_LOG_DB, "no bin found");
@@ -532,10 +596,24 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 			bcopy (p, iv, CT_IV_LEN);
 		} else {
 			CNDBG(CT_LOG_DB, "no iv found");
-			rv = 0;
+			rv = CTDB_SHA_NEXISTS;
 		}
+
+		genid = sqlite3_column_int(stmt, 2);
+	} else {
+		genid = sqlite3_column_int(stmt, 1);
 	}
 	sqlite3_reset(stmt);
+
+	if (genid < state->ctdb_genid) {
+		ct_sha1_encode(sha_k, shat);
+		rv = CTDB_SHA_MAYBE_EXISTS;
+		*old_genid = genid;
+	} if (genid > state->ctdb_genid) {
+		/* XXX Abort? */
+		CWARNX("WARNING: sha with higher genid than database!");
+	}
+
 
 	state->ctdb_trans_commit_rem--;
 	if (state->ctdb_trans_commit_rem <= 0) {
@@ -547,7 +625,7 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 
 int
 ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
-    uint8_t *iv)
+    uint8_t *iv, int32_t genid)
 {
 	char			shatk[SHA_DIGEST_STRING_LENGTH];
 	char			shatv[SHA_DIGEST_STRING_LENGTH];
@@ -596,13 +674,13 @@ ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 			sqlite3_reset(stmt);
 			return rv;
 		}
-		if (sqlite3_bind_int(stmt, 4, state->ctdb_genid) != 0) {
+		if (sqlite3_bind_int(stmt, 4, genid) != 0) {
 			CNDBG(CT_LOG_DB, "could not bind genid");
 			sqlite3_reset(stmt);
 			return rv;
 		}
 	} else {
-		if (sqlite3_bind_int(stmt, 2, state->ctdb_genid) != 0) {
+		if (sqlite3_bind_int(stmt, 2, genid) != 0) {
 			CNDBG(CT_LOG_DB, "could not bind genid");
 			sqlite3_reset(stmt);
 			return rv;
@@ -620,6 +698,60 @@ ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 		    sqlite3_errmsg(state->ctdb_db));
 	} else  {
 		CNDBG(CT_LOG_DB, "sha already exists");
+	}
+
+	sqlite3_reset(stmt);
+
+	/* inserts are more 'costly' than reads */
+	state->ctdb_trans_commit_rem -= 4;
+	if (state->ctdb_trans_commit_rem <= 0)
+		ctdb_end_transaction(state);
+
+	return rv;
+}
+
+int
+ctdb_update_sha(struct ctdb_state *state, uint8_t *sha, int32_t genid)
+{
+	sqlite3_stmt		*stmt;
+	char			 shat[SHA_DIGEST_STRING_LENGTH];
+	int			 rv = 0;
+
+	rv = 0;
+
+	if (state == NULL)
+		return rv;
+
+	stmt = state->ctdb_stmt_update;
+	ct_sha1_encode(sha, shat);
+
+	if (state->ctdb_in_transaction == 0) {
+		if (ctdb_begin_transaction(state) != 0)
+			return (rv);
+		state->ctdb_trans_commit_rem = OPS_PER_TRANSACTION;
+	}
+
+	if (clog_mask_is_set(CT_LOG_DB)) {
+		ct_sha1_encode(sha, shat);
+		CNDBG(CT_LOG_DB, "updating %s to genid %d ", shat, genid);
+	}
+	if (sqlite3_bind_int(stmt, 1, genid)) {
+		CNDBG(CT_LOG_DB, "could not bind genid");
+		return rv;
+	}
+	if (sqlite3_bind_blob(stmt, 2, sha, SHA_DIGEST_LENGTH,
+	    SQLITE_STATIC)) {
+		CNDBG(CT_LOG_DB, "could not bind sha");
+		return rv;
+	}
+
+	if (sqlite3_step(stmt) == SQLITE_DONE) {
+		CNDBG(CT_LOG_DB, "update completed");
+		rv = 1;
+	} else { 
+		CNDBG(CT_LOG_DB, "update failed %d [%s]",
+		    sqlite3_extended_errcode(state->ctdb_db),
+		    sqlite3_errmsg(state->ctdb_db));
 	}
 
 	sqlite3_reset(stmt);

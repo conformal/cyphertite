@@ -387,6 +387,9 @@ struct ct_trans {
 	uint8_t			tr_sha[SHA_DIGEST_LENGTH];
 	uint8_t			tr_csha[SHA_DIGEST_LENGTH];
 	uint8_t			tr_iv[CT_IV_LEN];
+	int32_t			tr_old_genid;	/* valid after sha stage */
+	/* valid after exists or write success */
+	int32_t			tr_current_genid;
 
 
 	int			tr_chsize;

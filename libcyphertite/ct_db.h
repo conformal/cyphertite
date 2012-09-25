@@ -22,11 +22,19 @@ struct ctdb_state;
 struct ctdb_state		*ctdb_setup(const char *, int);
 void				 ctdb_shutdown(struct ctdb_state *);
 int				 ctdb_insert_sha(struct ctdb_state *,
-				     uint8_t *, uint8_t *, uint8_t *);
-int				 ctdb_lookup_sha(struct ctdb_state *,
-				     uint8_t *, uint8_t *, uint8_t *);
+				     uint8_t *, uint8_t *, uint8_t *, int32_t);
+int				 ctdb_update_sha(struct ctdb_state *,
+				     uint8_t *, int32_t);
+enum ctdb_lookup {
+	CTDB_SHA_NEXISTS,
+	CTDB_SHA_EXISTS,
+	CTDB_SHA_MAYBE_EXISTS
+};
+enum ctdb_lookup		 ctdb_lookup_sha(struct ctdb_state *,
+				     uint8_t *, uint8_t *, uint8_t *,
+				     int32_t *);
 int				 ctdb_get_genid(struct ctdb_state *);
-void				 ctdb_reopendb(struct ctdb_state *, int);
+void				 ctdb_set_genid(struct ctdb_state *, int32_t);
 void				 ctdb_cull_start(struct ctdb_state *);
 void				 ctdb_cull_mark(struct ctdb_state *,
 				     uint8_t *);

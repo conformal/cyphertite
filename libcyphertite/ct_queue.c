@@ -1214,8 +1214,15 @@ ct_compute_sha(void *vctx)
 				    "entering sha into db %" PRIu64 " %s",
 				    trans->tr_trans_id, shat);
 			}
-			ctdb_insert_sha(state->ct_db_state, trans->tr_sha,
-			    trans->tr_csha, trans->tr_iv);
+			/* if this was a db shortcut, update not insert */
+			if (trans->tr_old_genid != -1) {
+				ctdb_update_sha(state->ct_db_state,
+				    trans->tr_sha, trans->tr_current_genid);
+			} else {
+				ctdb_insert_sha(state->ct_db_state,
+				    trans->tr_sha, trans->tr_csha,
+				    trans->tr_iv, trans->tr_current_genid);
+			}
 			trans->tr_state = TR_S_WMD_READY;
 			ct_queue_transfer(state, trans);
 			continue;
@@ -1241,12 +1248,32 @@ ct_compute_sha(void *vctx)
 			    "block tr_id %" PRIu64 " sha %s sz %d",
 			    trans->tr_trans_id, shat, trans->tr_size[slot]);
 		}
-		if (ctdb_lookup_sha(state->ct_db_state, trans->tr_sha,
-			    trans->tr_csha, trans->tr_iv)) {
+		/*
+		 * trinary return:
+		 * yes, no, maybe. csha and iv valid for yes and maybe
+		 */
+		trans->tr_old_genid = -1;
+		switch (ctdb_lookup_sha(state->ct_db_state, trans->tr_sha,
+		    trans->tr_csha, trans->tr_iv, &trans->tr_old_genid)) {
+		case CTDB_SHA_EXISTS:
 			state->ct_stats->st_bytes_exists += trans->tr_chsize;
 			trans->tr_state = TR_S_WMD_READY;
-		} else {
+			break;
+		case CTDB_SHA_MAYBE_EXISTS:
+			/*
+			 * Skip the compress/encrypt and try exists stright off.
+			 * if it fails, we go around again, if it passes we
+			 * saved the effort on existing data.
+			 * tr_old_genid is now !-1 and can be used to tell we
+			 * took this path.
+			 */
+			trans->tr_state = TR_S_COMPSHA_ED;
+			break;
+		case CTDB_SHA_NEXISTS:
 			trans->tr_state = TR_S_UNCOMPSHA_ED;
+			break;
+		default:
+			CABORTX("unexpected return value");
 		}
 		ct_queue_transfer(state, trans);
 	}
@@ -1273,7 +1300,16 @@ ct_compute_csha(void *vctx)
 			CNDBG(CT_LOG_SHA, "block tr_id %" PRIu64 " sha %s",
 			    trans->tr_trans_id, shat);
 		}
-		trans->tr_state = TR_S_COMPSHA_ED;
+		if (trans->tr_old_genid == -1) {
+			/* normal sha */
+			trans->tr_state = TR_S_COMPSHA_ED;
+		} else {
+			/*
+			 * sha has already been exists as part of stale
+			 * database resolution, skip doing exists again.
+			 */
+			trans->tr_state = TR_S_NEXISTS;
+		}
 		ct_queue_transfer(state, trans);
 	}
 }
@@ -1410,9 +1446,16 @@ ct_handle_exists_reply(struct ct_global_state *state, struct ct_trans *trans,
 	}
 	if (exists) {
 		/* enter shas into local db */
+		CNDBG(CT_LOG_SHA, "sha exists");
 		trans->tr_state = TR_S_EXISTS;
 		state->ct_stats->st_bytes_exists += trans->tr_chsize;
+		trans->tr_current_genid = ctdb_get_genid(state->ct_db_state);;
+	} else if (trans->tr_old_genid != -1) {
+		/* database info was stale, do full upload */
+		CNDBG(CT_LOG_SHA, "db info stale, recompressing data");
+		trans->tr_state = TR_S_UNCOMPSHA_ED;
 	} else {
+		CNDBG(CT_LOG_SHA, "sha does not exist");
 		trans->tr_state = TR_S_NEXISTS;
 		if (trans->tr_fl_node)
 			trans->tr_fl_node->fl_comp_size +=
@@ -1443,6 +1486,7 @@ ct_handle_write_reply(struct ct_global_state *state, struct ct_trans *trans,
 		goto transfer; /* just transfer so trans will complete */
 	}
 
+	trans->tr_current_genid = ctdb_get_genid(state->ct_db_state);;
 	if (trans->hdr.c_flags & C_HDR_F_METADATA)
 		trans->tr_state = TR_S_WMD_READY; /* XXX */
 	else
