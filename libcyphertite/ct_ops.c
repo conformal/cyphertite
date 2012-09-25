@@ -217,6 +217,21 @@ ct_extract_complete_file_read(struct ct_global_state *state,
 	int	slot, ret;
 
 	state->ct_stats->st_chunks_completed++;
+	if (trans->tr_errno != 0) {
+		char		*errstr;
+		char		 shat[SHA_DIGEST_STRING_LENGTH];
+		/* any other read failure is bad */
+		ct_sha1_encode(trans->tr_sha, shat);
+		e_asprintf(&errstr, "Data missing on server: "
+		    "file %s, sha %s",
+		    trans->tr_fl_node ?
+		    trans->tr_fl_node->fl_sname  : "unknown",
+		    shat);
+		ct_fatal(state, errstr, trans->tr_errno);
+		free(errstr);
+		return (0);
+	}
+
 	if (trans->tr_fl_node->fl_skip_file == 0) {
 		slot = trans->tr_dataslot;
 		ct_sha1_add(trans->tr_data[slot],

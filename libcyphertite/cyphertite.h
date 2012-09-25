@@ -336,6 +336,7 @@ struct ct_trans {
 	struct fnode		*tr_fl_node;
 	struct ctfile_write_state *tr_ctfile;
 	uint64_t tr_trans_id;
+	int	tr_errno;
 	int tr_type;
 /* DIR is another special */
 #define TR_T_SPECIAL		(1)

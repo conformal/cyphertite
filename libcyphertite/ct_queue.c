@@ -1467,8 +1467,9 @@ ct_handle_read_reply(struct ct_global_state *state, struct ct_trans *trans,
 		if ((hdr->c_flags & C_HDR_F_METADATA) &&
 		    (ret = ct_parse_read_ctfile_chunk_info(hdr, vbody,
 			trans->tr_ctfile_chunkno)) != 0)  {
-				ct_fatal(state, "invalid ctfile read packet",
-				    ret);
+				/* Skip to the end */
+				trans->tr_errno = ret;
+				trans->tr_state = TR_S_EX_UNCOMPRESSED;
 				goto out;
 		}
 	} else {
@@ -1478,13 +1479,9 @@ ct_handle_read_reply(struct ct_global_state *state, struct ct_trans *trans,
 			ctfile_extract_handle_eof(state, trans);
 			goto out;
 		} else {
-			char errstr[SHA_DIGEST_STRING_LENGTH + 27];
-			/* any other read failure is bad */
-			ct_sha1_encode(trans->tr_sha, shat);
-			strlcpy(errstr, "Data missing on server sha ",
-			    sizeof(errstr));
-			strlcat(errstr, shat, sizeof(errstr));
-			ct_fatal(state, errstr, ret);
+			/* Skip to the end */
+			trans->tr_errno = ret;
+			trans->tr_state = TR_S_EX_UNCOMPRESSED;
 			goto out;
 		}
 	} 
@@ -1499,7 +1496,6 @@ ct_handle_read_reply(struct ct_global_state *state, struct ct_trans *trans,
 	state->ct_stats->st_bytes_read += trans->tr_size[slot];
 
 out:
-
 	ct_queue_transfer(state, trans);
 	ct_header_free(NULL, hdr);
 }

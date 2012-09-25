@@ -442,6 +442,11 @@ ctfile_extract_complete_read(struct ct_global_state *state, struct ct_trans
 {
 	int	ret;
 
+	/* ctfile reads only currently fail if the footer was wrong */
+	if (trans->tr_errno != 0) {
+		ct_fatal(state, "invalid ctfile read packet", trans->tr_errno);
+		return (0);
+	}
 	CNDBG(CT_LOG_FILE, "writing packet sz %d",
 	    trans->tr_size[(int)trans->tr_dataslot]);
 	if ((ret = ct_file_extract_write(state->extract_state,
