@@ -314,11 +314,24 @@ cull(struct ct_cli_cmd *c, int argc, char **argv)
 
 /* Make sure we don't overwrite the file without permission */
 ct_op_complete_cb ct_check_secrets_upload;
+ct_op_complete_cb ctctl_delete_cda;
+
+int
+ctctl_delete_cda(struct ct_global_state *state, struct ct_op *op)
+{
+	struct ctfile_delete_args	*cda = op->op_args;
+
+	e_free(&cda);
+
+	return (0);
+}
+
 int
 ct_check_secrets_upload(struct ct_global_state *state, struct ct_op *op)
 {
-	struct ct_ctfileop_args	*cca = op->op_args;
-	char			 answer[1024];
+	struct ct_ctfileop_args		*cca = op->op_args;
+	struct ctfile_delete_args	*cda;
+	char				 answer[1024];
 
 	/* Check to see if we already have a secrets file on the server */
 	if (ct_file_on_server(state, cca->cca_remotename)) {
@@ -326,8 +339,11 @@ ct_check_secrets_upload(struct ct_global_state *state, struct ct_op *op)
 		    "the server, would you like to replace it? [no]: ",
 		    "yes", "no", "no", answer, sizeof answer, 0) != 1)
 			CFATALX("not uploading secrets file");
-		op = ct_add_operation_after(state, op, ctfile_delete, NULL,
-		    cca->cca_remotename);
+		cda = e_calloc(1, sizeof(*cda));
+		cda->cda_name = cca->cca_remotename;
+		cda->cda_callback = NULL;
+		op = ct_add_operation_after(state, op, ctfile_delete,
+		    ctctl_delete_cda, cda);
 	}
 
 	ct_add_operation_after(state, op, ctfile_archive, NULL, cca);
