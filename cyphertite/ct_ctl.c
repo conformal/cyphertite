@@ -395,14 +395,48 @@ secrets_download(struct ct_cli_cmd *c, int argc, char **argv)
 	e_free(&fname);
 }
 
+int
+ctctl_secrets_generate_check_files(struct ct_global_state *state,
+    struct ct_op *op)
+{
+	/* Check to see if we already have a secrets file on the server */
+	if (ct_file_on_server(state, "*")) {
+		CFATALX("There are already files on the server for this account.\n"
+		    "Creating a new secrets file will invalidate these files!\n"
+		    "If you really intend to do this please delete all remote files\n"
+		    "then re-run this command");
+	}
+
+	return (0);
+}
 void
 secrets_generate(struct ct_cli_cmd *c, int argc, char **argv)
 {
 	struct stat	sb;
+	int		ret;
 
 	if (stat(ctctl_config->ct_crypto_secrets, &sb) != -1)
 		CFATALX("A crypto secrets file already exists!\n"
 		    "Please check if it is valid before deleting.");
+	
+	if ((ret = ct_do_operation(ctctl_config, ctfile_list_start,
+	    ctctl_secrets_generate_check_files, NULL, 0)) != 0)
+		CFATALX("Can not check files on server: %s", ct_strerror(ret));
+	/*
+	 * if we get here it means that the check in the previous operation did
+	 * not fatal for us.
+	 * Since secrets generate invalidates all previous work, trim the cache
+	 * directory of all files and remove the local db file.
+	 */
+	if (ctctl_config->ct_ctfile_cachedir != NULL)
+		ctfile_trim_cache(ctctl_config->ct_ctfile_cachedir, 0);
+
+	if (ctctl_config->ct_localdb != NULL &&
+	    unlink(ctctl_config->ct_localdb) == -1 && errno != ENOENT) {
+		CFATAL("failed to remove cache database %s",
+		    ctctl_config->ct_localdb);
+	}
+
 	CWARNX("Generating crypto secrets file...");
 	if (ct_create_secrets(ctctl_config->ct_crypto_passphrase,
 	    ctctl_config->ct_crypto_secrets, NULL, NULL))
