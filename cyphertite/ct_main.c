@@ -389,7 +389,8 @@ ct_main(int argc, char **argv)
 	if (force_allfiles != -1)
 		conf->ct_multilevel_allfiles = force_allfiles;
 
-	if (!(ct_metadata && ct_action == CT_A_LIST)) {
+	if (!(ct_metadata && (ct_action == CT_A_LIST ||
+	    ct_action == CT_A_ERASE))) {
 		if (ctfile == NULL) {
 			CWARNX("ctfile is required");
 			ct_usage();
@@ -515,7 +516,7 @@ ct_main(int argc, char **argv)
 			    ctfile_archive : ctfile_extract),
 			    ctfile_op_cleanup, &cca);
 		} else if (ct_action == CT_A_ERASE) {
-			ccda.ccda_pattern = ctfile;
+			ccda.ccda_pattern = argv;
 			ccda.ccda_matchmode = ct_match_mode;
 			ccda.ccda_callback = ct_print_delete;
 			ct_add_operation(state, ctfile_list_start,

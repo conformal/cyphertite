@@ -974,8 +974,6 @@ ctfile_delete_check_required(struct ct_global_state *state, struct ct_op *op)
 	struct ctfile_list_tree		 del_tree;
 	struct ctfile_list_file		*file, search, *prevfile, *tmp;
 	struct ct_match			*match;
-	char				*pattern[] = { ccda->ccda_pattern,
-					     NULL };
 	char				*prev_filename;
 	int				 fail = 0, ret;
 
@@ -987,9 +985,8 @@ ctfile_delete_check_required(struct ct_global_state *state, struct ct_op *op)
 	if (state->ct_dying != 0)
 		goto dying;
 
-
 	if ((ret = ct_match_compile(&match, ccda->ccda_matchmode,
-	    pattern)) != 0) { 
+	    ccda->ccda_pattern)) != 0) { 
 		ct_fatal(state, NULL, ret);
 		goto dying;
 	}

@@ -503,7 +503,7 @@ struct ctfile_delete_args;
 typedef void ctfile_delete_complete_fn(struct ctfile_delete_args *,
     struct ct_global_state *, struct ct_trans *);
 struct ct_ctfile_delete_args {
-	char				*ccda_pattern;
+	char				**ccda_pattern;
 	int				 ccda_matchmode;
 	ctfile_delete_complete_fn	*ccda_callback;
 };

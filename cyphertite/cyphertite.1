@@ -38,9 +38,11 @@
 .Bk -words
 .Fl m
 .Fl e
+.Op Fl r
+.Op Fl v
 .Op Fl D Ar debugstring
 .Op Fl F Ar conffile
-.Op Fl f Ar ctfile
+.Op Ar pattern
 .Ek
 .Nm
 .Bk -words
@@ -305,7 +307,9 @@ This option will cancel out
 .Fl A .
 .It Fl e
 Delete remote
-.Ar ctfile
+.Ar ctfiles
+matching
+.Ar pattern
 from the server.
 This option is used in conjunction with -m.
 .It Fl h
