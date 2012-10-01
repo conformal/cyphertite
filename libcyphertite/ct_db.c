@@ -359,7 +359,7 @@ ctdb_set_genid(struct ctdb_state *state, int genid)
 {
 	sqlite3_stmt		*stmt;
 
-	if (state == NULL)
+	if (state == NULL || state->ctdb_db == NULL)
 		return;
 	if (genid == state->ctdb_genid)
 		return;
@@ -523,7 +523,7 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 	rv = CTDB_SHA_NEXISTS;
 	*old_genid = -1;
 
-	if (state == NULL)
+	if (state == NULL || state->ctdb_db == NULL)
 		return rv;
 
 	stmt = state->ctdb_stmt_lookup;
@@ -634,7 +634,7 @@ ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 
 	rv = 0;
 
-	if (state == NULL)
+	if (state == NULL || state->ctdb_db == NULL)
 		return rv;
 
 	stmt = state->ctdb_stmt_insert;
@@ -719,7 +719,7 @@ ctdb_update_sha(struct ctdb_state *state, uint8_t *sha, int32_t genid)
 
 	rv = 0;
 
-	if (state == NULL)
+	if (state == NULL || state->ctdb_db == NULL)
 		return rv;
 
 	stmt = state->ctdb_stmt_update;
@@ -768,7 +768,7 @@ void
 ctdb_cull_start(struct ctdb_state *state)
 {
 	char		*errmsg;
-	if (state == NULL)
+	if (state == NULL || state->ctdb_db == NULL)
 		return;
 
 	CNDBG(CT_LOG_DB, "beginning cull");
@@ -799,7 +799,7 @@ ctdb_cull_mark(struct ctdb_state *state, uint8_t *sha)
 {
 	sqlite3_stmt		*stmt;
 
-	if (state == NULL) {
+	if (state == NULL || state->ctdb_db == NULL) {
 		CNDBG(CT_LOG_DB, "no state");
 		return;
 	}
@@ -835,7 +835,8 @@ ctdb_cull_end(struct ctdb_state *state, int32_t genid)
 {
 	char		*errmsg, sql[1024];
 
-	if (state == NULL || state->ctdb_in_cull == 0)
+	if (state == NULL || state->ctdb_db == NULL ||
+	    state->ctdb_in_cull == 0)
 		return;
 	state->ctdb_in_cull = 0; /* either way we are done now */
 	CNDBG(CT_LOG_DB, "ending cull new genid %d", genid);
