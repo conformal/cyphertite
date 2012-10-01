@@ -367,6 +367,11 @@ ctdb_set_genid(struct ctdb_state *state, int genid)
 	CNDBG(CT_LOG_DB, "update genid from %d to %d", state->ctdb_genid,
 	    genid);
 
+	/* -1 means turn off database! */
+	if (genid == -1) {
+		ctdb_cleanup(state);
+		state->ctdb_genid = genid;
+	}
 	/*
 	 * If no crypt then we can't save any operations so best to just clear
 	 * the db out.
