@@ -201,6 +201,7 @@ struct ct_global_state {
 	/* User data (opaque). */
 	void				*ct_userptr;
 
+	int				 ct_cull_occurred;
 	int				 ct_dying;
 	struct ct_trans			*ct_fatal_trans;
 	int				 ct_errno;
@@ -629,6 +630,9 @@ int			ct_prompt_password(char *, char *, size_t, char *,
 
 
 
+/* XXX elsewhere */
+int			 ct_handle_unsolicited_xml(struct ct_header *, void *,
+			     struct ct_global_state *);
 
 
 /* FreeBSD 7 doesn't have openat() */

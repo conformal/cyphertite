@@ -553,6 +553,11 @@ static struct xmlsd_v_elements ct_xml_cull_complete_cmds[] = {
 	{ NULL, NULL }
 };
 
+static struct xmlsd_v_elements ct_xml_unsolicited_cmds[] = {
+	{ "ct_clientdb_newver", xe_ct_clientdb_newver },
+	{ NULL, NULL }
+};
+
 int
 ct_parse_xml_prepare(struct ct_header *hdr, void *vbody,
     struct xmlsd_v_elements *x_cmds, struct xmlsd_document **xl)
@@ -1203,4 +1208,47 @@ ct_cleanup_packet(struct ct_header *hdr, void *vbody)
 		/* real body was in iov[0] and belongs to caller */
 		e_free(&iov);
 	}
+}
+
+#include <cyphertite.h>
+/*
+ * XXX proto.c functions generally don't know about global state
+ */
+int
+ct_handle_unsolicited_xml(struct ct_header *hdr, void *vbody,
+    struct ct_global_state *state)
+{
+	struct xmlsd_document	*xl;
+	struct xmlsd_element	*xe;
+	const char		*errstr;
+	int32_t 		 newgenid;
+	int			 rv;
+
+	if ((rv = ct_parse_xml_prepare(hdr, vbody,
+	    ct_xml_unsolicited_cmds, &xl)) != 0)
+		return (rv);
+
+	xe = xmlsd_doc_get_first_elem(xl);
+	if (strcmp(xmlsd_elem_get_name(xe), "ct_clientdb_newver") == 0) {
+		CNDBG(CT_LOG_XML, "ct_clientdb_newver");
+		newgenid = xmlsd_elem_get_attr_strtonum(xe, "clientdbgenid",
+		    INT32_MIN, INT32_MAX, &errstr);
+		if (errstr != NULL) {
+			CNDBG(CT_LOG_XML, "failed to get clientdbgenid: %s",
+			    errstr);
+			newgenid = -1;
+		}
+
+		CNDBG(CT_LOG_XML, "newgenid message with genid %d", newgenid);
+		ctdb_set_genid(state->ct_db_state, newgenid);
+		state->ct_cull_occurred = 1;
+		ct_wakeup_file(state->event_state);
+
+		rv = 0;
+	} else  {
+		rv = CTE_INVALID_XML_TYPE;
+	}
+
+	xmlsd_doc_free(xl);
+	return (rv);
 }

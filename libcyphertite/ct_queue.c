@@ -1044,6 +1044,10 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 			ct_fatal(state, tagc, CTE_UNEXPECTED_TRANS); 
 			return;
 		}
+	} else if (hdr->c_opcode == C_HDR_O_XML) {
+		/* handle unsolicited message */
+		ct_handle_unsolicited_xml(hdr, vbody, state);
+		return;
 	} else {
 		/* for now this is bogus */
 		CABORTX("got a message that wasn't a reply opcode: %d",

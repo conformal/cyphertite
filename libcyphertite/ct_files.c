@@ -590,6 +590,7 @@ struct ct_archive_priv {
 	struct flist			*cap_curlist;
 	time_t				 cap_prev_backup_time;
 	int				 cap_fd;
+	int				 cap_cull_occurred;
 };
 
 int
@@ -693,6 +694,96 @@ ct_archive_cleanup_done(struct ct_global_state *state,
 	}
 }
 
+struct ct_archive_nexists_state {
+	int			 cans_sha_missing;
+	struct ct_archive_args	*cans_caa;
+};
+void
+ct_archive_sha_nexists(void *ctx, struct ct_exists_args *ce,
+    struct ct_trans *trans)
+{
+	struct ct_archive_nexists_state	*cans = ctx;
+	char	 			 shat[SHA_DIGEST_STRING_LENGTH];
+
+	if (clog_mask_is_set(CT_LOG_SHA)) {
+		ct_sha1_encode(trans->tr_sha, shat);
+		CNDBG(CT_LOG_SHA, "sha %s missing for archive", shat);
+	}
+	cans->cans_sha_missing++;
+
+}
+
+int
+ct_rearchive_cleanup(struct ct_global_state *state, struct ct_op *op)
+{
+	struct ct_archive_args	*caa = op->op_args;
+	char			**str;
+
+	if (caa->caa_filelist) {
+		str = caa->caa_filelist;
+		while (*str != NULL) {
+			e_free(str);
+			str++;
+		}
+		e_free(&caa->caa_filelist);
+	}
+	if (caa->caa_excllist) {
+		str = caa->caa_filelist;
+		while (*str != NULL) {
+			e_free(str);
+			str++;
+		}
+		e_free(&caa->caa_excllist);
+	}
+	if (caa->caa_includelist) {
+		str = caa->caa_filelist;
+		while (*str != NULL) {
+			e_free(str);
+			str++;
+		}
+
+		e_free(&caa->caa_includelist);
+	}
+
+	if (caa->caa_local_ctfile)
+		e_free(&caa->caa_local_ctfile);
+	if (caa->caa_tag)
+		e_free(&caa->caa_tag);
+	if (caa->caa_basis)
+		e_free(&caa->caa_basis);
+	if (caa->caa_tdir)
+		e_free(&caa->caa_tdir);
+	if (caa->caa_ctfile_basedir)
+		e_free(&caa->caa_ctfile_basedir);
+	e_free(&caa);
+
+	return (0);
+}
+
+int
+ct_check_rearchive(struct ct_global_state *state, struct ct_op *op)
+{
+	struct ct_exists_args		*ce = op->op_args;
+	struct ct_archive_nexists_state	*cans = ce->ce_nexists_state;
+
+	if (cans->cans_sha_missing) {
+		CWARNX("cull caused missing shas! Re-running archive");
+		/* delete old backup, irrelavent since it is bad. */
+		(void)unlink(ce->ce_ctfile);
+		ct_add_operation_after(state, op, ct_archive,
+		    ct_rearchive_cleanup, cans->cans_caa);
+	} else {
+		CWARNX("all shas present and correct");
+	}
+
+	e_free(&ce->ce_ctfile);
+	e_free(&ce->ce_ctfile_basedir);
+	e_free(&ce);
+	e_free(cans);
+
+	return (0);
+}
+
 void
 ct_archive(struct ct_global_state *state, struct ct_op *op)
 {
@@ -712,6 +803,86 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 
 	if (state->ct_dying != 0)
 		goto dying;
+	/*
+	 * We got an unsolicited cull message, another connection culled.
+	 * run exists on every sha in the archive after we are done to make
+	 * sure all of them are registered as required.
+	 */
+	if (state->ct_cull_occurred && cap->cap_cull_occurred == 0) {
+		struct ct_exists_args		*ce;
+		struct ct_archive_nexists_state	*cans;
+
+		cans = e_calloc(1, sizeof(*cans));
+		cans->cans_caa = e_calloc(1, sizeof(*cans));
+		CWARNX("triggering run of exists");
+		/*
+		 * fill in caa with a copy of our arguments, current caa may be
+		 * freed at the end of this op.
+		 */
+		bcopy(caa, cans->cans_caa, sizeof(*caa));
+		if (caa->caa_local_ctfile != NULL)
+			cans->cans_caa->caa_local_ctfile =
+			    e_strdup(caa->caa_local_ctfile);
+		if (caa->caa_tag != NULL)
+			cans->cans_caa->caa_tag = e_strdup(caa->caa_tag);
+		if (caa->caa_basis != NULL)
+			cans->cans_caa->caa_basis = e_strdup(caa->caa_basis);
+		if (caa->caa_tdir != NULL)
+			cans->cans_caa->caa_tdir = e_strdup(caa->caa_tdir);
+		if (caa->caa_ctfile_basedir != NULL)
+			cans->cans_caa->caa_ctfile_basedir =
+			    e_strdup(caa->caa_ctfile_basedir);
+		if (caa->caa_filelist != NULL) {
+			char	**current;
+			int	 i;
+			for (i = 0; caa->caa_filelist[i] != NULL; i++)
+				;
+			cans->cans_caa->caa_filelist = e_calloc(i + 1,
+			    sizeof(caa->caa_filelist));
+			for (i = 0, current = caa->caa_filelist;
+			    *current != NULL; i++, current++) {
+				cans->cans_caa->caa_filelist[i] =
+				    e_strdup(*current);
+			}
+		}
+
+		if (caa->caa_includelist != NULL) {
+			char	**current;
+			int	 i;
+			for (i = 0; caa->caa_includelist[i]!= NULL; i++)
+				;
+			cans->cans_caa->caa_includelist = e_calloc(i + 1,
+			    sizeof(caa->caa_includelist));
+			for (i = 0, current = caa->caa_includelist;
+			    *current != NULL; i++, current++) {
+				cans->cans_caa->caa_includelist[i] =
+				    e_strdup(*current);
+			}
+		}
+
+		if (caa->caa_excllist != NULL) {
+			char	**current;
+			int	 i;
+			for (i = 0; caa->caa_excllist[i] != NULL; i++)
+				;
+			cans->cans_caa->caa_excllist = e_calloc(i + 1,
+			    sizeof(caa->caa_excllist));
+			for (i = 0, current = caa->caa_excllist;
+			    *current != NULL; i++, current++) {
+				cans->cans_caa->caa_excllist[i] =
+				    e_strdup(*current);
+			}
+		}
+		ce = e_calloc(1, sizeof(*ce));
+		ce->ce_ctfile = e_strdup(ctfile);
+		ce->ce_ctfile_basedir = e_strdup(caa->caa_ctfile_basedir);
+		ce->ce_nexists_cb = ct_archive_sha_nexists;
+		ce->ce_nexists_state = cans;
+		ct_add_operation_after(state, op, ct_exists_file,
+		    ct_check_rearchive, ce);
+		cap->cap_cull_occurred = 1;
+
+	}
 	CNDBG(CT_LOG_TRANS, "processing");
 
 	switch (ct_get_file_state(state)) {
