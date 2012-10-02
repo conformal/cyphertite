@@ -918,12 +918,18 @@ ct_op_complete_cb	ctfile_delete_extract_cleanup;
 ct_op_cb 		ctfile_delete_check_required;
 ct_op_complete_cb	ctfile_delete_from_cache;
 
+struct ct_delete_trees {
+	struct ctfile_list_tree	all_files;
+	struct ctfile_list_tree	delete_files;
+};
+
 int
 ctfile_process_delete(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfile_delete_args	*ccda = op->op_args;
-	struct ctfile_list_tree		*results;
-	struct ctfile_list_file		*file;
+	struct ct_delete_trees		*trees;
+	struct ct_match			*match;
+	struct ctfile_list_file		*file, *tmp;
 	struct ct_ctfileop_args		*cca;
 	int				 ret;
 
@@ -931,19 +937,43 @@ ctfile_process_delete(struct ct_global_state *state, struct ct_op *op)
 	 * XXX In some way make sure we filter out crypto.secrets unless
 	 * specifically mentioned.
 	 */
-	results = e_calloc(1, sizeof(*results));
-	RB_INIT(results);
+	trees = e_calloc(1, sizeof(*trees));
+	RB_INIT(&trees->all_files);
+	RB_INIT(&trees->delete_files);
 	if ((ret = ctfile_list_complete(&state->ctfile_list_files,
-	    CT_MATCH_REGEX, all_ctfiles_pattern, NULL, results)) != 0)
-		return (ret);
+	    CT_MATCH_REGEX, all_ctfiles_pattern, NULL,
+	    &trees->all_files)) != 0){
+		goto dying;
+	}
 	/*
 	 * XXX could do this all in one pass by going through directory,
 	 * deleting any ctfiles that don't match the list and
 	 * removing/trimming others, then downloading all unmarked ones
 	 */
-	ctfile_cache_trim_aliens(state->ct_config->ct_ctfile_cachedir, results);
+	ctfile_cache_trim_aliens(state->ct_config->ct_ctfile_cachedir,
+	    &trees->all_files);
 
-	RB_FOREACH(file, ctfile_list_tree, results) {
+	if ((ret = ct_match_compile(&match, ccda->ccda_matchmode,
+	    ccda->ccda_pattern)) != 0) { 
+		goto dying;
+	}
+
+	/* pass 1: separate out the files we intend to delete */
+	RB_FOREACH_SAFE(file, ctfile_list_tree, &trees->all_files, tmp) {
+		if (ct_match(match, file->mlf_name) == 0) {
+			RB_REMOVE(ctfile_list_tree, &trees->all_files, file);
+			RB_INSERT(ctfile_list_tree, &trees->delete_files, file);
+		}
+	}
+
+	ct_match_unwind(match);
+
+	if (RB_EMPTY(&trees->delete_files)) {
+		ret = CTE_NOTHING_TO_DELETE;
+		goto dying;
+	}
+
+	RB_FOREACH(file, ctfile_list_tree, &trees->all_files) {
 		if (!ctfile_in_cache(file->mlf_name,
 		    state->ct_config->ct_ctfile_cachedir)) {
 			cca = e_calloc(1, sizeof(*cca));
@@ -957,9 +987,20 @@ ctfile_process_delete(struct ct_global_state *state, struct ct_op *op)
 	}
 
 	op = ct_add_operation(state, ctfile_delete_check_required, NULL, ccda);
-	op->op_priv = results;
+	op->op_priv = trees;
 
 	return (0);
+
+dying:
+	while ((file = RB_ROOT(&trees->all_files)) != NULL) {
+		RB_REMOVE(ctfile_list_tree, &trees->all_files, file);
+		e_free(&file);
+	}
+	while ((file = RB_ROOT(&trees->delete_files)) != NULL) {
+		RB_REMOVE(ctfile_list_tree, &trees->delete_files, file);
+		e_free(&file);
+	}
+	return (ret);
 }
 
 int
@@ -978,14 +1019,10 @@ ctfile_delete_check_required(struct ct_global_state *state, struct ct_op *op)
 {
 	struct ct_ctfile_delete_args	*ccda = op->op_args;
 	/* XXX pass this in as op->op_priv; */
-	struct ctfile_list_tree		*results = op->op_priv;
-	struct ctfile_list_tree		 del_tree;
-	struct ctfile_list_file		*file, search, *prevfile, *tmp;
-	struct ct_match			*match;
+	struct ct_delete_trees		*trees = op->op_priv;
+	struct ctfile_list_file		*file, search, *prevfile;
 	char				*prev_filename;
 	int				 fail = 0, ret;
-
-	RB_INIT(&del_tree);
 
 	if (ct_get_file_state(state) == CT_S_FINISHED)
 		return;
@@ -993,47 +1030,29 @@ ctfile_delete_check_required(struct ct_global_state *state, struct ct_op *op)
 	if (state->ct_dying != 0)
 		goto dying;
 
-	if ((ret = ct_match_compile(&match, ccda->ccda_matchmode,
-	    ccda->ccda_pattern)) != 0) { 
-		ct_fatal(state, NULL, ret);
-		goto dying;
-	}
-
-	/* two passes. */
-	/* pass 1: separate out the files we intend to delete into del_tree */
-	RB_FOREACH_SAFE(file, ctfile_list_tree, results, tmp) {
-		if (ct_match(match, file->mlf_name) == 0) {
-			RB_REMOVE(ctfile_list_tree, results, file);
-			RB_INSERT(ctfile_list_tree, &del_tree, file);
-		} 
-	}
-
-	ct_match_unwind(match);
-
-	if (RB_EMPTY(&del_tree)) {
-		ct_fatal(state, NULL, CTE_NOTHING_TO_DELETE);
-		goto dying;
-	}
-
 		
 	/*
 	 * pass 2: go over the list of files we don't intend to delete and
 	 * ensure that none of them depend on files in del_tree
 	 */
-	RB_FOREACH(file, ctfile_list_tree, results) {
+	while ((file = RB_ROOT(&trees->all_files)) != NULL) {
+		RB_REMOVE(ctfile_list_tree, &trees->all_files, file);
+
 		if ((ret = ctfile_get_previous(file->mlf_name,
 		    state->ct_config->ct_ctfile_cachedir,
 		    &prev_filename)) != 0) {
 			CWARNX("can not get previous file for %s: %s",
 			    file->mlf_name, ct_strerror(ret));
+			fail = 1;
+			e_free(&file);
 			continue;
 		}
 		if (prev_filename != NULL) {
 			/* XXX basename? */
 			strlcpy(search.mlf_name, prev_filename,
 			    sizeof(search.mlf_name));
-			if ((prevfile = RB_FIND(ctfile_list_tree, &del_tree,
-			    &search)) != NULL) {
+			if ((prevfile = RB_FIND(ctfile_list_tree,
+			    &trees->delete_files, &search)) != NULL) {
 				CWARNX("Can not delete %s, it is depended upon "
 				    "by %s which is not scheduled for deletion",
 				    prev_filename, file->mlf_name);
@@ -1042,15 +1061,17 @@ ctfile_delete_check_required(struct ct_global_state *state, struct ct_op *op)
 			}
 			e_free(&prev_filename);
 		} 
-
+		e_free(&file);
 	}
 	if (fail) {
 		ct_fatal(state, NULL, CTE_CAN_NOT_DELETE);
 		goto dying;
 	}
-	while ((file = RB_ROOT(&del_tree)) != NULL) {
+	while ((file = RB_ROOT(&trees->delete_files)) != NULL) {
 		struct ctfile_delete_args	*cda;
-		RB_REMOVE(ctfile_list_tree, &del_tree, file);
+
+		RB_REMOVE(ctfile_list_tree, &trees->delete_files, file);
+
 		cda = e_malloc(sizeof(*cda));
 		cda->cda_name = e_strdup(file->mlf_name);
 		cda->cda_callback = ccda->ccda_callback;
@@ -1060,35 +1081,27 @@ ctfile_delete_check_required(struct ct_global_state *state, struct ct_op *op)
 		e_free(&file);
 		
 	}
-	while ((file = RB_ROOT(results)) != NULL) {
-		RB_REMOVE(ctfile_list_tree, results, file);
-		e_free(&file);
-		
-	}
-	e_free(&results);
+	e_free(&trees);
 	op->op_args = NULL;
 
 	/* done with operation. next! */
 	ct_set_file_state(state, CT_S_FINISHED);
 	ct_op_complete(state);
 
-
 	return;
 
 dying:
 	/* He's dead, Jim. Clean up*/
-	if (results != NULL) {
-		while ((file = RB_ROOT(results)) != NULL) {
-			RB_REMOVE(ctfile_list_tree, results, file);
-			e_free(&file);
-		}
-	}
-	while ((file = RB_ROOT(&del_tree)) != NULL) {
-		RB_REMOVE(ctfile_list_tree, &del_tree, file);
+	while ((file = RB_ROOT(&trees->all_files)) != NULL) {
+		RB_REMOVE(ctfile_list_tree, &trees->all_files, file);
 		e_free(&file);
-		
+	}
+	while ((file = RB_ROOT(&trees->delete_files)) != NULL) {
+		RB_REMOVE(ctfile_list_tree, &trees->delete_files, file);
+		e_free(&file);
 	}
 
+	e_free(&trees);
 }
 
 int
