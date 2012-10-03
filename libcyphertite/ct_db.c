@@ -802,7 +802,6 @@ ctdb_cull_start(struct ctdb_state *state)
 void
 ctdb_cull_mark(struct ctdb_state *state, uint8_t *sha)
 {
-	sqlite3_stmt		*stmt;
 
 	if (state == NULL || state->ctdb_db == NULL) {
 		CNDBG(CT_LOG_DB, "no state");
@@ -814,25 +813,22 @@ ctdb_cull_mark(struct ctdb_state *state, uint8_t *sha)
 	}
 
 	CNDBG(CT_LOG_DB, "marking sha");
-	if (sqlite3_prepare(state->ctdb_db,
-	    "UPDATE digests set genid = -1 where sha = ?", -1, &stmt, NULL)) {
-		CNDBG(CT_LOG_DB, "could not prepare stmt");
-		return;
-
+	if (sqlite3_bind_int(state->ctdb_stmt_update, 1, -1)) {
+		CNDBG(CT_LOG_DB, "could not bind genid");
+		goto out;
 	}
 
-	if (sqlite3_bind_blob(stmt, 1, sha, SHA_DIGEST_LENGTH,
-	    SQLITE_STATIC)) {
+	if (sqlite3_bind_blob(state->ctdb_stmt_update, 2, sha,
+	    SHA_DIGEST_LENGTH, SQLITE_STATIC)) {
 		CNDBG(CT_LOG_DB, "could not bind sha");
-		return;
+		goto out;
 	}
 
-	if (sqlite3_step(stmt) != SQLITE_DONE) {
+	if (sqlite3_step(state->ctdb_stmt_update) != SQLITE_DONE) {
 		CNDBG(CT_LOG_DB, "could not step to mark sha");
 	}
-
-	sqlite3_finalize(stmt);
-
+out:
+	sqlite3_reset(state->ctdb_stmt_update);
 }
 
 void
@@ -853,6 +849,7 @@ ctdb_cull_end(struct ctdb_state *state, int32_t genid)
 		CNDBG(CT_LOG_DB, "update genid failed: %s:", errmsg);
 		goto failure;
 	}
+
 	return;
 failure:
 
