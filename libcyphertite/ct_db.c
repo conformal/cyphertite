@@ -779,7 +779,8 @@ ctdb_cull_start(struct ctdb_state *state)
 	CNDBG(CT_LOG_DB, "beginning cull");
 	/* Remove any shas marked -1, they are stale from a cull */
 	if (sqlite3_exec(state->ctdb_db,
-	    "DELETE FROM digests WHERE genid = -1;", NULL, 0, &errmsg) != 0) {
+	    "UPDATE digests set genid = 0 WHERE genid = -1;", NULL, 0,
+	    &errmsg) != 0) {
 		CNDBG(CT_LOG_DB, "Can't remove stale shas: %s", errmsg);
 		/* XXX delete db */
 		return;
