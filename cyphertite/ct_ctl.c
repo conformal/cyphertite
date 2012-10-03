@@ -309,7 +309,6 @@ cull(struct ct_cli_cmd *c, int argc, char **argv)
 	}
 
 	ct_cleanup(state);
-	e_check_memory();
 }
 
 /* Make sure we don't overwrite the file without permission */
