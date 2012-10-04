@@ -773,7 +773,7 @@ ct_check_rearchive(struct ct_global_state *state, struct ct_op *op)
 		ct_add_operation_after(state, op, ct_archive,
 		    ct_rearchive_cleanup, cans->cans_caa);
 	} else {
-		CWARNX("all shas present and correct");
+		CNDBG(CT_LOG_SHA, "all shas present and correct");
 	}
 
 	e_free(&ce->ce_ctfile);
@@ -814,7 +814,7 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 
 		cans = e_calloc(1, sizeof(*cans));
 		cans->cans_caa = e_calloc(1, sizeof(*cans));
-		CWARNX("triggering run of exists");
+		CNDBG(CT_LOG_SHA, "cull occurred trigering run of exists");
 		/*
 		 * fill in caa with a copy of our arguments, current caa may be
 		 * freed at the end of this op.
