@@ -22,8 +22,9 @@ ct_glob_match(char **g, char *file)
 {
 	int			i;
 
+	/* no pattern, nothing matches */
 	if (g == NULL)
-		return (0); /* no pattern means everything matches */
+		return (1);
 
 	for (i = 0; g[i] != NULL; i++) {
 		if (g[i] == NULL)

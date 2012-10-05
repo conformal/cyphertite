@@ -109,7 +109,7 @@ int
 ct_regex_match(regex_t *re, char *file)
 {
 	if (re == NULL)
-		return (0); /* no pattern means everything matches */
+		return (1); /* no pattern means nothing matches */
 
 	if (regexec(re, file, 0, NULL, 0) == 0) {
 		/* we got a match */
@@ -227,6 +227,9 @@ ct_match_compile(struct ct_match **matchp, int mode, char **flist)
 	match->cm_mode = mode;
 
 	switch (mode) {
+	case CT_MATCH_EVERYTHING:
+		ret = 0;
+		break;
 	case CT_MATCH_REGEX:
 		match->cm_regex = e_calloc(1, sizeof(regex_t));
 		ret = ct_regex_comp(match->cm_regex, flist);
@@ -265,6 +268,8 @@ void
 ct_match_unwind(struct ct_match *match)
 {
 	switch (match->cm_mode) {
+	case CT_MATCH_EVERYTHING:
+		break;
 	case CT_MATCH_REGEX:
 		if (match->cm_regex) {
 			ct_regex_unwind(match->cm_regex);
@@ -293,6 +298,9 @@ int
 ct_match(struct ct_match *match, char *candidate)
 {
 	switch (match->cm_mode) {
+	case CT_MATCH_EVERYTHING:
+		return (0);
+		break;
 	case CT_MATCH_REGEX:
 		return (ct_regex_match(match->cm_regex, candidate));
 		break;

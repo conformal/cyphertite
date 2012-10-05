@@ -21,6 +21,7 @@
 #define CT_MATCH_REGEX		(1)
 #define CT_MATCH_RB		(2)
 #define CT_MATCH_GLOB		(3)
+#define CT_MATCH_EVERYTHING	(4)
 
 struct ct_match;
 

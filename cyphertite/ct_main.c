@@ -401,6 +401,14 @@ ct_main(int argc, char **argv)
 			CFATALX("invalid ctfile: %s", ctfile);
 	}
 
+	/*
+	 * !metadata extract with no args extracts everything.
+	 * and all lists show everything if not filtered
+	 */
+	if (((ct_metadata == 0 && ct_action == CT_A_EXTRACT) ||
+	    ct_action == CT_A_LIST) && argc == 0)
+		ct_match_mode = CT_MATCH_EVERYTHING;
+
 	if (level0)
 		conf->ct_auto_incremental = 0; /* force incremental off */
 
