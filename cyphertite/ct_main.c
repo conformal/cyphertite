@@ -111,7 +111,7 @@ ct_usage(void)
 
 	/* ct -me usage */
 	fprintf(stderr,
-	    "       %s -m -e [-D debugstring] [-F conffile] -f ctfile\n",
+	    "       %s -m -e [-D debugstring] [-F conffile] <ctfilelist>\n",
 	    __progname);
 
 	/* ct -mt usage */
