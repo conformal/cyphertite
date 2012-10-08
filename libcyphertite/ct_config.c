@@ -512,6 +512,7 @@ ct_unload_config(char *configfile, struct ct_config *config)
 {
 	e_free(&configfile);
 	e_free(&config->ct_config_file);
+	e_free(&config);
 }
 
 void

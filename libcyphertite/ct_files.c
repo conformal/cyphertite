@@ -140,6 +140,16 @@ ct_flnode_cleanup(struct flist_head *head)
 }
 
 void
+ct_free_dnode(struct dnode *dnode)
+{
+	if (dnode->d_name != NULL)
+		e_free(&dnode->d_name);
+	if (dnode->d_sname != NULL)
+		e_free(&dnode->d_sname);
+	e_free(&dnode);
+}
+
+void
 ct_free_fnode(struct fnode *fnode)
 {
 	if (fnode->fl_hlname != NULL)
@@ -457,9 +467,10 @@ ct_archive_insert_dir(struct ct_archive_state *cas, struct dnode *dir)
 void
 ct_archive_cleanup(struct ct_archive_state *cas)
 {
+	struct dnode	*dnode;
+
 	if (cas->cas_rootdir.d_name != NULL)
 		e_free(&cas->cas_rootdir.d_name);
-	struct dnode	*dnode;
 	/*
 	 * ct -cf foo.md foo/bar/baz will have foo and foo/bar open at this
 	 * point (no fts postorder visiting), close them since we have just
@@ -472,11 +483,7 @@ ct_archive_cleanup(struct ct_archive_state *cas)
 			dnode->d_fd = -1;
 		}
 		RB_REMOVE(d_name_tree, &cas->cas_dname_head, dnode);
-		if(dnode->d_sname != NULL) {
-		  e_free(&dnode->d_sname);
-		}
-		e_free(&dnode->d_name);
-		e_free(&dnode);
+		ct_free_dnode(dnode);
 	}
 #ifndef CT_NO_OPENAT
 	close(cas->cas_rootdir.d_fd);
@@ -511,8 +518,7 @@ ct_sched_backup_file(struct ct_archive_state *cas, struct stat *sb,
 		dnode->d_num = -1; /* numbers are allocated on xdr write */
 		if ((e_dnode = ct_archive_insert_dir(cas, dnode)) != NULL) {
 			/* this directory already exists, do not record twice */
-			e_free(&dnode->d_name);
-			e_free(&dnode);
+			ct_free_dnode(dnode);
 			return;
 		} else
 			CNDBG(CT_LOG_CTFILE, "inserted %s", filename);
@@ -1070,6 +1076,7 @@ loop:
 		    caa->caa_follow_symlinks)) == -1) {
 			CWARN("archive: unable to open file '%s'",
 			    cap->cap_curnode->fl_sname);
+			ct_free_fnode(cap->cap_curnode);
 			ct_trans_free(state, ct_trans);
 			cap->cap_curnode->fl_state = CT_FILE_FINISHED;
 			goto next_file;
@@ -1666,8 +1673,7 @@ ct_file_extract_cleanup(struct ct_extract_state *ces)
 	}
 	while ((dnode = RB_ROOT(&ces->ces_dname_head)) != NULL) {
 		RB_REMOVE(d_name_tree, &ces->ces_dname_head, dnode);
-		e_free(&dnode->d_name);
-		e_free(&dnode);
+		ct_free_dnode(dnode);
 	}
 	if (ces->ces_rootdir->d_name)
 		e_free(&ces->ces_rootdir->d_name);
@@ -2520,8 +2526,8 @@ ct_populate_fnode(struct ct_extract_state *ces, struct ctfile_parse_state *ctx,
 				tdnode->d_uid = dnode->d_uid;
 				tdnode->d_gid = dnode->d_gid;
 			}
-			 e_free(&dnode);
-			 dnode = tdnode;
+			ct_free_dnode(dnode);
+			dnode = tdnode;
 		}
 		/* XXX check duplicates? */
 		ctfile_parse_insertdir(ctx, dnode);
