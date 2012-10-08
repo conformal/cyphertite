@@ -1505,6 +1505,7 @@ ct_cull_fetch_all_ctfiles(struct ct_global_state *state, struct ct_op *op)
 			    state->ct_config->ct_ctfile_cachedir);
 			CNDBG(CT_LOG_CTFILE, "getting %s to %s", file->mlf_name,
 			    cachename);
+			e_free(&cachename);
 			cca = e_calloc(1, sizeof(*cca));
 			cca->cca_localname =  e_strdup(file->mlf_name);
 			cca->cca_remotename = cca->cca_localname;
