@@ -157,7 +157,7 @@ ctfile_archive(struct ct_global_state *state, struct ct_op *op)
 			}
 			while ((ret = ctfile_parse(&xs_ctx)) != XS_RET_EOF) {
 				if (ret == XS_RET_SHA)  {
-					if (ctfile_parse_seek(&xs_ctx)) { 
+					if (ctfile_parse_seek(&xs_ctx)) {
 						s_errno = errno;
 						ret = xs_ctx.xs_errno;
 						ctfile_parse_close(&xs_ctx);
@@ -537,7 +537,7 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 		/* xml thread will wake us up when it gets the open */
 		ct_set_file_state(state, CT_S_WAITING_SERVER);
 		return;
-	} 
+	}
 
 	trans->tr_fl_node = ces->ces_fnode;
 	trans->tr_state = TR_S_EX_SHA;
@@ -679,12 +679,12 @@ ctfile_list_start(struct ct_global_state *state, struct ct_op *op)
 
 /*
  * To be used in a completion handler for an operation.
- * 
+ *
  * The operation which we are completing did a ctfile_list_start, the result of
  * this are in *files. perform any matching on this necessary using matchmode
  * with pattern flist and excludelist excludelist.  and place the results in
  * *results.
- * 
+ *
  * If we return non-zero a fatal error occured..
  */
 int
@@ -746,7 +746,7 @@ ctfile_delete_complete(struct ct_global_state *state,
 
 	if (cda->cda_callback != NULL)
 		cda->cda_callback(cda, state, trans);
-	
+
 	return (1);
 }
 
@@ -947,7 +947,7 @@ ctfile_process_delete(struct ct_global_state *state, struct ct_op *op)
 	}
 
 	if ((ret = ct_match_compile(&match, ccda->ccda_matchmode,
-	    ccda->ccda_pattern)) != 0) { 
+	    ccda->ccda_pattern)) != 0) {
 		goto dying;
 	}
 
@@ -1023,7 +1023,7 @@ ctfile_delete_check_required(struct ct_global_state *state, struct ct_op *op)
 	if (state->ct_dying != 0)
 		goto dying;
 
-		
+
 	/*
 	 * pass 2: go over the list of files we don't intend to delete and
 	 * ensure that none of them depend on files in del_tree
@@ -1053,7 +1053,7 @@ ctfile_delete_check_required(struct ct_global_state *state, struct ct_op *op)
 				fail = 1;
 			}
 			e_free(&prev_filename);
-		} 
+		}
 		e_free(&file);
 	}
 	if (fail) {
@@ -1072,7 +1072,7 @@ ctfile_delete_check_required(struct ct_global_state *state, struct ct_op *op)
 		ct_add_operation(state, ctfile_delete, ctfile_delete_from_cache,
 		    cda);
 		e_free(&file);
-		
+
 	}
 	e_free(&trees);
 	op->op_args = NULL;
@@ -1550,7 +1550,7 @@ ct_cull_collect_ctfiles(struct ct_global_state *state, struct ct_op *op)
 
 	if (state->ct_config->ct_ctfile_keep_days == 0) {
 		ct_fatal(state, "cull: ctfile_cull_keep_days",
-		    CTE_MISSING_CONFIG_VALUE); 
+		    CTE_MISSING_CONFIG_VALUE);
 		goto dying;
 	}
 	CNDBG(CT_LOG_SHA, "collecting ctfiles");
@@ -1614,7 +1614,7 @@ prev_ct_file:
 				e_free(&prev_filename);
 
 				if ((ret =
-				    ctfile_get_previous(prevfile->mlf_name, 
+				    ctfile_get_previous(prevfile->mlf_name,
 				    state->ct_config->ct_ctfile_cachedir,
 				    &prev_filename)) != 0) {
 					/* XXX Fail? */
