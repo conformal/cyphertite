@@ -524,10 +524,10 @@ ct_main(int argc, char **argv)
 			    ctfile_archive : ctfile_extract),
 			    ctfile_op_cleanup, &cca);
 		} else if (ct_action == CT_A_ERASE) {
+			if (ctfile != NULL)
+				CFATALX("-f is not permitted with -me operation");
 			if (argc == 0) 
 				CFATALX("no files specified");
-			if (ctfile != NULL)
-				CFATALX("-f specified with -me operation");
 			ccda.ccda_pattern = argv;
 			ccda.ccda_matchmode = ct_match_mode;
 			ccda.ccda_callback = ct_print_delete;
