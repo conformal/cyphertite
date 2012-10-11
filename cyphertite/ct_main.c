@@ -440,6 +440,10 @@ ct_main(int argc, char **argv)
 		CFATALX("failed to initialise cyphertite: %s",
 		    ct_strerror(ret));
 
+#if defined(CT_EXT_INIT)
+	CT_EXT_INIT(state);
+#endif
+
 	if (conf->ct_crypto_passphrase != NULL &&
 	    conf->ct_secrets_upload != 0) {
 		ct_add_operation(state, ctfile_list_start,

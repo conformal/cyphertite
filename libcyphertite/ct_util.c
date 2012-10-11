@@ -279,11 +279,7 @@ ct_init_eventloop(struct ct_global_state *state,
 
 	state->event_state = ct_event_init(state, ct_reconnect, info_cb);
 
-#if defined(CT_EXT_INIT)
-	CT_EXT_INIT(state);
-#endif
-
-	if ((flags & CT_NEED_DB) != 0) {	
+	if ((flags & CT_NEED_DB) != 0) {
 		state->ct_db_state = ctdb_setup(state->ct_config->ct_localdb,
 		    state->ct_config->ct_crypto_secrets != NULL);
 	} else {
