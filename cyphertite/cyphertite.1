@@ -354,23 +354,19 @@ may be used to delete remote
 from the server.
 .Bl -tag -width Ds
 .It Fl me
-Delete a remote
-.Ar ctfile
-from the server.  This combination must be used with the
-.Fl f
-flag to identify which
-.Ar ctfile
-to remove.  The exact
-.Ar ctfile
-as displayed with the
-.Fl mt
-option must be specified.
+Delete specified remote ctfiles from the server.  
+The arguments may be specified as
+.Xr glob 7
+patterns, (or, with the -r option,
+.Xr regex 3
+patterns).
 .It Fl mt
 List remote
 .Ar ctfiles .
 If any
 .Ar ctfiles
-are named on the command line, only those will be listed.  The arguments may be
+are named on the command line, only those will be listed.
+The arguments may be
 specified as
 .Xr glob 7
 patterns (or, with the
