@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.3.6
+%define version		1.4.0
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,14 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Tue Oct 16 2012 - davec 1.4.0-1
+- Modify usage of -mef <ctfile> to -me <pattern> to support removal of
+  multiple remote ctfiles with a single command
+- Improve backup performance after cull
+- Prevent changing remote secrets when there are ctfiles which depend on
+  them
+- Fix a couple of memory leaks
+- Other minor cleanup and bug fixes
 * Thu Aug 30 2012 - davec 1.3.6-1
 - Stats are now reported in a human-readable format
 - Removal of remote metadata files via the -mef flag combination will now
