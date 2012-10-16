@@ -472,6 +472,9 @@ ct_archive_cleanup(struct ct_archive_state *cas)
 			dnode->d_fd = -1;
 		}
 		RB_REMOVE(d_name_tree, &cas->cas_dname_head, dnode);
+		if(dnode->d_sname != NULL) {
+		  e_free(&dnode->d_sname);
+		}
 		e_free(&dnode->d_name);
 		e_free(&dnode);
 	}
