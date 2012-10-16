@@ -459,7 +459,6 @@ ct_archive_cleanup(struct ct_archive_state *cas)
 {
 	if (cas->cas_rootdir.d_name != NULL)
 		e_free(&cas->cas_rootdir.d_name);
-#ifndef CT_NO_OPENAT
 	struct dnode	*dnode;
 	/*
 	 * ct -cf foo.md foo/bar/baz will have foo and foo/bar open at this
@@ -476,6 +475,7 @@ ct_archive_cleanup(struct ct_archive_state *cas)
 		e_free(&dnode->d_name);
 		e_free(&dnode);
 	}
+#ifndef CT_NO_OPENAT
 	close(cas->cas_rootdir.d_fd);
 #endif
 	e_free(&cas);
