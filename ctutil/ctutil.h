@@ -73,24 +73,24 @@ struct ct_header {
 	uint32_t		c_tag;
 	uint32_t		c_size;
 	uint16_t		c_flags;
-#define C_HDR_F_UNUSED0		(1<<0)
+#define C_HDR_F_METADATA2	(1<<0)
 #define C_HDR_F_VERIFYDIGEST	(1<<1)
 #define C_HDR_F_METADATA	(1<<2)
-#define C_HDR_F_CB_OWN		(1<<3)
+#define C_HDR_F_UNUSED3		(1<<3)
 #define C_HDR_F_XML_REPLY	(1<<4)
 #define C_HDR_F_ENCRYPTED	(1<<5)
 #define C_HDR_F_UNUSED6		(1<<6)
 #define C_HDR_F_UNUSED7		(1<<7)
 #define C_HDR_F_UNUSED8		(1<<8)
 #define C_HDR_F_UNUSED9		(1<<9)
-#define C_HDR_F_UNUSED10	(1<<10)
-#define C_HDR_F_UNUSED11	(1<<11)
+#define C_HDR_F_RESERVED1	(1<<10)
+#define C_HDR_F_RESERVED0	(1<<11)
 /* bit 15..12 indicate the compression type */
 #define C_HDR_F_COMP_LZO	(1<<12)
 #define C_HDR_F_COMP_LZW	(2<<12)
 #define C_HDR_F_COMP_LZMA	(3<<12)
 #define C_HDR_F_COMPRESSED_MASK	(0xf000)
-#define C_HDR_F_VALIDMASK	(0xf03e)
+#define C_HDR_F_VALIDMASK	(0x3037)
 	uint16_t		c_unused;
 } __packed;
 
