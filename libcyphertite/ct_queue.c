@@ -1041,7 +1041,7 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 		    hdr->c_tag, hdr->c_opcode, hdr->c_status);
 		if ((trans = ct_lookup_inflight(state, hdr->c_tag)) == NULL) {
 			snprintf(tagc, sizeof(tagc), "%" PRIu32, hdr->c_tag);
-			ct_fatal(state, tagc, CTE_UNEXPECTED_TRANS); 
+			ct_fatal(state, tagc, CTE_UNEXPECTED_TRANS);
 			return;
 		}
 	} else if (hdr->c_opcode == C_HDR_O_XML) {
@@ -1532,7 +1532,7 @@ ct_handle_read_reply(struct ct_global_state *state, struct ct_trans *trans,
 			trans->tr_state = TR_S_EX_UNCOMPRESSED;
 			goto out;
 		}
-	} 
+	}
 
 	if (clog_mask_is_set(CT_LOG_NET)) {
 		ct_sha1_encode(trans->tr_sha, shat);

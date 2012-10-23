@@ -502,6 +502,7 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 		CNDBG(CT_LOG_FILE, "waiting on remote open");
 		/* FALLTHROUGH */
 	case CT_S_FINISHED:
+
 		return;
 	default:
 		break;
@@ -565,7 +566,7 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 dying:
 	if (ces != NULL) {
 		/*
-		 * XXX can't free fnode,don't know if we're done with it
+		 * XXX can't free fnode, don't know if we're done with it
 		 * or not...
 		 */
 		e_free(&ces);
@@ -849,6 +850,9 @@ ct_handle_xml_reply(struct ct_global_state *state, struct ct_trans *trans,
 		}
 		trans->tr_ctfile_name = filename; /* whether NULL or not */
 		trans->tr_state = TR_S_DONE;
+		if (filename != NULL) {
+		  e_free(&filename);
+		}
 		break;
 	case TR_S_XML_CULL_SEND:
 		/* XXX this is for both complete and setup */

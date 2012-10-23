@@ -55,6 +55,8 @@
 #define nitems(_a)      (sizeof((_a)) / sizeof((_a)[0]))
 #endif /* !nitems */
 
+#define CT_CHECK_MEMORY 0
+
 #ifdef BUILDSTR
 __attribute__((__unused__)) static const char *vertag = "version: " CT_VERSION\
     " " BUILDSTR;
@@ -357,7 +359,7 @@ ct_main(int argc, char **argv)
 		ct_basisbackup = e_strdup(basisfile);
 
 	if (ct_includefile != NULL) {
-		int nentries; 
+		int nentries;
 
 		if ((ct_action == CT_A_LIST || ct_action == CT_A_EXTRACT) &&
 		    argc != 0)
@@ -530,7 +532,7 @@ ct_main(int argc, char **argv)
 		} else if (ct_action == CT_A_ERASE) {
 			if (ctfile != NULL)
 				CFATALX("-f is not permitted with -me operation");
-			if (argc == 0) 
+			if (argc == 0)
 				CFATALX("no files specified");
 			ccda.ccda_pattern = argv;
 			ccda.ccda_matchmode = ct_match_mode;
@@ -591,7 +593,7 @@ ct_main(int argc, char **argv)
 		if (state->ct_errmsg[0] != '\0')
 			CWARNX("%s: %s", state->ct_errmsg,
 			    ct_strerror(ret));
-		else	
+		else
 			CWARNX("%s", ct_strerror(ret));
 		return (ret);
 	}
@@ -610,7 +612,7 @@ out:
 		    conf->ct_ctfile_max_cachesize);
 
 	ct_unload_config(config_file, conf);
-#ifdef notyet
+#if CT_CHECK_MEMORY
 	e_check_memory();
 #endif
 	exude_cleanup();
@@ -1008,7 +1010,7 @@ ct_print_ctfile_info(void *state, const char *filename,
 {
 	int	*verbose = state;
 	time_t ltime;
-	
+
 	if (*verbose) {
 		ltime = gh->cmg_created;
 		printf("file: %s version: %d level: %d block size: %d "

@@ -122,7 +122,7 @@ ct_parse_neg_reply(struct ct_header *hdr, void *body, int *max_trans,
     int *max_block_size)
 {
 	uint8_t		*buf = body;
-	
+
 	if (hdr->c_version != C_HDR_VERSION)
 		return (CTE_INVALID_REPLY_VERSION);
 	if (hdr->c_opcode != C_HDR_O_NEG_REPLY)
@@ -274,7 +274,7 @@ ct_create_xml_negotiate(struct ct_header *hdr, void **vbody,
 		goto out;
 
 	if ((body = xmlsd_generate(xl, ct_body_alloc_xml, &orig_size,
-	    XMLSD_GEN_ADD_HEADER)) == NULL) 
+	    XMLSD_GEN_ADD_HEADER)) == NULL)
 		goto out;
 	ret = 0;
 	hdr->c_size = orig_size;
@@ -503,7 +503,7 @@ ct_parse_read_ctfile_chunk_info(struct ct_header *hdr, void *vbody,
 			cmf->cmf_chunkno = ntohl(cmf->cmf_chunkno);
 
 			CNDBG(CT_LOG_CTFILE,
-			    "size: a %" PRIu32 "d e %" PRIu32 
+			    "size: a %" PRIu32 "d e %" PRIu32
 			    "chunkno a %" PRIu32 "d e %" PRIu32, cmf->cmf_size,
 			    (uint32_t)(hdr->c_size - sizeof(*cmf)),
 			    cmf->cmf_chunkno, expected_chunkno);
@@ -613,7 +613,7 @@ ct_parse_xml_prepare(struct ct_header *hdr, void *vbody,
  * hdr->c_tag is *not* set.
  */
 int
-ct_create_xml_open(struct ct_header *hdr, void **vbody, const char *file, 
+ct_create_xml_open(struct ct_header *hdr, void **vbody, const char *file,
     int mode, uint32_t chunkno)
 {
 	struct xmlsd_document		*xl;
@@ -882,7 +882,7 @@ ct_create_xml_delete(struct ct_header *hdr, void **vbody, const char *name)
 
 	if ((xe = xmlsd_doc_add_elem(xl, NULL, "ct_md_delete")) == NULL)
 		goto out;
-	if (xmlsd_elem_set_attr(xe, "version", CT_MD_DELETE_VERSION) != 0) 
+	if (xmlsd_elem_set_attr(xe, "version", CT_MD_DELETE_VERSION) != 0)
 		goto out;
 	if ((xe = xmlsd_doc_add_elem(xl, xe, "file")) == NULL)
 		goto out;
@@ -1052,7 +1052,7 @@ ct_create_xml_cull_shas(struct ct_header *hdr, void **vbody, uint64_t cull_uuid,
 
 	while ((node = RB_ROOT(head)) != NULL &&
 	    shas_in_packet < sha_per_packet) {
-		if ((xe = xmlsd_doc_add_elem(xl, xp, "sha")) == NULL)	
+		if ((xe = xmlsd_doc_add_elem(xl, xp, "sha")) == NULL)
 			goto out;
 		ct_sha1_encode(node->sha, shat);
 		//CNDBG(CT_LOG_SHA, "adding sha %s\n", shat);
