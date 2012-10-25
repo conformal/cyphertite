@@ -304,8 +304,8 @@ ct_populate_fnode_from_flist(struct ct_archive_state *cas,
 	if (ct_absolute_path(fname)) {
 		strlcpy(path, fname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s",
-		    ct_archive_get_rootdir(cas)->d_name, fname);
+		snprintf(path, sizeof(path), "%s%c%s",
+		    ct_archive_get_rootdir(cas)->d_name, CT_PATHSEP, fname);
 	}
 
 	if (follow_symlinks)
@@ -2059,8 +2059,8 @@ ct_file_extract_closefrom(struct ct_extract_state *ces, struct dnode *parent,
 	safe_mode = S_IRWXU | S_IRWXG | S_IRWXO;
 
 #ifdef CT_NO_OPENAT
-	snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
-	    child->d_name);
+	snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
+	    CT_PATHSEP, child->d_name);
 	if (ces->ces_attr) {
 		if (chown(path, child->d_uid, child->d_gid) == -1) {
 			ces->ces_log_chown_failed(ces->ces_log_state,
@@ -2132,8 +2132,8 @@ try_again:
 	if (ct_absolute_path(child->d_name)) {
 		strlcpy(path, child->d_name, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
-		    child->d_name);
+		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
+		    CT_PATHSEP, child->d_name);
 	}
 	if (ces->ces_follow_symlinks) {
 		ret = stat(path, &sb);
@@ -2190,8 +2190,8 @@ ct_open(struct ct_archive_state *cas , struct fnode *fnode, int flags,
 	if (ct_absolute_path(fnode->fl_fname)) {
 		strlcpy(path, fnode->fl_fname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", cas->cas_rootdir.d_name,
-		    fnode->fl_fname);
+		snprintf(path, sizeof(path), "%s%c%s", cas->cas_rootdir.d_name,
+		    CT_PATHSEP, fnode->fl_fname);
 	}
 
 	return (open(path, flags | follow_symlinks ? 0 : O_NOFOLLOW));
@@ -2211,8 +2211,8 @@ ct_readlink(struct ct_archive_state *cas, struct fnode *fnode, char *mylink,
 	if (ct_absolute_path(fnode->fl_fname)) {
 		strlcpy(path, fnode->fl_fname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", cas->cas_rootdir.d_name,
-		    fnode->fl_fname);
+		snprintf(path, sizeof(path), "%s%c%s", cas->cas_rootdir.d_name,
+		    CT_PATHSEP, fnode->fl_fname);
 	}
 
 	return (readlink(path, mylink, mylinksz));
@@ -2236,9 +2236,9 @@ ct_stat(struct fnode *fnode, struct stat *sb, int follow_symlinks,
 		strlcpy(path, ces ? fnode->fl_sname : fnode->fl_fname,
 		    sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ces ?
+		snprintf(path, sizeof(path), "%s%c%s", ces ?
 		    ces->ces_rootdir->d_name : cas->cas_rootdir.d_name,
-		    ces ? fnode->fl_sname : fnode->fl_fname);
+		    CT_PATHSEP, ces ? fnode->fl_sname : fnode->fl_fname);
 	}
 	if (follow_symlinks)
 		return (stat(path, sb));
@@ -2265,8 +2265,8 @@ ct_mkdir(struct ct_extract_state *ces, struct fnode *fnode, mode_t mode)
 	if (ct_absolute_path(fnode->fl_sname)) {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
-		    fnode->fl_sname);
+		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
+		    CT_PATHSEP, fnode->fl_sname);
 	}
 	return (mkdir(path, mode));
 #else
@@ -2283,8 +2283,8 @@ ct_mknod(struct ct_extract_state *ces, struct fnode *fnode)
 	if (ct_absolute_path(fnode->fl_sname)) {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
-		    fnode->fl_sname);
+		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
+		    CT_PATHSEP, fnode->fl_sname);
 	}
 	return (mknod(path, fnode->fl_mode, fnode->fl_dev));
 #else
@@ -2302,8 +2302,8 @@ ct_link(struct ct_extract_state *ces, struct fnode *fnode, char *destination)
 	if (ct_absolute_path(fnode->fl_sname)) {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
-		    fnode->fl_sname);
+		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
+		    CT_PATHSEP, fnode->fl_sname);
 	}
 	return (link(destination, path));
 #else
@@ -2321,8 +2321,8 @@ ct_symlink(struct ct_extract_state *ces, struct fnode *fnode)
 	if (ct_absolute_path(fnode->fl_sname)) {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
-		    fnode->fl_sname);
+		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
+		    CT_PATHSEP, fnode->fl_sname);
 	}
 	return (symlink(fnode->fl_hlname, path));
 #else
@@ -2340,8 +2340,8 @@ ct_rename(struct ct_extract_state *ces, struct fnode *fnode)
 	if (ct_absolute_path(fnode->fl_sname)) {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
-		    fnode->fl_sname);
+		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
+		    CT_PATHSEP, fnode->fl_sname);
 	}
 	return (rename(fnode->fl_fname, path));
 #else
@@ -2359,8 +2359,8 @@ ct_chmod(struct ct_extract_state *ces, struct fnode *fnode, mode_t mode)
 	if (ct_absolute_path(fnode->fl_sname)) {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
-		    fnode->fl_sname);
+		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
+		    CT_PATHSEP, fnode->fl_sname);
 	}
 	return (chmod(path, mode));
 #else
@@ -2377,8 +2377,8 @@ ct_chown(struct ct_extract_state *ces, struct fnode *fnode, int follow_symlinks)
 	if (ct_absolute_path(fnode->fl_sname)) {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
-		    fnode->fl_sname);
+		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
+		    CT_PATHSEP, fnode->fl_sname);
 	}
 	if (follow_symlinks)
 		return (chown(path, fnode->fl_uid,
@@ -2407,8 +2407,8 @@ ct_utimes(struct ct_extract_state *ces, struct fnode *fnode)
 	if (ct_absolute_path(fnode->fl_sname)) {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
-		    fnode->fl_sname);
+		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
+		    CT_PATHSEP, fnode->fl_sname);
 	}
 
 	return (utimes(path, tv));
@@ -2433,8 +2433,8 @@ ct_unlink(struct ct_extract_state *ces, struct fnode *fnode)
 	if (ct_absolute_path(fnode->fl_sname)) {
 		strlcpy(path, fnode->fl_sname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s/%s", ces->ces_rootdir->d_name,
-		    fnode->fl_sname);
+		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
+		    CT_PATHSEP, fnode->fl_sname);
 	}
 
 	return (unlink(path));
@@ -2489,8 +2489,9 @@ ct_populate_fnode(struct ct_extract_state *ces, struct ctfile_parse_state *ctx,
 			CABORTX("can't find parent dir %" PRId64 " for %s",
 			    ctx->xs_hdr.cmh_parent_dir,
 			    ctx->xs_hdr.cmh_filename);
-		e_asprintf(&fnode->fl_sname, "%s/%s",
-		    fnode->fl_parent_dir->d_name, ctx->xs_hdr.cmh_filename);
+		e_asprintf(&fnode->fl_sname, "%s%c%s",
+		    fnode->fl_parent_dir->d_name, CT_PATHSEP,
+		    ctx->xs_hdr.cmh_filename);
 		CNDBG(CT_LOG_CTFILE,
 		    "parent_dir %p %" PRId64, fnode->fl_parent_dir,
 		    ctx->xs_hdr.cmh_parent_dir);

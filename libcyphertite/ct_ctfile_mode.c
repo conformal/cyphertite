@@ -137,8 +137,8 @@ ctfile_archive(struct ct_global_state *state, struct ct_op *op)
 		op->op_priv = cas;
 
 		if (cca->cca_tdir) {
-			snprintf(tpath, sizeof tpath, "%s/%s",
-			    cca->cca_tdir, ctfile);
+			snprintf(tpath, sizeof tpath, "%s%c%s",
+			    cca->cca_tdir, CT_PATHSEP, ctfile);
 		} else {
 			strlcpy(tpath, ctfile, sizeof(tpath));
 		}
