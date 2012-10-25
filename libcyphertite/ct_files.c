@@ -1877,7 +1877,7 @@ ct_file_extract_special(struct ct_extract_state *ces, struct fnode *fnode)
 				    fnode->fl_sname);
 		}
 	} else if (C_ISLINK(fnode->fl_type)){
-		if (fnode->fl_hardlink && fnode->fl_hlname[0] != '/') {
+		if (fnode->fl_hardlink && !ct_absolute_path(fnode->fl_hlname)) {
 			snprintf(apath, sizeof(apath), "%s%c%s",
 			    ces->ces_rootdir->d_name, CT_PATHSEP,
 			    fnode->fl_hlname);

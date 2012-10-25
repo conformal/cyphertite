@@ -345,7 +345,7 @@ ct_basis_setup(int *nextlvlp, const char *basisbackup, char **filelist,
 		    i < xs_ctx.xs_gh.cmg_num_paths; fptr++, i++) {
 			if (strcmp(xs_ctx.xs_gh.cmg_paths[i], *fptr) != 0)
 				break;
-			if (xs_ctx.xs_gh.cmg_paths[i][0] != '/')
+			if (!ct_absolute_path(xs_ctx.xs_gh.cmg_paths[i])) 
 				rooted = 0;
 		}
 		if (i < xs_ctx.xs_gh.cmg_num_paths || *fptr != NULL) {
@@ -877,7 +877,7 @@ ctfile_write_header_entry(struct ctfile_write_state *ctx, char *filename,
 			    parent_dir->d_parent);
 		}
 		hdr.cmh_parent_dir = parent_dir->d_num;
-	} else if (base && filename[0] == '/') {
+	} else if (base && ct_absolute_path(filename)) {
 		/* this is a rooted directory element */
 		hdr.cmh_parent_dir = -2;
 	} else {
