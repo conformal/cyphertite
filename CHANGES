@@ -3,6 +3,10 @@ User visible changes for cyphertite
   A high-security scalable solution for online backups
 ============================================================================
 
+Changes in 1.4.1 (Tue Oct 30 2012)
+  - Add ability to delete remote secrets via cyphertitectl secrets delete
+  - Fix a few memory leaks
+
 Changes in 1.4.0 (Tue Oct 16 2012)
   - Modify usage of -mef <ctfile> to -me <pattern> to support removal of
     multiple remote ctfiles with a single command

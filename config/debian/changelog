@@ -1,3 +1,10 @@
+cyphertite (1.4.1-1) unstable; urgency=low
+
+  * Add ability to delete remote secrets via cyphertitectl secrets delete
+  * Fix a few memory leaks
+
+ -- Conformal Systems <package-discuss@conformal.com>  Tue, 30 Oct 2012 11:43:50 -0500
+
 cyphertite (1.4.0-1) unstable; urgency=low
 
   * Modify usage of -mef <ctfile> to -me <pattern> to support removal of

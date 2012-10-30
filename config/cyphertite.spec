@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.4.0
+%define version		1.4.1
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,9 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Tue Oct 30 2012 - davec 1.4.1-1
+- Add ability to delete remote secrets via cyphertitectl secrets delete
+- Fix a few memory leaks
 * Tue Oct 16 2012 - davec 1.4.0-1
 - Modify usage of -mef <ctfile> to -me <pattern> to support removal of
   multiple remote ctfiles with a single command
