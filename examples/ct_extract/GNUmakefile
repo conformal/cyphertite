@@ -50,8 +50,8 @@ LDLIBS += -lassl -lexude -lclog -lshrink -lxmlsd -lclens -levent_core -lexpat
 LDLIBS += -lcurl -lsqlite3 -llzma -llzo2 ${LIB.LINKSTATIC} -lssl -lcrypto
 LDLIBS += ${LIB.LINKDYNAMIC} -ldl -ledit -lncurses -lz
 
-BIN.NAME = exists_ctfile
-BIN.SRCS = exists_ctfile.c
+BIN.NAME = ct_extract
+BIN.SRCS = ct_extract.c
 BIN.OBJS = $(addprefix $(OBJPREFIX), $(BIN.SRCS:.c=.o))
 BIN.DEPS = $(addsuffix .depend, $(BIN.OBJS))
 BIN.LDFLAGS = $(LDFLAGS.EXTRA) $(LDFLAGS)

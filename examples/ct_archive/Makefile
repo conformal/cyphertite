@@ -17,9 +17,9 @@ BINDIR?=${LOCALBASE}/bin
 INCDIR?=${LOCALBASE}/include
 .PATH: ${.CURDIR}/../../ctutil
 
-PROG= remote_archive
-SRCS= remote_archive.c
-NOMAN= 
+PROG= ct_archive
+SRCS= ct_archive.c
+NOMAN=
 
 install:
 

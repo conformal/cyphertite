@@ -2,5 +2,5 @@ cyphertite/cyphertite.1
 cyphertite/cyphertite.conf.5
 cyphertite/cyphertitefb.1
 cyphertite/cyphertitectl.1
-libcyphertite/ct.3
+libcyphertite/cyphertite.3
 libcyphertite/simplect.3

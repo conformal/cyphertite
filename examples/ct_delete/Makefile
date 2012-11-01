@@ -17,9 +17,9 @@ BINDIR?=${LOCALBASE}/bin
 INCDIR?=${LOCALBASE}/include
 .PATH: ${.CURDIR}/../../ctutil
 
-PROG= exists_ctfile
-SRCS= exists_ctfile.c
-NOMAN= 
+PROG= ct_delete
+SRCS= ct_delete.c
+NOMAN=
 
 install:
 

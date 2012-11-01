@@ -14,7 +14,7 @@
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
 .Dd $Mdocdate: June 8 2012 $
-.Dt CT 3
+.Dt CYPHERTITE 3
 .Os
 .Sh NAME
 .Nm simplect
@@ -23,17 +23,29 @@
 
 .In cyphertite.h
 
-.Ft int 
-.Fn ct_do_remotearchive "struct ct_global_state *state" "char *ctfile" "char **flist" "char *tdir" "char **excludelist" "char *includefile" "int match_mode" "int no_cross_mounts" "int strip_slash" "int follow_root_symlink" "int follow_symlinks" "struct ct_config *conf"
-.Ft int 
-.Fn ct_do_remoteextract "struct ct_global_state *state" "char *ctfile" "char *tdir" "char **excludelist" "char **includelist" "int match_mode" "int strip_slash" "int follow_symlinks" "int preserve_attr" "struct ct_config *conf"
-.Ft int 
-.Fn ct_do_remotelist "struct ct_global_state *state" "char **search" "char **exclude" "int matchmode" "void (*printfn) (struct ct_global_state *state, struct ct_op *op)"
-
+.Ft int
+.Fn ct_do_archive "struct ct_global_state *state" "char *ctfile" "char **flist" "char *tdir" "char **excludelist" "char *includefile" "int matchmode" "int no_cross_mounts" "int strip_slash" "int follow_root_symlink" "int follow_symlinks"
+.Ft int
+.Fn ct_do_extract "struct ct_global_state *state" "char *ctfile" "char *tdir" "char **excludelist" "char **includelist" "int matchmode" "int strip_slash" "int follow_symlinks" "int preserve_attr"
+.Ft int
+.Fn ct_do_list "struct ct_global_state *state" "char **search" "char **exclude" "int matchmode" "void (*printfn) (struct ct_global_state *state, struct ct_op *op)"
+.Ft int
+.Fn ct_do_delete "struct ct_global_state *state" "char *ctfile" "int matchmode"
+.Ft int
+.Fn ct_do_checkforfile "struct ct_global_state *state" "char *ctfile"
+.Ft int
+.Fn ct_setup_preinit "int flags" "int cflags" "int debug_mask"
+.Ft int
+.Fn ct_setup_config "char *configfile" "struct ct_global_state **state"
+.Ft int
+.Fn ct_cleanup_all "struct ct_global_state *state" "char *configfile"
+.Ft int
+.Fn list_print "struct ct_global_state *state" "struct ct_op *op"
 .Sh DESCRIPTION
 
-These three functions provide a simple interface for the archiving, extraction
-and listing of files via cyphertite.
+These functions provide a simple interface for the archiving, extraction,
+and listing of files via cyphertite (along with initializing and
+cleaning up for those operations).
 
 .Sh RETURN VALUES
 
@@ -43,7 +55,7 @@ Specific error codes are available via errno.
 .Sh EXAMPLES
 
 .Sh SEE ALSO
-.Xr ct 3
+.Xr cyphertite 3
 
 .Sh HISTORY
 .An -nosplit

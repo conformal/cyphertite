@@ -50,8 +50,8 @@ LDLIBS += -lassl -lexude -lclog -lshrink -lxmlsd -lclens -levent_core -lexpat
 LDLIBS += -lcurl -lsqlite3 -llzma -llzo2 ${LIB.LINKSTATIC} -lssl -lcrypto
 LDLIBS += ${LIB.LINKDYNAMIC} -ldl -ledit -lncurses -lz
 
-BIN.NAME = remote_extract
-BIN.SRCS = remote_extract.c
+BIN.NAME = ct_delete
+BIN.SRCS = ct_delete.c
 BIN.OBJS = $(addprefix $(OBJPREFIX), $(BIN.SRCS:.c=.o))
 BIN.DEPS = $(addsuffix .depend, $(BIN.OBJS))
 BIN.LDFLAGS = $(LDFLAGS.EXTRA) $(LDFLAGS)

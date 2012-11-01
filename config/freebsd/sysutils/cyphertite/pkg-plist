@@ -19,7 +19,7 @@ man/man1/cyphertitefb.1.gz
 man/man1/ct.1.gz
 man/man1/ctctl.1.gz
 man/man1/ctfb.1.gz
-man/man3/ct.3.gz
+man/man3/cyphertite.3.gz
 man/man3/ct_absolute_path.3.gz
 man/man3/ct_add_operation.3.gz
 man/man3/ct_add_operation_after.3.gz

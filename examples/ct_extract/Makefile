@@ -17,9 +17,9 @@ BINDIR?=${LOCALBASE}/bin
 INCDIR?=${LOCALBASE}/include
 .PATH: ${.CURDIR}/../../ctutil
 
-PROG= remote_list
-SRCS= remote_list.c
-NOMAN= 
+PROG= ct_extract
+SRCS= ct_extract.c
+NOMAN=
 
 install:
 
@@ -47,7 +47,7 @@ CPPFLAGS+= -DBUILDSTR=\"$(BUILDVERSION)\"
 LDADD+= -L${LOCALBASE}/lib
 LDADD+=	-lassl -lclog -lcrypto -levent_core -lexpat -lexude -lshrink
 LDADD+=	-lsqlite3 -lssl -lutil -lxmlsd -ledit -lncurses -lcurl
-LDADD+= ${LDADDSSL} -lcyphertite -lctutil ${LDADDLATE} 
+LDADD+= ${LDADDSSL} -lcyphertite -lctutil ${LDADDLATE}
 CLEANFILES= cyphertite.cat1 cyphertite.conf.cat5
 
 CFLAGS+= -I${.CURDIR}

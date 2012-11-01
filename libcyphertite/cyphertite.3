@@ -14,10 +14,10 @@
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
 .Dd $Mdocdate: May 7 2012 $
-.Dt CT 3
+.Dt CYPHERTITE 3
 .Os
 .Sh NAME
-.Nm ct
+.Nm cyphertite
 .Nd cyphertite library
 .Sh SYNOPSIS
 
@@ -265,12 +265,6 @@ ct_internal.h functions used internally only:
 .Fn ct_prompt_password "char *prompt" "char *answer" "size_t answer_len" "char *answer2" "size_t answer2_len" "int confirm"
 .Ft char *
 .Fn ct_getloginbyuid "uid_t uid"
-.Ft int 
-.Fn ct_do_remotelist "struct ct_global_state *state" "char **search" "char **exclude" "int matchmode" "void (*printfn) (struct ct_global_state *state, struct ct_op *op)"
-.Ft int 
-.Fn ct_do_remotearchive "struct ct_global_state *state" "char *ctfile" "char **flist" "char *tdir" "char **excludelist" "char *includefile" "int match_mode" "int no_cross_mounts" "int strip_slash" "int follow_root_symlink" "int follow_symlinks" "struct ct_config *conf"
-.Ft int 
-.Fn ct_do_remoteextract "struct ct_global_state *state" "char *ctfile" "char *tdir" "char **excludelist" "char **includelist" "int match_mode" "int strip_slash" "int follow_symlinks" "int preserve_attr" "struct ct_config *conf"
 
 cyphertite.h functions used internally only:
 
@@ -1130,14 +1124,26 @@ typedef void	(ctfile_find_callback)(struct ct_global_state *,
 
 .\" ct_sapi.c
 
-.Ft int 
+The following functions belong to the simple api and are described in
+.Xr simplect 3
+
+.Ft int
 .Fn ct_do_remotelist "struct ct_global_state *state" "char **search" "char **exclude" "int matchmode" "void (*printfn) (struct ct_global_state *state, struct ct_op *op)"
 
-.Ft int 
+.Ft int
 .Fn ct_do_remotearchive "struct ct_global_state *state" "char *ctfile" "char **flist" "char *tdir" "char **excludelist" "char *includefile" "int match_mode" "int no_cross_mounts" "int strip_slash" "int follow_root_symlink" "int follow_symlinks" "struct ct_config *conf"
 
-.Ft int 
+.Ft int
 .Fn ct_do_remoteextract "struct ct_global_state *state" "char *ctfile" "char *tdir" "char **excludelist" "char **includelist" "int match_mode" "int strip_slash" "int follow_symlinks" "int preserve_attr" "struct ct_config *conf"
+
+.Ft int
+.Fn ct_setup_flags "int flags" "int cflags" "int debug_mask"
+
+.Ft int
+.Fn ct_setup_config "char *configfile" "struct ct_config **config" "struct ct_global_state **state"
+
+.Ft int
+.Fn ct_cleanup_all "struct ct_global_state *state" "char *configfile" "struct ct_config *config"
 
 .Ss MATCH
 

@@ -67,6 +67,7 @@ char *ct_user_config_old(void);
 void ct_write_config(struct ct_config *, FILE *, int, int);
 void ct_default_config(struct ct_config *);
 int ct_download_decode_and_save_certs(struct ct_config *);
+void ct_info_sig(evutil_socket_t fd, short event, void *vctx);
 
 /* Statistics */
 struct ct_statistics {
@@ -209,23 +210,6 @@ struct ct_global_state {
 };
 
 int		 ct_setup_state(struct ct_global_state **, struct ct_config *);
-
-/* Simplified API */
-int
-ct_do_remotelist(struct ct_global_state *state, char **search, char **exclude,
-    int matchmode,
-    int (*printfn) (struct ct_global_state *state, struct ct_op *op));
-
-int
-ct_do_remotearchive(struct ct_global_state *state, char *ctfile, char **flist,
-    char *tdir, char **excludelist, char **includelist, int match_mode,
-    int no_cross_mounts, int strip_slash, int follow_root_symlink,
-    int follow_symlinks, struct ct_config *conf);
-
-int
-ct_do_remoteextract(struct ct_global_state *state, char *ctfile, char *tdir,
-    char **excludelist, char **includefile, int match_mode, int strip_slash,
-    int follow_symlinks, int preserve_attr,  struct ct_config *conf);
 
 /* File status */
 #define CT_S_STARTING		(0)
@@ -497,7 +481,7 @@ struct ct_exists_args {
 	void		(*ce_nexists_cb)(void *, struct ct_exists_args *,
 			    struct ct_trans *);
 	void		*ce_nexists_state;
-	
+
 };
 
 /* arguments for globa check and delete */

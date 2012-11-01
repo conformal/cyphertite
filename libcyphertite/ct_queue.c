@@ -404,7 +404,7 @@ ct_fatal_alloc_trans(struct ct_global_state *state)
 }
 
 void
-ct_fatal(struct ct_global_state *state, const char *msg, int ct_errno) 
+ct_fatal(struct ct_global_state *state, const char *msg, int ct_errno)
 {
 	struct ct_trans		*trans;
 	/* XXX lock */
@@ -427,7 +427,7 @@ ct_fatal(struct ct_global_state *state, const char *msg, int ct_errno)
 	} else {
 		state->ct_errmsg[0] = '\0';
 	}
-	
+
 	trans->tr_state = TR_S_CYANIDE_CAPSULE;
 	trans->tr_complete = NULL;
 	trans->tr_cleanup = ct_cyanide_cleanup;
@@ -604,7 +604,7 @@ ct_state_ctfile_archive(struct ct_global_state *state,
 	case TR_S_FILE_START:
 	case TR_S_SPECIAL:
 	case TR_S_WMD_READY:
-	case TR_S_WRITTEN: 
+	case TR_S_WRITTEN:
 	case TR_S_XML_OPENED:
 	case TR_S_XML_CLOSE:
 	case TR_S_DONE:
@@ -758,10 +758,10 @@ ct_trans_realloc_local(struct ct_global_state *state, struct ct_trans *trans)
 	if ((tmp = ct_trans_alloc_local(state)) == NULL)
 		return (trans);
 	/* XXX maybe? */
-	tmp->tr_fl_node = trans->tr_fl_node; 
-	tmp->tr_statemachine = trans->tr_statemachine; 
-	tmp->tr_complete = trans->tr_complete; 
-	tmp->tr_cleanup = trans->tr_cleanup; 
+	tmp->tr_fl_node = trans->tr_fl_node;
+	tmp->tr_statemachine = trans->tr_statemachine;
+	tmp->tr_complete = trans->tr_complete;
+	tmp->tr_cleanup = trans->tr_cleanup;
 
 
 	ct_trans_free(state, trans);

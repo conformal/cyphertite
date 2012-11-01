@@ -1,4 +1,4 @@
-SUBDIRS = remote_list remote_archive remote_extract exists_ctfile
+SUBDIRS = ct_list ct_archive ct_extract ct_exists ct_delete
 TARGETS = clean obj install uninstall depend
 
 all: $(SUBDIRS)

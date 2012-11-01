@@ -27,7 +27,7 @@ lib/libcyphertite_p.a
 @man man/man1/ct.1
 @man man/man1/ctctl.1
 @man man/man1/ctfb.1
-@man man/man3/ct.3
+@man man/man3/cyphertite.3
 @man man/man3/ct_absolute_path.3
 @man man/man3/ct_add_operation.3
 @man man/man3/ct_add_operation_after.3
