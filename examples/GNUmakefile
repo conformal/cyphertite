@@ -1,5 +1,4 @@
-SUBDIRS = ctutil libcyphertite cyphertite examples
-TARGETS = clean obj install uninstall depend
+SUBDIRS = remote_list remote_archive remote_extract exists_ctfile
 
 all: $(SUBDIRS)
 
@@ -9,6 +8,12 @@ $(TARGETS):
 $(SUBDIRS):
 	@echo "===> $@"
 	$(MAKE) -C $@
+
+install:
+
+clean:
+
+uninstall:
 
 .PHONY: all $(SUBDIRS) $(TARGETS)
 

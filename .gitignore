@@ -11,6 +11,7 @@ ID
 *.gz
 obj/
 cyphertite/cyphertite
-examples/remote_archive/remotearchive
-examples/remote_extract/remoteextract
-examples/remotelist/remotelist
+examples/remote_archive/remote_archive
+examples/remote_extract/remote_extract
+examples/remote_list/remote_list
+examples/exists_ctfile/exists_ctfile

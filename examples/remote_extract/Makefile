@@ -17,8 +17,8 @@ BINDIR?=${LOCALBASE}/bin
 INCDIR?=${LOCALBASE}/include
 .PATH: ${.CURDIR}/../../ctutil
 
-PROG= remoteextract
-SRCS= remoteextract.c
+PROG= remote_extract
+SRCS= remote_extract.c
 NOMAN= 
 
 install:
