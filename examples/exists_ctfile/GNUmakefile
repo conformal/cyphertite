@@ -44,7 +44,7 @@ endif
 # Compiler and linker flags.
 CPPFLAGS += -DNEED_LIBCLENS
 INCFLAGS += -I../../ctutil -I../../libcyphertite -I$(INCDIR)/clens -I. -I$(INCDIR)
-CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(OPTLEVEL) $(DEBUG)
+CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(OPTLEVEL) $(DEBUG) -pthread
 LDLIBS += -L../../ctutil/obj -L../../ctutil -L../../libcyphertite/obj -L../../libcyphertite -lcyphertite -lctutil
 LDLIBS += -lassl -lexude -lclog -lshrink -lxmlsd -lclens -levent_core -lexpat
 LDLIBS += -lcurl -lsqlite3 -llzma -llzo2 ${LIB.LINKSTATIC} -lssl -lcrypto
