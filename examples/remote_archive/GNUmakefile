@@ -9,7 +9,7 @@ OSNAME := $(shell echo $(OSNAME) | tr A-Z a-z)
 
 # Default paths.
 DESTDIR ?=
-LOCALBASE ?= /home/john/tmp/conformal/install
+LOCALBASE ?= /usr/local
 BINDIR ?= ${LOCALBASE}/bin
 LIBDIR ?= ${LOCALBASE}/lib
 INCDIR ?= ${LOCALBASE}/include
