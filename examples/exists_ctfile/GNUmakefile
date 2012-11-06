@@ -48,7 +48,7 @@ CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(OPTLEVEL) $(DEBUG) -pthread
 LDLIBS += -L../../ctutil/obj -L../../ctutil -L../../libcyphertite/obj -L../../libcyphertite -lcyphertite -lctutil
 LDLIBS += -lassl -lexude -lclog -lshrink -lxmlsd -lclens -levent_core -lexpat
 LDLIBS += -lcurl -lsqlite3 -llzma -llzo2 ${LIB.LINKSTATIC} -lssl -lcrypto
-LDLIBS += ${LIB.LINKDYNAMIC} -ldl -ledit -lncurses -lz
+LDLIBS += ${LIB.LINKDYNAMIC} -ldl -ledit -lncurses -lz -pthread
 
 BIN.NAME = exists_ctfile
 BIN.SRCS = exists_ctfile.c
