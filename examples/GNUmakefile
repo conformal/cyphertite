@@ -1,4 +1,5 @@
 SUBDIRS = remote_list remote_archive remote_extract exists_ctfile
+TARGETS = clean obj install uninstall depend
 
 all: $(SUBDIRS)
 
@@ -8,12 +9,6 @@ $(TARGETS):
 $(SUBDIRS):
 	@echo "===> $@"
 	$(MAKE) -C $@
-
-install:
-
-clean:
-
-uninstall:
 
 .PHONY: all $(SUBDIRS) $(TARGETS)
 
