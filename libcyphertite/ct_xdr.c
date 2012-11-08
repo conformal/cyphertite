@@ -349,15 +349,11 @@ ct_basis_setup(int *nextlvlp, const char *basisbackup, char **filelist,
 				rooted = 0;
 		}
 		if (i < xs_ctx.xs_gh.cmg_num_paths || *fptr != NULL) {
-				CWARNX(" list of directories in basis:");
-				for (i = 0; i < xs_ctx.xs_gh.cmg_num_paths; i++)
-					CWARNX("%s", xs_ctx.xs_gh.cmg_paths[i]);
-				return (CTE_FILELIST_MISMATCH);
+				nextlvl = 0;
 		}
 
 		if (rooted == 0 && strcmp(cwd, xs_ctx.xs_gh.cmg_cwd) != 0) {
-			CWARNX("previous cwd: %s", xs_ctx.xs_gh.cmg_cwd);
-			return (CTE_CWD_MISMATCH);
+			nextlvl = 0;
 		}
 	}
 
