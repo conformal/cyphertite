@@ -1603,8 +1603,8 @@ try_again:
 	if (tdir != NULL) {
 		strlcpy(tpath, tdir, sizeof(tpath));
 		/* Make sure it is / terminated for make_full_path() */
-		if (tpath[strlen(tpath) - 1] != '/')
-			strlcat(tpath, "/", sizeof(tpath));
+		if (tpath[strlen(tpath) - 1] != CT_PATHSEP)
+			strlcat(tpath, CT_PATHSEP_STR, sizeof(tpath));
 
 	} else {
 		strlcpy(tpath, ".", sizeof(tpath));
@@ -1623,8 +1623,7 @@ try_again:
 		 * XXX a more restrictive mask wanted?
 		 */
 		if (errno == ENOENT && tries++ == 0 &&
-		    ct_make_full_path(tpath, 0777) == 0 &&
-		    mkdir(tdir, 0777) == 0)
+		    ct_make_full_path(tpath, 0777) == 0)
 			goto try_again;
 		s_errno = errno;
 
