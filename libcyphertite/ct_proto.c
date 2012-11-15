@@ -98,9 +98,9 @@ ct_create_neg(struct ct_header *hdr, void **vbody, int max_trans,
 	uint8_t		*body;
 
 	/* send server request */
+	bzero(hdr, sizeof(*hdr));
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_NEG;
-	hdr->c_tag = max_trans;		/* XXX - fix */
 	hdr->c_size = 8;
 
 	body = e_calloc(8, sizeof(*body));
