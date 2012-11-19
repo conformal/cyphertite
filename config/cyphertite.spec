@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.4.1
+%define version		1.4.2
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,12 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Mon Nov 19 2012 - davec 1.4.2-1
+- Allow archival to existing cttags with differing basis by automatically
+  enabling level 0 when necessary
+- Fix an issue preventing -C from extracting to a nonexistent directory
+- Compile example code on Linux
+- Other minor code cleanup
 * Tue Oct 30 2012 - davec 1.4.1-1
 - Add ability to delete remote secrets via cyphertitectl secrets delete
 - Fix a few memory leaks

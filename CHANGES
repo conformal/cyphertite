@@ -3,6 +3,13 @@ User visible changes for cyphertite
   A high-security scalable solution for online backups
 ============================================================================
 
+Changes in 1.4.2 (Mon Nov 19 2012)
+  - Allow archival to existing cttags with differing basis by automatically
+    enabling level 0 when necessary
+  - Fix an issue preventing -C from extracting to a nonexistent directory
+  - Compile example code on Linux
+  - Other minor code cleanup
+
 Changes in 1.4.1 (Tue Oct 30 2012)
   - Add ability to delete remote secrets via cyphertitectl secrets delete
   - Fix a few memory leaks

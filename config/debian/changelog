@@ -1,3 +1,13 @@
+cyphertite (1.4.2-1) unstable; urgency=low
+
+  * Allow archival to existing cttags with differing basis by automatically
+    enabling level 0 when necessary
+  * Fix an issue preventing -C from extracting to a nonexistent directory
+  * Compile example code on Linux
+  * Other minor code cleanup
+
+ -- Conformal Systems <package-discuss@conformal.com>  Mon, 19 Nov 2012 09:34:24 -0600
+
 cyphertite (1.4.1-1) unstable; urgency=low
 
   * Add ability to delete remote secrets via cyphertitectl secrets delete
