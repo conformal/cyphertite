@@ -108,7 +108,7 @@ main(int argc, char **argv)
 	excludelist = NULL;
 	includelist = &includenode;
 	tdir = NULL;
-	match_mode = CT_MATCH_GLOB;
+	match_mode = CT_MATCH_EVERYTHING;
 	attr = 0;
 	strip_slash = 1;
 	follow_symlinks = 0;
