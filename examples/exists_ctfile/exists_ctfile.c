@@ -140,7 +140,8 @@ main(int argc, char **argv)
 	}
 	ct_prompt_for_login_password(conf);
 
-	if ((ret = ct_init(&state, conf, CT_NEED_DB, ct_info_sig)) != 0)
+	if ((ret = ct_init(&state, conf, CT_NEED_DB | CT_NEED_SECRETS,
+	    ct_info_sig)) != 0)
 		CFATALX("can't initialize: %s", ct_strerror(ret));
 
 	ce.ce_ctfile_basedir = conf->ct_ctfile_cachedir;

@@ -130,7 +130,7 @@ main(int argc, char **argv)
 
 	ct_prompt_for_login_password(conf);
 
-	if ((ret = ct_init(&state, conf, 0, ct_info_sig)) != 0)
+	if ((ret = ct_init(&state, conf, CT_NEED_SECRETS, ct_info_sig)) != 0)
 		CFATALX("can't initialize: %s", ct_strerror(ret));
 
 	rslt = ct_do_remotearchive(state, ctfile, flist, tdir, excludelist,
