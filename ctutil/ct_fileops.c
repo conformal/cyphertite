@@ -35,7 +35,7 @@ ct_expand_tilde(char **path, const char *s)
         struct passwd           *pwd;
         const char              *sc = s;
         char                    *uid_s;
-        char                     user[LOGIN_NAME_MAX];
+        char                     user[sysconf(_SC_LOGIN_NAME_MAX)];
         uid_t                    uid;
         int                      i;
 
