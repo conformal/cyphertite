@@ -78,7 +78,7 @@ int ct_setup_wakeup_cv(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb);
 #endif
 int ct_setup_wakeup_pipe(struct event_base *, struct ct_ctx *ctx, void *vctx,
     ct_func_cb *func_cb);
-void * ct_cb_thread(void *);
+void *ct_cb_thread(void *);
 
 int
 ct_setup_wakeup_pipe(struct event_base *base, struct ct_ctx *ctx, void *vctx,
@@ -284,34 +284,50 @@ ct_pipe_sig(int fd, short event, void *vctx)
  */
 struct ct_event_state *
 ct_event_init(struct ct_global_state *state,
-    void (*cb)(evutil_socket_t, short, void *), void (*info_cb)(evutil_socket_t,
-    short, void *))
+    void (*reconn_cb)(evutil_socket_t, short, void *),
+    void (*info_cb)(evutil_socket_t, short, void *))
 {
 	struct ct_event_state	*ev_st;
 
 	ev_st = e_calloc(1, sizeof(*ev_st));
 
 	ev_st->ct_evt_base = event_base_new();
+	if (ev_st->ct_evt_base == NULL) {
+		ct_event_cleanup(ev_st);
+		return (NULL);
+	}
 
 	/* cache siginfo */
 	if (info_cb != NULL) {
 #if defined(SIGINFO) && SIGINFO != SIGUSR1
 		ev_st->ct_ev_sig_info = evsignal_new(ev_st->ct_evt_base,
 		    SIGINFO, info_cb, state);
+		if (ev_st->ct_ev_sig_info == NULL) {
+			ct_event_cleanup(ev_st);
+			return (NULL);
+		}
 		evsignal_add(ev_st->ct_ev_sig_info, NULL);
 #endif
 #if defined(SIGUSR1)
 		ev_st->ct_ev_sig_usr1 = evsignal_new(ev_st->ct_evt_base,
 		    SIGUSR1, info_cb, state);
+		if (ev_st->ct_ev_sig_usr1 == NULL) {
+			ct_event_cleanup(ev_st);
+			return (NULL);
+		}
 		evsignal_add(ev_st->ct_ev_sig_usr1, NULL);
 #endif
 	}
 #if defined(SIGPIPE)
 	ev_st->ct_ev_sig_pipe = evsignal_new(ev_st->ct_evt_base, SIGPIPE,
 	    ct_pipe_sig, state);
+	if (ev_st->ct_ev_sig_pipe == NULL) {
+		ct_event_cleanup(ev_st);
+		return (NULL);
+	}
 	evsignal_add(ev_st->ct_ev_sig_pipe, NULL);
 #endif
-	ev_st->recon_ev = evtimer_new(ev_st->ct_evt_base, cb, state);
+	ev_st->recon_ev = evtimer_new(ev_st->ct_evt_base, reconn_cb, state);
 	if (ev_st->recon_ev == NULL) {
 		ct_event_cleanup(ev_st);
 		return (NULL);
