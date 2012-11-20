@@ -41,9 +41,9 @@ LIB.NAME = cyphertite
 LIB.SRCS  = ct_aes_xts.c ct_bw_lim.c ct_config.c ct_config_paths.c ct_crypto.c
 LIB.SRCS += ct_ctfile_mode.c ct_ctfile_remote.c ct_ctfile_traverse.c ct_db.c
 LIB.SRCS += ct_event.c ct_files.c ct_glob.c ct_match.c ct_ops.c ct_proto.c ct_queue.c
-LIB.SRCS += ct_trees.c ct_util.c ct_xdr.c ct_sapi.c
+LIB.SRCS += ct_trees.c ct_util.c ct_xdr.c ct_sapi.c ct_version_tree.c
 LIB.HEADERS = ct_crypto.h ct_ctfile.h ct_db.h ct_ext.h cyphertite.h ct_match.h
-LIB.HEADERS += ct_proto.h ct_types.h
+LIB.HEADERS += ct_proto.h ct_types.h ct_version_tree.h
 LIB.OBJS = $(addprefix $(OBJPREFIX), $(LIB.SRCS:.c=.o))
 LIB.DEPS = $(addsuffix .depend, $(LIB.OBJS))
 LIB.MANPAGES = ct.3 simplect.3
