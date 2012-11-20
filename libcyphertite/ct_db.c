@@ -614,7 +614,7 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 		ct_sha1_encode(sha_k, shat);
 		rv = CTDB_SHA_MAYBE_EXISTS;
 		*old_genid = genid;
-	} if (genid > state->ctdb_genid) {
+	} else if (genid > state->ctdb_genid) {
 		/* XXX Abort? */
 		CWARNX("WARNING: sha with higher genid than database!");
 	}
@@ -697,7 +697,7 @@ ctdb_insert_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 	if (rc == SQLITE_DONE) {
 		CNDBG(CT_LOG_DB, "insert completed");
 		rv = 1;
-	} else if (rc != SQLITE_CONSTRAINT) { 
+	} else if (rc != SQLITE_CONSTRAINT) {
 		CNDBG(CT_LOG_DB, "insert failed %d %d [%s]", rc,
 		    sqlite3_extended_errcode(state->ctdb_db),
 		    sqlite3_errmsg(state->ctdb_db));
@@ -753,7 +753,7 @@ ctdb_update_sha(struct ctdb_state *state, uint8_t *sha, int32_t genid)
 	if (sqlite3_step(stmt) == SQLITE_DONE) {
 		CNDBG(CT_LOG_DB, "update completed");
 		rv = 1;
-	} else { 
+	} else {
 		CNDBG(CT_LOG_DB, "update failed %d [%s]",
 		    sqlite3_extended_errcode(state->ctdb_db),
 		    sqlite3_errmsg(state->ctdb_db));
