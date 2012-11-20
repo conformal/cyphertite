@@ -69,11 +69,12 @@ ct_expand_tilde(char **path, const char *s)
                 }
         }
 
-        e_asprintf(path, "%s%s", pwd->pw_dir, s);
+        if (asprintf(path, "%s%s", pwd->pw_dir, s))
+		CFATALX("no memory");
         return;
 
 no_expansion:
-        *path = e_strdup(sc);
+        *path = strdup(sc);
 }
 
 /*
