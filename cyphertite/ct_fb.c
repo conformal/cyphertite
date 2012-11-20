@@ -35,273 +35,22 @@
 #include <exude.h>
 
 #include <cyphertite.h>
+#include <ct_version_tree.h>
 #include "ct.h"
 #include "ct_fb.h"
 
 int ctfb_quit = 0;
 
-/* Subclass of dnode for faster lookup. */
-struct ct_fb_dnode {
-	struct dnode		 dnode;
-	struct ct_fb_entry	*dir;
-};
-
 struct ct_global_state	*ctfb_state;
 struct ct_fb_state	*ctfb_cfs;
 
 __dead void		 ctfb_usage(void);
-struct ct_fb_entry	*ct_add_tree(struct ct_fb_entry *,
-			     struct ctfile_parse_state *, struct ct_fb_ctfile *,
-			     off_t, int);
-struct ct_fb_entry	*ctfb_follow_path(struct ct_fb_state *, const char *,
+struct ct_vertree_entry	*ctfb_follow_path(struct ct_fb_state *, const char *,
 			     char *, size_t);
 int			 glob_ctfile(const char *, int,
 			     int (*)(const char *, int), glob_t *, int);
 
 extern char		*ct_getloginbyuid(uid_t);
-
-static inline int
-ct_cmp_entry(struct ct_fb_entry *a, struct ct_fb_entry *b)
-{
-	return strcmp(a->cfb_name, b->cfb_name);
-}
-
-RB_PROTOTYPE_STATIC(ct_fb_entries, ct_fb_entry, cfb_entry, ct_cmp_entry);
-RB_GENERATE_STATIC(ct_fb_entries, ct_fb_entry, cfb_entry, ct_cmp_entry);
-
-/*
- * Main guts of  ct_build tree. Factored out to avoid deep nesting.
- * Insert or update an entry in the tree with the information gotten from
- * the ctfile.
- */
-struct ct_fb_entry *
-ct_add_tree(struct ct_fb_entry *head, struct ctfile_parse_state *xdr_ctx,
-    struct ct_fb_ctfile *ctfile, off_t fileoffset, int allfiles)
-{
-	struct ctfile_header		*hdr = &xdr_ctx->xs_hdr;
-	struct ctfile_header		*hdrlnk= &xdr_ctx->xs_lnkhdr;
-	struct dnode 			*dnode;
-	struct ct_fb_dnode		*fb_dnode;
-	struct ct_fb_entry		*parent = NULL, sentry, *entry;
-	struct ct_fb_key		*lastkey, *key;
-	struct ct_fb_file		*file;
-	struct ct_fb_spec		*spec;
-	struct ct_fb_link		*linkkey;
-	size_t				 sz;
-
-	/* First find parent directory if any */
-	if (hdr->cmh_parent_dir != -1 && hdr->cmh_parent_dir != -2) {
-		if ((dnode = ctfile_parse_finddir(xdr_ctx,
-		    hdr->cmh_parent_dir)) == NULL)
-			CFATALX("can't find dir %" PRId64 ,
-			    hdr->cmh_parent_dir);
-		fb_dnode = (struct ct_fb_dnode *)dnode;
-		parent = fb_dnode->dir;
-	} else {
-		parent = head;
-	}
-
-	/*
-	 * Have parent node, search children to see if we already exist.
-	 * Else make a new one and insert.
-	 */
-	CNDBG(CT_LOG_VERTREE, "filename = %s", hdr->cmh_filename);
-	sentry.cfb_name = e_strdup(hdr->cmh_filename);
-	if ((entry = RB_FIND(ct_fb_entries, &parent->cfb_children,
-	    &sentry)) == NULL) {
-		/* new name, insert node */
-		entry = e_calloc(1, sizeof(*entry));
-
-		TAILQ_INIT(&entry->cfb_versions);
-		RB_INIT(&entry->cfb_children);
-		entry->cfb_parent = parent;
-		entry->cfb_name = sentry.cfb_name;
-		if (RB_INSERT(ct_fb_entries, &parent->cfb_children,
-		    entry) != NULL)
-			CFATALX("entry %s already exists", sentry.cfb_name);
-	} else {
-		e_free(&sentry.cfb_name);
-	}
-
-	/*
-	 * then check version tags -> head/tail if mtime and type match, we're
-	 * good else prepare version key.
-	 */
-	if (allfiles) {
-		lastkey = TAILQ_FIRST(&entry->cfb_versions);
-	} else {
-		lastkey = TAILQ_LAST(&entry->cfb_versions, ct_fb_vers);
-	}
-	/* Don't check atime, it doesn't matter */
-	if (lastkey != NULL && lastkey->cfb_type == hdr->cmh_type &&
-	    lastkey->cfb_mtime == hdr->cmh_mtime &&
-	    lastkey->cfb_uid == hdr->cmh_uid &&
-	    lastkey->cfb_gid == hdr->cmh_gid &&
-	    lastkey->cfb_mode == hdr->cmh_mode) {
-		key = lastkey;
-		CNDBG(CT_LOG_VERTREE, "found existing key");
-	} else { /* something changed. make a new one */
-		CNDBG(CT_LOG_VERTREE, "making new key");
-		if (C_ISDIR(hdr->cmh_type)) {
-			sz = sizeof(struct ct_fb_dir);
-		} else if (C_ISBLK(hdr->cmh_type) ||
-		    C_ISCHR(hdr->cmh_type)) {
-			sz = sizeof(struct ct_fb_spec);
-		} else  if (C_ISLINK(hdr->cmh_type)) {
-			sz = sizeof(struct ct_fb_link);
-		} else if (C_ISREG(hdr->cmh_type)) {
-			sz = sizeof(struct ct_fb_file);
-		} else {
-			CFATALX("invalid type %d", hdr->cmh_type);
-		}
-		key = e_calloc(1, sz);
-		key->cfb_type = hdr->cmh_type;
-		key->cfb_mtime = hdr->cmh_mtime;
-		key->cfb_atime = hdr->cmh_atime;
-		key->cfb_uid = hdr->cmh_uid;
-		key->cfb_gid = hdr->cmh_gid;
-		key->cfb_mode = hdr->cmh_mode;
-		/* dir handled below */
-		if (C_ISBLK(hdr->cmh_type) || C_ISCHR(hdr->cmh_type))  {
-			spec = (struct ct_fb_spec *)key;
-			spec->cfb_rdev = hdr->cmh_rdev;
-		} else if (C_ISLINK(hdr->cmh_type)){
-			/* hardlink/symlink */
-			linkkey = (struct ct_fb_link *)key;
-			linkkey->cfb_linkname = e_strdup(hdrlnk->cmh_filename);
-			linkkey->cfb_hardlink = !C_ISLINK(hdrlnk->cmh_type);
-		} else if (C_ISREG(hdr->cmh_type)) {
-			file = (struct ct_fb_file *)key;
-			file->cfb_nr_shas = -1;
-		}
-		if (allfiles) {
-			TAILQ_INSERT_HEAD(&entry->cfb_versions, key, cfb_link);
-		} else {
-			TAILQ_INSERT_TAIL(&entry->cfb_versions, key, cfb_link);
-		}
-	}
-
-	/*
-	 * Each MD file only has each directory referenced once, so put it
-	 * in the cache irregardless of whether it was known of before, that
-	 * will be a previous run and the cache will have been wiped since
-	 * then..
-	 */
-	if (C_ISDIR(hdr->cmh_type)) {
-		fb_dnode = e_calloc(1,sizeof (*fb_dnode));
-		fb_dnode->dnode.d_name = e_strdup(entry->cfb_name);
-		fb_dnode->dir = entry;
-		CNDBG(CT_LOG_VERTREE, "inserting %s as %" PRId64,
-		    fb_dnode->dnode.d_name, fb_dnode->dnode.d_num );
-		if ((dnode = ctfile_parse_insertdir(xdr_ctx,
-		    &fb_dnode->dnode)) != NULL)
-			CFATALX("duplicate dentry");
-	} else if (C_ISREG(hdr->cmh_type)) {
-		/*
-		 * Allfiles ctfiles may have shas == -1, so in some cases we
-		 * may wish to update an existing file when we find the actual
-		 * shas. It is an error to have a file node with -1 for shas
-		 * after all metadata have been parsed. it means one was
-		 * missing.
-		 */
-		file = (struct ct_fb_file *)key;
-		if (file->cfb_nr_shas != -1 && file->cfb_nr_shas !=
-		    hdr->cmh_nr_shas) {
-			CFATALX("sha mismatch before %" PRIu64 " now %" PRIu64,
-			    file->cfb_nr_shas, hdr->cmh_nr_shas);
-		}
-		if (hdr->cmh_nr_shas != -1)  {
-			file->cfb_nr_shas = hdr->cmh_nr_shas;
-			file->cfb_sha_offs = fileoffset;
-			file->cfb_file = ctfile;
-			if (ctfile_parse_seek(xdr_ctx))
-				CFATALX("%s skip shas: %s",  ctfile->cff_path,
-				    ct_strerror(xdr_ctx->xs_errno));
-		}
-		if (ctfile_parse(xdr_ctx) != XS_RET_FILE_END)
-			CFATALX("no file trailer: %s",
-			    ct_strerror(xdr_ctx->xs_errno)); 
-		file->cfb_file_size = xdr_ctx->xs_trl.cmt_orig_size;
-	}
-
-	return (entry);
-}
-
-/*
- * Build version tree on ``head'' from ``filename'' (and dependant files).
- */
-void
-ct_build_tree(const char *filename, struct ct_fb_entry *head,
-    const char *ctfile_basedir)
-{
-	struct ct_extract_head		 extract_head;
-	struct ctfile_parse_state	 xdr_ctx;
-	struct ct_fb_ctfile		*ctfile = NULL;
-	struct ct_fb_dir		*root_dir;
-	struct ct_fb_key		*root_version;
-	off_t				 offset;
-	int				 ret;
-	int				 allfiles;
-
-	CNDBG(CT_LOG_FILE, "entry");
-
-	TAILQ_INIT(&extract_head);
-	if ((ret = ct_extract_setup(&extract_head, &xdr_ctx, filename,
-	    ctfile_basedir, &allfiles)) != 0)
-		CFATALX("can't setup queue: %s", ct_strerror(ret));
-
-	TAILQ_INIT(&head->cfb_versions);
-	RB_INIT(&head->cfb_children);
-	head->cfb_name = "/";
-
-nextfile:
-	root_dir = e_calloc(1, sizeof(*root_dir));
-	root_version = &root_dir->cfb_base;
-	root_version->cfb_type = C_TY_DIR;
-	root_version->cfb_uid = 0;
-	root_version->cfb_gid = 0;
-	root_version->cfb_mode = 0777;
-	root_version->cfb_atime = xdr_ctx.xs_gh.cmg_created;
-	root_version->cfb_mtime = xdr_ctx.xs_gh.cmg_created;
-	TAILQ_INSERT_HEAD(&head->cfb_versions, root_version, cfb_link);
-
-	/* XXX keep these in a list? Right now they leak */
-	ctfile = calloc(1, sizeof(*ctfile));
-	strlcpy(ctfile->cff_path, xdr_ctx.xs_filename,
-	    sizeof(ctfile->cff_path));
-	offset = ctfile_parse_tell(&xdr_ctx);
-
-	while ((ret = ctfile_parse(&xdr_ctx)) != XS_RET_EOF &&
-	    ret != XS_RET_FAIL) {
-		switch(ret) {
-		case XS_RET_FILE:
-			(void)ct_add_tree(head, &xdr_ctx,
-			    ctfile, offset, allfiles);
-			break;
-		case XS_RET_FILE_END:
-			break;
-		default:
-			CABORTX("invalid state in %s: %d", __func__, ret);
-		}
-		offset = ctfile_parse_tell(&xdr_ctx);
-	}
-	if (ret == XS_RET_EOF) {
-		CNDBG(CT_LOG_FILE, "done, closing file");
-		ctfile_parse_close(&xdr_ctx);
-		if (!TAILQ_EMPTY(&extract_head)) {
-			CNDBG(CT_LOG_FILE, "opening next one");
-			if ((ret = ct_extract_open_next(&extract_head,
-			    &xdr_ctx)) != 0)
-				CFATALX("can't open next file: %s",
-				    ct_strerror(ret));
-			goto nextfile;
-		}
-		/* free state */
-	} else {
-		CFATALX("failed to parse ctfile: %s",
-		    ct_strerror(xdr_ctx.xs_errno));
-	}
-}
 
 /*
  * Functions for manipulating ct_fb_state.
@@ -316,11 +65,11 @@ nextfile:
  * if newcwd is non null then it will be updated to contain the new path
  * after expansion. If we fail it will be unchanged.
  */
-struct ct_fb_entry *
+struct ct_vertree_entry *
 ctfb_follow_path(struct ct_fb_state *cfs, const char *path,
     char *newcwd, size_t newcwdsz)
 {
-	struct ct_fb_entry	*cwd;
+	struct ct_vertree_entry	*cwd;
 	char			*next, *cur, cwdbuf[PATH_MAX], pbuf[PATH_MAX];
 	int			 absolute = 0, home = 0;
 
@@ -333,7 +82,7 @@ ctfb_follow_path(struct ct_fb_state *cfs, const char *path,
 	}
 
 	if (absolute || home) {
-		cwd = &cfs->cfs_tree;
+		cwd = &cfs->cfs_tree->cvt_head;
 		cwdbuf[0] = '\0';
 		if (absolute) /* Skip initial / */
 			path++;
@@ -369,11 +118,11 @@ ctfb_follow_path(struct ct_fb_state *cfs, const char *path,
 
 			CNDBG(CT_LOG_VERTREE, "goback");
 			/* ignore .. from root */
-			if (cwd->cfb_parent == NULL) {
+			if (cwd->cve_parent == NULL) {
 				CNDBG(CT_LOG_VERTREE, "at root");
 				continue;
 			}
-			cwd = cwd->cfb_parent;
+			cwd = cwd->cve_parent;
 
 			if (newcwd == NULL)
 				continue;
@@ -385,11 +134,12 @@ ctfb_follow_path(struct ct_fb_state *cfs, const char *path,
 		} else if (strcmp(cur, ".") == 0) {
 			CNDBG(CT_LOG_VERTREE, ".: doing nothing");
 		} else {
-			struct ct_fb_entry	sentry;
+			struct ct_vertree_entry	sentry;
 			CNDBG(CT_LOG_VERTREE, "next dir = %s", cur);
 
-			sentry.cfb_name = cur;
-			if ((cwd = RB_FIND(ct_fb_entries, &cwd->cfb_children,
+			sentry.cve_name = cur;
+			if ((cwd = RB_FIND(ct_vertree_entries,
+			    &cwd->cve_children,
 			    &sentry)) == NULL) {
 				CNDBG(CT_LOG_VERTREE,
 				    "can't find directory %s", cur);
@@ -414,10 +164,10 @@ ctfb_follow_path(struct ct_fb_state *cfs, const char *path,
 
 int
 ctfb_get_version(struct ct_fb_state *state, const char *path, int preferdir,
-    struct ct_fb_entry **entryp, struct ct_fb_key **keyp)
+    struct ct_vertree_entry **entryp, struct ct_vertree_ver **keyp)
 {
-	struct ct_fb_entry		*entry;
-	struct ct_fb_key		*key = NULL;
+	struct ct_vertree_entry		*entry;
+	struct ct_vertree_ver		*key = NULL;
 	char				*postfix;
 	struct tm			 tm;
 	time_t				 mtime = 0;
@@ -454,17 +204,17 @@ search:
 	if (noversion) {
 		if (preferdir) {
 			/* See if we have a directory, pick the latest */
-			TAILQ_FOREACH_REVERSE(key, &entry->cfb_versions,
-			    ct_fb_vers, cfb_link)
-				if (C_ISDIR(key->cfb_type))
+			TAILQ_FOREACH_REVERSE(key, &entry->cve_versions,
+			    ct_vertree_vers, cvv_link)
+				if (C_ISDIR(key->cvv_type))
 					break;
 		}
 		/* no directory? pick the most recent type */
 		if (key == NULL)
-			key = TAILQ_LAST(&entry->cfb_versions, ct_fb_vers);
+			key = TAILQ_LAST(&entry->cve_versions, ct_vertree_vers);
 	} else {
-		TAILQ_FOREACH(key, &entry->cfb_versions, cfb_link)
-			if (key->cfb_mtime == mtime)
+		TAILQ_FOREACH(key, &entry->cve_versions, cvv_link)
+			if (key->cvv_mtime == mtime)
 				break;
 		*postfix = '.'; /* put string back how it was */
 	}
@@ -486,7 +236,7 @@ search:
 int
 ctfb_chdir(struct ct_fb_state *state, const char *path)
 {
-	struct ct_fb_entry *result;
+	struct ct_vertree_entry *result;
 
 	if ((result = ctfb_follow_path(state, path,
 	    state->cfs_curpath, sizeof(state->cfs_curpath))) == NULL)
@@ -500,17 +250,17 @@ ctfb_chdir(struct ct_fb_state *state, const char *path)
  * Print out the node ``parent'', including children if it is a directory.
  */
 void
-ctfb_print_node(struct ct_fb_entry *parent, char *prefix)
+ctfb_print_node(struct ct_vertree_entry *parent, char *prefix)
 {
-	struct ct_fb_entry	*entry;
-	struct ct_fb_key	*key;
+	struct ct_vertree_entry	*entry;
+	struct ct_vertree_ver	*key;
 	size_t			 sz;
 	time_t			 mtime;
 	char			 buf[PATH_MAX];
 
-	if (!TAILQ_EMPTY(&parent->cfb_versions))
+	if (!TAILQ_EMPTY(&parent->cve_versions))
 		printf("Versions:\n");
-	TAILQ_FOREACH(key, &parent->cfb_versions, cfb_link) {
+	TAILQ_FOREACH(key, &parent->cve_versions, cvv_link) {
 		if (prefix) {
 			sz = snprintf(buf, sizeof(buf), "%s/", prefix);
 			if (sz == -1 || sz >= sizeof(buf)) {
@@ -520,12 +270,12 @@ ctfb_print_node(struct ct_fb_entry *parent, char *prefix)
 		} else {
 			buf[0] = '\0';
 		}
-		if ((sz = strlcat(buf, parent->cfb_name, sizeof(buf))) >=
+		if ((sz = strlcat(buf, parent->cve_name, sizeof(buf))) >=
 		    sizeof(buf)) {
 			CWARNX("string too long");
 			continue;
 		}
-		mtime = (time_t)key->cfb_mtime;
+		mtime = (time_t)key->cvv_mtime;
 
 		if (strftime(buf + sz , sizeof(buf) - sz, ".%Y%m%d%H%M%S",
 		    localtime(&mtime)) == 0) {
@@ -536,26 +286,26 @@ ctfb_print_node(struct ct_fb_entry *parent, char *prefix)
 		ct_fb_print_entry(buf, key, 2);
 		printf("\n");
 	}
-	if (!RB_EMPTY(&parent->cfb_children))
+	if (!RB_EMPTY(&parent->cve_children))
 		printf("Children:\n");
-	RB_FOREACH(entry, ct_fb_entries, &parent->cfb_children) {
+	RB_FOREACH(entry, ct_vertree_entries, &parent->cve_children) {
 		if (prefix) {
 			sz = snprintf(buf, sizeof(buf), "%s/", prefix);
 			if (sz == -1 || sz >= sizeof(buf)) {
 				CWARNX("string too long");
 				continue;
 			}
-			if ((sz = strlcat(buf, entry->cfb_name,
+			if ((sz = strlcat(buf, entry->cve_name,
 			    sizeof(buf))) >= sizeof(buf)) {
 				CWARNX("string too long");
 				continue;
 			}
 		} else {
-			strlcpy(buf, entry->cfb_name, sizeof(buf));
+			strlcpy(buf, entry->cve_name, sizeof(buf));
 		}
 		/* if an entry exists it should have at least 1 key */
 		ct_fb_print_entry(buf,
-		    TAILQ_LAST(&entry->cfb_versions, ct_fb_vers), 2);
+		    TAILQ_LAST(&entry->cve_versions, ct_vertree_vers), 2);
 		printf("\n");
 	}
 }
@@ -577,9 +327,9 @@ ctfb_cd(int argc, const char **argv)
 void
 ctfb_get(int argc, const char **argv)
 {
-	struct ct_fb_entry		*entry;
-	struct ct_fb_key		*key;
-	struct ct_fb_file		*file;
+	struct ct_vertree_entry		*entry;
+	struct ct_vertree_ver		*key;
+	struct ct_vertree_file		*file;
 	struct ct_extract_file_args	*cefa;
 	char				*dest, *name;
 	struct stat			 sb;
@@ -615,20 +365,20 @@ ctfb_get(int argc, const char **argv)
 			continue;
 		}
 
-		if (!C_ISREG(key->cfb_type)) {
+		if (!C_ISREG(key->cvv_type)) {
 			CWARNX("version %s is not a file", g.gl_pathv[i]);
 			continue;
 		}
 
-		file = (struct ct_fb_file *)key;
+		file = (struct ct_vertree_file *)key;
 		cefa = e_calloc(1, sizeof(*cefa));
-		cefa->cefa_ctfile = e_strdup(file->cfb_file->cff_path);
-		cefa->cefa_ctfile_off = file->cfb_sha_offs;
+		cefa->cefa_ctfile = e_strdup(file->cvf_file->cvc_path);
+		cefa->cefa_ctfile_off = file->cvf_sha_offs;
 		/* not a directory so shouldn't have a / at the end */
 		if ((name = strrchr(g.gl_pathv[i], '/')) != NULL) {
 			name++;
 		} else {
-			name = entry->cfb_name;
+			name = entry->cve_name;
 		}
 		if (argc == 3) {
 			if (isdir) {
@@ -664,7 +414,7 @@ out:
 void
 ctfb_ls(int argc, const char **argv)
 {
-	struct ct_fb_entry	*entry;
+	struct ct_vertree_entry	*entry;
 	char			*slash, *prefix;
 	glob_t			 g;
 	int			 i, j;
@@ -820,10 +570,10 @@ ctfb_usage(void)
  * Directory manipulation functions to be used with GLOB_ALTDIRFUNC.
  */
 struct ctfb_opendir {
-	struct ct_fb_entry	*cwd;
-	struct ct_fb_key	*nextkey;
-	struct ct_fb_entry	*curentry; /* valid only if nextkey != NULL */
-	struct ct_fb_entry	*nextentry;
+	struct ct_vertree_entry	*cwd;
+	struct ct_vertree_ver	*nextkey;
+	struct ct_vertree_entry	*curentry; /* valid only if nextkey != NULL */
+	struct ct_vertree_entry	*nextentry;
 };
 
 /*
@@ -833,7 +583,7 @@ void *
 ctfb_opendir(const char *path)
 {
 	struct ctfb_opendir		*dir;
-	struct ct_fb_entry		*entry;
+	struct ct_vertree_entry		*entry;
 
 	CNDBG(CT_LOG_VERTREE, "%s: %s", __func__, path);
 
@@ -844,7 +594,7 @@ ctfb_opendir(const char *path)
 
 	dir = e_calloc(1, sizeof(*dir));
 	dir->cwd = entry;
-	dir->nextentry = RB_MIN(ct_fb_entries, &entry->cfb_children);
+	dir->nextentry = RB_MIN(ct_vertree_entries, &entry->cve_children);
 
 	return (dir);
 }
@@ -856,7 +606,7 @@ struct dirent *
 ctfb_readdir(void *arg)
 {
 	struct ctfb_opendir	*ctx = arg;
-	struct ct_fb_entry	*entry;
+	struct ct_vertree_entry	*entry;
 	static struct dirent	ret;
 
 	if (ctx->nextkey == NULL && ctx->nextentry == NULL) {
@@ -866,13 +616,13 @@ ctfb_readdir(void *arg)
 
 	entry = ctx->nextentry;
 
-	CNDBG(CT_LOG_VERTREE, "%s: %s", __func__, entry->cfb_name);
+	CNDBG(CT_LOG_VERTREE, "%s: %s", __func__, entry->cve_name);
 	/*
 	 * OpenBSD doesn't have d_ino, but does have d_type. posix only
 	 * promises dirent has d_name and d_ino so just fill in d_name.
 	 */
-	strlcpy(ret.d_name, entry->cfb_name, sizeof(ret.d_name));
-	ctx->nextentry = RB_NEXT(ct_fb_entries, &ctx->cwd, entry);
+	strlcpy(ret.d_name, entry->cve_name, sizeof(ret.d_name));
+	ctx->nextentry = RB_NEXT(ct_vertree_entries, &ctx->cwd, entry);
 	return (&ret);
 }
 
@@ -883,8 +633,8 @@ struct dirent *
 ctfb_readdir_versions(void *arg)
 {
 	struct ctfb_opendir	*ctx = arg;
-	struct ct_fb_key	*key;
-	struct ct_fb_entry	*entry;
+	struct ct_vertree_ver	*key;
+	struct ct_vertree_entry	*entry;
 	static struct dirent	 ret;
 	time_t			 mtime;
 	size_t			 sz;
@@ -898,14 +648,14 @@ ctfb_readdir_versions(void *arg)
 	if (ctx->nextkey != NULL) {
 		key = ctx->nextkey;
 		entry = ctx->curentry;
-		ctx->nextkey = TAILQ_NEXT(key, cfb_link);
+		ctx->nextkey = TAILQ_NEXT(key, cvv_link);
 
-		if ((sz = strlcpy(buf, entry->cfb_name, sizeof(buf))) >=
+		if ((sz = strlcpy(buf, entry->cve_name, sizeof(buf))) >=
 		    sizeof(buf)) {
-			CWARNX("name too long: %s", entry->cfb_name);
+			CWARNX("name too long: %s", entry->cve_name);
 			return (NULL); /* Should never happen */
 		}
-		mtime = (time_t)key->cfb_mtime;
+		mtime = (time_t)key->cvv_mtime;
 
 		if (strftime(buf + sz , sizeof(buf) - sz, ".%Y%m%d%H%M%S",
 		    localtime(&mtime)) == 0) {
@@ -918,15 +668,15 @@ ctfb_readdir_versions(void *arg)
 	}
 	entry = ctx->nextentry;
 
-	CNDBG(CT_LOG_VERTREE, "%s: %s", __func__, entry->cfb_name);
+	CNDBG(CT_LOG_VERTREE, "%s: %s", __func__, entry->cve_name);
 
 	/* set up for next version to be read */
-	ctx->nextkey = TAILQ_FIRST(&entry->cfb_versions);
+	ctx->nextkey = TAILQ_FIRST(&entry->cve_versions);
 	ctx->curentry = entry;
-	ctx->nextentry = RB_NEXT(ct_fb_entries, &ctx->cwd, entry);
+	ctx->nextentry = RB_NEXT(ct_vertree_entries, &ctx->cwd, entry);
 
 	/* d_ino shouldn't matter here */
-	strlcpy(ret.d_name, entry->cfb_name, sizeof(ret.d_name));
+	strlcpy(ret.d_name, entry->cve_name, sizeof(ret.d_name));
 	return (&ret);
 }
 
@@ -968,7 +718,7 @@ glob_ctfile(const char *pattern, int flags, int (*errfunc)(const char *, int),
  * 99% stolen from ct_pr_fmt_file, should amalgamate
  */
 void
-ct_fb_print_entry(char *name, struct ct_fb_key *key, int verbose)
+ct_fb_print_entry(char *name, struct ct_vertree_ver *key, int verbose)
 {
 	char *loginname;
 	struct group *group;
@@ -981,7 +731,7 @@ ct_fb_print_entry(char *name, struct ct_fb_key *key, int verbose)
 	char *pchr;
 
 	if (verbose > 1) {
-		switch(key->cfb_type & C_TY_MASK) {
+		switch(key->cvv_type & C_TY_MASK) {
 		case C_TY_DIR:
 			filemode[0] = 'd'; break;
 		case C_TY_CHR:
@@ -999,30 +749,30 @@ ct_fb_print_entry(char *name, struct ct_fb_key *key, int verbose)
 		default:
 			filemode[0] = '?';
 		}
-		filemode[1] = (key->cfb_mode & 0400) ? 'r' : '-';
-		filemode[2] = (key->cfb_mode & 0100) ? 'w' : '-';
-		filemode[3] = (key->cfb_mode & 0200) ? 'x' : '-';
-		filemode[4] = (key->cfb_mode & 0040) ? 'r' : '-';
-		filemode[5] = (key->cfb_mode & 0020) ? 'w' : '-';
-		filemode[6] = (key->cfb_mode & 0010) ? 'x' : '-';
-		filemode[7] = (key->cfb_mode & 0004) ? 'r' : '-';
-		filemode[8] = (key->cfb_mode & 0002) ? 'w' : '-';
-		filemode[9] = (key->cfb_mode & 0001) ? 'x' : '-';
+		filemode[1] = (key->cvv_mode & 0400) ? 'r' : '-';
+		filemode[2] = (key->cvv_mode & 0100) ? 'w' : '-';
+		filemode[3] = (key->cvv_mode & 0200) ? 'x' : '-';
+		filemode[4] = (key->cvv_mode & 0040) ? 'r' : '-';
+		filemode[5] = (key->cvv_mode & 0020) ? 'w' : '-';
+		filemode[6] = (key->cvv_mode & 0010) ? 'x' : '-';
+		filemode[7] = (key->cvv_mode & 0004) ? 'r' : '-';
+		filemode[8] = (key->cvv_mode & 0002) ? 'w' : '-';
+		filemode[9] = (key->cvv_mode & 0001) ? 'x' : '-';
 		filemode[10] = '\0';
 
-		loginname = ct_getloginbyuid(key->cfb_uid);
+		loginname = ct_getloginbyuid(key->cvv_uid);
 		if (loginname && (strlen(loginname) < sizeof(uid)))
 			snprintf(uid, sizeof(uid), "%10s", loginname);
 		else
-			snprintf(uid, sizeof(uid), "%-10d", key->cfb_uid);
-		group = getgrgid(key->cfb_gid);
+			snprintf(uid, sizeof(uid), "%-10d", key->cvv_uid);
+		group = getgrgid(key->cvv_gid);
 
 
 		if (group && (strlen(group->gr_name) < sizeof(gid)))
 			snprintf(gid, sizeof(gid), "%10s", group->gr_name);
 		else
-			snprintf(gid, sizeof(gid), "%-10d", key->cfb_gid);
-		ltime = key->cfb_mtime;
+			snprintf(gid, sizeof(gid), "%-10d", key->cvv_gid);
+		ltime = key->cvv_mtime;
 		ctime_r(&ltime, lctime);
 		pchr = strchr(lctime, '\n');
 		if (pchr != NULL)
@@ -1035,16 +785,17 @@ ct_fb_print_entry(char *name, struct ct_fb_key *key, int verbose)
 	if (verbose > 1) {
 
 		/* XXX - translate to guid name */
-		if (C_ISLINK(key->cfb_type))  {
-			struct ct_fb_link *lnk = (struct ct_fb_link *)key;
+		if (C_ISLINK(key->cvv_type))  {
+			struct ct_vertree_link *lnk =
+			    (struct ct_vertree_link *)key;
 
-			if (lnk->cfb_hardlink)  {
+			if (lnk->cvl_hardlink)  {
 				link_ty = "==";
 			} else {
 				link_ty = "->";
 			}
-			printf(" %s %s", link_ty, lnk->cfb_linkname);
-		} else if (C_ISREG(key->cfb_type)) {
+			printf(" %s %s", link_ty, lnk->cvl_linkname);
+		} else if (C_ISREG(key->cvv_type)) {
 			if (verbose > 1) {
 			}
 		}

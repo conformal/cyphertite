@@ -37,8 +37,10 @@
 #include <exude.h>
 
 #include <cyphertite.h>
+#include <ct_version_tree.h>
 #include "ct.h"
 #include "ct_fb.h"
+
 
 #ifndef nitems
 #define nitems(_a)      (sizeof((_a)) / sizeof((_a)[0]))
@@ -162,9 +164,9 @@ ctfb_shell(int argc, const char **argv)
 int
 ctfb_lstat(const char *path, struct stat *sb)
 {
-	struct ct_fb_entry		*entry;
-	struct ct_fb_key		*key;
-	struct ct_fb_spec		*spec;
+	struct ct_vertree_entry		*entry;
+	struct ct_vertree_ver		*key;
+	struct ct_vertree_spec		*spec;
 	int				 ret = -1;
 
 	CNDBG(CT_LOG_VERTREE, "%s %s", __func__, path);
@@ -183,15 +185,15 @@ ctfb_lstat(const char *path, struct stat *sb)
 	sb->st_blksize = 0;
 	sb->st_blocks = 0;
 
-	sb->st_mode = key->cfb_type | key->cfb_mode; /* XXX is this correct? */
-	sb->st_uid = key->cfb_uid;
-	sb->st_gid = key->cfb_gid;
-	sb->st_mtime = key->cfb_mtime;
-	sb->st_ctime = key->cfb_mtime;
-	sb->st_atime = key->cfb_atime;
-	if (C_ISCHR(key->cfb_type) || C_ISBLK(key->cfb_type)) {
-		spec = (struct ct_fb_spec *)key;
-		sb->st_rdev = spec->cfb_rdev;
+	sb->st_mode = key->cvv_type | key->cvv_mode; /* XXX is this correct? */
+	sb->st_uid = key->cvv_uid;
+	sb->st_gid = key->cvv_gid;
+	sb->st_mtime = key->cvv_mtime;
+	sb->st_ctime = key->cvv_mtime;
+	sb->st_atime = key->cvv_atime;
+	if (C_ISCHR(key->cvv_type) || C_ISBLK(key->cvv_type)) {
+		spec = (struct ct_vertree_spec *)key;
+		sb->st_rdev = spec->cvs_rdev;
 	} else {
 		sb->st_rdev = 0;
 	}
@@ -353,11 +355,11 @@ ctfb_main(int argc, char *argv[])
 		ct_fb_filename = e_strdup(ctfile);
 	}
 	/* now have name of the file we actually want to open... */
-	ct_build_tree(ct_fb_filename, &cfs.cfs_tree,
+	ct_version_tree_build(ct_fb_filename, 
 	    conf->ct_ctfile_mode == CT_MDMODE_REMOTE ?
-	    conf->ct_ctfile_cachedir : NULL);
+	    conf->ct_ctfile_cachedir : NULL, &cfs.cfs_tree);
 	ctfb_cfs = &cfs;
-	ctfb_cfs->cfs_cwd = &ctfb_cfs->cfs_tree;
+	ctfb_cfs->cfs_cwd = &ctfb_cfs->cfs_tree->cvt_head;
 	ctfb_cfs->cfs_curpath[0] = '\0';
 
 	if ((el = el_init(__progname, stdin, stdout, stderr)) == NULL)

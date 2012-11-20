@@ -590,7 +590,7 @@ ctdb_lookup_sha(struct ctdb_state *state, uint8_t *sha_k, uint8_t *sha_v,
 			if (sqlite3_column_bytes(stmt, 1) != CT_IV_LEN) {
 				CNDBG(CT_LOG_DB, "invalid blob size");
 				sqlite3_reset(stmt);
-				rv = 0;
+				rv = CTDB_SHA_NEXISTS;
 				return rv;
 			}
 			if (clog_mask_is_set(CT_LOG_DB)) {
