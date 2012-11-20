@@ -29,6 +29,7 @@
 #include <cyphertite.h>
 #include <ct_internal.h>
 
+#define CT_KEEPALIVE_TIMEOUT (86400)
 
 #ifdef __linux__
 #define SIGINFO SIGUSR1
@@ -65,7 +66,7 @@ struct ct_event_state {
 	struct event		*ct_ev_sig_usr1;
 	struct event		*ct_ev_sig_pipe;
 	struct event		*recon_ev;
-
+	struct event		*keepalive_ev;
 };
 
 void ct_handle_wakeup(int, short, void *);
@@ -78,6 +79,8 @@ int ct_setup_wakeup_cv(struct ct_ctx *ctx, void *vctx, ct_func_cb *func_cb);
 #endif
 int ct_setup_wakeup_pipe(struct event_base *, struct ct_ctx *ctx, void *vctx,
     ct_func_cb *func_cb);
+void ct_keepalive(evutil_socket_t, short, void *);
+void ct_set_keepalive_timeout(struct ct_event_state *, int);
 void *ct_cb_thread(void *);
 
 int
@@ -333,6 +336,14 @@ ct_event_init(struct ct_global_state *state,
 		return (NULL);
 	}
 
+	ev_st->keepalive_ev = evtimer_new(ev_st->ct_evt_base, ct_keepalive,
+	    state);
+	if (ev_st->keepalive_ev == NULL) {
+		ct_event_cleanup(ev_st);
+		return (NULL);
+	}
+	ct_set_keepalive_timeout(ev_st, CT_KEEPALIVE_TIMEOUT);
+
 	return (ev_st);
 }
 
@@ -387,6 +398,8 @@ ct_event_cleanup(struct ct_event_state *ev_st)
 		event_free(ev_st->ct_ev_sig_pipe);
 	if (ev_st->recon_ev != NULL)
 		event_free(ev_st->recon_ev);
+	if (ev_st->keepalive_ev != NULL)
+		event_free(ev_st->keepalive_ev);
 	if (ev_st->ct_evt_base != NULL)
 		event_base_free(ev_st->ct_evt_base);
 	e_free(&ev_st);
@@ -402,6 +415,26 @@ ct_set_reconnect_timeout(struct ct_event_state *ev_st, int delay)
 	bzero(&tv, sizeof(tv));
 	tv.tv_sec = delay;
 	evtimer_add(ev_st->recon_ev, &tv);
+}
+
+void
+ct_set_keepalive_timeout(struct ct_event_state *ev_st, int delay)
+{
+	struct timeval tv;
+
+	if (evtimer_pending(ev_st->keepalive_ev, NULL))
+		evtimer_del(ev_st->keepalive_ev);
+	bzero(&tv, sizeof(tv));
+	tv.tv_sec = delay;
+	evtimer_add(ev_st->keepalive_ev, &tv);
+}
+
+void
+ct_keepalive(evutil_socket_t unused, short event, void *vctx)
+{
+	struct ct_global_state *state = vctx;
+
+	ct_set_keepalive_timeout(state->event_state, CT_KEEPALIVE_TIMEOUT);
 }
 
 #if CT_ENABLE_PTHREADS
