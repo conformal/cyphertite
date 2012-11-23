@@ -69,7 +69,7 @@ ct_expand_tilde(char **path, const char *s)
                 }
         }
 
-        if (asprintf(path, "%s%s", pwd->pw_dir, s))
+        if (asprintf(path, "%s%s", pwd->pw_dir, s) == -1)
 		CFATALX("no memory");
         return;
 
