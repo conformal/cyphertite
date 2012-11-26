@@ -32,8 +32,6 @@ int			ct_xml_file_open_polled(
 			    struct ct_global_state *,
 			    const char *, int, uint32_t);
 
-int			ct_basis_setup(int *, const char *, char **, int,
-			    time_t *, const char *);
 
 typedef void (ct_func_cb)(void *);
 int	ct_setup_wakeup_file(struct ct_event_state *, void *, ct_func_cb *);

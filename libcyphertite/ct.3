@@ -62,7 +62,7 @@ ct_crypto.h functions used internally only:
 .Ft struct dnode *
 .Fn ctfile_parse_insertdir "struct ctfile_parse_state *ctx" "struct dnode *dnode"
 .Ft struct ctfile_write_state *
-.Fn ctfile_write_init "const char *ctfile" "const char *ctfile_basedir" "int type" "const char *basis" "int lvl" "char *cmd" "char **filelist" "int encrypted" "int allfiles" "int max_block_size"
+.Fn ctfile_write_init "const char *ctfile" "const char *ctfile_basedir" "int type" "const char *basis" "int lvl" "char *cmd" "char **filelist" "int encrypted" "int max_block_size"
 
 ct_ctfile.h functions used internally only:
 
@@ -583,7 +583,7 @@ struct ctfile_parse_state {
 .Fn ctfile_parse_insertdir "struct ctfile_parse_state *ctx" "struct dnode *dnode"
 .br
 .Ft struct ctfile_write_state *
-.Fn ctfile_write_init "const char *ctfile" "const char *ctfile_basedir" "int type" "const char *basis" "int lvl" "char *cmd" "char **filelist" "int encrypted" "int allfiles" "int max_block_size"
+.Fn ctfile_write_init "const char *ctfile" "const char *ctfile_basedir" "int type" "const char *basis" "int lvl" "char *cmd" "char **filelist" "int encrypted" "int max_block_size"
 
 .Ss DB
 
@@ -637,7 +637,6 @@ struct ct_config {
 
 	int	ct_max_trans;
 	int	ct_compress;
-	int	ct_multilevel_allfiles;
 	int	ct_auto_incremental;
 	int	ct_max_incrementals;
 	int	ct_ctfile_keep_days;

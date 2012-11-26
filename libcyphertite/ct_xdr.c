@@ -312,78 +312,6 @@ ctfile_cleanup_gheader(struct ctfile_gheader *gh)
 	}
 }
 
-
-int
-ct_basis_setup(int *nextlvlp, const char *basisbackup, char **filelist,
-    int max_incrementals, time_t *prev_backup, const char *cwd)
-{
-	struct ctfile_parse_state	 xs_ctx;
-	char				**fptr;
-	time_t				 prev_backup_time = 0;
-	int				 nextlvl, i, rooted = 1, ret, s_errno;
-
-	if ((ret = ctfile_parse_init(&xs_ctx, basisbackup, NULL)))
-		return (ret);
-
-	if (max_incrementals == 0 ||
-	    xs_ctx.xs_gh.cmg_cur_lvl < max_incrementals) {
-		prev_backup_time = xs_ctx.xs_gh.cmg_created;
-		CINFO("prev backup time %s %s", ctime(&prev_backup_time),
-		    basisbackup);
-		nextlvl = ++xs_ctx.xs_gh.cmg_cur_lvl;
-	} else {
-		nextlvl = 0;
-	}
-
-	/*
-	 * if we have the list of dirs in this previous backup, check that
-	 * our cwd matches and the list of dirs we care about are a strict
-	 * superset of the previous backup
-	 */
-	if (xs_ctx.xs_gh.cmg_version >= CT_MD_V2) {
-		for (i = 0, fptr = filelist; *fptr != NULL &&
-		    i < xs_ctx.xs_gh.cmg_num_paths; fptr++, i++) {
-			if (strcmp(xs_ctx.xs_gh.cmg_paths[i], *fptr) != 0)
-				break;
-			if (!ct_absolute_path(xs_ctx.xs_gh.cmg_paths[i])) 
-				rooted = 0;
-		}
-		if (i < xs_ctx.xs_gh.cmg_num_paths || *fptr != NULL) {
-				nextlvl = 0;
-		}
-
-		if (rooted == 0 && strcmp(cwd, xs_ctx.xs_gh.cmg_cwd) != 0) {
-			nextlvl = 0;
-		}
-	}
-
-	while ((ret = ctfile_parse(&xs_ctx)) != XS_RET_EOF) {
-		if (ret == XS_RET_SHA)  {
-			if (ctfile_parse_seek(&xs_ctx)) {
-				s_errno = errno;
-				ret = xs_ctx.xs_errno;
-				ctfile_parse_close(&xs_ctx);
-				errno = s_errno;
-				return (ret);
-			}
-		} else if (ret == XS_RET_FAIL) {
-			s_errno = errno;
-			ret = xs_ctx.xs_errno;
-			ctfile_parse_close(&xs_ctx);
-			errno = s_errno;
-			return (ret);
-		}
-
-	}
-	ctfile_parse_close(&xs_ctx);
-
-	if (nextlvl != 0 && prev_backup != NULL)
-		*prev_backup = prev_backup_time;
-
-	*nextlvlp = nextlvl;
-	return (0);
-}
-
 /*
  * Gets the previous filename for `file' stored in `basedir'.
  * returns non zero ct_errno on error, 0 on success. Previous filename is in
@@ -729,7 +657,7 @@ static int	 ctfile_write_header_entry(struct ctfile_write_state *, char *,
 int
 ctfile_write_init(struct ctfile_write_state **ctxp, const char *ctfile,
     const char *ctfile_basedir, int type, const char *basis, int lvl,
-    char *cwd, char **filelist, int encrypted, int allfiles, int max_block_size)
+    char *cwd, char **filelist, int encrypted, int max_block_size)
 {
 	struct ctfile_write_state	*ctx;
 	char				**fptr;
@@ -758,11 +686,10 @@ ctfile_write_init(struct ctfile_write_state **ctxp, const char *ctfile,
 	gh.cmg_chunk_size = ctx->cws_block_size = max_block_size;
 	gh.cmg_created = time(NULL);
 	gh.cmg_type = type;
-	gh.cmg_flags = 0;
+	/* all new backups are allfiles now. */
+	gh.cmg_flags = CT_MD_MLB_ALLFILES;
 	if (encrypted)
 		gh.cmg_flags |= CT_MD_CRYPTO;
-	if (allfiles)
-		gh.cmg_flags |= CT_MD_MLB_ALLFILES;
 	gh.cmg_prevlvl_filename = basis ? (char *)basis : "";
 	gh.cmg_cur_lvl = lvl;
 	gh.cmg_cwd = cwd;

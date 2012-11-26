@@ -42,6 +42,7 @@
 #include <ct_match.h>
 #include <cyphertite.h>
 #include <ct_internal.h>
+#include "ct_archive.h"
 
 /*
  * flist is a structure that keeps track of the files that still need to be
@@ -409,8 +410,10 @@ ct_populate_fnode_from_flist(struct ct_archive_state *cas,
 }
 
 struct ct_archive_state {
-	struct dnode		 cas_rootdir;
+	struct ct_archive_dnode	 cas_rootdir;
 	struct d_name_tree	 cas_dname_head;
+	time_t			 cas_prev_backup_time;
+	int			 cas_level;
 };
 
 int
@@ -420,19 +423,20 @@ ct_archive_init(struct ct_archive_state **casp, const char *tdir)
 	cas = e_calloc(1, sizeof(*cas));
 	RB_INIT(&cas->cas_dname_head);
 
-	cas->cas_rootdir.d_num = -3;
-	cas->cas_rootdir.d_parent = NULL;
+	RB_INIT(&cas->cas_rootdir.ad_children);
+	cas->cas_rootdir.ad_dnode.d_num = -3;
+	cas->cas_rootdir.ad_dnode.d_parent = NULL;
 	if (tdir != NULL)
-		cas->cas_rootdir.d_name = e_strdup(tdir);
+		cas->cas_rootdir.ad_dnode.d_name = e_strdup(tdir);
 	else
-		cas->cas_rootdir.d_name = e_strdup(".");
+		cas->cas_rootdir.ad_dnode.d_name = e_strdup(".");
 
 #ifndef CT_NO_OPENAT
-	if ((cas->cas_rootdir.d_fd = open(tdir ? tdir : ".",
+	if ((cas->cas_rootdir.ad_dnode.d_fd = open(tdir ? tdir : ".",
 	    O_RDONLY | O_DIRECTORY)) == -1) {
 		int s_errno = errno;
 
-		e_free(&cas->cas_rootdir.d_name);
+		e_free(&cas->cas_rootdir.ad_dnode.d_name);
 		e_free(&cas);
 		errno = s_errno;
 
@@ -446,7 +450,7 @@ ct_archive_init(struct ct_archive_state **casp, const char *tdir)
 struct dnode *
 ct_archive_get_rootdir(struct ct_archive_state *cas)
 {
-	return (&cas->cas_rootdir);
+	return (&cas->cas_rootdir.ad_dnode);
 }
 
 struct dnode *
@@ -465,18 +469,104 @@ ct_archive_insert_dir(struct ct_archive_state *cas, struct dnode *dir)
 }
 
 void
+ct_archive_set_level(struct ct_archive_state *cas, int level)
+{
+	cas->cas_level = level;
+}
+
+int
+ct_archive_get_level(struct ct_archive_state *cas)
+{
+	return (cas->cas_level);
+}
+
+void
+ct_archive_set_prev_backup_time(struct ct_archive_state *cas, time_t time)
+{
+	cas->cas_prev_backup_time = time;
+}
+
+int
+ct_archive_needs_archive(struct ct_archive_state *cas, struct fnode *fnode)
+{
+	struct dnode		*dnode;
+	struct ct_archive_dnode	*adnode;
+	struct ct_archive_file	*afile, sfile;
+
+	/*
+	 * All non regular files have all information stored in the ctfile.
+	 * so just return yes here.
+	 */
+	if (!C_ISREG(fnode->fl_type)) {
+		CNDBG(CT_LOG_FILE, "%s (%s) not regular file, always needs "
+		    "archive", fnode->fl_sname, fnode->fl_fname);
+		return (1);
+	}
+
+	/*
+	 * 3 factor checking:
+	 * factor 1: existance in previous backup
+	 * factor 2: file size
+	 * factor 3: mtime
+	 */
+
+	dnode = fnode->fl_parent_dir;
+	adnode = (struct ct_archive_dnode *)dnode;
+
+	sfile.af_name = fnode->fl_fname;
+	if ((afile = RB_FIND(ct_archive_files, &adnode->ad_children,
+	    &sfile)) == NULL) {
+		/* wasn't in previous backup, needs archive */
+		CNDBG(CT_LOG_FILE, "%s (%s) not in previous (%s)",
+		    fnode->fl_sname, fnode->fl_fname, dnode->d_name);
+		return (1);
+	}
+
+	if (afile->af_size != fnode->fl_size) {
+		CNDBG(CT_LOG_FILE, "%s (%s) size doesn't match %" PRId64
+		    " vs %" PRId64, fnode->fl_sname, fnode->fl_fname,
+		    afile->af_size, fnode->fl_size);
+		return (1);
+	}
+	if (afile->af_mtime != fnode->fl_mtime) {
+		CNDBG(CT_LOG_FILE, "%s (%s) mtime doesn't match %" PRId64
+		    " vs %" PRId64, fnode->fl_sname, fnode->fl_fname,
+		    afile->af_mtime, fnode->fl_mtime);
+		return (1);
+	}
+	/*
+	 * Was in previous backup, same mtime, same size.
+	 * Probably hasn't changed.
+	 *
+	 */
+	CNDBG(CT_LOG_FILE, "%s (%s) incremental unneeded", fnode->fl_sname,
+	    fnode->fl_fname);
+	return (0);
+
+}
+
+void
 ct_archive_cleanup(struct ct_archive_state *cas)
 {
-	struct dnode	*dnode;
+	struct dnode		*dnode;
+	struct ct_archive_dnode	*adnode;
+	struct ct_archive_file	*afile;
 
-	if (cas->cas_rootdir.d_name != NULL)
-		e_free(&cas->cas_rootdir.d_name);
+	if (cas->cas_rootdir.ad_dnode.d_name != NULL)
+		e_free(&cas->cas_rootdir.ad_dnode.d_name);
 	/*
 	 * ct -cf foo.md foo/bar/baz will have foo and foo/bar open at this
 	 * point (no fts postorder visiting), close them since we have just
 	 * finished with the filesystem.
 	 */
 	while ((dnode = RB_ROOT(&cas->cas_dname_head)) != NULL) {
+		adnode = (struct ct_archive_dnode *)dnode;
+		while ((afile = RB_ROOT(&adnode->ad_children)) != NULL) {
+			RB_REMOVE(ct_archive_files, &adnode->ad_children,
+			    afile);
+			e_free(&afile->af_name);
+			e_free(&afile);
+		}
 		if (dnode->d_fd != -1) {
 			CNDBG(CT_LOG_FILE, "%s wasn't closed", dnode->d_name);
 			close(dnode->d_fd);
@@ -485,8 +575,14 @@ ct_archive_cleanup(struct ct_archive_state *cas)
 		RB_REMOVE(d_name_tree, &cas->cas_dname_head, dnode);
 		ct_free_dnode(dnode);
 	}
+	while ((afile = RB_ROOT(&cas->cas_rootdir.ad_children)) != NULL) {
+		RB_REMOVE(ct_archive_files, &cas->cas_rootdir.ad_children,
+		    afile);
+		e_free(&afile->af_name);
+		e_free(&afile);
+	}
 #ifndef CT_NO_OPENAT
-	close(cas->cas_rootdir.d_fd);
+	close(cas->cas_rootdir.ad_dnode.d_fd);
 #endif
 	e_free(&cas);
 }
@@ -501,6 +597,7 @@ ct_sched_backup_file(struct ct_archive_state *cas, struct stat *sb,
 	const char		*safe;
 	struct flist		*flnode_exists;
 	struct dnode		*dfound, *dnode = NULL, *e_dnode;
+	struct ct_archive_dnode	*adnode;
 	char			*dir_name;
 
 	/* compute 'safe' name */
@@ -513,19 +610,32 @@ ct_sched_backup_file(struct ct_archive_state *cas, struct stat *sb,
 			CABORTX("close directory for nonexistant dir %s",
 			    filename);
 	} else if (forcedir || S_ISDIR(sb->st_mode)) {
-		dnode = e_calloc(1, sizeof(*dnode));
+		adnode = e_calloc(1, sizeof(*adnode));
+		RB_INIT(&adnode->ad_children);
+		adnode->ad_seen = 1;
+		dnode = &adnode->ad_dnode;
 		dnode->d_name = e_strdup(filename);
-		dnode->d_num = -1; /* numbers are allocated on xdr write */
 		if ((e_dnode = ct_archive_insert_dir(cas, dnode)) != NULL) {
-			/* this directory already exists, do not record twice */
+			adnode = (struct ct_archive_dnode *)e_dnode;
 			ct_free_dnode(dnode);
-			return;
+			if (adnode->ad_seen == 0) {
+				adnode->ad_seen = 1;
+				dnode = e_dnode;
+			} else {
+				/* don't do more than once */
+				return;
+			}
 		} else
 			CNDBG(CT_LOG_CTFILE, "inserted %s", filename);
+		/*
+		 * 3factor dnodes will have been allocated numbers during
+		 * ctfile parse, so reset all numbers to ``unallocated''
+		 * now, allocated at write time.
+		 */
+		dnode->d_num = -1;
 		/* The rest of the initialisation happens below */
 	}
 
-	//ct_numalloc++;
 	flnode = e_calloc(1, sizeof (*flnode));
 
 	flnode->fl_dev = sb->st_dev;
@@ -597,7 +707,6 @@ struct ct_archive_priv {
 	struct ct_match			*cap_exclude;
 	struct fnode			*cap_curnode;
 	struct flist			*cap_curlist;
-	time_t				 cap_prev_backup_time;
 	int				 cap_fd;
 	int				 cap_cull_occurred;
 };
@@ -633,7 +742,7 @@ ct_archive_complete_file_start(struct ct_global_state *state,
 		CWARNX("header write failed");
 
 	state->ct_print_file_start(state->ct_print_state, trans->tr_fl_node);
-	/* Empty file, or allfiles backup */
+	/* Empty file, or unchanged during incremental */
 	if (trans->tr_eof == 1 || trans->tr_fl_node->fl_skip_file) {
 		if (ctfile_write_file_end(trans->tr_ctfile,
 		    trans->tr_fl_node))
@@ -808,7 +917,6 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 	char			cwd[PATH_MAX];
 	int			new_file = 0;
 	int			error;
-	int			nextlvl = 0;
 
 	if (state->ct_dying != 0)
 		goto dying;
@@ -927,25 +1035,25 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 			goto dying;
 		}
 
-		if (basisbackup != NULL) {
-			if ((error = ct_basis_setup(&nextlvl, basisbackup,
-			    filelist, caa->caa_max_incrementals,
-			    &cap->cap_prev_backup_time, cwd)) != 0) {
-				ct_fatal(state,
-				    "Can't setup incrememtal backup", error);
-				goto dying;
-			}
-
-			if (nextlvl == 0)
-				e_free(&basisbackup);
-		}
-
 		if ((error = ct_archive_init(&state->archive_state,
 		    caa->caa_tdir)) != 0) {
 			ct_fatal(state, "Can't initialize archive mode",
 			    error);
 			goto dying;
 		}
+
+		if (basisbackup != NULL) {
+			if ((error = ct_basis_setup(state->archive_state,
+			    basisbackup, filelist, caa->caa_max_incrementals,
+			    cwd, caa->caa_strip_slash)) != 0) {
+				ct_fatal(state,
+				    "Can't setup incrememtal backup", error);
+				goto dying;
+			}
+			if (ct_archive_get_level(state->archive_state) == 0)
+				e_free(&basisbackup);
+		}
+
 		if (caa->caa_tdir && chdir(caa->caa_tdir) != 0) {
 			ct_fatal(state, "can't chdir to tmpdir",
 			    CTE_ERRNO);
@@ -984,8 +1092,8 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		/* XXX - if basisbackup should the type change ? */
 		if ((error = ctfile_write_init(&cap->cap_cws, ctfile,
 		    caa->caa_ctfile_basedir, CT_MD_REGULAR, basisbackup,
-		    nextlvl, cwd, filelist, caa->caa_encrypted,
-		    caa->caa_allfiles, state->ct_max_block_size)) != 0) {
+		    ct_archive_get_level(state->archive_state), cwd, filelist,
+		    caa->caa_encrypted, state->ct_max_block_size)) != 0) {
 			/* XXX put name in string */
 			ct_fatal(state, "can't create ctfile %s", error);
 			goto dying;
@@ -1032,20 +1140,14 @@ loop:
 			 * we do want to skip old directories with
 			 * no (new) files in them
 			 */
-			if (ct_stat(cap->cap_curnode, &sb,
-			    caa->caa_follow_symlinks, NULL,
-			    state->archive_state) != 0) {
-				CWARN("archive: dir %s stat error",
+			if (!ct_archive_needs_archive(state->archive_state,
+			    cap->cap_curnode)) {
+				CNDBG(CT_LOG_FILE, "skipping dir"
+				    " based on mtime %s",
 				    cap->cap_curnode->fl_sname);
-			} else {
-				if (sb.st_mtime < cap->cap_prev_backup_time) {
-					CNDBG(CT_LOG_FILE, "skipping dir"
-					    " based on mtime %s",
-					    cap->cap_curnode->fl_sname);
-					ct_free_fnode(cap->cap_curnode);
-					ct_trans_free(state, ct_trans);
-					goto skip;
-				}
+				ct_free_fnode(cap->cap_curnode);
+				ct_trans_free(state, ct_trans);
+				goto skip;
 			}
 		}
 		ct_trans->tr_ctfile = cap->cap_cws;
@@ -1081,17 +1183,15 @@ loop:
 			goto skip;
 		}
 
-		error = fstat(cap->cap_fd, &sb);
-		if (error) {
+		if (fstat(cap->cap_fd, &sb) != 0) {
 			CWARN("archive: file %s stat error",
 			    cap->cap_curnode->fl_sname);
-		} else {
-			if (sb.st_mtime < cap->cap_prev_backup_time) {
-				state->ct_print_file_skip(state->ct_print_state,
-				    cap->cap_curnode);
-				cap->cap_curnode->fl_skip_file = 1;
-			}
-		}
+			close(cap->cap_fd);
+			cap->cap_fd = -1;
+			ct_free_fnode(cap->cap_curnode);
+			ct_trans_free(state, ct_trans);
+			goto skip;
+		} 
 		/*
 		 * Now we have actually statted the file atomically
 		 * confirm the permissions bits that we got with the last
@@ -1100,7 +1200,11 @@ loop:
 		if (!S_ISREG(sb.st_mode)) {
 			CWARNX("%s is no longer a regular file, skipping",
 			    cap->cap_curnode->fl_sname);
-			cap->cap_curnode->fl_skip_file = 1;
+			close(cap->cap_fd);
+			cap->cap_fd = -1;
+			ct_free_fnode(cap->cap_curnode);
+			ct_trans_free(state, ct_trans);
+			goto skip;
 		}
 		cap->cap_curnode->fl_dev = sb.st_dev;
 		cap->cap_curnode->fl_rdev = sb.st_rdev;
@@ -1111,6 +1215,14 @@ loop:
 		cap->cap_curnode->fl_atime = sb.st_atime;
 		cap->cap_curnode->fl_mtime = sb.st_mtime;
 		cap->cap_curnode->fl_size = sb.st_size;
+
+		/* Now we have filled in fnode, see if we can skip it */
+		if (!ct_archive_needs_archive(state->archive_state,
+		    cap->cap_curnode)) {
+			state->ct_print_file_skip(state->ct_print_state,
+			    cap->cap_curnode);
+			cap->cap_curnode->fl_skip_file = 1;
+		}
 
 		ct_trans->tr_ctfile = cap->cap_cws;
 		ct_trans->tr_fl_node = cap->cap_curnode;
@@ -1127,17 +1239,6 @@ loop:
 		} else {
 			ct_trans->tr_eof = 0;
 			ct_trans->tr_cleanup = NULL;
-		}
-
-		/*
-		 * Allfiles backups needs to still record skipped files.
-		 * Non allfiles backups don't need to do anything with them
-		 * so we can dump them here.
-		 */
-		if (cap->cap_curnode->fl_skip_file && caa->caa_allfiles == 0) {
-			ct_free_fnode(cap->cap_curnode);
-			ct_trans_free(state, ct_trans);
-			goto skip;
 		}
 
 		ct_queue_first(state, ct_trans);
@@ -2188,7 +2289,8 @@ ct_open(struct ct_archive_state *cas , struct fnode *fnode, int flags,
 	if (ct_absolute_path(fnode->fl_fname)) {
 		strlcpy(path, fnode->fl_fname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s%c%s", cas->cas_rootdir.d_name,
+		snprintf(path, sizeof(path), "%s%c%s",
+		    ct_archive_get_rootdir(cas)->d_name,
 		    CT_PATHSEP, fnode->fl_fname);
 	}
 
@@ -2209,7 +2311,8 @@ ct_readlink(struct ct_archive_state *cas, struct fnode *fnode, char *mylink,
 	if (ct_absolute_path(fnode->fl_fname)) {
 		strlcpy(path, fnode->fl_fname, sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s%c%s", cas->cas_rootdir.d_name,
+		snprintf(path, sizeof(path), "%s%c%s",
+		    ct_archive_get_rootdir(cas)->d_name,
 		    CT_PATHSEP, fnode->fl_fname);
 	}
 
@@ -2234,8 +2337,9 @@ ct_stat(struct fnode *fnode, struct stat *sb, int follow_symlinks,
 		strlcpy(path, ces ? fnode->fl_sname : fnode->fl_fname,
 		    sizeof(path));
 	} else {
-		snprintf(path, sizeof(path), "%s%c%s", ces ?
-		    ces->ces_rootdir->d_name : cas->cas_rootdir.d_name,
+		snprintf(path, sizeof(path), "%s%c%s", (ces ?
+		    ces->ces_rootdir->d_name :
+		    ct_archive_get_rootdir(cas)->d_name),
 		    CT_PATHSEP, ces ? fnode->fl_sname : fnode->fl_fname);
 	}
 	if (follow_symlinks)

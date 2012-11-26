@@ -73,6 +73,7 @@ struct dnode {
 };
 
 void			ct_free_fnode(struct fnode *);
+void			ct_free_dnode(struct dnode *);
 
 /*
  * remote listing structures.

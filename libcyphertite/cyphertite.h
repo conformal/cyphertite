@@ -48,7 +48,6 @@ struct ct_config {
 
 	int	ct_max_trans;
 	int	ct_compress;
-	int	ct_multilevel_allfiles;
 	int	ct_auto_incremental;
 	int	ct_max_incrementals;
 	int	ct_ctfile_keep_days;
@@ -466,7 +465,6 @@ struct ct_archive_args {
 	char			**caa_excllist;
 	int			 caa_matchmode;
 	int			 caa_encrypted;
-	int			 caa_allfiles;
 	int			 caa_no_cross_mounts;
 	int			 caa_max_incrementals;
 	int			 caa_strip_slash;

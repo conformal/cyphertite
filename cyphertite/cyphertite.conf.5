@@ -147,20 +147,6 @@ Assuming backups are performed daily, the aforementioned value would
 result in a full backup once per week with 6 days of incremental
 backups.
 .Pp
-.It Xo
-.Ic ctfile_incremental_allfiles =
-.Pq Ic 0 Ns \&| Ns Ic 1
-.Xc
-Toggle ``allfiles'' mode on and off.
-An incremental archive made in allfiles mode will contain the complete list of files that
-were present at the time it was made.
-An archive made without allfiles will only have the list of files that changed
-since the previous level archive, and thus on extract all files will be
-restored (this is the same semantics as
-.Xr dump 1 ).
-.Em allfiles
-ctfiles will often be larger than ctfiles made without this option.
-.Pp
 .It Ic password = Ar string
 Specify the password with which to authenticate.  Optional.
 .Xr cyphertite 1

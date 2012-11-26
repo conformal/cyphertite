@@ -233,7 +233,6 @@ ct_main(int argc, char **argv)
 	int				 ret = 0;
 	int				 level0 = 0;
 	int				 freeincludes = 0;
-	int				 force_allfiles = -1;
 	int				 no_cross_mounts = 0;
 	int				 strip_slash = 1;
 	int				 follow_root_symlink = 0;
@@ -246,7 +245,7 @@ ct_main(int argc, char **argv)
 	    "AB:C:D:E:F:HI:PRVXacdef:hmprtvx0")) != -1) {
 		switch (c) {
 		case 'A':
-			force_allfiles = 0;
+			/* noop, deprecated */
 			break;
 		case 'B':
 			basisfile = optarg;
@@ -285,7 +284,7 @@ ct_main(int argc, char **argv)
 			no_cross_mounts = 1;
 			break;
 		case 'a':
-			force_allfiles = 1;
+			/* noop, deprecated */
 			break;
 		case 'c':
 			if (ct_action)
@@ -386,10 +385,6 @@ ct_main(int argc, char **argv)
 	if ((ret = ct_load_config(&conf, &config_file)) != 0) {
 		CFATALX("%s", ct_strerror(ret));
 	}
-
-	/* ct -A or ct -a force allfiles on and off and cancel each other */
-	if (force_allfiles != -1)
-		conf->ct_multilevel_allfiles = force_allfiles;
 
 	if (!(ct_metadata && (ct_action == CT_A_LIST ||
 	    ct_action == CT_A_ERASE))) {
@@ -493,7 +488,6 @@ ct_main(int argc, char **argv)
 			caa.caa_ctfile_basedir = conf->ct_ctfile_cachedir;
 			/* we want to encrypt as long as we have keys */
 			caa.caa_encrypted = (conf->ct_crypto_secrets != NULL);
-			caa.caa_allfiles = conf->ct_multilevel_allfiles;
 			caa.caa_no_cross_mounts = no_cross_mounts;
 			caa.caa_strip_slash = strip_slash;
 			caa.caa_follow_root_symlink = follow_root_symlink;
@@ -564,7 +558,6 @@ ct_main(int argc, char **argv)
 			caa.caa_ctfile_basedir = NULL;
 			/* we want to encrypt as long as we have keys */
 			caa.caa_encrypted = (conf->ct_crypto_secrets != NULL);
-			caa.caa_allfiles = conf->ct_multilevel_allfiles;
 			caa.caa_no_cross_mounts = no_cross_mounts;
 			caa.caa_strip_slash = strip_slash;
 			caa.caa_follow_root_symlink = follow_root_symlink;

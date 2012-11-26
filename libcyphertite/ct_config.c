@@ -313,6 +313,7 @@ ct_load_config(struct ct_config **config, char **configfile)
 	char			*ctfile_mode_str = NULL;
 	char			*config_path = NULL;
 	char			 ct_fullcachedir[PATH_MAX];
+	int			 allfiles; /* ignored */
 	int			 config_try = 0;
 	int			 s_errno;
 	struct ct_settings	 settings[] = {
@@ -352,12 +353,12 @@ ct_load_config(struct ct_config **config, char **configfile)
 		{ "ctfile_max_incrementals" , CT_S_INT, &conf.ct_max_incrementals,
 		    NULL, NULL, NULL },
 		{ "ctfile_incremental_allfiles", CT_S_INT,
-		    &conf.ct_multilevel_allfiles, NULL, NULL, NULL },
+		    &allfiles, NULL, NULL, NULL },
 		/* backwards compat, old names */
 		{ "ctfile_remote_auto_differential" , CT_S_INT,
 		    &conf.ct_auto_incremental, NULL, NULL, NULL },
 		{ "ctfile_differential_allfiles", CT_S_INT,
-		    &conf.ct_multilevel_allfiles, NULL, NULL, NULL },
+		    &allfiles, NULL, NULL, NULL },
 		{ "md_mode", CT_S_STR, NULL, &ctfile_mode_str, NULL, NULL },
 		{ "md_cachedir", CT_S_DIR, NULL, &conf.ct_ctfile_cachedir, NULL, NULL },
 		{ "md_cachedir_max_size", CT_S_SIZE, NULL, NULL, NULL,
