@@ -1078,8 +1078,7 @@ loop:
 			    cap->cap_curnode->fl_sname);
 			ct_free_fnode(cap->cap_curnode);
 			ct_trans_free(state, ct_trans);
-			cap->cap_curnode->fl_state = CT_FILE_FINISHED;
-			goto next_file;
+			goto skip;
 		}
 
 		error = fstat(cap->cap_fd, &sb);
