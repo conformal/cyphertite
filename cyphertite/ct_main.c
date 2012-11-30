@@ -559,13 +559,19 @@ ct_main(int argc, char **argv)
 			caa.caa_excllist = excludelist;
 			caa.caa_matchmode = ct_match_mode;
 			caa.caa_includelist = includelist;
+			caa.caa_tdir = ct_tdir;
+			caa.caa_tag = ctfile;
+			caa.caa_ctfile_basedir = NULL;
+			/* we want to encrypt as long as we have keys */
+			caa.caa_encrypted = (conf->ct_crypto_secrets != NULL);
+			caa.caa_allfiles = conf->ct_multilevel_allfiles;
 			caa.caa_no_cross_mounts = no_cross_mounts;
 			caa.caa_strip_slash = strip_slash;
 			caa.caa_follow_root_symlink = follow_root_symlink;
 			caa.caa_follow_symlinks = follow_symlinks;
 			caa.caa_max_incrementals = 0; /* unlimited */
 			caa.caa_basis = ct_basisbackup;
-			caa.caa_tag = ctfile;
+
 			ct_add_operation(state, ct_archive, NULL, &caa);
 		} else if (ct_action == CT_A_EXTRACT) {
 			cea.cea_local_ctfile = ctfile;
