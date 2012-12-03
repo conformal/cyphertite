@@ -579,7 +579,7 @@ ct_main(int argc, char **argv)
 			cea.cea_excllist = excludelist;
 			cea.cea_matchmode = ct_match_mode;
 			cea.cea_ctfile_basedir = NULL;
-			cca.cca_tdir = ct_tdir;
+			cea.cea_tdir = ct_tdir;
 			cea.cea_strip_slash = strip_slash;
 			cea.cea_attr = attr;
 			cea.cea_follow_symlinks = follow_symlinks;
