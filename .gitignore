@@ -2,6 +2,7 @@
 *.depend
 *.po
 *.a
+*.exe
 *.cat[1-9]
 *.manlint
 ID

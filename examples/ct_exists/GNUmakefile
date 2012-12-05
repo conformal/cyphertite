@@ -3,7 +3,7 @@
 
 # Attempt to include platform specific makefile.
 # OSNAME may be passed in.
-OSNAME ?= $(shell uname -s)
+OSNAME ?= $(shell uname -s | sed -e 's/[-_].*//g')
 OSNAME := $(shell echo $(OSNAME) | tr A-Z a-z)
 -include ../../config/Makefile.$(OSNAME)
 
