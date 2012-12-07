@@ -15,6 +15,7 @@
  */
 #include <string.h>
 #include <inttypes.h>
+#include <limits.h>
 
 #include <clog.h>
 #include <exude.h>
