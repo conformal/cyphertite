@@ -908,7 +908,6 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 	struct ct_archive_args	*caa = op->op_args;
 	const char		*ctfile = caa->caa_local_ctfile;
 	char			**filelist = caa->caa_filelist;
-	const char		*basisbackup = caa->caa_basis;
 	ssize_t			rlen;
 	off_t			rsz;
 	struct stat		sb;
@@ -1042,16 +1041,15 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 			goto dying;
 		}
 
-		if (basisbackup != NULL) {
+		if (caa->caa_basis != NULL) {
 			if ((error = ct_basis_setup(state->archive_state,
-			    basisbackup, filelist, caa->caa_max_incrementals,
-			    cwd, caa->caa_strip_slash)) != 0) {
+			    caa, cwd)) != 0) {
 				ct_fatal(state,
 				    "Can't setup incrememtal backup", error);
 				goto dying;
 			}
 			if (ct_archive_get_level(state->archive_state) == 0)
-				e_free(&basisbackup);
+				e_free(&caa->caa_basis);
 		}
 
 		if (caa->caa_tdir && chdir(caa->caa_tdir) != 0) {
@@ -1091,7 +1089,7 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		/* XXX - deal with stdin */
 		/* XXX - if basisbackup should the type change ? */
 		if ((error = ctfile_write_init(&cap->cap_cws, ctfile,
-		    caa->caa_ctfile_basedir, CT_MD_REGULAR, basisbackup,
+		    caa->caa_ctfile_basedir, CT_MD_REGULAR, caa->caa_basis,
 		    ct_archive_get_level(state->archive_state), cwd, filelist,
 		    caa->caa_encrypted, state->ct_max_block_size)) != 0) {
 			/* XXX put name in string */
@@ -1099,8 +1097,8 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 			goto dying;
 		}
 
-		if (basisbackup != NULL)
-			e_free(&basisbackup);
+		if (caa->caa_basis != NULL)
+			e_free(&caa->caa_basis);
 		break;
 	case CT_S_FINISHED:
 		return;

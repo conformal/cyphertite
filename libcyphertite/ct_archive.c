@@ -31,8 +31,8 @@ ct_archive_file_cmp(struct ct_archive_file *a, struct ct_archive_file *b)
 RB_GENERATE(ct_archive_files, ct_archive_file, af_entry, ct_archive_file_cmp);
 
 int
-ct_basis_setup(struct ct_archive_state *state, const char *basisbackup,
-    char **filelist, int max_incrementals, const char *cwd, int strip_slash)
+ct_basis_setup(struct ct_archive_state *state, struct ct_archive_args *caa,
+    const char *cwd)
 {
 	struct ctfile_parse_state	 xs_ctx;
 	struct dnode			*pdnode;
@@ -43,14 +43,14 @@ ct_basis_setup(struct ct_archive_state *state, const char *basisbackup,
 	time_t				 prev_backup_time = 0;
 	int				 nextlvl, i, rooted = 1, ret, s_errno;
 
-	if ((ret = ctfile_parse_init(&xs_ctx, basisbackup, NULL)))
+	if ((ret = ctfile_parse_init(&xs_ctx, caa->caa_basis, NULL)))
 		return (ret);
 
-	if (max_incrementals == 0 ||
-	    xs_ctx.xs_gh.cmg_cur_lvl < max_incrementals) {
+	if (caa->caa_max_incrementals == 0 ||
+	    xs_ctx.xs_gh.cmg_cur_lvl < caa->caa_max_incrementals) {
 		prev_backup_time = xs_ctx.xs_gh.cmg_created;
 		CINFO("prev backup time %s %s", ctime(&prev_backup_time),
-		    basisbackup);
+		    caa->caa_basis);
 		nextlvl = ++xs_ctx.xs_gh.cmg_cur_lvl;
 	} else {
 		nextlvl = 0;
@@ -66,7 +66,7 @@ ct_basis_setup(struct ct_archive_state *state, const char *basisbackup,
 	 * superset of the previous backup
 	 */
 	if (xs_ctx.xs_gh.cmg_version >= CT_MD_V2) {
-		for (i = 0, fptr = filelist; *fptr != NULL &&
+		for (i = 0, fptr = caa->caa_filelist; *fptr != NULL &&
 		    i < xs_ctx.xs_gh.cmg_num_paths; fptr++, i++) {
 			if (strcmp(xs_ctx.xs_gh.cmg_paths[i], *fptr) != 0)
 				break;
@@ -95,7 +95,7 @@ ct_basis_setup(struct ct_archive_state *state, const char *basisbackup,
 			pdnode = ct_archive_get_rootdir(state);
 			if (xs_ctx.xs_hdr.cmh_parent_dir == -2) {
 				e_asprintf(&name, "%s%s",
-				    strip_slash ? "" : "/",
+				    caa->caa_strip_slash ? "" : "/",
 				    xs_ctx.xs_hdr.cmh_filename);
 			} else if (xs_ctx.xs_hdr.cmh_parent_dir != -1) {
 				pdnode = ctfile_parse_finddir(&xs_ctx,

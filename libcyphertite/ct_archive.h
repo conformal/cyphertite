@@ -16,8 +16,8 @@ struct ct_archive_dnode {
 };
 RB_PROTOTYPE(ct_archive_files, ct_archive_file, af_entry, ct_archive_file_cmp);
 
-int	ct_basis_setup(struct ct_archive_state *, const char *, char **, int,
-	    const char *, int);
+int	ct_basis_setup(struct ct_archive_state *, struct ct_archive_args *,
+	    const char *);
 void	ct_archive_set_level(struct ct_archive_state *, int);
 int	ct_archive_get_level(struct ct_archive_state *);
 void	ct_archive_set_prev_backup_time(struct ct_archive_state *, time_t);
