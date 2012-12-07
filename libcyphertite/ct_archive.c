@@ -46,6 +46,13 @@ ct_basis_setup(struct ct_archive_state *state, struct ct_archive_args *caa,
 	if ((ret = ctfile_parse_init(&xs_ctx, caa->caa_basis, NULL)))
 		return (ret);
 
+	/* all we care about is that either both are 0 or both are set */
+	if ((!!(xs_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO)) !=
+	    (!!(caa->caa_encrypted))) {
+		nextlvl = 0;
+		goto done;
+	}
+
 	if (caa->caa_max_incrementals == 0 ||
 	    xs_ctx.xs_gh.cmg_cur_lvl < caa->caa_max_incrementals) {
 		prev_backup_time = xs_ctx.xs_gh.cmg_created;
