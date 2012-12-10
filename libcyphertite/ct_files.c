@@ -481,9 +481,10 @@ ct_archive_get_level(struct ct_archive_state *cas)
 }
 
 void
-ct_archive_set_prev_backup_time(struct ct_archive_state *cas, time_t time)
+ct_archive_set_prev_backup_time(struct ct_archive_state *cas,
+    time_t backup_time)
 {
-	cas->cas_prev_backup_time = time;
+	cas->cas_prev_backup_time = backup_time;
 }
 
 int
