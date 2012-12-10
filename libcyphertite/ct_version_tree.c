@@ -63,12 +63,16 @@ ct_vertree_add(struct ct_vertree_dnode_cache *dnode_cache,
 	struct ct_vertree_link		*linkver;
 	size_t				 sz;
 
+	entry = NULL;
+
 	/* First find parent directory if any */
 	if (hdr->cmh_parent_dir != -1 && hdr->cmh_parent_dir != -2) {
 		if ((dnode = ctfile_parse_finddir(parse_state,
-		    hdr->cmh_parent_dir)) == NULL)
-			CFATALX("can't find dir %" PRId64,
+		    hdr->cmh_parent_dir)) == NULL) {
+			CNDBG(CT_LOG_VERTREE, "can't find dir %" PRId64,
 			    hdr->cmh_parent_dir);
+			return NULL;
+		}
 		fb_dnode = (struct ct_vertree_dnode *)dnode;
 		parent = fb_dnode->cvd_dir;
 	} else {
@@ -90,8 +94,12 @@ ct_vertree_add(struct ct_vertree_dnode_cache *dnode_cache,
 		entry->cve_parent = parent;
 		entry->cve_name = sentry.cve_name;
 		if (RB_INSERT(ct_vertree_entries, &parent->cve_children,
-		    entry) != NULL)
-			CFATALX("entry %s already exists", sentry.cve_name);
+		    entry) != NULL) {
+			CNDBG(CT_LOG_VERTREE, "entry %s already exists",
+			    sentry.cve_name);
+			e_free(&sentry.cve_name);
+			goto err;
+		}
 	} else {
 		e_free(&sentry.cve_name);
 	}
@@ -123,7 +131,8 @@ ct_vertree_add(struct ct_vertree_dnode_cache *dnode_cache,
 		} else if (C_ISREG(hdr->cmh_type)) {
 			sz = sizeof(struct ct_vertree_file);
 		} else {
-			CFATALX("invalid type %d", hdr->cmh_type);
+			CNDBG(CT_LOG_VERTREE, "invalid type %d", hdr->cmh_type);
+			goto err;
 		}
 		ver = e_calloc(1, sz);
 		ver->cvv_type = hdr->cmh_type;
@@ -164,7 +173,7 @@ ct_vertree_add(struct ct_vertree_dnode_cache *dnode_cache,
 		fb_dnode->cvd_dir = entry;
 		if ((dnode = ctfile_parse_insertdir(parse_state,
 		    &fb_dnode->cvd_dnode)) != NULL)
-			CFATALX("duplicate dentry");
+			CABORTX("duplicate dentry");
 		TAILQ_INSERT_TAIL(dnode_cache, fb_dnode, cvd_link);
 	} else if (C_ISREG(hdr->cmh_type)) {
 		/*
@@ -177,23 +186,35 @@ ct_vertree_add(struct ct_vertree_dnode_cache *dnode_cache,
 		file = (struct ct_vertree_file *)ver;
 		if (file->cvf_nr_shas != -1 && file->cvf_nr_shas !=
 		    hdr->cmh_nr_shas) {
-			CFATALX("sha mismatch before %" PRIu64 " now %" PRIu64,
+			CNDBG(CT_LOG_VERTREE,
+			    "sha mismatch before %" PRIu64 " now %" PRIu64,
 			    file->cvf_nr_shas, hdr->cmh_nr_shas);
+			goto err;
 		}
 		if (hdr->cmh_nr_shas != -1)  {
 			file->cvf_nr_shas = hdr->cmh_nr_shas;
 			file->cvf_sha_offs = fileoffset;
 			file->cvf_file = ctfile;
-			if (ctfile_parse_seek(parse_state))
-				CFATALX("failed to skip shas in %s",
+			if (ctfile_parse_seek(parse_state)) {
+				CNDBG(CT_LOG_VERTREE,
+				    "failed to skip shas in %s",
 				    ctfile->cvc_path);
+				goto err;
+			}
 		}
-		if (ctfile_parse(parse_state) != XS_RET_FILE_END)
-			CFATALX("no file trailer found");
+		if (ctfile_parse(parse_state) != XS_RET_FILE_END) {
+			CNDBG(CT_LOG_VERTREE, "no file trailer found");
+			goto err;
+		}
 		file->cvf_file_size = parse_state->xs_trl.cmt_orig_size;
 	}
 
 	return (entry);
+
+err:
+	if (entry != NULL)
+		e_free(&entry);
+	return (NULL);
 }
 
 int
@@ -257,8 +278,11 @@ nextfile:
 	    (rv != XS_RET_FAIL)) {
 		switch(rv) {
 		case XS_RET_FILE:
-			(void)ct_vertree_add(&dnode_cache, &tree->cvt_head,
-			    &parse_state, ctfile, offset, allfiles);
+			if (ct_vertree_add(&dnode_cache, &tree->cvt_head,
+			    &parse_state, ctfile, offset, allfiles) == NULL) {
+				rv = CTE_CTFILE_CORRUPT;
+				goto out;
+			}
 			break;
 		case XS_RET_FILE_END:
 			break;
