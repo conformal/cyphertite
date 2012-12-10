@@ -526,7 +526,7 @@ ct_archive_needs_archive(struct ct_archive_state *cas, struct fnode *fnode)
 	if (afile->af_size != fnode->fl_size) {
 		CNDBG(CT_LOG_FILE, "%s (%s) size doesn't match %" PRId64
 		    " vs %" PRId64, fnode->fl_sname, fnode->fl_fname,
-		    afile->af_size, fnode->fl_size);
+		    (int64_t)afile->af_size, (int64_t)fnode->fl_size);
 		return (1);
 	}
 	if (afile->af_mtime != fnode->fl_mtime) {
