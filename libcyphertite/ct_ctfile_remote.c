@@ -551,7 +551,7 @@ ctfile_nextop_archive(struct ct_global_state *state, char *basis, void *args)
 	 */
 	cca = e_calloc(1, sizeof(*cca));
 	cca->cca_localname = cachename;
-	cca->cca_encrypted = caa->caa_encrypted;
+	cca->cca_cleartext = 0;
 	cca->cca_ctfile = 1;
 	ct_add_operation(state, ctfile_archive, ctfile_nextop_archive_cleanup,
 	    cca);
@@ -597,7 +597,7 @@ ct_check_secrets_extract(struct ct_global_state *state, struct ct_op *op)
 	cca->cca_localname = "cyphertite-server.secrets";
 	cca->cca_remotename = "crypto.secrets";
 	cca->cca_tdir = state->ct_config->ct_ctfile_cachedir;
-	cca->cca_encrypted = 0; /* ignored */
+	cca->cca_cleartext = 0;
 	cca->cca_ctfile = 0;
 	ct_add_operation_after(state, op, ctfile_extract, ct_compare_secrets,
 	    cca);
@@ -761,7 +761,7 @@ ct_upload_secrets(struct ct_config *config)
 	cca.cca_localname = config->ct_crypto_secrets;
 	cca.cca_remotename = "crypto.secrets";
 	cca.cca_tdir = NULL;
-	cca.cca_encrypted = 0;
+	cca.cca_cleartext = 1; /* can't encrypt something with itself */
 	cca.cca_ctfile = 0;
 
 	rv = ct_do_operation(config, ctfile_list_start,
@@ -810,7 +810,7 @@ ct_download_secrets(struct ct_config *config)
 	cca.cca_localname = fname;
 	cca.cca_remotename = "crypto.secrets";
 	cca.cca_tdir = dirpath;
-	cca.cca_encrypted = 0;
+	cca.cca_cleartext = 1; /* not checked, but true */
 	cca.cca_ctfile = 0;
 
 	rv = ct_do_operation(config, ctfile_extract, NULL, &cca, 0);

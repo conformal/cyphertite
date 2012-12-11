@@ -1092,7 +1092,7 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		if ((error = ctfile_write_init(&cap->cap_cws, ctfile,
 		    caa->caa_ctfile_basedir, CT_MD_REGULAR, caa->caa_basis,
 		    ct_archive_get_level(state->archive_state), cwd, filelist,
-		    caa->caa_encrypted, state->ct_max_block_size)) != 0) {
+		    1, state->ct_max_block_size)) != 0) {
 			/* XXX put name in string */
 			ct_fatal(state, "can't create ctfile %s", error);
 			goto dying;
@@ -1279,7 +1279,7 @@ loop:
 	ct_trans->tr_type = TR_T_WRITE_CHUNK;
 	ct_trans->tr_complete = ct_archive_complete_write_chunk;
 	ct_trans->tr_eof = 0;
-	ct_trans->hdr.c_flags = caa->caa_encrypted ? C_HDR_F_ENCRYPTED : 0;
+	ct_trans->hdr.c_flags = C_HDR_F_ENCRYPTED;
 	/* update offset */
 	if (rsz != rlen || rlen == 0 || ((cap->cap_curnode->fl_offset + rlen) ==
 	    cap->cap_curnode->fl_size)) {

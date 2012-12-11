@@ -86,7 +86,6 @@ ct_do_remotearchive(struct ct_global_state *state, char *ctfile, char **flist,
 	caa.caa_tag = ctfile;
 	caa.caa_ctfile_basedir = conf->ct_ctfile_cachedir;
 	/* we want to encrypt as long as we have keys */
-	caa.caa_encrypted = (conf->ct_crypto_secrets != NULL);
 	caa.caa_no_cross_mounts = no_cross_mounts;
 	caa.caa_strip_slash = strip_slash;
 	caa.caa_follow_root_symlink = follow_root_symlink;

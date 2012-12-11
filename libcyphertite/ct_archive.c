@@ -46,9 +46,8 @@ ct_basis_setup(struct ct_archive_state *state, struct ct_archive_args *caa,
 	if ((ret = ctfile_parse_init(&xs_ctx, caa->caa_basis, NULL)))
 		return (ret);
 
-	/* all we care about is that either both are 0 or both are set */
-	if ((!!(xs_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO)) !=
-	    (!!(caa->caa_encrypted))) {
+	/* all archives are encrypted now, so if an old wasn't force lvl0 */
+	if ((xs_ctx.xs_gh.cmg_flags & CT_MD_CRYPTO) == 0) {
 		nextlvl = 0;
 		goto done;
 	}

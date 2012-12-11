@@ -362,7 +362,7 @@ secrets_upload(struct ct_cli_cmd *c, int argc, char **argv)
 	cca.cca_localname = ctctl_config->ct_crypto_secrets;
 	cca.cca_remotename = "crypto.secrets";
 	cca.cca_tdir = NULL;
-	cca.cca_encrypted = 0;
+	cca.cca_cleartext = 1;
 	cca.cca_ctfile = 0;
 
 	ct_do_operation(ctctl_config, ctfile_list_start,
@@ -387,7 +387,7 @@ secrets_download(struct ct_cli_cmd *c, int argc, char **argv)
 	cca.cca_localname = fname;
 	cca.cca_remotename = "crypto.secrets";
 	cca.cca_tdir = dirpath;
-	cca.cca_encrypted = 0;
+	cca.cca_cleartext = 1; /* not checked, but this *is* the case */
 	cca.cca_ctfile = 0;
 
 	ct_do_operation(ctctl_config, ctfile_extract, NULL, &cca, 0);

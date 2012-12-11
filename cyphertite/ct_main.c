@@ -487,7 +487,6 @@ ct_main(int argc, char **argv)
 			caa.caa_tag = ctfile;
 			caa.caa_ctfile_basedir = conf->ct_ctfile_cachedir;
 			/* we want to encrypt as long as we have keys */
-			caa.caa_encrypted = (conf->ct_crypto_secrets != NULL);
 			caa.caa_no_cross_mounts = no_cross_mounts;
 			caa.caa_strip_slash = strip_slash;
 			caa.caa_follow_root_symlink = follow_root_symlink;
@@ -516,9 +515,9 @@ ct_main(int argc, char **argv)
 			cca.cca_localname = ctfile;
 			cca.cca_remotename = NULL;
 			cca.cca_tdir = ct_tdir;
+			cca.cca_cleartext = 0;
 			cca.cca_ctfile = 1;
 			/* only matters for archive */
-			cca.cca_encrypted = (conf->ct_crypto_secrets != NULL);
 			ct_add_operation(state,
 			    ((ct_action == CT_A_ARCHIVE) ?
 			    ctfile_archive : ctfile_extract),
@@ -557,7 +556,6 @@ ct_main(int argc, char **argv)
 			caa.caa_tag = ctfile;
 			caa.caa_ctfile_basedir = NULL;
 			/* we want to encrypt as long as we have keys */
-			caa.caa_encrypted = (conf->ct_crypto_secrets != NULL);
 			caa.caa_no_cross_mounts = no_cross_mounts;
 			caa.caa_strip_slash = strip_slash;
 			caa.caa_follow_root_symlink = follow_root_symlink;

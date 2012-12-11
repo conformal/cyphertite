@@ -464,7 +464,6 @@ struct ct_archive_args {
 	char			**caa_includelist;
 	char			**caa_excllist;
 	int			 caa_matchmode;
-	int			 caa_encrypted;
 	int			 caa_no_cross_mounts;
 	int			 caa_max_incrementals;
 	int			 caa_strip_slash;
@@ -488,7 +487,7 @@ struct ct_ctfileop_args {
 	char		*cca_localname;
 	char		*cca_remotename;
 	char		*cca_tdir;
-	int		 cca_encrypted; /* for archive only */
+	int		 cca_cleartext; /* for secrets archive only */
 	int		 cca_ctfile; /* is ctfile or other data */
 };
 

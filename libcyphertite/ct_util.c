@@ -200,7 +200,7 @@ ct_init(struct ct_global_state **statep, struct ct_config *conf,
 	    NULL)) != 0)
 		goto fail;
 
-	if ((flags & CT_NEED_SECRETS) != 0 && conf->ct_crypto_secrets != NULL) {
+	if ((flags & CT_NEED_SECRETS) != 0) {
 		if (stat(conf->ct_crypto_secrets, &sb) == -1) {
 			ret = CTE_NO_SECRETS_FILE;
 			goto fail;

@@ -278,7 +278,8 @@ loop:
 	ct_trans->tr_type = TR_T_WRITE_CHUNK;
 	ct_trans->tr_eof = 0;
 	ct_trans->hdr.c_flags = C_HDR_F_METADATA;
-	ct_trans->hdr.c_flags |= cca->cca_encrypted ? C_HDR_F_ENCRYPTED : 0;
+	ct_trans->hdr.c_flags |= ((cca->cca_cleartext == 0) ?
+	    C_HDR_F_ENCRYPTED : 0);
 	ct_trans->hdr.c_ex_status = 2; /* we handle new metadata protocol */
 	/* Set chunkno for restart and for iv generation */
 	ct_trans->tr_ctfile_chunkno = cas->cas_block_no;
