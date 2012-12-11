@@ -3,6 +3,14 @@ User visible changes for cyphertite
   A high-security scalable solution for online backups
 ============================================================================
 
+Changes in 1.4.3 (Tue Dec 11 2012)
+  - Add enhanced detection of changed files for incremental backups
+  - Remove option to create an unencrypted backup
+  - Fix an issue where it was possible under certain circumstances for a
+    running backup to end prematurely
+  - Improve example code
+  - Other minor code cleanup
+
 Changes in 1.4.2 (Mon Nov 19 2012)
   - Allow archival to existing cttags with differing basis by automatically
     enabling level 0 when necessary

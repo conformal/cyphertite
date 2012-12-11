@@ -6,7 +6,7 @@
 #
 
 PORTNAME=       cyphertite
-PORTVERSION=    1.4.2
+PORTVERSION=    1.4.3
 PORTREVISION?=	
 CATEGORIES=     textproc
 MASTER_SITES=   https://opensource.conformal.com/snapshots/cyphertite/ \

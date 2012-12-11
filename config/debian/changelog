@@ -1,3 +1,14 @@
+cyphertite (1.4.3-1) unstable; urgency=low
+
+  * Add enhanced detection of changed files for incremental backups
+  * Remove option to create an unencrypted backup
+  * Fix an issue where it was possible under certain circumstances for a
+    running backup to end prematurely
+  * Improve example code
+  * Other minor code cleanup
+
+ -- Conformal Systems <package-discuss@conformal.com>  Tue, 11 Dec 2012 16:04:23 -0600
+
 cyphertite (1.4.2-1) unstable; urgency=low
 
   * Allow archival to existing cttags with differing basis by automatically

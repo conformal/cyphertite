@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.4.2
+%define version		1.4.3
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,13 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Tue Dec 11 2012 - davec 1.4.3-1
+- Add enhanced detection of changed files for incremental backups
+- Remove option to create an unencrypted backup
+- Fix an issue where it was possible under certain circumstances for a
+  running backup to end prematurely
+- Improve example code
+- Other minor code cleanup
 * Mon Nov 19 2012 - davec 1.4.2-1
 - Allow archival to existing cttags with differing basis by automatically
   enabling level 0 when necessary
