@@ -25,11 +25,7 @@ SRCS+=	ct_ctfile_mode.c ct_ctfile_remote.c ct_ctfile_traverse.c ct_db.c
 SRCS+=	ct_event.c ct_files.c ct_glob.c ct_match.c ct_ops.c ct_proto.c ct_sapi.c
 SRCS+=	ct_queue.c ct_trees.c ct_util.c ct_xdr.c ct_version_tree.c ct_archive.c
 HDRS=	ct_crypto.h ct_ctfile.h ct_db.h ct_ext.h cyphertite.h ct_match.h
-<<<<<<< HEAD
-HDRS+=	ct_proto.h ct_types.h ct_version_tree.h
-=======
-HDRS+=	ct_proto.h ct_types.h ct_sapi.h
->>>>>>> e79976e... Removed remote in the name of sapi functions based on request by oga and drahn.
+HDRS+=	ct_proto.h ct_types.h ct_version_tree.h ct_sapi.h
 MAN= cyphertite.3 simplect.3
 MLINKS+=cyphertite.3 ct_create_secrets.3
 MLINKS+=cyphertite.3 ct_unlock_secrets.3
