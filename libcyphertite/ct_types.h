@@ -170,6 +170,7 @@ struct ctfile_list_file {
 #define CTE_NOTHING_TO_DELETE		57
 #define CTE_CAN_NOT_DELETE		58
 #define CTE_MAX				59
+#define CTE_SNAPSHOT			60
 
 const char	*ct_strerror(int);
 
