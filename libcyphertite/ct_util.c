@@ -126,6 +126,8 @@ const char *ct_errmsgs[] = {
 	[CTE_XMLSD_FAILURE]= "Failed to handle xml",
 	[CTE_NOTHING_TO_DELETE] = "Nothing to delete",
 	[CTE_CAN_NOT_DELETE] = "Can not delete specified files",
+	[CTE_SNAPSHOT] = "Failed to initialize operating system snapshot "
+	    "services.  Please review system logs for further details",
 };
 
 const char *
