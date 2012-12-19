@@ -212,7 +212,6 @@ ct_create_xml_negotiate(struct ct_header *hdr, void **vbody,
 	struct xmlsd_element		*root, *xe;
 	char				*body;
 	char				*os_version = NULL;
-	char				*verbuf = NULL;
 	size_t				 orig_size;
 	int				 ret = CTE_XMLSD_FAILURE;
 #ifdef BUILDSTR
@@ -220,7 +219,7 @@ ct_create_xml_negotiate(struct ct_header *hdr, void **vbody,
 #else
 	static const char *vertag = CT_VERSION;
 #endif
-	static const char *opensslver = "version: " OPENSSL_VERSION_TEXT;
+	static const char *opensslver = OPENSSL_VERSION_TEXT;
 
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
@@ -260,16 +259,12 @@ ct_create_xml_negotiate(struct ct_header *hdr, void **vbody,
 		goto out;
 	if ((xe = xmlsd_doc_add_elem(xl, root, "curl_version")) == NULL)
 		goto out;
-	e_asprintf(&verbuf, "version: %s", curl_version());
-	if (xmlsd_elem_set_attr(xe, "value", verbuf) != 0)
+	if (xmlsd_elem_set_attr(xe, "value", curl_version()) != 0)
 		goto out;
-	e_free(&verbuf);
 	if ((xe = xmlsd_doc_add_elem(xl, root, "event_version")) == NULL)
 		goto out;
-	e_asprintf(&verbuf, "version: %s", event_get_version());
 	if (xmlsd_elem_set_attr(xe, "value", event_get_version()) != 0)
 		goto out;
-	e_free(&verbuf);
 	if ((xe = xmlsd_doc_add_elem(xl, root, "exude_version")) == NULL)
 		goto out;
 	if (xmlsd_elem_set_attr(xe, "value", exude_verstring()) != 0)
@@ -302,8 +297,6 @@ ct_create_xml_negotiate(struct ct_header *hdr, void **vbody,
 out:
 	if (os_version)
 		e_free(&os_version);
-	if (verbuf)
-		e_free(&verbuf);
 	xmlsd_doc_free(xl);
 	return (ret);
 

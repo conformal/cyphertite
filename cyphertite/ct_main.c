@@ -139,10 +139,10 @@ show_version(void)
 	fprintf(stderr, fmt, "clens", clens_verstring());
 #endif /* NEED_LIBCLENS */
 	fprintf(stderr, fmt, "clog", clog_verstring());
-	fprintf(stderr, fmt, "curl: version", curl_version());
-	fprintf(stderr, fmt, "event: version", event_get_version());
+	fprintf(stderr, fmt, "curl", curl_version());
+	fprintf(stderr, fmt, "event", event_get_version());
 	fprintf(stderr, fmt, "exude", exude_verstring());
-	fprintf(stderr, fmt, "openssl: version", OPENSSL_VERSION_TEXT);
+	fprintf(stderr, fmt, "openssl", OPENSSL_VERSION_TEXT);
 	fprintf(stderr, fmt, "shrink", shrink_verstring());
 	fprintf(stderr, fmt, "xmlsd", xmlsd_verstring());
 
