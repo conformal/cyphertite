@@ -219,7 +219,6 @@ ct_create_xml_negotiate(struct ct_header *hdr, void **vbody,
 #else
 	static const char *vertag = CT_VERSION;
 #endif
-	static const char *opensslver = OPENSSL_VERSION_TEXT;
 
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_XML;
@@ -271,7 +270,8 @@ ct_create_xml_negotiate(struct ct_header *hdr, void **vbody,
 		goto out;
 	if ((xe = xmlsd_doc_add_elem(xl, root, "openssl_version")) == NULL)
 		goto out;
-	if (xmlsd_elem_set_attr(xe, "value", opensslver) != 0)
+	if (xmlsd_elem_set_attr(xe, "value",
+	    SSLeay_version(SSLEAY_VERSION)) != 0)
 		goto out;
 	if ((xe = xmlsd_doc_add_elem(xl, root, "shrink_version")) == NULL)
 		goto out;

@@ -142,7 +142,7 @@ show_version(void)
 	fprintf(stderr, fmt, "curl", curl_version());
 	fprintf(stderr, fmt, "event", event_get_version());
 	fprintf(stderr, fmt, "exude", exude_verstring());
-	fprintf(stderr, fmt, "openssl", OPENSSL_VERSION_TEXT);
+	fprintf(stderr, fmt, "openssl", SSLeay_version(SSLEAY_VERSION));
 	fprintf(stderr, fmt, "shrink", shrink_verstring());
 	fprintf(stderr, fmt, "xmlsd", xmlsd_verstring());
 
