@@ -942,7 +942,6 @@ int
 ctfile_write_file_end(struct ctfile_write_state *ctx, struct fnode *fnode)
 {
 	struct ctfile_trailer	trl;
-	bool_t			ret;
 
 	if ((ctx->cws_flags & CT_MD_MLB_ALLFILES) == 0 && fnode->fl_skip_file)
 		return (0);
@@ -958,8 +957,6 @@ ctfile_write_file_end(struct ctfile_write_state *ctx, struct fnode *fnode)
 	trl.cmt_comp_size = fnode->fl_comp_size;
 
 	return (ct_xdr_trailer(&ctx->cws_xdr, &trl) == FALSE);
-
-	return (ret == FALSE);
 }
 
 int
