@@ -101,14 +101,12 @@ ct_basis_setup(struct ct_archive_state *state, struct ct_archive_args *caa,
 			pdnode = ct_archive_get_rootdir(state);
 			if (xs_ctx.xs_hdr.cmh_parent_dir == -2) {
 				e_asprintf(&name, "%s%s",
-				    caa->caa_strip_slash ? "" : "/",
-				    xs_ctx.xs_hdr.cmh_filename);
+				    "/", xs_ctx.xs_hdr.cmh_filename);
 			} else if (xs_ctx.xs_hdr.cmh_parent_dir != -1) {
 				pdnode = ctfile_parse_finddir(&xs_ctx,
 				    xs_ctx.xs_hdr.cmh_parent_dir);
 				
-				e_asprintf(&name, "%s%c%s",
-				    pdnode->d_name, CT_PATHSEP,
+				e_asprintf(&name, "%s%c%s", pdnode->d_name, CT_PATHSEP,
 				    xs_ctx.xs_hdr.cmh_filename);
 			} else {
 				name = e_strdup(xs_ctx.xs_hdr.cmh_filename);
