@@ -82,7 +82,6 @@ static void		 ct_sched_backup_file(struct ct_archive_state *,
 			     struct ct_statistics *);
 static struct fnode	*ct_populate_fnode_from_flist(struct ct_archive_state *,
 			     struct flist *, int);
-static char		*ct_name_to_safename(char *, int);
 
 /* Helper functions for the above */
 static char		*eat_double_dots(char *, char *);
@@ -176,30 +175,6 @@ fl_inode_sort(struct flist *f1, struct flist *f2)
 		return (rv);
 
 	return (0);
-}
-
-static char *
-ct_name_to_safename(char *filename, int strip_slash)
-{
-	char		*safe;
-
-	/* compute 'safe' name */
-	safe = filename;
-	if (strip_slash && safe[0] == CT_PATHSEP) {
-		safe++;
-		if (safe[0] == '\0') {
-			return NULL;
-		}
-	}
-	while (!(strncmp(safe, ".." CT_PATHSEP_STR, 3)))
-		safe += 3;
-	if (!strcmp(safe, ".."))
-		return NULL;
-	/* skip '.' */
-	if (!strcmp(filename, ".")) {
-		return NULL;
-	}
-	return safe;
 }
 
 static char *
@@ -575,17 +550,10 @@ ct_sched_backup_file(struct ct_archive_state *cas, struct stat *sb,
     struct fl_tree *ino_tree, struct ct_statistics *ct_stats)
 {
 	struct flist		*flnode;
-	const char		*safe;
 	struct flist		*flnode_exists;
 	struct dnode		*dfound, *dnode = NULL, *e_dnode;
 	struct ct_archive_dnode	*adnode;
 	char			*dir_name;
-
-	/* compute 'safe' name */
-	/* XXX check for stupidities in the path */
-	safe = ct_name_to_safename(filename, 0);
-	if (safe == NULL)
-		return;
 
 	if (closedir) {
 		if ((dnode = ct_archive_lookup_dir(cas, filename)) == NULL)
