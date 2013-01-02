@@ -81,7 +81,6 @@ ct_log_file_start_fn		ct_pr_fmt_file;
 ct_log_file_end_fn		ct_pr_fmt_file_end;
 ct_log_file_start_fn		ct_print_file_start;
 ct_log_file_end_fn		ct_print_file_end;
-ct_log_file_skip_fn		ct_print_file_skip;
 ct_log_ctfile_info_fn		ct_print_ctfile_info;
 ct_log_traverse_start_fn	ct_print_traverse_start;
 ct_log_traverse_end_fn		ct_print_traverse_end;
@@ -453,11 +452,11 @@ ct_main(int argc, char **argv)
 
 	if (ct_action == CT_A_EXTRACT)
 		ct_set_log_fns(state, &ct_verbose, ct_print_ctfile_info,
-		    ct_print_file_start, ct_print_file_end, ct_print_file_skip,
+		    ct_print_file_start, ct_print_file_end,
 		    ct_print_traverse_start, ct_print_traverse_end);
 	else if (ct_action == CT_A_ARCHIVE)
 		ct_set_log_fns(state, &ct_verbose, ct_print_ctfile_info,
-		    ct_pr_fmt_file, ct_pr_fmt_file_end, ct_print_file_skip,
+		    ct_pr_fmt_file, ct_pr_fmt_file_end,
 		    ct_print_traverse_start, ct_print_traverse_end);
 
 	if (conf->ct_ctfile_mode == CT_MDMODE_REMOTE && ct_metadata == 0) {
@@ -935,7 +934,13 @@ ct_pr_fmt_file(void *state, struct fnode *fnode)
 
 		printf("%s %s %s %s ", filemode, uid, gid, lctime);
 	}
-	printf("%s", fnode->fl_sname);
+	if (fnode->fl_skip_file) {
+		if (*verbose > 1)
+			printf("%s does not need rearchive",
+			    fnode->fl_sname);
+	} else {
+		printf("%s", fnode->fl_sname);
+	}
 
 	if (*verbose > 1) {
 		/* XXX - translate to guid name */
@@ -957,7 +962,9 @@ ct_pr_fmt_file_end(void *state, struct fnode *fnode, int block_size)
 {
 	int	*verbose = state;
 
-	if (*verbose)
+	/* only if we printed anything before */
+	if ((fnode->fl_skip_file == 0 && *verbose) ||
+	    (fnode->fl_skip_file && *verbose > 1))
 		printf("\n");
 }
 
@@ -995,15 +1002,6 @@ ct_print_file_end(void *state, struct fnode *fnode, int block_size)
 	} else if (*verbose)
 		printf("\n");
 
-}
-
-void
-ct_print_file_skip(void *state, struct fnode *fnode)
-{
-	int	*verbose = state;
-
-	if (*verbose)
-		CINFO("skipping file based on mtime %s", fnode->fl_sname);
 }
 
 void

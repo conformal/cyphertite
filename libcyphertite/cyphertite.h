@@ -109,7 +109,6 @@ typedef		void	(ct_log_ctfile_info_fn)(void *, const char *,
 			    struct ctfile_gheader *);
 typedef		void	(ct_log_file_start_fn)(void *, struct fnode *);
 typedef		void	(ct_log_file_end_fn)(void *, struct fnode *, int);
-typedef		void	(ct_log_file_skip_fn)(void *, struct fnode *);
 typedef		void	(ct_log_traverse_start_fn)(void *, char **);
 typedef		void	(ct_log_traverse_end_fn)(void *, char **);
 typedef		void	(ct_log_chown_failed_fn)(void *, struct fnode *,
@@ -194,7 +193,6 @@ struct ct_global_state {
 	ct_log_ctfile_info_fn		*ct_print_ctfile_info;
 	ct_log_file_start_fn		*ct_print_file_start;
 	ct_log_file_end_fn		*ct_print_file_end;
-	ct_log_file_skip_fn		*ct_print_file_skip;
 	ct_log_traverse_start_fn	*ct_print_traverse_start;
 	ct_log_traverse_start_fn	*ct_print_traverse_end;
 
@@ -246,7 +244,7 @@ int			ct_init(struct ct_global_state **, struct ct_config *,
 int			ct_set_log_fns(struct ct_global_state *, void *,
 			     ct_log_ctfile_info_fn *,
 			     ct_log_file_start_fn *, ct_log_file_end_fn *,
-			     ct_log_file_skip_fn *, ct_log_traverse_start_fn *,
+			     ct_log_traverse_start_fn *,
 			     ct_log_traverse_end_fn *);
 void			ct_cleanup(struct ct_global_state *);
 int			ct_init_eventloop(struct ct_global_state *,

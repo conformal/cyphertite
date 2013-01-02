@@ -1165,8 +1165,6 @@ loop:
 		/* Now we have filled in fnode, see if we can skip it */
 		if (!ct_archive_needs_archive(state->archive_state,
 		    cap->cap_curnode)) {
-			state->ct_print_file_skip(state->ct_print_state,
-			    cap->cap_curnode);
 			cap->cap_curnode->fl_skip_file = 1;
 		}
 

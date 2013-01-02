@@ -147,7 +147,6 @@ ct_strerror(int ct_errno)
 ct_log_ctfile_info_fn		ct_log_ctfile_info_default;
 ct_log_file_start_fn		ct_log_file_start_default;
 ct_log_file_end_fn		ct_log_file_end_default;
-ct_log_file_skip_fn		ct_log_file_skip_default;
 ct_log_traverse_start_fn	ct_log_traverse_start_default;
 ct_log_traverse_end_fn		ct_log_traverse_end_default;
 
@@ -164,11 +163,6 @@ ct_log_file_start_default(void *state, struct fnode *fnode)
 
 void
 ct_log_file_end_default(void *state, struct fnode *fnode, int blocksize)
-{
-}
-
-void
-ct_log_file_skip_default(void *state, struct fnode *fnode)
 {
 }
 
@@ -198,7 +192,7 @@ ct_init(struct ct_global_state **statep, struct ct_config *conf,
 		goto fail;
 
 	/* set defaults */
-	if ((ret = ct_set_log_fns(state, NULL, NULL, NULL, NULL, NULL, NULL,
+	if ((ret = ct_set_log_fns(state, NULL, NULL, NULL, NULL, NULL,
 	    NULL)) != 0)
 		goto fail;
 
@@ -233,7 +227,7 @@ fail:
 int
 ct_set_log_fns(struct ct_global_state *state, void *logst,
     ct_log_ctfile_info_fn *ctfile_info, ct_log_file_start_fn *log_start,
-    ct_log_file_end_fn *log_end, ct_log_file_skip_fn *log_skip,
+    ct_log_file_end_fn *log_end,
     ct_log_traverse_start_fn *log_traverse_start,
     ct_log_traverse_end_fn *log_traverse_end)
 {
@@ -254,11 +248,6 @@ ct_set_log_fns(struct ct_global_state *state, void *logst,
 	else
 		state->ct_print_file_end = ct_log_file_end_default;
 
-	if (log_skip != NULL)
-		state->ct_print_file_skip = log_skip;
-	else
-		state->ct_print_file_skip = ct_log_file_skip_default;
-		
 	if (log_traverse_start != NULL) 
 		state->ct_print_traverse_start = log_traverse_start;
 	else
