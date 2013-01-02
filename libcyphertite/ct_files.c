@@ -1039,7 +1039,7 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 		if ((error = ctfile_write_init(&cap->cap_cws, ctfile,
 		    caa->caa_ctfile_basedir, CT_MD_REGULAR, caa->caa_basis,
 		    ct_archive_get_level(state->archive_state), cwd, filelist,
-		    1, state->ct_max_block_size)) != 0) {
+		    1, state->ct_max_block_size, caa->caa_strip_slash)) != 0) {
 			/* XXX put name in string */
 			ct_fatal(state, "can't create ctfile %s", error);
 			goto dying;
@@ -2490,6 +2490,9 @@ ct_populate_fnode(struct ct_extract_state *ces, struct ctfile_parse_state *ctx,
 {
 	struct dnode		*dnode, *tdnode;
 	char			*name;
+
+	if (strip_slash == 0 && ctx->xs_gh.cmg_flags & CT_MD_STRIP_SLASH)
+		strip_slash = 1;
 
 	if (C_ISLINK(ctx->xs_hdr.cmh_type)) {
 		/* hardlink/symlink */

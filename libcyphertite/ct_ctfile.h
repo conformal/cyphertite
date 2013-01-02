@@ -36,6 +36,7 @@ struct ctfile_gheader {
 #define CT_MD_NOCRYPTO		(0)
 #define CT_MD_CRYPTO		(1)
 #define CT_MD_MLB_ALLFILES	(2)
+#define CT_MD_STRIP_SLASH	(4)	/* ignore rootedness */
 	char			*cmg_prevlvl_filename;
 	int			cmg_cur_lvl;
 	char			*cmg_cwd;
@@ -142,7 +143,7 @@ struct dnode *ctfile_parse_insertdir(struct ctfile_parse_state *, struct dnode *
 struct ctfile_write_state;
 int	 ctfile_write_init(struct ctfile_write_state **, const char *,
 	     const char *, int, const char *, int, char *, char **, int,
-	     int);
+	     int, int);
 int	 ctfile_write_special(struct ctfile_write_state *, struct fnode *);
 int	 ctfile_write_file_start(struct ctfile_write_state *, struct fnode *);
 int	 ctfile_write_file_sha(struct ctfile_write_state *, uint8_t *,

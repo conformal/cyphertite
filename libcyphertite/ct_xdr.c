@@ -657,7 +657,8 @@ static int	 ctfile_write_header_entry(struct ctfile_write_state *, char *,
 int
 ctfile_write_init(struct ctfile_write_state **ctxp, const char *ctfile,
     const char *ctfile_basedir, int type, const char *basis, int lvl,
-    char *cwd, char **filelist, int encrypted, int max_block_size)
+    char *cwd, char **filelist, int encrypted, int max_block_size,
+    int strip_slash)
 {
 	struct ctfile_write_state	*ctx;
 	char				**fptr;
@@ -690,6 +691,8 @@ ctfile_write_init(struct ctfile_write_state **ctxp, const char *ctfile,
 	gh.cmg_flags = CT_MD_MLB_ALLFILES;
 	if (encrypted)
 		gh.cmg_flags |= CT_MD_CRYPTO;
+	if (strip_slash)
+		gh.cmg_flags |= CT_MD_STRIP_SLASH;
 	gh.cmg_prevlvl_filename = basis ? (char *)basis : "";
 	gh.cmg_cur_lvl = lvl;
 	gh.cmg_cwd = cwd;
