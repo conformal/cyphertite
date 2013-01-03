@@ -937,9 +937,9 @@ ct_pr_fmt_file(void *state, struct fnode *fnode)
 	if (fnode->fn_skip_file) {
 		if (*verbose > 1)
 			printf("%s does not need rearchive",
-			    fnode->fn_sname);
+			    fnode->fn_fullname);
 	} else {
-		printf("%s", fnode->fn_sname);
+		printf("%s", fnode->fn_fullname);
 	}
 
 	if (*verbose > 1) {
@@ -974,7 +974,7 @@ ct_print_file_start(void *state, struct fnode *fnode)
 	int	*verbose = state;
 
 	if (*verbose) {
-		printf("%s", fnode->fn_sname);
+		printf("%s", fnode->fn_fullname);
 		fflush(stdout);
 	}
 }
@@ -1046,7 +1046,7 @@ ct_print_extract_chown_failed(void *state, struct fnode *fnode,
 	const char	*dir = "";
 
 	if (fnode != NULL) {
-		name = fnode->fn_sname;
+		name = fnode->fn_fullname;
 	} else {
 		name = dnode->d_name;
 		dir = "directory ";
@@ -1229,9 +1229,9 @@ next_file:
 			ct_populate_fnode(ces, &xs_ctx, fnode, &state,
 			    xs_ctx.xs_gh.cmg_flags & CT_MD_MLB_ALLFILES,
 			    strip_slash);
-			doprint = !ct_match(match, fnode->fn_sname);
+			doprint = !ct_match(match, fnode->fn_fullname);
 			if (doprint && ex_match != NULL &&
-			    !ct_match(ex_match, fnode->fn_sname))
+			    !ct_match(ex_match, fnode->fn_fullname))
 				doprint = 0;
 			if (doprint) {
 				ct_pr_fmt_file(&verbose, fnode);
@@ -1241,8 +1241,8 @@ next_file:
 			}
 			if (fnode->fn_hlname)
 				e_free(&fnode->fn_hlname);
-			if (fnode->fn_sname)
-				e_free(&fnode->fn_sname);
+			if (fnode->fn_fullname)
+				e_free(&fnode->fn_fullname);
 			break;
 		case XS_RET_FILE_END:
 			sign = " ";

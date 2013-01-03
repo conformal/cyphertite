@@ -46,9 +46,9 @@ struct fnode {
 	off_t			fn_size;
 	off_t			fn_offset;
 	off_t			fn_comp_size;
-	char			*fn_fname;
-	char			*fn_name; /* name without directory */
-	char			*fn_sname;
+	char			*fn_name;	/* name to access */
+	char			*fn_fullname;	/* path to file */
+	char			*fn_tempname;
 	int			fn_state;
 #define CT_FILE_START		(0)
 #define CT_FILE_PROCESSING	(1)

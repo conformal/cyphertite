@@ -763,7 +763,7 @@ ctfile_write_header(struct ctfile_write_state *ctx, struct fnode *fnode,
 {
 	int64_t nr_shas = 0;
 
-	CNDBG(CT_LOG_CTFILE, "writing file header %s %s", fnode->fn_sname,
+	CNDBG(CT_LOG_CTFILE, "writing file header %s %s", fnode->fn_fullname,
 	    filename);
 
 	if (C_ISDIR(fnode->fn_type)) {
@@ -839,34 +839,34 @@ ctfile_write_special(struct ctfile_write_state *ctx, struct fnode *fnode)
 	int type = fnode->fn_type;
 
 	if (C_ISDIR(type)) {
-		if (ctfile_write_header(ctx, fnode, fnode->fn_sname, 1)) {
+		if (ctfile_write_header(ctx, fnode, fnode->fn_fullname, 1)) {
 			CNDBG(CT_LOG_CTFILE, "dir header write failed");
 			return (1);
 		}
-		CNDBG(CT_LOG_CTFILE, "record dir %s", fnode->fn_sname);
+		CNDBG(CT_LOG_CTFILE, "record dir %s", fnode->fn_fullname);
 	} else if (C_ISCHR(type) || C_ISBLK(type)) {
-		if (ctfile_write_header(ctx, fnode, fnode->fn_sname, 1)) {
+		if (ctfile_write_header(ctx, fnode, fnode->fn_fullname, 1)) {
 			CNDBG(CT_LOG_CTFILE, "special dev header write failed");
 			return (1);
 		}
 	} else if (C_ISFIFO(type)) {
 		CNDBG(CT_LOG_CTFILE, "fifo not supported (%s)",
-		    fnode->fn_sname);
+		    fnode->fn_fullname);
 	} else if (C_ISLINK(type)) {
-		if (fnode->fn_sname == NULL &&
+		if (fnode->fn_fullname == NULL &&
 		    fnode->fn_hlname == NULL) {
 			CABORTX("%slink with no name or dest",
 			    fnode->fn_hardlink ? "hard" : "sym");
-		} else if (fnode->fn_sname == NULL) {
+		} else if (fnode->fn_fullname == NULL) {
 			CABORTX("%slink with no name",
 			    fnode->fn_hardlink ? "hard" : "sym");
 		} else if (fnode->fn_hlname == NULL) {
 			CABORTX("%slink with no dest",
 			    fnode->fn_hardlink ? "hard" : "sym");
 		}
-		CNDBG(CT_LOG_CTFILE, "mylink %s %s", fnode->fn_sname,
+		CNDBG(CT_LOG_CTFILE, "mylink %s %s", fnode->fn_fullname,
 		    fnode->fn_hlname);
-		if (ctfile_write_header(ctx, fnode, fnode->fn_sname, 1)) {
+		if (ctfile_write_header(ctx, fnode, fnode->fn_fullname, 1)) {
 			CNDBG(CT_LOG_CTFILE, "link header write failed");
 			return (1);
 		}
@@ -884,9 +884,9 @@ ctfile_write_special(struct ctfile_write_state *ctx, struct fnode *fnode)
 
 	} else if (C_ISSOCK(type)) {
 		CNDBG(CT_LOG_CTFILE, "cannot archive a socket %s",
-		    fnode->fn_sname);
+		    fnode->fn_fullname);
 	} else {
-		CABORTX("invalid type on %s %d", fnode->fn_sname,
+		CABORTX("invalid type on %s %d", fnode->fn_fullname,
 		    type);
 	}
 
@@ -896,7 +896,7 @@ ctfile_write_special(struct ctfile_write_state *ctx, struct fnode *fnode)
 int
 ctfile_write_file_start(struct ctfile_write_state *ctx, struct fnode *fnode)
 {
-	return (ctfile_write_header(ctx, fnode, fnode->fn_sname, 1));
+	return (ctfile_write_header(ctx, fnode, fnode->fn_fullname, 1));
 }
 
 
@@ -953,7 +953,7 @@ ctfile_write_file_end(struct ctfile_write_state *ctx, struct fnode *fnode)
 
 	CNDBG(CT_LOG_CTFILE, "multi %d",
 	    !!(ctx->cws_flags & CT_MD_MLB_ALLFILES));
-	CNDBG(CT_LOG_CTFILE, "writing file trailer %s", fnode->fn_sname);
+	CNDBG(CT_LOG_CTFILE, "writing file trailer %s", fnode->fn_fullname);
 
 	ct_sha1_final(trl.cmt_sha, &fnode->fn_shactx);
 	trl.cmt_orig_size = fnode->fn_size;

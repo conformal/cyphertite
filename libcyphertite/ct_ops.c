@@ -203,7 +203,7 @@ ct_extract_complete_file_start(struct ct_global_state *state,
 		    trans->tr_fl_node);
 	} else {
 		CWARN("unable to open file for writing %s",
-		    trans->tr_fl_node->fn_sname);
+		    trans->tr_fl_node->fn_fullname);
 		trans->tr_fl_node->fn_skip_file = 1;
 	}
 
@@ -225,7 +225,7 @@ ct_extract_complete_file_read(struct ct_global_state *state,
 		e_asprintf(&errstr, "Data missing on server: "
 		    "file %s, sha %s",
 		    trans->tr_fl_node ?
-		    trans->tr_fl_node->fn_sname  : "unknown",
+		    trans->tr_fl_node->fn_fullname  : "unknown",
 		    shat);
 		ct_fatal(state, errstr, trans->tr_errno);
 		free(errstr);
@@ -264,7 +264,7 @@ ct_extract_complete_file_end(struct ct_global_state *state,
 		if (bcmp(trans->tr_csha, trans->tr_sha,
 		    sizeof(trans->tr_sha)) != 0)
 			CWARNX("extract sha mismatch on %s",
-			    trans->tr_fl_node->fn_sname);
+			    trans->tr_fl_node->fn_fullname);
 		ct_file_extract_close(state->extract_state,
 		    trans->tr_fl_node);
 		state->ct_print_file_end(state->ct_print_state,
@@ -363,9 +363,9 @@ ct_extract_calculate_total(struct ct_global_state *state,
 			}
 
 			doextract = !ct_match(inc_match,
-			    fnode->fn_sname);
+			    fnode->fn_fullname);
 			if (doextract && ex_match != NULL &&
-			  !ct_match(ex_match, fnode->fn_sname))
+			  !ct_match(ex_match, fnode->fn_fullname))
 				doextract = 0;
 			/*
 			 * If we're on the first ctfile in an allfiles backup
@@ -374,7 +374,7 @@ ct_extract_calculate_total(struct ct_global_state *state,
 			 */
 			if (doextract == 1 && fillrb &&
 			    xdr_ctx.xs_hdr.cmh_nr_shas == -1) {
-				ct_match_insert_rb(rb_match, fnode->fn_sname);
+				ct_match_insert_rb(rb_match, fnode->fn_fullname);
 				doextract = 0;
 			}
 			ct_free_fnode(fnode);
@@ -570,9 +570,9 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			}
 
 			ex_priv->doextract = !ct_match(ex_priv->inc_match,
-			    fnode->fn_sname);
+			    fnode->fn_fullname);
 			if (ex_priv->doextract && ex_priv->ex_match != NULL &&
-			    !ct_match(ex_priv->ex_match, fnode->fn_sname))
+			    !ct_match(ex_priv->ex_match, fnode->fn_fullname))
 				ex_priv->doextract = 0;
 			/*
 			 * If we're on the first ctfile in an allfiles backup
@@ -582,7 +582,7 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			if (ex_priv->doextract == 1 && ex_priv->fillrb &&
 			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas == -1) {
 				ct_match_insert_rb(ex_priv->rb_match,
-					    fnode->fn_sname);
+					    fnode->fn_fullname);
 				ex_priv->doextract = 0;
 				goto skipfree;
 			}
@@ -596,7 +596,7 @@ skip:
 			}
 
 			CNDBG(CT_LOG_CTFILE,
-			    "file %s numshas %" PRId64, fnode->fn_sname,
+			    "file %s numshas %" PRId64, fnode->fn_fullname,
 			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas);
 
 			ct_queue_first(state, trans);
@@ -616,7 +616,7 @@ skip:
 			if (memcmp(zerosha, ex_priv->xdr_ctx.xs_sha,
 				SHA_DIGEST_LENGTH) == 0) {
 				CWARNX("\"%s\" truncated during backup",
-				    trans->tr_fl_node->fn_sname);
+				    trans->tr_fl_node->fn_fullname);
 				if (ctfile_parse_seek(&ex_priv->xdr_ctx)) {
 					ct_fatal(state, "Can't seek past "
 					    "truncation shas",
@@ -897,12 +897,12 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			}
 
 			/* XXX Check filename matches what we expect */
-			e_free(&trans->tr_fl_node->fn_sname);
-			trans->tr_fl_node->fn_sname = e_strdup(localfile);
+			e_free(&trans->tr_fl_node->fn_fullname);
+			trans->tr_fl_node->fn_fullname = e_strdup(localfile);
 			/* Set name pointer to something else passed in */
 
 			CNDBG(CT_LOG_CTFILE, "file %s numshas %" PRId64,
-			    trans->tr_fl_node->fn_sname,
+			    trans->tr_fl_node->fn_fullname,
 			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas);
 			break;
 		case XS_RET_SHA:

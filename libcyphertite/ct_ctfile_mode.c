@@ -524,7 +524,7 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 		ces->ces_fnode->fn_parent_dir =
 		    ct_file_extract_get_rootdir(state->extract_state);
 		ces->ces_fnode->fn_name = e_strdup(ctfile);
-		ces->ces_fnode->fn_sname = e_strdup(ctfile);
+		ces->ces_fnode->fn_fullname = e_strdup(ctfile);
 		ces->ces_fnode->fn_mode = S_IRUSR | S_IWUSR;
 		ces->ces_fnode->fn_uid = getuid();
 		ces->ces_fnode->fn_gid = getgid();

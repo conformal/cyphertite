@@ -100,12 +100,12 @@ ct_basis_setup(struct ct_archive_state *state, struct ct_archive_args *caa,
 			/* set up parent dnode */
 			ct_get_file_path(&xs_ctx, &xs_ctx.xs_hdr, &sfnode,
 			    ct_archive_get_rootdir(state), 0);
-			e_free(sfnode.fn_name);
+			e_free(&sfnode.fn_name);
 
 			if (C_ISDIR(xs_ctx.xs_hdr.cmh_type)) {
 				adnode = e_calloc(1, sizeof(*adnode));
 				RB_INIT(&adnode->ad_children);
-				adnode->ad_dnode.d_name = sfnode.fn_sname;
+				adnode->ad_dnode.d_name = sfnode.fn_fullname;
 				CNDBG(CT_LOG_FILE, "dir: %s",
 				    adnode->ad_dnode.d_name);
 				adnode->ad_dnode.d_fd = -1;
@@ -125,9 +125,9 @@ ct_basis_setup(struct ct_archive_state *state, struct ct_archive_args *caa,
 				    &adnode->ad_dnode);
 			} else if (C_ISREG(xs_ctx.xs_hdr.cmh_type)) {
 				CNDBG(CT_LOG_FILE, "file: %s (%s)",
-				    sfnode.fn_sname,
+				    sfnode.fn_fullname,
 				    xs_ctx.xs_hdr.cmh_filename);
-				e_free(sfnode.fn_sname);
+				e_free(&sfnode.fn_fullname);
 				if (sfnode.fn_parent_dir == NULL)
 					CABORTX("that's unpossible!");
 				adnode = (struct ct_archive_dnode *)
