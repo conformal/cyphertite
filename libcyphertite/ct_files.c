@@ -2298,6 +2298,16 @@ ct_stat(struct fnode *fnode, struct stat *sb, int follow_symlinks,
 int
 ct_mkdir(struct ct_extract_state *ces, struct fnode *fnode, mode_t mode)
 {
+	const char	*slash;
+
+	if ((slash = strrchr(fnode->fl_sname, CT_PATHSEP)) == NULL) {
+		slash = fnode->fl_sname;
+	} else {
+		slash++;
+	}
+	if (strcmp(slash, "..") == 0)
+		return (0);
+	/* filter out .. */
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
 
@@ -2335,6 +2345,15 @@ ct_mknod(struct ct_extract_state *ces, struct fnode *fnode)
 int
 ct_link(struct ct_extract_state *ces, struct fnode *fnode, char *destination)
 {
+	const char 	*slash;
+	/* check that we aren't trying to make a .. */
+	if ((slash = strrchr(destination, CT_PATHSEP)) == NULL) {
+		slash = destination;
+	} else {
+		slash++;
+	}
+	if (strcmp(slash, "..") == 0)
+		return (0);
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
 
