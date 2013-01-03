@@ -887,7 +887,7 @@ ct_pr_fmt_file(void *state, struct fnode *fnode)
 		return;
 
 	if (*verbose > 1) {
-		switch(fnode->fl_type & C_TY_MASK) {
+		switch(fnode->fn_type & C_TY_MASK) {
 		case C_TY_DIR:
 			filemode[0] = 'd'; break;
 		case C_TY_CHR:
@@ -905,28 +905,28 @@ ct_pr_fmt_file(void *state, struct fnode *fnode)
 		default:
 			filemode[0] = '?';
 		}
-		filemode[1] = (fnode->fl_mode & 0400) ? 'r' : '-';
-		filemode[2] = (fnode->fl_mode & 0100) ? 'w' : '-';
-		filemode[3] = (fnode->fl_mode & 0200) ? 'x' : '-';
-		filemode[4] = (fnode->fl_mode & 0040) ? 'r' : '-';
-		filemode[5] = (fnode->fl_mode & 0020) ? 'w' : '-';
-		filemode[6] = (fnode->fl_mode & 0010) ? 'x' : '-';
-		filemode[7] = (fnode->fl_mode & 0004) ? 'r' : '-';
-		filemode[8] = (fnode->fl_mode & 0002) ? 'w' : '-';
-		filemode[9] = (fnode->fl_mode & 0001) ? 'x' : '-';
+		filemode[1] = (fnode->fn_mode & 0400) ? 'r' : '-';
+		filemode[2] = (fnode->fn_mode & 0100) ? 'w' : '-';
+		filemode[3] = (fnode->fn_mode & 0200) ? 'x' : '-';
+		filemode[4] = (fnode->fn_mode & 0040) ? 'r' : '-';
+		filemode[5] = (fnode->fn_mode & 0020) ? 'w' : '-';
+		filemode[6] = (fnode->fn_mode & 0010) ? 'x' : '-';
+		filemode[7] = (fnode->fn_mode & 0004) ? 'r' : '-';
+		filemode[8] = (fnode->fn_mode & 0002) ? 'w' : '-';
+		filemode[9] = (fnode->fn_mode & 0001) ? 'x' : '-';
 		filemode[10] = '\0';
 
-		loginname = ct_getloginbyuid(fnode->fl_uid);
+		loginname = ct_getloginbyuid(fnode->fn_uid);
 		if (loginname && (strlen(loginname) < sizeof(uid)))
 			snprintf(uid, sizeof(uid), "%10s", loginname);
 		else
-			snprintf(uid, sizeof(uid), "%-10d", fnode->fl_uid);
-		group = getgrgid(fnode->fl_gid);
+			snprintf(uid, sizeof(uid), "%-10d", fnode->fn_uid);
+		group = getgrgid(fnode->fn_gid);
 		if (group && (strlen(group->gr_name) < sizeof(gid)))
 			snprintf(gid, sizeof(gid), "%10s", group->gr_name);
 		else
-			snprintf(gid, sizeof(gid), "%-10d", fnode->fl_gid);
-		ltime = fnode->fl_mtime;
+			snprintf(gid, sizeof(gid), "%-10d", fnode->fn_gid);
+		ltime = fnode->fn_mtime;
 		ctime_r(&ltime, lctime);
 		pchr = strchr(lctime, '\n');
 		if (pchr != NULL)
@@ -934,24 +934,24 @@ ct_pr_fmt_file(void *state, struct fnode *fnode)
 
 		printf("%s %s %s %s ", filemode, uid, gid, lctime);
 	}
-	if (fnode->fl_skip_file) {
+	if (fnode->fn_skip_file) {
 		if (*verbose > 1)
 			printf("%s does not need rearchive",
-			    fnode->fl_sname);
+			    fnode->fn_sname);
 	} else {
-		printf("%s", fnode->fl_sname);
+		printf("%s", fnode->fn_sname);
 	}
 
 	if (*verbose > 1) {
 		/* XXX - translate to guid name */
-		if (C_ISLINK(fnode->fl_type))  {
-			if (fnode->fl_hardlink)  {
+		if (C_ISLINK(fnode->fn_type))  {
+			if (fnode->fn_hardlink)  {
 				link_ty = "==";
 			} else {
 				link_ty = "->";
 			}
-			printf(" %s %s", link_ty, fnode->fl_hlname);
-		} else if (C_ISREG(fnode->fl_type)) {
+			printf(" %s %s", link_ty, fnode->fn_hlname);
+		} else if (C_ISREG(fnode->fn_type)) {
 		}
 	}
 	fflush(stdout);
@@ -963,8 +963,8 @@ ct_pr_fmt_file_end(void *state, struct fnode *fnode, int block_size)
 	int	*verbose = state;
 
 	/* only if we printed anything before */
-	if ((fnode->fl_skip_file == 0 && *verbose) ||
-	    (fnode->fl_skip_file && *verbose > 1))
+	if ((fnode->fn_skip_file == 0 && *verbose) ||
+	    (fnode->fn_skip_file && *verbose > 1))
 		printf("\n");
 }
 
@@ -974,7 +974,7 @@ ct_print_file_start(void *state, struct fnode *fnode)
 	int	*verbose = state;
 
 	if (*verbose) {
-		printf("%s", fnode->fl_sname);
+		printf("%s", fnode->fn_sname);
 		fflush(stdout);
 	}
 }
@@ -986,14 +986,14 @@ ct_print_file_end(void *state, struct fnode *fnode, int block_size)
 	int			 compression, nrshas;
 
 	if (*verbose > 1) {
-		if (fnode->fl_size == 0)
+		if (fnode->fn_size == 0)
 			compression = 0;
 		else
-			compression = 100 * (fnode->fl_size -
-			    fnode->fl_comp_size) / fnode->fl_size;
+			compression = 100 * (fnode->fn_size -
+			    fnode->fn_comp_size) / fnode->fn_size;
 		if (*verbose > 2) {
-			nrshas = fnode->fl_size / block_size;
-			if (fnode->fl_size % block_size)
+			nrshas = fnode->fn_size / block_size;
+			if (fnode->fn_size % block_size)
 				nrshas++;
 
 			printf(" shas %d", nrshas);
@@ -1046,7 +1046,7 @@ ct_print_extract_chown_failed(void *state, struct fnode *fnode,
 	const char	*dir = "";
 
 	if (fnode != NULL) {
-		name = fnode->fl_sname;
+		name = fnode->fn_sname;
 	} else {
 		name = dnode->d_name;
 		dir = "directory ";
@@ -1229,9 +1229,9 @@ next_file:
 			ct_populate_fnode(ces, &xs_ctx, fnode, &state,
 			    xs_ctx.xs_gh.cmg_flags & CT_MD_MLB_ALLFILES,
 			    strip_slash);
-			doprint = !ct_match(match, fnode->fl_sname);
+			doprint = !ct_match(match, fnode->fn_sname);
 			if (doprint && ex_match != NULL &&
-			    !ct_match(ex_match, fnode->fl_sname))
+			    !ct_match(ex_match, fnode->fn_sname))
 				doprint = 0;
 			if (doprint) {
 				ct_pr_fmt_file(&verbose, fnode);
@@ -1239,10 +1239,10 @@ next_file:
 				    verbose > 2)
 					printf("\n");
 			}
-			if (fnode->fl_hlname)
-				e_free(&fnode->fl_hlname);
-			if (fnode->fl_sname)
-				e_free(&fnode->fl_sname);
+			if (fnode->fn_hlname)
+				e_free(&fnode->fn_hlname);
+			if (fnode->fn_sname)
+				e_free(&fnode->fn_sname);
 			break;
 		case XS_RET_FILE_END:
 			sign = " ";

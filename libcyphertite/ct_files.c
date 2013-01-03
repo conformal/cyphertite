@@ -152,14 +152,14 @@ ct_free_dnode(struct dnode *dnode)
 void
 ct_free_fnode(struct fnode *fnode)
 {
-	if (fnode->fl_hlname != NULL)
-		e_free(&fnode->fl_hlname);
-	if (fnode->fl_sname != NULL)
-		e_free(&fnode->fl_sname);
-	if (fnode->fl_fname)
-		e_free(&fnode->fl_fname);
-	if (fnode->fl_name)
-		e_free(&fnode->fl_name);
+	if (fnode->fn_hlname != NULL)
+		e_free(&fnode->fn_hlname);
+	if (fnode->fn_sname != NULL)
+		e_free(&fnode->fn_sname);
+	if (fnode->fn_fname)
+		e_free(&fnode->fn_fname);
+	if (fnode->fn_name)
+		e_free(&fnode->fn_name);
 	e_free(&fnode);
 
 }
@@ -215,15 +215,15 @@ again:
 	if (fnode == NULL)
 		return (NULL);
 
-	if (include && ct_match(include, fnode->fl_sname)) {
+	if (include && ct_match(include, fnode->fn_sname)) {
 		CNDBG(CT_LOG_FILE, "%s not in include list, skipping",
-		    fnode->fl_sname);
+		    fnode->fn_sname);
 		ct_free_fnode(fnode);
 		goto again;
 	}
-	if (exclude && !ct_match(exclude, fnode->fl_sname)) {
+	if (exclude && !ct_match(exclude, fnode->fn_sname)) {
 		CNDBG(CT_LOG_FILE, "%s in exclude list, skipping",
-		    fnode->fl_sname);
+		    fnode->fn_sname);
 		ct_free_fnode(fnode);
 		goto again;
 	}
@@ -288,22 +288,22 @@ ct_populate_fnode_from_flist(struct ct_archive_state *cas,
 
 	fnode = e_calloc(1, sizeof(*fnode));
 
-	fnode->fl_name = fname;
-	fnode->fl_sname = gen_fname(flnode);
-	fnode->fl_dev = sb->st_dev;
-	fnode->fl_rdev = sb->st_rdev;
-	fnode->fl_ino = sb->st_ino;
-	fnode->fl_uid = sb->st_uid;
-	fnode->fl_gid = sb->st_gid;
-	fnode->fl_mode = sb->st_mode;
-	fnode->fl_atime = sb->st_atime;
-	fnode->fl_mtime = sb->st_mtime;
-	fnode->fl_type = s_to_e_type(sb->st_mode);
-	fnode->fl_size = sb->st_size;
-	fnode->fl_offset = 0;
+	fnode->fn_name = fname;
+	fnode->fn_sname = gen_fname(flnode);
+	fnode->fn_dev = sb->st_dev;
+	fnode->fn_rdev = sb->st_rdev;
+	fnode->fn_ino = sb->st_ino;
+	fnode->fn_uid = sb->st_uid;
+	fnode->fn_gid = sb->st_gid;
+	fnode->fn_mode = sb->st_mode;
+	fnode->fn_atime = sb->st_atime;
+	fnode->fn_mtime = sb->st_mtime;
+	fnode->fn_type = s_to_e_type(sb->st_mode);
+	fnode->fn_size = sb->st_size;
+	fnode->fn_offset = 0;
 
 	if (flnode->fl_flags & C_FF_FORCEDIR)
-		fnode->fl_type = C_TY_DIR;
+		fnode->fn_type = C_TY_DIR;
 	/*
 	 * If we someone tries to perform a symlink race and it happens before
 	 * we stat the directory this second time then we may hit the case
@@ -311,25 +311,25 @@ ct_populate_fnode_from_flist(struct ct_archive_state *cas,
 	 * allowing evil path manipulation games. Therefore, if we think it is
 	 * a directory then check that it is, in case we have children.
 	 */
-	if (flnode->fl_flags & C_FF_WASDIR && fnode->fl_type != C_TY_DIR) {
-		CWARNX("%s is no longer a directory", fnode->fl_sname);
+	if (flnode->fl_flags & C_FF_WASDIR && fnode->fn_type != C_TY_DIR) {
+		CWARNX("%s is no longer a directory", fnode->fn_sname);
 		ct_free_fnode(fnode);
 		return (NULL);
 	}
 
 	/* either the parent is NULL (which is fine) or is our parent */
-	fnode->fl_parent_dir = flnode->fl_parent_dir;
+	fnode->fn_parent_dir = flnode->fl_parent_dir;
 
-	fnode->fl_state = CT_FILE_START;
-	ct_sha1_setup(&fnode->fl_shactx);
+	fnode->fn_state = CT_FILE_START;
+	ct_sha1_setup(&fnode->fn_shactx);
 
-	if (C_ISDIR(fnode->fl_type)) {
+	if (C_ISDIR(fnode->fn_type)) {
 		dname = gen_fname(flnode);
 		if ((dfound = ct_archive_lookup_dir(cas, dname)) == NULL)
 			CABORTX("directory not found in d_name_tree %s",
 			    dname);
 		e_free(&dname);
-		fnode->fl_curdir_dir = dfound;
+		fnode->fn_curdir_dir = dfound;
 
 #ifndef CT_NO_OPENAT
 		/* XXX O_SEARCH */
@@ -337,23 +337,23 @@ ct_populate_fnode_from_flist(struct ct_archive_state *cas,
 		if ((flnode->fl_flags & C_FF_FORCEDIR) || follow_symlinks)
 			dopenflags &= ~O_NOFOLLOW;
 
-		if ((dfound->d_fd = openat(fnode->fl_parent_dir->d_fd,
-		    fnode->fl_name, dopenflags)) == -1) {
-			CWARN("can't open directory %s", fnode->fl_sname);
+		if ((dfound->d_fd = openat(fnode->fn_parent_dir->d_fd,
+		    fnode->fn_name, dopenflags)) == -1) {
+			CWARN("can't open directory %s", fnode->fn_sname);
 		}
 #endif
 	}
 
 	if (flnode->fl_hlnode != NULL) {
-		fnode->fl_hardlink = 1;
-		fnode->fl_type = C_TY_LINK;
-		fnode->fl_hlname = gen_fname(flnode->fl_hlnode);
-	} else if (C_ISLINK(fnode->fl_type) && fnode->fl_hardlink == 0) {
+		fnode->fn_hardlink = 1;
+		fnode->fn_type = C_TY_LINK;
+		fnode->fn_hlname = gen_fname(flnode->fl_hlnode);
+	} else if (C_ISLINK(fnode->fn_type) && fnode->fn_hardlink == 0) {
 		char			 mylink[PATH_MAX];
 
 		ret = ct_readlink(cas, fnode, mylink, sizeof(mylink));
 		if (ret == -1 || ret == sizeof(mylink)) {
-			CWARN("can't read link for %s", fnode->fl_sname);
+			CWARN("can't read link for %s", fnode->fn_sname);
 			ct_free_fnode(fnode);
 			return (NULL);
 		}
@@ -361,7 +361,7 @@ ct_populate_fnode_from_flist(struct ct_archive_state *cas,
 		 * readlink(2) does not append a NUL.
 		 */
 		mylink[ret] = '\0';
-		fnode->fl_hlname = e_strdup(mylink);
+		fnode->fn_hlname = e_strdup(mylink);
 	}
 
 	return fnode;
@@ -456,9 +456,9 @@ ct_archive_needs_archive(struct ct_archive_state *cas, struct fnode *fnode)
 	 * All non regular files have all information stored in the ctfile.
 	 * so just return yes here.
 	 */
-	if (!C_ISREG(fnode->fl_type)) {
+	if (!C_ISREG(fnode->fn_type)) {
 		CNDBG(CT_LOG_FILE, "%s not regular file, always needs "
-		    "archive", fnode->fl_sname);
+		    "archive", fnode->fn_sname);
 		return (1);
 	}
 
@@ -469,27 +469,28 @@ ct_archive_needs_archive(struct ct_archive_state *cas, struct fnode *fnode)
 	 * factor 3: mtime
 	 */
 
-	dnode = fnode->fl_parent_dir;
+	dnode = fnode->fn_parent_dir;
 	adnode = (struct ct_archive_dnode *)dnode;
 
-	sfile.af_name = fnode->fl_name;
+	sfile.af_name = fnode->fn_name;
 	if ((afile = RB_FIND(ct_archive_files, &adnode->ad_children,
 	    &sfile)) == NULL) {
 		/* wasn't in previous backup, needs archive */
 		CNDBG(CT_LOG_FILE, "%s not in previous (%s)",
-		    fnode->fl_sname, dnode->d_name);
+		    fnode->fn_sname, dnode->d_name);
 		return (1);
 	}
 
-	if (afile->af_size != fnode->fl_size) {
+	if (afile->af_size != fnode->fn_size) {
 		CNDBG(CT_LOG_FILE, "%s size doesn't match %" PRId64
-		    " vs %" PRId64, fnode->fl_sname, (int64_t)afile->af_size,
-		    (int64_t)fnode->fl_size);
+		    " vs %" PRId64, fnode->fn_sname, (int64_t)afile->af_size,
+		    (int64_t)fnode->fn_size);
 		return (1);
 	}
-	if (afile->af_mtime != fnode->fl_mtime) {
+	if (afile->af_mtime != fnode->fn_mtime) {
 		CNDBG(CT_LOG_FILE, "%s mtime doesn't match %" PRId64
-		    " vs %" PRId64, fnode->fl_sname, afile->af_mtime, fnode->fl_mtime);
+		    " vs %" PRId64, fnode->fn_sname, afile->af_mtime,
+		    fnode->fn_mtime);
 		return (1);
 	}
 	/*
@@ -497,7 +498,7 @@ ct_archive_needs_archive(struct ct_archive_state *cas, struct fnode *fnode)
 	 * Probably hasn't changed.
 	 *
 	 */
-	CNDBG(CT_LOG_FILE, "%s incremental unneeded", fnode->fl_sname);
+	CNDBG(CT_LOG_FILE, "%s incremental unneeded", fnode->fn_sname);
 	return (0);
 
 }
@@ -669,7 +670,7 @@ ct_archive_complete_special(struct ct_global_state *state,
 	    state->ct_max_block_size);
 	if (ctfile_write_special(trans->tr_ctfile, trans->tr_fl_node))
 		CWARNX("failed to write special entry for %s",
-		    trans->tr_fl_node->fl_sname);
+		    trans->tr_fl_node->fn_sname);
 
 	return (0);
 }
@@ -692,7 +693,7 @@ ct_archive_complete_file_start(struct ct_global_state *state,
 
 	state->ct_print_file_start(state->ct_print_state, trans->tr_fl_node);
 	/* Empty file, or unchanged during incremental */
-	if (trans->tr_eof == 1 || trans->tr_fl_node->fl_skip_file) {
+	if (trans->tr_eof == 1 || trans->tr_fl_node->fn_skip_file) {
 		if (ctfile_write_file_end(trans->tr_ctfile,
 		    trans->tr_fl_node))
 			CWARNX("failed to write trailer sha");
@@ -716,18 +717,18 @@ ct_archive_complete_write_chunk(struct ct_global_state *state,
 		if (ctfile_write_file_sha(trans->tr_ctfile,
 		    trans->tr_sha, trans->tr_csha, trans->tr_iv) != 0)
 			CWARNX("failed to write sha for %s",
-			    trans->tr_fl_node->fl_sname);
+			    trans->tr_fl_node->fn_sname);
 	}
 
 	if (trans->tr_eof) {
 		if (trans->tr_eof == 2 && ctfile_write_file_pad(
 		    trans->tr_ctfile, trans->tr_fl_node) != 0)
 			CWARNX("failed to pad file for %s",
-			    trans->tr_fl_node->fl_sname);
+			    trans->tr_fl_node->fn_sname);
 		if (ctfile_write_file_end(trans->tr_ctfile,
 		    trans->tr_fl_node) != 0)
 			CWARNX("failed to write trailer for %s",
-			    trans->tr_fl_node->fl_sname);
+			    trans->tr_fl_node->fn_sname);
 		state->ct_print_file_end(state->ct_print_state,
 		    trans->tr_fl_node, state->ct_max_block_size);
 	}
@@ -1058,9 +1059,9 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 	if (cap->cap_curnode == NULL)
 		goto done;
 loop:
-	CNDBG(CT_LOG_CTFILE, "file %s state %d", cap->cap_curnode->fl_sname,
-	    cap->cap_curnode->fl_state);
-	new_file = (cap->cap_curnode->fl_state == CT_FILE_START);
+	CNDBG(CT_LOG_CTFILE, "file %s state %d", cap->cap_curnode->fn_sname,
+	    cap->cap_curnode->fn_state);
+	new_file = (cap->cap_curnode->fn_state == CT_FILE_START);
 
 	/* allocate transaction */
 	ct_trans = ct_trans_alloc(state);
@@ -1076,12 +1077,12 @@ loop:
 	 * Only regular files that haven't just been opened need to talk
 	 * to the server. don't waste slots.
 	 */
-	if (!C_ISREG(cap->cap_curnode->fl_type) || new_file)
+	if (!C_ISREG(cap->cap_curnode->fn_type) || new_file)
 		ct_trans = ct_trans_realloc_local(state, ct_trans);
 
 	/* handle special files */
-	if (!C_ISREG(cap->cap_curnode->fl_type)) {
-		if (C_ISDIR(cap->cap_curnode->fl_type)) {
+	if (!C_ISREG(cap->cap_curnode->fn_type)) {
+		if (C_ISDIR(cap->cap_curnode->fn_type)) {
 			/*
 			 * we do want to skip old directories with
 			 * no (new) files in them
@@ -1090,7 +1091,7 @@ loop:
 			    cap->cap_curnode)) {
 				CNDBG(CT_LOG_FILE, "skipping dir"
 				    " based on mtime %s",
-				    cap->cap_curnode->fl_sname);
+				    cap->cap_curnode->fn_sname);
 				ct_free_fnode(cap->cap_curnode);
 				ct_trans_free(state, ct_trans);
 				goto skip;
@@ -1098,8 +1099,8 @@ loop:
 		}
 		ct_trans->tr_ctfile = cap->cap_cws;
 		ct_trans->tr_fl_node = cap->cap_curnode;
-		cap->cap_curnode->fl_state = CT_FILE_FINISHED;
-		cap->cap_curnode->fl_size = 0;
+		cap->cap_curnode->fn_state = CT_FILE_FINISHED;
+		cap->cap_curnode->fn_size = 0;
 		ct_trans->tr_state = TR_S_SPECIAL;
 		ct_trans->tr_type = TR_T_SPECIAL;
 		ct_trans->tr_complete = ct_archive_complete_special;
@@ -1111,19 +1112,19 @@ loop:
 
 	/* do not open zero length files */
 	if (new_file) {
-		cap->cap_curnode->fl_state = CT_FILE_PROCESSING;
+		cap->cap_curnode->fn_state = CT_FILE_PROCESSING;
 		if (cap->cap_fd != -1) {
 			CABORTX("state error, new file open,"
 			    " sz %" PRId64 " offset %" PRId64,
-			    (int64_t) cap->cap_curnode->fl_size,
-			    (int64_t) cap->cap_curnode->fl_offset);
+			    (int64_t) cap->cap_curnode->fn_size,
+			    (int64_t) cap->cap_curnode->fn_offset);
 		}
 
 		if ((cap->cap_fd = ct_open(state->archive_state,
 		    cap->cap_curnode, O_RDONLY,
 		    caa->caa_follow_symlinks)) == -1) {
 			CWARN("archive: unable to open file '%s'",
-			    cap->cap_curnode->fl_sname);
+			    cap->cap_curnode->fn_sname);
 			ct_free_fnode(cap->cap_curnode);
 			ct_trans_free(state, ct_trans);
 			goto skip;
@@ -1131,7 +1132,7 @@ loop:
 
 		if (fstat(cap->cap_fd, &sb) != 0) {
 			CWARN("archive: file %s stat error",
-			    cap->cap_curnode->fl_sname);
+			    cap->cap_curnode->fn_sname);
 			close(cap->cap_fd);
 			cap->cap_fd = -1;
 			ct_free_fnode(cap->cap_curnode);
@@ -1145,27 +1146,27 @@ loop:
 		 */
 		if (!S_ISREG(sb.st_mode)) {
 			CWARNX("%s is no longer a regular file, skipping",
-			    cap->cap_curnode->fl_sname);
+			    cap->cap_curnode->fn_sname);
 			close(cap->cap_fd);
 			cap->cap_fd = -1;
 			ct_free_fnode(cap->cap_curnode);
 			ct_trans_free(state, ct_trans);
 			goto skip;
 		}
-		cap->cap_curnode->fl_dev = sb.st_dev;
-		cap->cap_curnode->fl_rdev = sb.st_rdev;
-		cap->cap_curnode->fl_ino = sb.st_ino;
-		cap->cap_curnode->fl_uid = sb.st_uid;
-		cap->cap_curnode->fl_gid = sb.st_gid;
-		cap->cap_curnode->fl_mode = sb.st_mode;
-		cap->cap_curnode->fl_atime = sb.st_atime;
-		cap->cap_curnode->fl_mtime = sb.st_mtime;
-		cap->cap_curnode->fl_size = sb.st_size;
+		cap->cap_curnode->fn_dev = sb.st_dev;
+		cap->cap_curnode->fn_rdev = sb.st_rdev;
+		cap->cap_curnode->fn_ino = sb.st_ino;
+		cap->cap_curnode->fn_uid = sb.st_uid;
+		cap->cap_curnode->fn_gid = sb.st_gid;
+		cap->cap_curnode->fn_mode = sb.st_mode;
+		cap->cap_curnode->fn_atime = sb.st_atime;
+		cap->cap_curnode->fn_mtime = sb.st_mtime;
+		cap->cap_curnode->fn_size = sb.st_size;
 
 		/* Now we have filled in fnode, see if we can skip it */
 		if (!ct_archive_needs_archive(state->archive_state,
 		    cap->cap_curnode)) {
-			cap->cap_curnode->fl_skip_file = 1;
+			cap->cap_curnode->fn_skip_file = 1;
 		}
 
 		ct_trans->tr_ctfile = cap->cap_cws;
@@ -1173,13 +1174,13 @@ loop:
 		ct_trans->tr_state = TR_S_FILE_START;
 		ct_trans->tr_type = TR_T_WRITE_HEADER;
 		ct_trans->tr_complete = ct_archive_complete_file_start;
-		if (cap->cap_curnode->fl_size == 0 ||
-		    cap->cap_curnode->fl_skip_file) {
+		if (cap->cap_curnode->fn_size == 0 ||
+		    cap->cap_curnode->fn_skip_file) {
 			close(cap->cap_fd);
 			cap->cap_fd = -1;
 			ct_trans->tr_eof = 1;
 			ct_trans->tr_cleanup = ct_archive_cleanup_fnode;
-			cap->cap_curnode->fl_state = CT_FILE_FINISHED;
+			cap->cap_curnode->fn_state = CT_FILE_FINISHED;
 		} else {
 			ct_trans->tr_eof = 0;
 			ct_trans->tr_cleanup = NULL;
@@ -1187,8 +1188,8 @@ loop:
 
 		ct_queue_first(state, ct_trans);
 
-		if (cap->cap_curnode->fl_size == 0 ||
-		    cap->cap_curnode->fl_skip_file) {
+		if (cap->cap_curnode->fn_size == 0 ||
+		    cap->cap_curnode->fn_skip_file) {
 			goto next_file;
 		}
 		goto loop;
@@ -1196,13 +1197,13 @@ loop:
 		if (cap->cap_fd == -1) {
 			CABORTX("state error, old file not open,"
 			    " sz %" PRId64 " offset %" PRId64,
-			    (int64_t) cap->cap_curnode->fl_size,
-			    (int64_t) cap->cap_curnode->fl_offset);
+			    (int64_t) cap->cap_curnode->fn_size,
+			    (int64_t) cap->cap_curnode->fn_offset);
 		}
 	}
 
 	/* perform read */
-	rsz = cap->cap_curnode->fl_size - cap->cap_curnode->fl_offset;
+	rsz = cap->cap_curnode->fn_size - cap->cap_curnode->fn_offset;
 	CNDBG(CT_LOG_FILE, "rsz %lu max %d", (unsigned long) rsz,
 	    state->ct_max_block_size);
 	if (rsz > state->ct_max_block_size) {
@@ -1226,8 +1227,8 @@ loop:
 	ct_trans->tr_eof = 0;
 	ct_trans->hdr.c_flags = C_HDR_F_ENCRYPTED;
 	/* update offset */
-	if (rsz != rlen || rlen == 0 || ((cap->cap_curnode->fl_offset + rlen) ==
-	    cap->cap_curnode->fl_size)) {
+	if (rsz != rlen || rlen == 0 || ((cap->cap_curnode->fn_offset + rlen) ==
+	    cap->cap_curnode->fn_size)) {
 		/* short read, file truncated, or end of file */
 		/* restat file for modifications */
 		error = fstat(cap->cap_fd, &sb);
@@ -1236,21 +1237,21 @@ loop:
 		cap->cap_fd = -1;
 		ct_trans->tr_eof = 1;
 		ct_trans->tr_cleanup = ct_archive_cleanup_fnode;
-		cap->cap_curnode->fl_state = CT_FILE_FINISHED;
+		cap->cap_curnode->fn_state = CT_FILE_FINISHED;
 
 		if (error) {
 			CWARN("archive: file %s stat error",
-			    cap->cap_curnode->fl_sname);
-		} else if (sb.st_size != cap->cap_curnode->fl_size) {
+			    cap->cap_curnode->fn_sname);
+		} else if (sb.st_size != cap->cap_curnode->fn_size) {
 			CWARNX("\"%s\" %s during backup",
-			    cap->cap_curnode->fl_sname,
-			    (sb.st_size > cap->cap_curnode->fl_size) ? "grew" :
+			    cap->cap_curnode->fn_sname,
+			    (sb.st_size > cap->cap_curnode->fn_size) ? "grew" :
 				"truncated");
 			ct_trans->tr_state = TR_S_WMD_READY;
 			ct_trans->tr_eof = 2;
 		}
 	} else {
-		cap->cap_curnode->fl_offset += rlen;
+		cap->cap_curnode->fn_offset += rlen;
 	}
 	ct_queue_first(state, ct_trans);
 	CNDBG(CT_LOG_FILE, "read %ld for block %" PRIu64 " eof %d",
@@ -1261,9 +1262,9 @@ loop:
 	/* XXX is there other file metadata that needs to be saved?  */
 next_file:
 	/* XXX should node be removed from list at this time? */
-	if (cap->cap_curnode->fl_state == CT_FILE_FINISHED) {
+	if (cap->cap_curnode->fn_state == CT_FILE_FINISHED) {
 		CNDBG(CT_LOG_FILE, "going to next file %s",
-		    cap->cap_curnode->fl_sname);
+		    cap->cap_curnode->fn_sname);
 skip:
 		if ((cap->cap_curnode = ct_get_next_fnode(state->archive_state,
 		    &cap->cap_flist, &cap->cap_curlist, cap->cap_include,
@@ -1271,7 +1272,7 @@ skip:
 			CNDBG(CT_LOG_FILE, "no more files");
 		} else {
 			CNDBG(CT_LOG_FILE, "going to next file %s",
-			    cap->cap_curnode->fl_sname);
+			    cap->cap_curnode->fn_sname);
 		}
 	}
 
@@ -1795,10 +1796,10 @@ ct_file_extract_open(struct ct_extract_state *ces, struct fnode *fnode)
 
 	ct_file_extract_nextdir(ces, fnode);
 
-	CNDBG(CT_LOG_FILE, "opening %s for writing", fnode->fl_sname);
+	CNDBG(CT_LOG_FILE, "opening %s for writing", fnode->fn_sname);
 
-	if (fnode->fl_fname)
-		e_free(&fnode->fl_fname);
+	if (fnode->fn_fname)
+		e_free(&fnode->fn_fname);
 	/*
 	 * All previous directories should have been created when we changed
 	 * directory above. If this is not the case then something changed
@@ -1807,11 +1808,11 @@ ct_file_extract_open(struct ct_extract_state *ces, struct fnode *fnode)
 #ifdef CT_NO_OPENAT
 	char tpath[PATH_MAX], dirpath[PATH_MAX], *dirp;
 
-	if (ct_absolute_path(fnode->fl_sname)) {
-		strlcpy(tpath, fnode->fl_sname, sizeof(tpath));
+	if (ct_absolute_path(fnode->fn_sname)) {
+		strlcpy(tpath, fnode->fn_sname, sizeof(tpath));
 	} else {
 		snprintf(tpath, sizeof(tpath), "%s%c%s",
-		    ces->ces_rootdir->d_name, CT_PATHSEP, fnode->fl_sname);
+		    ces->ces_rootdir->d_name, CT_PATHSEP, fnode->fn_sname);
 	}
 	strlcpy(dirpath, tpath, sizeof(dirpath));
 	/*
@@ -1822,13 +1823,13 @@ ct_file_extract_open(struct ct_extract_state *ces, struct fnode *fnode)
 	if ((dirp = dirname(dirpath)) == NULL) /* XXX CTE_ERRNO */
 		CABORTX("can't get dirname of %s", tpath);
 
-	e_asprintf(&fnode->fl_fname, "%s%c%s", dirp, CT_PATHSEP,
+	e_asprintf(&fnode->fn_fname, "%s%c%s", dirp, CT_PATHSEP,
 	    "cyphertite.XXXXXXXXXX");
-	ces->ces_fd = mkstemp(fnode->fl_fname);
+	ces->ces_fd = mkstemp(fnode->fn_fname);
 #else
-	fnode->fl_fname = e_strdup("cyphertite.XXXXXXXXXX");
-	ces->ces_fd = mkstemp_at(fnode->fl_parent_dir->d_fd,
-	    fnode->fl_fname);
+	fnode->fn_fname = e_strdup("cyphertite.XXXXXXXXXX");
+	ces->ces_fd = mkstemp_at(fnode->fn_parent_dir->d_fd,
+	    fnode->fn_fname);
 #endif
 	if (ces->ces_fd == -1)
 		return (1);
@@ -1859,24 +1860,24 @@ ct_file_extract_close(struct ct_extract_state *ces, struct fnode *fnode)
 
 	safe_mode = S_IRWXU | S_IRWXG | S_IRWXO;
 	if (ces->ces_attr) {
-		if (fchown(ces->ces_fd, fnode->fl_uid, fnode->fl_gid) == -1) {
+		if (fchown(ces->ces_fd, fnode->fn_uid, fnode->fn_gid) == -1) {
 			ces->ces_log_chown_failed(ces->ces_log_state,
 			    fnode, NULL);
 		} else
 			safe_mode = ~0;
 	}
 
-	if (fchmod(ces->ces_fd, fnode->fl_mode & safe_mode) == -1) {
-		CWARN("chmod failed on %s", fnode->fl_sname);
+	if (fchmod(ces->ces_fd, fnode->fn_mode & safe_mode) == -1) {
+		CWARN("chmod failed on %s", fnode->fn_sname);
 	} else if (ces->ces_attr) {
-		tv[0].tv_sec = fnode->fl_atime;
-		tv[1].tv_sec = fnode->fl_mtime;
+		tv[0].tv_sec = fnode->fn_atime;
+		tv[1].tv_sec = fnode->fn_mtime;
 		tv[0].tv_usec = tv[1].tv_usec = 0;
 		if (futimes(ces->ces_fd, tv) == -1)
-			CWARN("utimes on %s failed", fnode->fl_sname);
+			CWARN("utimes on %s failed", fnode->fn_sname);
 	}
 	if (ct_rename(ces, fnode) != 0) {
-		CWARN("rename to %s failed", fnode->fl_sname);
+		CWARN("rename to %s failed", fnode->fn_sname);
 		/* nuke temp file */
 		(void)ct_unlink(ces, fnode);
 	}
@@ -1899,33 +1900,33 @@ ct_file_extract_special(struct ct_extract_state *ces, struct fnode *fnode)
 	 */
 	ct_file_extract_nextdir(ces, fnode);
 
-	CNDBG(CT_LOG_FILE, "special %s mode %d", fnode->fl_sname,
-	    fnode->fl_mode);
+	CNDBG(CT_LOG_FILE, "special %s mode %d", fnode->fn_sname,
+	    fnode->fn_mode);
 
-	if (C_ISDIR(fnode->fl_type)) {
+	if (C_ISDIR(fnode->fn_type)) {
 		if (ct_mkdir(ces, fnode, 0700)) {
 			if (errno != EEXIST) /* XXX check it is a dir */
 				CWARN("can't create directory %s",
-				    fnode->fl_sname);
+				    fnode->fn_sname);
 		}
-	} else if (C_ISBLK(fnode->fl_type) || C_ISCHR(fnode->fl_type))  {
+	} else if (C_ISBLK(fnode->fn_type) || C_ISCHR(fnode->fn_type))  {
 		if (ct_mknod(ces, fnode) != 0) {
 			if (errno != EEXIST) /* XXX check it is a spec node */
 				CWARN("can't create special file %s",
-				    fnode->fl_sname);
+				    fnode->fn_sname);
 		}
-	} else if (C_ISLINK(fnode->fl_type)){
-		if (fnode->fl_hardlink && !ct_absolute_path(fnode->fl_hlname)) {
+	} else if (C_ISLINK(fnode->fn_type)){
+		if (fnode->fn_hardlink && !ct_absolute_path(fnode->fn_hlname)) {
 			snprintf(apath, sizeof(apath), "%s%c%s",
 			    ces->ces_rootdir->d_name, CT_PATHSEP,
-			    fnode->fl_hlname);
+			    fnode->fn_hlname);
 			appath = apath;
 		} else {
-			appath = fnode->fl_hlname;
+			appath = fnode->fn_hlname;
 		}
 
 link_again:
-		if (fnode->fl_hardlink) {
+		if (fnode->fn_hardlink) {
 			/*
 			 * XXX AT_FDCWD is dangerous here but we don't have
 			 * sufficient information.
@@ -1937,7 +1938,7 @@ link_again:
 			ret = ct_symlink(ces, fnode);
 		}
 		if (ret && errno == EEXIST) {
-			if (fnode->fl_hardlink) {
+			if (fnode->fn_hardlink) {
 				struct stat	tsb, lsb;
 
 				/*
@@ -1950,13 +1951,13 @@ link_again:
 				}
 				if (ct_stat(fnode, &lsb,
 				    ces->ces_follow_symlinks, ces, NULL) != 0) {
-					CWARN("can't stat %s", fnode->fl_sname);
+					CWARN("can't stat %s", fnode->fn_sname);
 					goto link_out;
 				}
 				if (tsb.st_dev != lsb.st_dev) {
 					CWARNX("%s and %s no longer on same "
 					    "device: can't link",
-					    appath, fnode->fl_sname);
+					    appath, fnode->fn_sname);
 					goto link_out;
 				}
 				/*
@@ -1971,27 +1972,27 @@ link_again:
 
 			if (ct_unlink(ces, fnode) == 0)
 				goto link_again;
-			CWARN("can't remove old link %s", fnode->fl_sname);
+			CWARN("can't remove old link %s", fnode->fn_sname);
 		}
 link_out:
 		if (ret) {
-			CWARN("%s failed: %s to %s", fnode->fl_hardlink ?
-			    "link" : "symlink", fnode->fl_sname, appath);
+			CWARN("%s failed: %s to %s", fnode->fn_hardlink ?
+			    "link" : "symlink", fnode->fn_sname, appath);
 			return;
 		}
 	} else {
-		CABORTX("illegal file %s of type %d", fnode->fl_sname,
-		    fnode->fl_mode);
+		CABORTX("illegal file %s of type %d", fnode->fn_sname,
+		    fnode->fn_mode);
 	}
 
-	if (C_ISDIR(fnode->fl_type)) {
+	if (C_ISDIR(fnode->fn_type)) {
 		/*
 		 * Directory permissions are handled at directory close
 		 * time when all dependancies are finished.
 		 */
 		;
-	} else if (C_ISLINK(fnode->fl_type)){
-		if (!fnode->fl_hardlink) {
+	} else if (C_ISLINK(fnode->fn_type)){
+		if (!fnode->fn_hardlink) {
 			/* symlinks have no 'real' permissions */
 			if (ces->ces_attr) {
 				/* set the link's ownership */
@@ -2015,11 +2016,11 @@ link_out:
 				safe_mode = ~0;
 		}
 
-		if (ct_chmod(ces, fnode, fnode->fl_mode & safe_mode) != 0) {
-			CWARN("chmod failed on %s", fnode->fl_sname);
+		if (ct_chmod(ces, fnode, fnode->fn_mode & safe_mode) != 0) {
+			CWARN("chmod failed on %s", fnode->fn_sname);
 		} else if (ces->ces_attr) {
 			if (ct_utimes(ces, fnode) != 0)
-				CWARN("utimes on %s failed", fnode->fl_sname);
+				CWARN("utimes on %s failed", fnode->fn_sname);
 		}
 	}
 }
@@ -2027,7 +2028,7 @@ link_out:
 void
 ct_file_extract_nextdir(struct ct_extract_state *ces, struct fnode *fnode)
 {
-	struct dnode	*newdir = fnode->fl_parent_dir, *tdir;
+	struct dnode	*newdir = fnode->fn_parent_dir, *tdir;
 	struct dnode	**newdirlist;
 	int		 ndirs, i;
 
@@ -2216,7 +2217,7 @@ try_again:
 
 /*
  * Portability functions to be used by archive-like operations.
- * These operate on fnode->fl_name as the correct ``real'' path.
+ * These operate on fnode->fn_name as the correct ``real'' path.
  */
 int
 ct_open(struct ct_archive_state *cas , struct fnode *fnode, int flags,
@@ -2225,17 +2226,17 @@ ct_open(struct ct_archive_state *cas , struct fnode *fnode, int flags,
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
 
-	if (ct_absolute_path(fnode->fl_sname)) {
-		strlcpy(path, fnode->fl_sname, sizeof(path));
+	if (ct_absolute_path(fnode->fn_sname)) {
+		strlcpy(path, fnode->fn_sname, sizeof(path));
 	} else {
 		snprintf(path, sizeof(path), "%s%c%s",
 		    ct_archive_get_rootdir(cas)->d_name,
-		    CT_PATHSEP, fnode->fl_sname);
+		    CT_PATHSEP, fnode->fn_sname);
 	}
 
 	return (open(path, flags | follow_symlinks ? 0 : O_NOFOLLOW));
 #else
-	return (openat(fnode->fl_parent_dir->d_fd, fnode->fl_name,
+	return (openat(fnode->fn_parent_dir->d_fd, fnode->fn_name,
 	    flags | follow_symlinks ? 0 : O_NOFOLLOW));
 #endif
 }
@@ -2247,17 +2248,17 @@ ct_readlink(struct ct_archive_state *cas, struct fnode *fnode, char *mylink,
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
 
-	if (ct_absolute_path(fnode->fl_sname)) {
-		strlcpy(path, fnode->fl_sname, sizeof(path));
+	if (ct_absolute_path(fnode->fn_sname)) {
+		strlcpy(path, fnode->fn_sname, sizeof(path));
 	} else {
 		snprintf(path, sizeof(path), "%s%c%s",
 		    ct_archive_get_rootdir(cas)->d_name,
-		    CT_PATHSEP, fnode->fl_sname);
+		    CT_PATHSEP, fnode->fn_sname);
 	}
 
 	return (readlink(path, mylink, mylinksz));
 #else
-	return (readlinkat(fnode->fl_parent_dir->d_fd, fnode->fl_name,
+	return (readlinkat(fnode->fn_parent_dir->d_fd, fnode->fn_name,
 	    mylink, mylinksz));
 #endif
 }
@@ -2272,20 +2273,20 @@ ct_stat(struct fnode *fnode, struct stat *sb, int follow_symlinks,
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
 
-	if (ct_absolute_path(fnode->fl_sname)) {
-		strlcpy(path, fnode->fl_sname, sizeof(path));
+	if (ct_absolute_path(fnode->fn_sname)) {
+		strlcpy(path, fnode->fn_sname, sizeof(path));
 	} else {
 		snprintf(path, sizeof(path), "%s%c%s", (ces ?
 		    ces->ces_rootdir->d_name :
 		    ct_archive_get_rootdir(cas)->d_name),
-		    CT_PATHSEP, fnode->fl_sname);
+		    CT_PATHSEP, fnode->fn_sname);
 	}
 	if (follow_symlinks)
 		return (stat(path, sb));
 	else
 		return (lstat(path, sb));
 #else
-	return (fstatat(fnode->fl_parent_dir->d_fd, fnode->fl_name, sb,
+	return (fstatat(fnode->fn_parent_dir->d_fd, fnode->fn_name, sb,
 	    follow_symlinks ? 0 : AT_SYMLINK_NOFOLLOW));
 #endif
 }
@@ -2293,15 +2294,15 @@ ct_stat(struct fnode *fnode, struct stat *sb, int follow_symlinks,
 
 /*
  * Portability functions to be used by extract operations.
- * These operated on fnode->fl_sname as the ``correct'' pathname.
+ * These operated on fnode->fn_sname as the ``correct'' pathname.
  */
 int
 ct_mkdir(struct ct_extract_state *ces, struct fnode *fnode, mode_t mode)
 {
 	const char	*slash;
 
-	if ((slash = strrchr(fnode->fl_sname, CT_PATHSEP)) == NULL) {
-		slash = fnode->fl_sname;
+	if ((slash = strrchr(fnode->fn_sname, CT_PATHSEP)) == NULL) {
+		slash = fnode->fn_sname;
 	} else {
 		slash++;
 	}
@@ -2311,15 +2312,15 @@ ct_mkdir(struct ct_extract_state *ces, struct fnode *fnode, mode_t mode)
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
 
-	if (ct_absolute_path(fnode->fl_sname)) {
-		strlcpy(path, fnode->fl_sname, sizeof(path));
+	if (ct_absolute_path(fnode->fn_sname)) {
+		strlcpy(path, fnode->fn_sname, sizeof(path));
 	} else {
 		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
-		    CT_PATHSEP, fnode->fl_sname);
+		    CT_PATHSEP, fnode->fn_sname);
 	}
 	return (mkdir(path, mode));
 #else
-	return (mkdirat(fnode->fl_parent_dir->d_fd, fnode->fl_name, mode));
+	return (mkdirat(fnode->fn_parent_dir->d_fd, fnode->fn_name, mode));
 #endif
 }
 
@@ -2329,16 +2330,16 @@ ct_mknod(struct ct_extract_state *ces, struct fnode *fnode)
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
 
-	if (ct_absolute_path(fnode->fl_sname)) {
-		strlcpy(path, fnode->fl_sname, sizeof(path));
+	if (ct_absolute_path(fnode->fn_sname)) {
+		strlcpy(path, fnode->fn_sname, sizeof(path));
 	} else {
 		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
-		    CT_PATHSEP, fnode->fl_sname);
+		    CT_PATHSEP, fnode->fn_sname);
 	}
-	return (mknod(path, fnode->fl_mode, fnode->fl_dev));
+	return (mknod(path, fnode->fn_mode, fnode->fn_dev));
 #else
-	return (mknodat(fnode->fl_parent_dir->d_fd, fnode->fl_name,
-	    fnode->fl_mode, fnode->fl_dev));
+	return (mknodat(fnode->fn_parent_dir->d_fd, fnode->fn_name,
+	    fnode->fn_mode, fnode->fn_dev));
 #endif
 }
 
@@ -2357,16 +2358,16 @@ ct_link(struct ct_extract_state *ces, struct fnode *fnode, char *destination)
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
 
-	if (ct_absolute_path(fnode->fl_sname)) {
-		strlcpy(path, fnode->fl_sname, sizeof(path));
+	if (ct_absolute_path(fnode->fn_sname)) {
+		strlcpy(path, fnode->fn_sname, sizeof(path));
 	} else {
 		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
-		    CT_PATHSEP, fnode->fl_sname);
+		    CT_PATHSEP, fnode->fn_sname);
 	}
 	return (link(destination, path));
 #else
-	return (linkat(AT_FDCWD, destination, fnode->fl_parent_dir->d_fd,
-	    fnode->fl_name, AT_SYMLINK_FOLLOW));
+	return (linkat(AT_FDCWD, destination, fnode->fn_parent_dir->d_fd,
+	    fnode->fn_name, AT_SYMLINK_FOLLOW));
 #endif
 }
 
@@ -2376,16 +2377,16 @@ ct_symlink(struct ct_extract_state *ces, struct fnode *fnode)
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
 
-	if (ct_absolute_path(fnode->fl_sname)) {
-		strlcpy(path, fnode->fl_sname, sizeof(path));
+	if (ct_absolute_path(fnode->fn_sname)) {
+		strlcpy(path, fnode->fn_sname, sizeof(path));
 	} else {
 		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
-		    CT_PATHSEP, fnode->fl_sname);
+		    CT_PATHSEP, fnode->fn_sname);
 	}
-	return (symlink(fnode->fl_hlname, path));
+	return (symlink(fnode->fn_hlname, path));
 #else
-	return (symlinkat(fnode->fl_hlname, fnode->fl_parent_dir->d_fd,
-	    fnode->fl_name));
+	return (symlinkat(fnode->fn_hlname, fnode->fn_parent_dir->d_fd,
+	    fnode->fn_name));
 #endif
 }
 
@@ -2395,16 +2396,16 @@ ct_rename(struct ct_extract_state *ces, struct fnode *fnode)
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
 
-	if (ct_absolute_path(fnode->fl_sname)) {
-		strlcpy(path, fnode->fl_sname, sizeof(path));
+	if (ct_absolute_path(fnode->fn_sname)) {
+		strlcpy(path, fnode->fn_sname, sizeof(path));
 	} else {
 		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
-		    CT_PATHSEP, fnode->fl_sname);
+		    CT_PATHSEP, fnode->fn_sname);
 	}
-	return (rename(fnode->fl_fname, path));
+	return (rename(fnode->fn_fname, path));
 #else
-	return (renameat(fnode->fl_parent_dir->d_fd, fnode->fl_fname,
-	    fnode->fl_parent_dir->d_fd, fnode->fl_name));
+	return (renameat(fnode->fn_parent_dir->d_fd, fnode->fn_fname,
+	    fnode->fn_parent_dir->d_fd, fnode->fn_name));
 #endif
 }
 
@@ -2414,15 +2415,15 @@ ct_chmod(struct ct_extract_state *ces, struct fnode *fnode, mode_t mode)
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
 
-	if (ct_absolute_path(fnode->fl_sname)) {
-		strlcpy(path, fnode->fl_sname, sizeof(path));
+	if (ct_absolute_path(fnode->fn_sname)) {
+		strlcpy(path, fnode->fn_sname, sizeof(path));
 	} else {
 		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
-		    CT_PATHSEP, fnode->fl_sname);
+		    CT_PATHSEP, fnode->fn_sname);
 	}
 	return (chmod(path, mode));
 #else
-	return (fchmodat(fnode->fl_parent_dir->d_fd, fnode->fl_name, mode, 0));
+	return (fchmodat(fnode->fn_parent_dir->d_fd, fnode->fn_name, mode, 0));
 #endif
 }
 
@@ -2432,22 +2433,22 @@ ct_chown(struct ct_extract_state *ces, struct fnode *fnode, int follow_symlinks)
 #ifdef CT_NO_OPENAT
 	char	path[PATH_MAX];
 
-	if (ct_absolute_path(fnode->fl_sname)) {
-		strlcpy(path, fnode->fl_sname, sizeof(path));
+	if (ct_absolute_path(fnode->fn_sname)) {
+		strlcpy(path, fnode->fn_sname, sizeof(path));
 	} else {
 		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
-		    CT_PATHSEP, fnode->fl_sname);
+		    CT_PATHSEP, fnode->fn_sname);
 	}
 	if (follow_symlinks)
-		return (chown(path, fnode->fl_uid,
-		    fnode->fl_gid));
+		return (chown(path, fnode->fn_uid,
+		    fnode->fn_gid));
 	else
-		return (lchown(path, fnode->fl_uid,
-		   fnode->fl_gid));
+		return (lchown(path, fnode->fn_uid,
+		   fnode->fn_gid));
 #else
-	return (fchownat(fnode->fl_parent_dir->d_fd,
-	    fnode->fl_name, fnode->fl_uid,
-	    fnode->fl_gid, follow_symlinks ? 0 : AT_SYMLINK_NOFOLLOW));
+	return (fchownat(fnode->fn_parent_dir->d_fd,
+	    fnode->fn_name, fnode->fn_uid,
+	    fnode->fn_gid, follow_symlinks ? 0 : AT_SYMLINK_NOFOLLOW));
 #endif
 }
 
@@ -2458,27 +2459,27 @@ ct_utimes(struct ct_extract_state *ces, struct fnode *fnode)
 	char		path[PATH_MAX];
 	struct timeval	tv[2];
 
-	tv[0].tv_sec = fnode->fl_atime;
-	tv[1].tv_sec = fnode->fl_mtime;
+	tv[0].tv_sec = fnode->fn_atime;
+	tv[1].tv_sec = fnode->fn_mtime;
 	tv[0].tv_usec = tv[1].tv_usec = 0;
 
-	if (ct_absolute_path(fnode->fl_sname)) {
-		strlcpy(path, fnode->fl_sname, sizeof(path));
+	if (ct_absolute_path(fnode->fn_sname)) {
+		strlcpy(path, fnode->fn_sname, sizeof(path));
 	} else {
 		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
-		    CT_PATHSEP, fnode->fl_sname);
+		    CT_PATHSEP, fnode->fn_sname);
 	}
 
 	return (utimes(path, tv));
 #else
 	struct timespec	ts[2];
 
-	ts[0].tv_sec = fnode->fl_atime;
-	ts[1].tv_sec = fnode->fl_mtime;
+	ts[0].tv_sec = fnode->fn_atime;
+	ts[1].tv_sec = fnode->fn_mtime;
 	ts[0].tv_nsec = ts[1].tv_nsec = 0;
 
-	return (utimensat(fnode->fl_parent_dir->d_fd,
-	    fnode->fl_name, ts, 0));
+	return (utimensat(fnode->fn_parent_dir->d_fd,
+	    fnode->fn_name, ts, 0));
 #endif
 }
 
@@ -2488,16 +2489,16 @@ ct_unlink(struct ct_extract_state *ces, struct fnode *fnode)
 #ifdef CT_NO_OPENAT
 	char		path[PATH_MAX];
 
-	if (ct_absolute_path(fnode->fl_sname)) {
-		strlcpy(path, fnode->fl_sname, sizeof(path));
+	if (ct_absolute_path(fnode->fn_sname)) {
+		strlcpy(path, fnode->fn_sname, sizeof(path));
 	} else {
 		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
-		    CT_PATHSEP, fnode->fl_sname);
+		    CT_PATHSEP, fnode->fn_sname);
 	}
 
 	return (unlink(path));
 #else
-	return (unlinkat(fnode->fl_parent_dir->d_fd, fnode->fl_name, 0));
+	return (unlinkat(fnode->fn_parent_dir->d_fd, fnode->fn_name, 0));
 #endif
 }
 
@@ -2507,34 +2508,34 @@ ct_get_file_path(struct ctfile_parse_state *ctx, struct ctfile_header *hdr,
 {
 	char		*name;
 
-	fnode->fl_parent_dir = root_dnode; /* root unless otherwise stated */
+	fnode->fn_parent_dir = root_dnode; /* root unless otherwise stated */
 	name = hdr->cmh_filename;
-	/* fnode->fl_parent_dir default to NULL */
+	/* fnode->fn_parent_dir default to NULL */
 	if (hdr->cmh_parent_dir == -2) {
 		/* rooted directory */
-		e_asprintf(&fnode->fl_sname, "%s%s", strip_slash ? "" : "/",
+		e_asprintf(&fnode->fn_sname, "%s%s", strip_slash ? "" : "/",
 		    ctx->xs_hdr.cmh_filename);
-		name = fnode->fl_sname;
+		name = fnode->fn_sname;
 	} else if (hdr->cmh_parent_dir != -1) {
-		fnode->fl_parent_dir = ctfile_parse_finddir(ctx,
+		fnode->fn_parent_dir = ctfile_parse_finddir(ctx,
 		    ctx->xs_hdr.cmh_parent_dir);
-		if (fnode->fl_parent_dir == NULL)
+		if (fnode->fn_parent_dir == NULL)
 			CABORTX("can't find parent dir %" PRId64 " for %s",
 			    hdr->cmh_parent_dir, hdr->cmh_filename);
-		e_asprintf(&fnode->fl_sname, "%s%c%s",
-		    fnode->fl_parent_dir->d_name, CT_PATHSEP,
+		e_asprintf(&fnode->fn_sname, "%s%c%s",
+		    fnode->fn_parent_dir->d_name, CT_PATHSEP,
 		    ctx->xs_hdr.cmh_filename);
 		CNDBG(CT_LOG_CTFILE,
-		    "parent_dir %p %" PRId64, fnode->fl_parent_dir,
+		    "parent_dir %p %" PRId64, fnode->fn_parent_dir,
 		    hdr->cmh_parent_dir);
 	} else
-		fnode->fl_sname = e_strdup(ctx->xs_hdr.cmh_filename);
+		fnode->fn_sname = e_strdup(ctx->xs_hdr.cmh_filename);
 
 	/* name needed for openat() */
-	fnode->fl_name = e_strdup(name);
+	fnode->fn_name = e_strdup(name);
 
 	CNDBG(CT_LOG_CTFILE,
-	    "name %s from %s %" PRId64, fnode->fl_sname,
+	    "name %s from %s %" PRId64, fnode->fn_sname,
 	    ctx->xs_hdr.cmh_filename, ctx->xs_hdr.cmh_parent_dir);
 }
 
@@ -2549,8 +2550,8 @@ ct_populate_fnode(struct ct_extract_state *ces, struct ctfile_parse_state *ctx,
 
 	if (C_ISLINK(ctx->xs_hdr.cmh_type)) {
 		/* hardlink/symlink */
-		fnode->fl_hlname = e_strdup(ctx->xs_lnkhdr.cmh_filename);
-		fnode->fl_hardlink = !C_ISLINK(ctx->xs_lnkhdr.cmh_type);
+		fnode->fn_hlname = e_strdup(ctx->xs_lnkhdr.cmh_filename);
+		fnode->fn_hardlink = !C_ISLINK(ctx->xs_lnkhdr.cmh_type);
 		*state = TR_S_EX_SPECIAL;
 
 	} else if (!C_ISREG(ctx->xs_hdr.cmh_type)) {
@@ -2562,28 +2563,28 @@ ct_populate_fnode(struct ct_extract_state *ces, struct ctfile_parse_state *ctx,
 	}
 
 	/* ino not preserved? */
-	fnode->fl_rdev = ctx->xs_hdr.cmh_rdev;
-	fnode->fl_uid = ctx->xs_hdr.cmh_uid;
-	fnode->fl_gid = ctx->xs_hdr.cmh_gid;
-	fnode->fl_mode = ctx->xs_hdr.cmh_mode;
-	fnode->fl_mtime = ctx->xs_hdr.cmh_mtime;
-	fnode->fl_atime = ctx->xs_hdr.cmh_atime;
-	fnode->fl_type = ctx->xs_hdr.cmh_type;
+	fnode->fn_rdev = ctx->xs_hdr.cmh_rdev;
+	fnode->fn_uid = ctx->xs_hdr.cmh_uid;
+	fnode->fn_gid = ctx->xs_hdr.cmh_gid;
+	fnode->fn_mode = ctx->xs_hdr.cmh_mode;
+	fnode->fn_mtime = ctx->xs_hdr.cmh_mtime;
+	fnode->fn_atime = ctx->xs_hdr.cmh_atime;
+	fnode->fn_type = ctx->xs_hdr.cmh_type;
 
 	ct_get_file_path(ctx, &ctx->xs_hdr, fnode,
 	    ct_file_extract_get_rootdir(ces), strip_slash);
 
 	if (C_ISDIR(ctx->xs_hdr.cmh_type)) {
 		dnode = e_calloc(1,sizeof (*dnode));
-		dnode->d_name = e_strdup(fnode->fl_sname);
-		dnode->d_sname = e_strdup(fnode->fl_name);
+		dnode->d_name = e_strdup(fnode->fn_sname);
+		dnode->d_sname = e_strdup(fnode->fn_name);
 		dnode->d_fd = -1;
-		dnode->d_parent = fnode->fl_parent_dir;
-		dnode->d_mode = fnode->fl_mode;
-		dnode->d_atime = fnode->fl_atime;
-		dnode->d_mtime = fnode->fl_mtime;
-		dnode->d_uid = fnode->fl_uid;
-		dnode->d_gid = fnode->fl_gid;
+		dnode->d_parent = fnode->fn_parent_dir;
+		dnode->d_mode = fnode->fn_mode;
+		dnode->d_atime = fnode->fn_atime;
+		dnode->d_mtime = fnode->fn_mtime;
+		dnode->d_uid = fnode->fn_uid;
+		dnode->d_gid = fnode->fn_gid;
 
 		/* Insert into the name tree first to check for duplicates. */
 		if ((tdnode = ct_file_extract_insert_dir(ces, dnode)) != NULL) {

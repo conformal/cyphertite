@@ -1241,7 +1241,7 @@ ct_compute_sha(void *vctx)
 		    trans->tr_trans_id, slot, trans->tr_size[slot]);
 		ct_sha1(trans->tr_data[slot], trans->tr_sha,
 		    trans->tr_size[slot]);
-		ct_sha1_add(trans->tr_data[slot], &fnode->fl_shactx,
+		ct_sha1_add(trans->tr_data[slot], &fnode->fn_shactx,
 		    trans->tr_size[slot]);
 
 		state->ct_stats->st_bytes_sha += trans->tr_size[slot];
@@ -1462,7 +1462,7 @@ ct_handle_exists_reply(struct ct_global_state *state, struct ct_trans *trans,
 		CNDBG(CT_LOG_SHA, "sha does not exist");
 		trans->tr_state = TR_S_NEXISTS;
 		if (trans->tr_fl_node)
-			trans->tr_fl_node->fl_comp_size +=
+			trans->tr_fl_node->fn_comp_size +=
 			    trans->tr_size[(int)trans->tr_dataslot];
 	}
 transfer:

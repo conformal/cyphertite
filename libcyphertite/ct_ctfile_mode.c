@@ -429,7 +429,7 @@ ctfile_extract_complete_open(struct ct_global_state *state,
 	if ((ret = ct_file_extract_open(state->extract_state,
 	    trans->tr_fl_node)) != 0) {
 		snprintf(buffer, sizeof(buffer), "unable to open file %s",
-		    trans->tr_fl_node->fl_name);
+		    trans->tr_fl_node->fn_name);
 		ct_fatal(state, buffer, ret);
 	}
 
@@ -520,16 +520,16 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 	trans->tr_statemachine = ct_state_ctfile_extract;
 	if (ces->ces_open_sent == 0) {
 		ces->ces_fnode = e_calloc(1, sizeof(*ces->ces_fnode));
-		ces->ces_fnode->fl_type = C_TY_REG;
-		ces->ces_fnode->fl_parent_dir =
+		ces->ces_fnode->fn_type = C_TY_REG;
+		ces->ces_fnode->fn_parent_dir =
 		    ct_file_extract_get_rootdir(state->extract_state);
-		ces->ces_fnode->fl_name = e_strdup(ctfile);
-		ces->ces_fnode->fl_sname = e_strdup(ctfile);
-		ces->ces_fnode->fl_mode = S_IRUSR | S_IWUSR;
-		ces->ces_fnode->fl_uid = getuid();
-		ces->ces_fnode->fl_gid = getgid();
-		ces->ces_fnode->fl_atime = time(NULL);
-		ces->ces_fnode->fl_mtime = time(NULL);
+		ces->ces_fnode->fn_name = e_strdup(ctfile);
+		ces->ces_fnode->fn_sname = e_strdup(ctfile);
+		ces->ces_fnode->fn_mode = S_IRUSR | S_IWUSR;
+		ces->ces_fnode->fn_uid = getuid();
+		ces->ces_fnode->fn_gid = getgid();
+		ces->ces_fnode->fn_atime = time(NULL);
+		ces->ces_fnode->fn_mtime = time(NULL);
 
 		trans->tr_fl_node = ces->ces_fnode;
 

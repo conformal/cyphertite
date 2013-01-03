@@ -29,32 +29,32 @@
 
 struct fnode {
 	/* TAILQ_ENTRY(fnode)	fl_list; */
-	char			*fl_hlname;
-	struct dnode		*fl_parent_dir;
-	struct dnode		*fl_curdir_dir;
-	int			fl_hardlink;
-	dev_t			fl_dev;
-	ino_t			fl_ino;
-	uint64_t		fl_idx;
-	dev_t			fl_rdev;
-	uint32_t		fl_uid;
-	uint32_t		fl_gid;
-	int			fl_mode;
-	int64_t			fl_atime;
-	int64_t			fl_mtime;
-	int			fl_type;
-	off_t			fl_size;
-	off_t			fl_offset;
-	off_t			fl_comp_size;
-	char			*fl_fname;
-	char			*fl_name; /* name without directory */
-	char			*fl_sname;
-	int			fl_state;
+	char			*fn_hlname;
+	struct dnode		*fn_parent_dir;
+	struct dnode		*fn_curdir_dir;
+	int			fn_hardlink;
+	dev_t			fn_dev;
+	ino_t			fn_ino;
+	uint64_t		fn_idx;
+	dev_t			fn_rdev;
+	uint32_t		fn_uid;
+	uint32_t		fn_gid;
+	int			fn_mode;
+	int64_t			fn_atime;
+	int64_t			fn_mtime;
+	int			fn_type;
+	off_t			fn_size;
+	off_t			fn_offset;
+	off_t			fn_comp_size;
+	char			*fn_fname;
+	char			*fn_name; /* name without directory */
+	char			*fn_sname;
+	int			fn_state;
 #define CT_FILE_START		(0)
 #define CT_FILE_PROCESSING	(1)
 #define CT_FILE_FINISHED	(2)
-	SHA_CTX			fl_shactx;
-	int			fl_skip_file;
+	SHA_CTX			fn_shactx;
+	int			fn_skip_file;
 };
 
 struct dnode {

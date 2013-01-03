@@ -196,15 +196,15 @@ int
 ct_extract_complete_file_start(struct ct_global_state *state,
     struct ct_trans *trans)
 {
-	ct_sha1_setup(&trans->tr_fl_node->fl_shactx);
+	ct_sha1_setup(&trans->tr_fl_node->fn_shactx);
 	if (ct_file_extract_open(state->extract_state,
 	    trans->tr_fl_node) == 0) {
 		state->ct_print_file_start(state->ct_print_state,
 		    trans->tr_fl_node);
 	} else {
 		CWARN("unable to open file for writing %s",
-		    trans->tr_fl_node->fl_sname);
-		trans->tr_fl_node->fl_skip_file = 1;
+		    trans->tr_fl_node->fn_sname);
+		trans->tr_fl_node->fn_skip_file = 1;
 	}
 
 	return (0);
@@ -225,17 +225,17 @@ ct_extract_complete_file_read(struct ct_global_state *state,
 		e_asprintf(&errstr, "Data missing on server: "
 		    "file %s, sha %s",
 		    trans->tr_fl_node ?
-		    trans->tr_fl_node->fl_sname  : "unknown",
+		    trans->tr_fl_node->fn_sname  : "unknown",
 		    shat);
 		ct_fatal(state, errstr, trans->tr_errno);
 		free(errstr);
 		return (0);
 	}
 
-	if (trans->tr_fl_node->fl_skip_file == 0) {
+	if (trans->tr_fl_node->fn_skip_file == 0) {
 		slot = trans->tr_dataslot;
 		ct_sha1_add(trans->tr_data[slot],
-		    &trans->tr_fl_node->fl_shactx,
+		    &trans->tr_fl_node->fn_shactx,
 		    trans->tr_size[slot]);
 		if ((ret = ct_file_extract_write(state->extract_state,
 		    trans->tr_fl_node, trans->tr_data[slot],
@@ -258,13 +258,13 @@ int
 ct_extract_complete_file_end(struct ct_global_state *state,
     struct ct_trans *trans)
 {
-	if (trans->tr_fl_node->fl_skip_file == 0) {
+	if (trans->tr_fl_node->fn_skip_file == 0) {
 		ct_sha1_final(trans->tr_csha,
-		    &trans->tr_fl_node->fl_shactx);
+		    &trans->tr_fl_node->fn_shactx);
 		if (bcmp(trans->tr_csha, trans->tr_sha,
 		    sizeof(trans->tr_sha)) != 0)
 			CWARNX("extract sha mismatch on %s",
-			    trans->tr_fl_node->fl_sname);
+			    trans->tr_fl_node->fn_sname);
 		ct_file_extract_close(state->extract_state,
 		    trans->tr_fl_node);
 		state->ct_print_file_end(state->ct_print_state,
@@ -358,14 +358,14 @@ ct_extract_calculate_total(struct ct_global_state *state,
 			    &xdr_ctx, fnode, &tr_state, allfiles,
 			    cea->cea_strip_slash);
 			/* we don't care about individual shas */
-			if (C_ISREG(fnode->fl_type)) {
+			if (C_ISREG(fnode->fn_type)) {
 				ctfile_parse_seek(&xdr_ctx);
 			}
 
 			doextract = !ct_match(inc_match,
-			    fnode->fl_sname);
+			    fnode->fn_sname);
 			if (doextract && ex_match != NULL &&
-			  !ct_match(ex_match, fnode->fl_sname))
+			  !ct_match(ex_match, fnode->fn_sname))
 				doextract = 0;
 			/*
 			 * If we're on the first ctfile in an allfiles backup
@@ -374,7 +374,7 @@ ct_extract_calculate_total(struct ct_global_state *state,
 			 */
 			if (doextract == 1 && fillrb &&
 			    xdr_ctx.xs_hdr.cmh_nr_shas == -1) {
-				ct_match_insert_rb(rb_match, fnode->fl_sname);
+				ct_match_insert_rb(rb_match, fnode->fn_sname);
 				doextract = 0;
 			}
 			ct_free_fnode(fnode);
@@ -570,9 +570,9 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			}
 
 			ex_priv->doextract = !ct_match(ex_priv->inc_match,
-			    fnode->fl_sname);
+			    fnode->fn_sname);
 			if (ex_priv->doextract && ex_priv->ex_match != NULL &&
-			    !ct_match(ex_priv->ex_match, fnode->fl_sname))
+			    !ct_match(ex_priv->ex_match, fnode->fn_sname))
 				ex_priv->doextract = 0;
 			/*
 			 * If we're on the first ctfile in an allfiles backup
@@ -582,7 +582,7 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			if (ex_priv->doextract == 1 && ex_priv->fillrb &&
 			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas == -1) {
 				ct_match_insert_rb(ex_priv->rb_match,
-					    fnode->fl_sname);
+					    fnode->fn_sname);
 				ex_priv->doextract = 0;
 				goto skipfree;
 			}
@@ -596,14 +596,14 @@ skip:
 			}
 
 			CNDBG(CT_LOG_CTFILE,
-			    "file %s numshas %" PRId64, fnode->fl_sname,
+			    "file %s numshas %" PRId64, fnode->fn_sname,
 			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas);
 
 			ct_queue_first(state, trans);
 			break;
 		case XS_RET_SHA:
 			if (ex_priv->doextract == 0 ||
-			    trans->tr_fl_node->fl_skip_file != 0) {
+			    trans->tr_fl_node->fn_skip_file != 0) {
 				if (ctfile_parse_seek(&ex_priv->xdr_ctx)) {
 					ct_fatal(state, "Can't seek past shas",
 					    ex_priv->xdr_ctx.xs_errno);
@@ -616,7 +616,7 @@ skip:
 			if (memcmp(zerosha, ex_priv->xdr_ctx.xs_sha,
 				SHA_DIGEST_LENGTH) == 0) {
 				CWARNX("\"%s\" truncated during backup",
-				    trans->tr_fl_node->fl_sname);
+				    trans->tr_fl_node->fn_sname);
 				if (ctfile_parse_seek(&ex_priv->xdr_ctx)) {
 					ct_fatal(state, "Can't seek past "
 					    "truncation shas",
@@ -658,7 +658,7 @@ skip:
 			trans->tr_fl_node = ex_priv->fl_ex_node; /* reload */
 
 			if (ex_priv->doextract == 0 ||
-			    trans->tr_fl_node->fl_skip_file != 0) {
+			    trans->tr_fl_node->fn_skip_file != 0) {
 				ct_trans_free(state, trans);
 				continue;
 			}
@@ -667,7 +667,7 @@ skip:
 			trans->tr_state = TR_S_EX_FILE_END;
 			trans->tr_complete = ct_extract_complete_file_end;
 			trans->tr_cleanup = ct_extract_cleanup_fnode;
-			trans->tr_fl_node->fl_size =
+			trans->tr_fl_node->fn_size =
 			    ex_priv->xdr_ctx.xs_trl.cmt_orig_size;
 			ct_queue_first(state, trans);
 			break;
@@ -897,12 +897,12 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			}
 
 			/* XXX Check filename matches what we expect */
-			e_free(&trans->tr_fl_node->fl_sname);
-			trans->tr_fl_node->fl_sname = e_strdup(localfile);
+			e_free(&trans->tr_fl_node->fn_sname);
+			trans->tr_fl_node->fn_sname = e_strdup(localfile);
 			/* Set name pointer to something else passed in */
 
 			CNDBG(CT_LOG_CTFILE, "file %s numshas %" PRId64,
-			    trans->tr_fl_node->fl_sname,
+			    trans->tr_fl_node->fn_sname,
 			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas);
 			break;
 		case XS_RET_SHA:
@@ -942,7 +942,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			trans->tr_state = TR_S_EX_FILE_END;
 			trans->tr_complete = ct_extract_complete_file_end;
 			trans->tr_cleanup = ct_extract_cleanup_fnode;
-			trans->tr_fl_node->fl_size =
+			trans->tr_fl_node->fn_size =
 			    ex_priv->xdr_ctx.xs_trl.cmt_orig_size;
 			/* Done now, don't parse further. */
 			ex_priv->done = 1;
