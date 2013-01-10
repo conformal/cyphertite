@@ -59,3 +59,22 @@ extern struct xmlsd_v_elem xe_ct_clientdb_newver[];
 
 #define CT_CLIENTDB_NEWVER_REPLY_VERSION	"V1"
 extern struct xmlsd_v_elem xe_ct_clientdb_newver_reply[];
+
+#define CT_ARCHIVE_CREATE_VERSION		"V1"
+#define CT_ARCHIVE_CREATE_REPLY_VERSION		"V1"
+extern struct xmlsd_v_elem xe_ct_archive_create_reply[];
+
+#define CT_ARCHIVE_REPLACE_VERSION		"V1"
+#define CT_ARCHIVE_REPLACE_REPLY_VERSION	"V1"
+
+#define CT_ARCHIVE_REMOVE_VERSION		"V1"
+#define CT_ARCHIVE_REMOVE_REPLY_VERSION		"V1"
+extern struct xmlsd_v_elem xe_ct_archive_remove_reply[];
+
+#define CT_ARCHIVE_LIST_VERSION			"V1"
+#define CT_ARCHIVE_LIST_REPLY_VERSION		"V1"
+extern struct xmlsd_v_elem xe_ct_archive_list_reply[];
+
+#define CT_ARCHIVE_GET_VERSION			"V1"
+#define CT_ARCHIVE_GET_REPLY_VERSION		"V1"
+extern struct xmlsd_v_elem xe_ct_archive_get_reply[];

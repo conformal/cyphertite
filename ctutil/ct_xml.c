@@ -51,6 +51,7 @@ struct xmlsd_v_attr		xa_ct_value_attr[] = {
 
 struct xmlsd_v_attr		xa_ct_reply_attr[] = {
 	{ "version" },
+	{ "xmlversion" },
 	{ "success" },
 	{ NULL }
 };
@@ -65,6 +66,18 @@ struct xmlsd_v_attr		xa_ct_cull_reply_attr[] = {
 	{ "version" },
 	{ "success" },
 	{ "clientdbgenid" },
+	{ NULL }
+};
+
+struct xmlsd_v_attr		xa_ct_archive_ctfile_attr[] = {
+	{ "xmlversion" },
+	{ "tag" },
+	{ "timestamp" },
+	{ "level" },
+	{ "version" },
+	{ "mtime" },
+	{ "size" },
+	{ "success" },
 	{ NULL }
 };
 
@@ -145,5 +158,33 @@ struct xmlsd_v_elem		xe_ct_clientdb_newver[] = {
 
 struct xmlsd_v_elem		xe_ct_clientdb_newver_reply[] = {
 	{ "ct_clientdb_newver_reply","",		xa_ct_reply_attr },
+	{ NULL,		NULL,			NULL}
+};
+
+struct xmlsd_v_attr		xa_ct_archive_reply_attr[] = {
+	{ "xmlversion", XMLSD_V_ATTR_F_REQUIRED  },
+	{ "success",  XMLSD_V_ATTR_F_REQUIRED },
+	{ NULL }
+};
+
+struct xmlsd_v_elem		xe_ct_archive_create_reply[] = {
+	{ "ct_archive_create_reply","",		xa_ct_archive_reply_attr },
+	{ NULL,		NULL,			NULL}
+};
+
+struct xmlsd_v_elem		xe_ct_archive_remove_reply[] = {
+	{ "ct_archive_remove_reply","",		xa_ct_archive_reply_attr },
+	{ NULL,		NULL,			NULL}
+};
+
+struct xmlsd_v_elem		xe_ct_archive_list_reply[] = {
+	{ "ct_archive_list_reply","",		xa_ct_reply_attr },
+	{ "archive", "archive.ct_archive_list_reply",
+	    xa_ct_archive_ctfile_attr },
+	{ NULL,		NULL,			NULL}
+};
+struct xmlsd_v_elem		xe_ct_archive_get_reply[] = {
+	{ "ct_archive_get_reply","",		xa_ct_archive_ctfile_attr },
+	{ "chunk", "chunk.ct_archive_get_reply", xa_ct_sha_attr },
 	{ NULL,		NULL,			NULL}
 };
