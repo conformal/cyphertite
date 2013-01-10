@@ -393,6 +393,7 @@ void			ct_trans_cleanup(struct ct_global_state *);
 char	*ct_dirname(const char *);
 char	*ct_basename(const char *);
 int	 ct_absolute_path(const char *);
+int	 ct_is_root_path(const char *);
 char			*ctfile_cook_name(const char *);
 int			 ctfile_in_cache(const char *, const char *);
 char			*ctfile_get_cachename(const char *, const char *);

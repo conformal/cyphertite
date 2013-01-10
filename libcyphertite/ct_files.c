@@ -183,8 +183,9 @@ gen_fname(struct flist *flnode)
 	char *name;
 
 	if (flnode->fl_parent_dir && flnode->fl_parent_dir->d_num != -3) {
-		e_asprintf(&name, "%s%c%s", flnode->fl_parent_dir->d_name,
-		    CT_PATHSEP, flnode->fl_fname);
+		e_asprintf(&name, "%s%s%s", flnode->fl_parent_dir->d_name,
+		    (ct_is_root_path(flnode->fl_parent_dir->d_name) ?
+		    "" : CT_PATHSEP_STR), flnode->fl_fname);
 	} else {
 		name = e_strdup(flnode->fl_fname);
 	}
@@ -290,6 +291,8 @@ ct_populate_fnode_from_flist(struct ct_archive_state *cas,
 
 	fnode->fn_name = fname;
 	fnode->fn_fullname = gen_fname(flnode);
+	CNDBG(CT_LOG_FILE, "name = %s fname = %s", fnode->fn_name,
+	    fnode->fn_fullname);
 	fnode->fn_dev = sb->st_dev;
 	fnode->fn_rdev = sb->st_rdev;
 	fnode->fn_ino = sb->st_ino;
@@ -570,14 +573,17 @@ ct_sched_backup_file(struct ct_archive_state *cas, struct stat *sb,
 			adnode = (struct ct_archive_dnode *)e_dnode;
 			ct_free_dnode(dnode);
 			if (adnode->ad_seen == 0) {
+				CNDBG(CT_LOG_FILE, "found previous dir for %s",
+				    e_dnode->d_name);
 				adnode->ad_seen = 1;
 				dnode = e_dnode;
 			} else {
 				/* don't do more than once */
 				return;
 			}
-		} else
-			CNDBG(CT_LOG_CTFILE, "inserted %s", filename);
+		} else {
+			CNDBG(CT_LOG_FILE, "inserted dir %s", filename);
+		}
 		/*
 		 * 3factor dnodes will have been allocated numbers during
 		 * ctfile parse, so reset all numbers to ``unallocated''
@@ -594,7 +600,8 @@ ct_sched_backup_file(struct ct_archive_state *cas, struct stat *sb,
 	flnode->fl_parent_dir = NULL;
 
 	dir_name = ct_dirname(filename);
-	if ((dfound = ct_archive_lookup_dir(cas, dir_name)) != NULL) {
+	if (!ct_is_root_path(filename) &&
+	    (dfound = ct_archive_lookup_dir(cas, dir_name)) != NULL) {
 		flnode->fl_parent_dir = dfound;
 		CNDBG(CT_LOG_CTFILE, "parent of %s is %s", filename,
 		    dfound->d_name);
@@ -2513,8 +2520,20 @@ ct_get_file_path(struct ctfile_parse_state *ctx, struct ctfile_header *hdr,
 	/* fnode->fn_parent_dir default to NULL */
 	if (hdr->cmh_parent_dir == -2) {
 		/* rooted directory */
-		e_asprintf(&fnode->fn_fullname, "%s%s", strip_slash ? "" : "/",
-		    ctx->xs_hdr.cmh_filename);
+		if (ct_is_root_path(hdr->cmh_filename)) {
+			/* e.g. /, -2 when '/' was backed up explicitly */
+			if (strip_slash) {
+				fnode->fn_fullname = e_strdup(".");
+			} else {
+				fnode->fn_fullname =
+				    e_strdup(ctx->xs_hdr.cmh_filename);
+			}
+		} else {
+			/* /sbin backed up explicitly leads to sbin, -2 */
+			e_asprintf(&fnode->fn_fullname, "%s%s",
+			    strip_slash ? "" : "/",
+			    ctx->xs_hdr.cmh_filename);
+		}
 		name = fnode->fn_fullname;
 	} else if (hdr->cmh_parent_dir != -1) {
 		fnode->fn_parent_dir = ctfile_parse_finddir(ctx,
@@ -2522,9 +2541,10 @@ ct_get_file_path(struct ctfile_parse_state *ctx, struct ctfile_header *hdr,
 		if (fnode->fn_parent_dir == NULL)
 			CABORTX("can't find parent dir %" PRId64 " for %s",
 			    hdr->cmh_parent_dir, hdr->cmh_filename);
-		e_asprintf(&fnode->fn_fullname, "%s%c%s",
-		    fnode->fn_parent_dir->d_name, CT_PATHSEP,
-		    ctx->xs_hdr.cmh_filename);
+		e_asprintf(&fnode->fn_fullname, "%s%s%s",
+		    fnode->fn_parent_dir->d_name,
+		    (ct_is_root_path(fnode->fn_parent_dir->d_name) ?
+		    "" : CT_PATHSEP_STR), ctx->xs_hdr.cmh_filename);
 		CNDBG(CT_LOG_CTFILE,
 		    "parent_dir %p %" PRId64, fnode->fn_parent_dir,
 		    hdr->cmh_parent_dir);
@@ -2697,4 +2717,10 @@ int
 ct_absolute_path(const char *path)
 {
 	return (path[0] == '/');
+}
+
+int
+ct_is_root_path(const char *path)
+{
+	return (strcmp(path, "/") == 0);
 }
