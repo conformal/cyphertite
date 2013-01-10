@@ -61,7 +61,7 @@ check_external_libs()
 {
 	OS=$(uname)
 	EXTERNAL_LIBS="ssl crypto expat z lzo2 lzma sqlite3 event_core edit"
-	EXTERNAL_LIBS="$EXTERNAL_LIBS ncurses curl"
+	EXTERNAL_LIBS="$EXTERNAL_LIBS ncurses"
 
 	# standard lib dirs - override below if needed
 	LIB_DIRS="/usr/lib /usr/lib64 /usr/local/lib /usr/local/lib64"
@@ -118,6 +118,16 @@ ct_build_and_install()
 		make install || report_err "Install failed for '$pkg'."
 		cd ..
 	fi
+
+	# build and install curl source using the same openssl version as ct.
+	pkg="curl-7.28.1"
+	echo "Building ==> $pkg"
+	cd "$pkg"
+	./configure || report_err "config script failed for '$pkg'."
+	make || report_err "Make failed for '$pkg'."
+	echo "Installing ==> $pkg"
+	make install || report_err "Install failed for '$pkg'."
+	cd ..
 
 	# build and install packages in dependency order
 	CT_PKGS="clens clog assl xmlsd shrink exude cyphertite"

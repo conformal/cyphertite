@@ -73,7 +73,7 @@ check_utils()
 
 check_external_libs()
 {
-	EXTERNAL_LIBS="expat z lzo2 lzma sqlite3 event_core edit ncurses curl"
+	EXTERNAL_LIBS="expat z lzo2 lzma sqlite3 event_core edit ncurses"
 
 	# standard lib dirs - override below if needed
 	LIB_DIRS="/usr/lib /usr/lib64 /usr/local/lib /usr/local/lib64"
@@ -154,6 +154,18 @@ ct_get_source()
 		fi
 	fi
 
+	# download the curl source tar
+	CURL_PKG="curl-7.28.1"
+	CURL_TGZ="$CURL_PKG.tar.gz"
+	CURL_URL="https://www.cyphertite.com/snapshots/curl/$CURL_TGZ"
+	if [ ! -d "$CURL_PKG" ]; then
+		if [ ! -e "$CURL_TGZ" ]; then
+			echo "Getting source ==> $CURL_PKG"
+			ct_download_url "$CURL_TGZ" "$CURL_URL"
+		fi
+			tar -zxf "$CURL_TGZ"
+	fi
+
 	# clone the source or update existing repo for ct and all of its
 	# Conformal dependencies
 	CT_PKGS="clens clog assl xmlsd shrink exude cyphertite"
@@ -187,6 +199,16 @@ ct_build_and_install()
 		make install || report_err "Install failed for '$pkg'."
 		cd ..
 	fi
+
+	# build and install curl source using the same openssl version as ct.
+	pkg="$CURL_PKG"
+	echo "Building ==> $pkg"
+	cd "$pkg"
+	./configure || report_err "config script failed for '$pkg'."
+	make || report_err "Make failed for '$pkg'."
+	echo "Installing ==> $pkg"
+	make install || report_err "Install failed for '$pkg'."
+	cd ..
 
 	# build and install packages in dependency order
 	CT_PKGS="clens clog assl xmlsd shrink exude cyphertite"
