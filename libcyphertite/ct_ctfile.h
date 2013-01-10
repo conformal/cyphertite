@@ -155,4 +155,7 @@ void	 ctfile_write_abort(struct ctfile_write_state *);
 
 int	 ctfile_get_previous(const char *, const char *, char **);
 
+/* XXX internal only */
+void	ct_get_file_path(struct ctfile_parse_state *, struct ctfile_header *,
+	    struct fnode *, struct dnode *, int);
 #endif /* ! CT_CTFILE_H */

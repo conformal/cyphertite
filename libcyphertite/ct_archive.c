@@ -35,10 +35,8 @@ ct_basis_setup(struct ct_archive_state *state, struct ct_archive_args *caa,
     const char *cwd)
 {
 	struct ctfile_parse_state	 xs_ctx;
-	struct dnode			*pdnode;
 	struct ct_archive_dnode		*adnode;
 	struct ct_archive_file		*af = NULL;
-	char				*name;
 	char				**fptr;
 	time_t				 prev_backup_time = 0;
 	int				 nextlvl, i, rooted = 1, ret, s_errno;
@@ -94,31 +92,25 @@ ct_basis_setup(struct ct_archive_state *state, struct ct_archive_args *caa,
 
 	while ((ret = ctfile_parse(&xs_ctx)) != XS_RET_EOF) {
 		if (ret == XS_RET_FILE /* && 3factor */) {
+			struct fnode	sfnode;
+
 			if (!C_ISDIR(xs_ctx.xs_hdr.cmh_type) &&
 			    !C_ISREG(xs_ctx.xs_hdr.cmh_type)) 
 				continue;
 			/* set up parent dnode */
-			pdnode = ct_archive_get_rootdir(state);
-			if (xs_ctx.xs_hdr.cmh_parent_dir == -2) {
-				e_asprintf(&name, "%s%s",
-				    "/", xs_ctx.xs_hdr.cmh_filename);
-			} else if (xs_ctx.xs_hdr.cmh_parent_dir != -1) {
-				pdnode = ctfile_parse_finddir(&xs_ctx,
-				    xs_ctx.xs_hdr.cmh_parent_dir);
-				
-				e_asprintf(&name, "%s%c%s", pdnode->d_name, CT_PATHSEP,
-				    xs_ctx.xs_hdr.cmh_filename);
-			} else {
-				name = e_strdup(xs_ctx.xs_hdr.cmh_filename);
-			}
+			ct_get_file_path(&xs_ctx, &xs_ctx.xs_hdr, &sfnode,
+			    ct_archive_get_rootdir(state), 0);
+			e_free(sfnode.fl_name);
 
 			if (C_ISDIR(xs_ctx.xs_hdr.cmh_type)) {
-				CNDBG(CT_LOG_FILE, "dir: %s", name);
 				adnode = e_calloc(1, sizeof(*adnode));
 				RB_INIT(&adnode->ad_children);
-				adnode->ad_dnode.d_name = name;
+				adnode->ad_dnode.d_name = sfnode.fl_sname;
+				CNDBG(CT_LOG_FILE, "dir: %s",
+				    adnode->ad_dnode.d_name);
 				adnode->ad_dnode.d_fd = -1;
-				adnode->ad_dnode.d_parent = pdnode;
+				adnode->ad_dnode.d_parent =
+				    sfnode.fl_parent_dir;
 				/*
 				 * rest of this data will be filled
 				 * in by ct_sched_backup_file
@@ -132,13 +124,16 @@ ct_basis_setup(struct ct_archive_state *state, struct ct_archive_args *caa,
 				ctfile_parse_insertdir(&xs_ctx,
 				    &adnode->ad_dnode);
 			} else if (C_ISREG(xs_ctx.xs_hdr.cmh_type)) {
-				CNDBG(CT_LOG_FILE, "file: %s (%s)", name,
+				CNDBG(CT_LOG_FILE, "file: %s (%s)",
+				    sfnode.fl_sname,
 				    xs_ctx.xs_hdr.cmh_filename);
-				if (pdnode == NULL)
+				e_free(sfnode.fl_sname);
+				if (sfnode.fl_parent_dir == NULL)
 					CABORTX("that's unpossible!");
-				adnode = (struct ct_archive_dnode *)pdnode;
+				adnode = (struct ct_archive_dnode *)
+				    sfnode.fl_parent_dir;
 				CNDBG(CT_LOG_FILE, "parent: %s",
-				    pdnode->d_name);
+				    sfnode.fl_parent_dir->d_name);
 
 				/* make file reference for self */
 				af = e_calloc(1, sizeof(*af));

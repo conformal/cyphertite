@@ -2501,12 +2501,48 @@ ct_unlink(struct ct_extract_state *ces, struct fnode *fnode)
 #endif
 }
 
+void
+ct_get_file_path(struct ctfile_parse_state *ctx, struct ctfile_header *hdr,
+    struct fnode *fnode, struct dnode *root_dnode, int strip_slash)
+{
+	char		*name;
+
+	fnode->fl_parent_dir = root_dnode; /* root unless otherwise stated */
+	name = hdr->cmh_filename;
+	/* fnode->fl_parent_dir default to NULL */
+	if (hdr->cmh_parent_dir == -2) {
+		/* rooted directory */
+		e_asprintf(&fnode->fl_sname, "%s%s", strip_slash ? "" : "/",
+		    ctx->xs_hdr.cmh_filename);
+		name = fnode->fl_sname;
+	} else if (hdr->cmh_parent_dir != -1) {
+		fnode->fl_parent_dir = ctfile_parse_finddir(ctx,
+		    ctx->xs_hdr.cmh_parent_dir);
+		if (fnode->fl_parent_dir == NULL)
+			CABORTX("can't find parent dir %" PRId64 " for %s",
+			    hdr->cmh_parent_dir, hdr->cmh_filename);
+		e_asprintf(&fnode->fl_sname, "%s%c%s",
+		    fnode->fl_parent_dir->d_name, CT_PATHSEP,
+		    ctx->xs_hdr.cmh_filename);
+		CNDBG(CT_LOG_CTFILE,
+		    "parent_dir %p %" PRId64, fnode->fl_parent_dir,
+		    hdr->cmh_parent_dir);
+	} else
+		fnode->fl_sname = e_strdup(ctx->xs_hdr.cmh_filename);
+
+	/* name needed for openat() */
+	fnode->fl_name = e_strdup(name);
+
+	CNDBG(CT_LOG_CTFILE,
+	    "name %s from %s %" PRId64, fnode->fl_sname,
+	    ctx->xs_hdr.cmh_filename, ctx->xs_hdr.cmh_parent_dir);
+}
+
 int
 ct_populate_fnode(struct ct_extract_state *ces, struct ctfile_parse_state *ctx,
     struct fnode *fnode, int *state, int allfiles, int strip_slash)
 {
 	struct dnode		*dnode, *tdnode;
-	char			*name;
 
 	if (strip_slash == 0 && ctx->xs_gh.cmg_flags & CT_MD_STRIP_SLASH)
 		strip_slash = 1;
@@ -2534,42 +2570,13 @@ ct_populate_fnode(struct ct_extract_state *ces, struct ctfile_parse_state *ctx,
 	fnode->fl_atime = ctx->xs_hdr.cmh_atime;
 	fnode->fl_type = ctx->xs_hdr.cmh_type;
 
-	/* Default to parent being the ``root''. */
-	fnode->fl_parent_dir = ct_file_extract_get_rootdir(ces);
-	name = ctx->xs_hdr.cmh_filename;
-	/* fnode->fl_parent_dir default to NULL */
-	if (ctx->xs_hdr.cmh_parent_dir == -2) {
-		/* rooted directory */
-		e_asprintf(&fnode->fl_sname, "%s%s", strip_slash ? "" : "/",
-		    ctx->xs_hdr.cmh_filename);
-		name = fnode->fl_sname;
-	} else if (ctx->xs_hdr.cmh_parent_dir != -1) {
-		fnode->fl_parent_dir = ctfile_parse_finddir(ctx,
-		    ctx->xs_hdr.cmh_parent_dir);
-		if (fnode->fl_parent_dir == NULL)
-			CABORTX("can't find parent dir %" PRId64 " for %s",
-			    ctx->xs_hdr.cmh_parent_dir,
-			    ctx->xs_hdr.cmh_filename);
-		e_asprintf(&fnode->fl_sname, "%s%c%s",
-		    fnode->fl_parent_dir->d_name, CT_PATHSEP,
-		    ctx->xs_hdr.cmh_filename);
-		CNDBG(CT_LOG_CTFILE,
-		    "parent_dir %p %" PRId64, fnode->fl_parent_dir,
-		    ctx->xs_hdr.cmh_parent_dir);
-	} else
-		fnode->fl_sname = e_strdup(ctx->xs_hdr.cmh_filename);
-
-	/* name needed for openat() */
-	fnode->fl_name = e_strdup(name);
-
-	CNDBG(CT_LOG_CTFILE,
-	    "name %s from %s %" PRId64, fnode->fl_sname,
-	    ctx->xs_hdr.cmh_filename, ctx->xs_hdr.cmh_parent_dir);
+	ct_get_file_path(ctx, &ctx->xs_hdr, fnode,
+	    ct_file_extract_get_rootdir(ces), strip_slash);
 
 	if (C_ISDIR(ctx->xs_hdr.cmh_type)) {
 		dnode = e_calloc(1,sizeof (*dnode));
 		dnode->d_name = e_strdup(fnode->fl_sname);
-		dnode->d_sname = e_strdup(name);
+		dnode->d_sname = e_strdup(fnode->fl_name);
 		dnode->d_fd = -1;
 		dnode->d_parent = fnode->fl_parent_dir;
 		dnode->d_mode = fnode->fl_mode;
