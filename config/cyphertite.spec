@@ -20,7 +20,7 @@ Buildroot:	%{_tmppath}/%{name}-%{version}-buildroot
 Prefix: 	/usr
 Requires:	assl >= 1.1.0, clog >= 0.4.0, exude >= 0.6.0, shrink >= 0.3.0
 Requires:	xmlsd >= 0.9.0, libbsd, %{libeventpkg} >= 2.0, sqlite >= 3.6.23
-Requires:	libedit >= 3.0, libcurl >= 7.11
+Requires:	libedit >= 3.0
 
 %description
 Cyphertite is a high-security scalable solution for online backups.
