@@ -28,6 +28,7 @@ LN ?= ln
 LNFLAGS ?= -sf
 MKDIR ?= mkdir
 RM ?= rm -f
+RMDIR ?= rmdir
 
 # Compiler and linker flags.
 CPPFLAGS += -DNEED_LIBCLENS
@@ -66,8 +67,7 @@ install:
 
 uninstall:
 	$(RM) $(DESTDIR)$(LIBDIR)/$(LIB.STATIC)
-	$(RM) $(addprefix $(DESTDIR)$(INCDIR)/cyphertite, $(LIB.HEADERS))
-	$(RMDIR) $(DESTDIR)$(INCDIR)/cyphertite
+	$(RM) $(addprefix $(DESTDIR)$(INCDIR)/cyphertite/, $(LIB.HEADERS))
 
 clean:
 	$(RM) $(LIB.OBJS)

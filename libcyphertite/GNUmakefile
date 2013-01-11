@@ -30,6 +30,7 @@ LNFORCE ?= -f
 LNFLAGS ?= -sf
 MKDIR ?= mkdir
 RM ?= rm -f
+RMDIR ?= rmdir
 
 # Compiler and linker flags.
 CPPFLAGS += -DNEED_LIBCLENS
@@ -182,8 +183,9 @@ install:
 
 uninstall:
 	$(RM) $(DESTDIR)$(LIBDIR)/$(LIB.STATIC)
-	$(RM) $(addprefix $(DESTDIR)$(INCDIR)/cyphertite, $(LIB.HEADERS))
+	$(RM) $(addprefix $(DESTDIR)$(INCDIR)/cyphertite/, $(LIB.HEADERS))
 	$(RMDIR) $(DESTDIR)$(INCDIR)/cyphertite
+	@set $(addprefix $(DESTDIR)$(MANDIR)/, $(LIB.MLINKS)); \
 	while : ; do \
 		case $$# in \
 			0) break;; \
