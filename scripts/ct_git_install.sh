@@ -76,7 +76,21 @@ check_external_libs()
 	EXTERNAL_LIBS="expat z lzo2 lzma sqlite3 event_core edit ncurses"
 
 	# standard lib dirs - override below if needed
-	LIB_DIRS="/usr/lib /usr/lib64 /usr/local/lib /usr/local/lib64"
+	SLIB_DIRS="/usr/lib /usr/lib64 /usr/local/lib /usr/local/lib64"
+
+	# attempt to extract lib dirs from ld
+	LIB_DIRS=$(ld --verbose 2>/dev/null | grep SEARCH_DIR)
+	LIB_DIRS=$(echo $LIB_DIRS | sed -e 's/SEARCH_DIR("//g')
+	LIB_DIRS=$(echo $LIB_DIRS | sed -e 's/=//g')
+	LIB_DIRS=$(echo $LIB_DIRS | sed -e 's/");//g')
+
+	# fallback to standard lib dirs - override below if needed
+	for d in $SLIB_DIRS; do
+	    IGNORE=$(echo "$LIB_DIRS" | grep "$d" 2>/dev/null)
+	    if [ $? -ne 0 ]; then
+		LIB_DIRS="$LIB_DIRS $d"
+	    fi
+	done
 
 	# linux flavor
 	if [ "$OS" = "Linux" ]; then
