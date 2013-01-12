@@ -137,7 +137,7 @@ ct_build_and_install()
 	pkg="curl-7.28.1"
 	echo "Building ==> $pkg"
 	cd "$pkg"
-	./configure --disable-shared --disable-ldap || \
+	./configure --disable-shared --disable-ldap --with-ssl || \
 	    report_err "config script failed for '$pkg'."
 	make || report_err "Make failed for '$pkg'."
 	echo "Installing ==> $pkg"
