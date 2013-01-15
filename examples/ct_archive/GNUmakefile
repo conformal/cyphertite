@@ -41,13 +41,19 @@ else
 CTUTILDIR=../../ctutil
 endif
 
+# curl
+CURL.LDLIBS = $(shell $(BINDIR)/curl-config --static-libs | \
+    sed -e 's/-lssl//g' -e 's/-lcrypto//g' -e 's/-lz//g' -e 's/ \+/ /g')
+
 # Compiler and linker flags.
 CPPFLAGS += -DNEED_LIBCLENS
 INCFLAGS += -I../../ctutil -I../../libcyphertite -I$(INCDIR)/clens -I. -I$(INCDIR)
 CFLAGS += $(INCFLAGS) $(WARNFLAGS) $(OPTLEVEL) $(DEBUG)
-LDLIBS += -L../../ctutil/obj -L../../ctutil -L../../libcyphertite/obj -L../../libcyphertite -lcyphertite -lctutil
-LDLIBS += -lassl -lexude -lclog -lshrink -lxmlsd -lclens -levent_core -lexpat
-LDLIBS += -lcurl -lsqlite3 -llzma -llzo2 ${LIB.LINKSTATIC} -lssl -lcrypto
+LDLIBS += -L../../ctutil/obj -L../../ctutil -L../../libcyphertite/obj
+LDLIBS += -L../../libcyphertite
+LDLIBS += -lcyphertite -lctutil -lassl -lexude -lclog -lshrink -lxmlsd
+LDLIBS += -lclens -levent_core -lexpat -lsqlite3 -llzma -llzo2 $(CURL.LDLIBS)
+LDLIBS += ${LIB.LINKSTATIC} -lssl -lcrypto
 LDLIBS += ${LIB.LINKDYNAMIC} -ldl -ledit -lncurses -lz
 
 BIN.NAME = ct_archive
