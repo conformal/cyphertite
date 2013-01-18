@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.4.3
+%define version		1.4.5
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,11 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Fri Jan 18 2013 - davec 1.4.5-1
+- Fix an issue that caused a crash on older versions of Fedora during
+  certificate download (bz #40)
+- Include version information for additional dependencies in -V output
+- Other minor code cleanup
 * Tue Dec 11 2012 - davec 1.4.3-1
 - Add enhanced detection of changed files for incremental backups
 - Remove option to create an unencrypted backup

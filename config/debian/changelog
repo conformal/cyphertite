@@ -1,3 +1,12 @@
+cyphertite (1.4.5-1) unstable; urgency=low
+
+  * Fix an issue that caused a crash on older versions of Fedora during
+    certificate download (bz #40)
+  * Include version information for additional dependencies in -V output
+  * Other minor code cleanup
+
+ -- Conformal Systems <package-discuss@conformal.com>  Fri, 18 Jan 2013 09:48:37 -0600
+
 cyphertite (1.4.3-1) unstable; urgency=low
 
   * Add enhanced detection of changed files for incremental backups
