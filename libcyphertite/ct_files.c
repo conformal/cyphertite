@@ -1493,10 +1493,6 @@ eat_double_dots(char *path, char *resolved)
 			continue;
 		}
 
-		/* '.' component is redundant */
-		if (!strcmp(cp, "."))
-			continue;
-
 		/* '..' component is special */
 		if (!strcmp(cp, "..")) {
 			if (!strcmp(resolved, CT_PATHSEP_STR))
@@ -1517,9 +1513,6 @@ eat_double_dots(char *path, char *resolved)
 			strlcat(resolved, CT_PATHSEP_STR, PATH_MAX);
 		strlcat(resolved, cp, PATH_MAX);
 	}
-
-	if (!strncmp(resolved, "." CT_PATHSEP_STR, 2))
-		memmove(resolved, resolved + 2, PATH_MAX - 2);
 
 	rv = resolved;
 done:
