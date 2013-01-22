@@ -600,7 +600,7 @@ ct_sched_backup_file(struct ct_archive_state *cas, struct stat *sb,
 	flnode->fl_parent_dir = NULL;
 
 	dir_name = ct_dirname(filename);
-	if (!ct_is_root_path(filename) &&
+	if (!ct_is_null_path(filename) && !ct_is_root_path(filename) &&
 	    (dfound = ct_archive_lookup_dir(cas, dir_name)) != NULL) {
 		flnode->fl_parent_dir = dfound;
 		CNDBG(CT_LOG_CTFILE, "parent of %s is %s", filename,
@@ -2716,4 +2716,11 @@ int
 ct_is_root_path(const char *path)
 {
 	return (strcmp(path, "/") == 0);
+}
+
+int
+ct_is_null_path(const char *path)
+{
+	/* XXX or "./"? */
+	return (strcmp(path, ".") == 0);
 }
