@@ -2534,15 +2534,32 @@ ct_get_file_path(struct ctfile_parse_state *ctx, struct ctfile_header *hdr,
 		if (fnode->fn_parent_dir == NULL)
 			CABORTX("can't find parent dir %" PRId64 " for %s",
 			    hdr->cmh_parent_dir, hdr->cmh_filename);
-		e_asprintf(&fnode->fn_fullname, "%s%s%s",
-		    fnode->fn_parent_dir->d_name,
-		    (ct_is_root_path(fnode->fn_parent_dir->d_name) ?
-		    "" : CT_PATHSEP_STR), ctx->xs_hdr.cmh_filename);
+		/*
+		 * If we are a ../ and we are stripping slashes then we strip 
+		 * back to the tdir again, behaves similar to gtar.
+		 */
+		if (strip_slash &&
+		    ct_is_backwards_path(ctx->xs_hdr.cmh_filename)) {
+			fnode->fn_parent_dir = root_dnode;
+			fnode->fn_fullname = e_strdup(".");
+			name = fnode->fn_fullname;
+		} else {
+			e_asprintf(&fnode->fn_fullname, "%s%s%s",
+			    fnode->fn_parent_dir->d_name,
+			    (ct_is_root_path(fnode->fn_parent_dir->d_name) ?
+			    "" : CT_PATHSEP_STR), ctx->xs_hdr.cmh_filename);
+		}
 		CNDBG(CT_LOG_CTFILE,
 		    "parent_dir %p %" PRId64, fnode->fn_parent_dir,
 		    hdr->cmh_parent_dir);
 	} else
-		fnode->fn_fullname = e_strdup(ctx->xs_hdr.cmh_filename);
+		if (strip_slash &&
+		    ct_is_backwards_path(ctx->xs_hdr.cmh_filename)) {
+			fnode->fn_fullname = e_strdup(".");
+			name = fnode->fn_fullname;
+		} else {
+			fnode->fn_fullname = e_strdup(ctx->xs_hdr.cmh_filename);
+		}
 
 	/* name needed for openat() */
 	fnode->fn_name = e_strdup(name);
@@ -2723,4 +2740,10 @@ ct_is_null_path(const char *path)
 {
 	/* XXX or "./"? */
 	return (strcmp(path, ".") == 0);
+}
+
+int
+ct_is_backwards_path(const char *path)
+{
+	return (strcmp(path, "..") == 0);
 }
