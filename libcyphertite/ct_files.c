@@ -84,7 +84,6 @@ static struct fnode	*ct_populate_fnode_from_flist(struct ct_archive_state *,
 			     struct flist *, int);
 
 /* Helper functions for the above */
-static char		*eat_double_dots(char *, char *);
 static int		 backup_prefix(struct ct_archive_state *, char *,
 			     struct flist_head *, struct fl_tree *,
 			     struct ct_statistics *);
@@ -1353,7 +1352,6 @@ ct_traverse(struct ct_global_state *state, struct ct_archive_state *cas,
 	FTS			*ftsp;
 	FTSENT			*fe;
 	struct fl_tree		 ino_tree;
-	char			 clean[PATH_MAX];
 	int			 fts_options, cnt, forcedir, ret;
 
 	RB_INIT(&ino_tree);
@@ -1387,11 +1385,6 @@ ct_traverse(struct ct_global_state *state, struct ct_archive_state *cas,
 			/* these are ok */
 			/* FALLTHROUGH */
 		case FTS_DP: /* Setup for close dir, no stats */
-			/* sanitize path */
-			if (eat_double_dots(fe->fts_path, clean) == NULL) {
-				ct_fatal(state, fe->fts_path, CTE_CRAZY_PATH);
-				return (1);
-			}
 			if (fe->fts_info == FTS_DP)
 				goto sched;
 			break;
@@ -1412,18 +1405,19 @@ ct_traverse(struct ct_global_state *state, struct ct_archive_state *cas,
 			/* XXX technically this should apply to files too */
 			if (follow_root_symlink && fe->fts_info == FTS_D)
 				forcedir = 1;
-			if ((ret = backup_prefix(cas, clean, files, &ino_tree,
-			    ct_stats)) != 0) {
+			if ((ret = backup_prefix(cas, fe->fts_path, files,
+			    &ino_tree, ct_stats)) != 0) {
 				ct_fatal(state, "backup_prefix", ret);
 				return (1);
 			}
 		}
 
-		CNDBG(CT_LOG_FILE, "scheduling backup of %s", clean);
+		CNDBG(CT_LOG_FILE, "scheduling backup of %s", fe->fts_path);
 		/* backup all other files */
 sched:
-		ct_sched_backup_file(cas, fe->fts_statp, clean, forcedir,
-		    fe->fts_info == FTS_DP ? 1 : 0, files, &ino_tree, ct_stats);
+		ct_sched_backup_file(cas, fe->fts_statp, fe->fts_path,
+		    forcedir, fe->fts_info == FTS_DP ? 1 : 0, files, &ino_tree,
+		    ct_stats);
 
 	}
 
@@ -1445,85 +1439,6 @@ sched:
 	return (0);
 }
 
-static char *
-eat_double_dots(char *path, char *resolved)
-{
-	char	**tab = NULL, *buf = NULL, *rv = NULL, *cp, **ntab;
-	int	sz = 0, bufsz, i;
-
-	/* emulate realpath(3) for those cases */
-	if (path == NULL || *path == '\0') {
-		strlcpy(resolved, ".", PATH_MAX);
-		return (resolved);
-	}
-
-	/*
-	 * append dummy component that will be eventually ignored;
-	 * greatly simplifies the splitting code below.
-	 */
-	bufsz = e_asprintf(&buf, "%s/dummy", path);
-
-	/* split path into components */
-	for (;;) {
-		cp = dirname(buf);
-		if (cp == NULL)
-			goto done;
-		else
-			strlcpy(buf, cp, bufsz);
-
-		cp = basename(buf);
-		if (cp == NULL)
-			goto done;
-
-		ntab = e_realloc(tab, (sz + 1) * sizeof(char *));
-		tab = ntab;
-		tab[sz++] = e_strdup(cp);
-
-		if (!strcmp(buf, ".") || !strcmp(buf, CT_PATHSEP_STR))
-			break; /* reached the top */
-	}
-
-	/* walk path components top to bottom */
-	for (i = sz - 1; i >= 0; i--) {
-		cp = tab[i];
-
-		/* topmost component is always either / or . */
-		if (i == sz - 1) {
-			strlcpy(resolved, cp, PATH_MAX);
-			continue;
-		}
-
-		/* '..' component is special */
-		if (!strcmp(cp, "..")) {
-			if (!strcmp(resolved, CT_PATHSEP_STR))
-				continue; /* cannot go beyond fs root */
-
-			/* remove last component if other than '..' */
-			if (strcmp(basename(resolved), ".") != 0 &&
-			    strcmp(basename(resolved), "..") != 0)
-				strlcpy(resolved, dirname(resolved), PATH_MAX);
-			else
-				strlcat(resolved, CT_PATHSEP_STR "..",
-				    PATH_MAX);
-			continue;
-		}
-
-		/* append regular component */
-		if (strcmp(resolved, CT_PATHSEP_STR) != 0)
-			strlcat(resolved, CT_PATHSEP_STR, PATH_MAX);
-		strlcat(resolved, cp, PATH_MAX);
-	}
-
-	rv = resolved;
-done:
-	if (buf)
-		e_free(&buf);
-	for (i = 0; i < sz; i++)
-		e_free(&tab[i]);
-	e_free(&tab);
-	return (rv);
-}
-
 static int
 backup_prefix(struct ct_archive_state *cas, char *root,
     struct flist_head *flist, struct fl_tree *ino_tree, struct ct_statistics *ct_stats)
@@ -1532,6 +1447,9 @@ backup_prefix(struct ct_archive_state *cas, char *root,
 	char			*cp, *p;
 	struct stat		sb;
 
+	/* if no prefix, fuck it. */
+	if (strchr(root, CT_PATHSEP) == NULL)
+		return (0);
 	/* it is just the prefix that needs to be parsed */
 	strlcpy(rbuf, root, sizeof rbuf);
 	strlcpy(pfx, dirname(rbuf), sizeof pfx);
