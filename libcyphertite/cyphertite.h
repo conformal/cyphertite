@@ -396,6 +396,7 @@ int	 ct_absolute_path(const char *);
 int	 ct_is_root_path(const char *);
 int	 ct_is_null_path(const char *);
 int	 ct_is_backwards_path(const char *);
+char	*ct_strip_slash(const char *);
 char			*ctfile_cook_name(const char *);
 int			 ctfile_in_cache(const char *, const char *);
 char			*ctfile_get_cachename(const char *, const char *);

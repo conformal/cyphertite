@@ -2498,7 +2498,13 @@ ct_populate_fnode(struct ct_extract_state *ces, struct ctfile_parse_state *ctx,
 
 	if (C_ISLINK(ctx->xs_hdr.cmh_type)) {
 		/* hardlink/symlink */
-		fnode->fn_hlname = e_strdup(ctx->xs_lnkhdr.cmh_filename);
+		if (strip_slash) {
+			fnode->fn_hlname =
+			    ct_strip_slash(ctx->xs_lnkhdr.cmh_filename);
+		} else {
+			fnode->fn_hlname =
+			    e_strdup(ctx->xs_lnkhdr.cmh_filename);
+		}
 		fnode->fn_hardlink = !C_ISLINK(ctx->xs_lnkhdr.cmh_type);
 		*state = TR_S_EX_SPECIAL;
 
@@ -2664,4 +2670,21 @@ int
 ct_is_backwards_path(const char *path)
 {
 	return (strcmp(path, "..") == 0);
+}
+
+/*
+ * Remove leading root markers from a path.
+ * note: assumes well formed paths (from a ctfile, for example) and thus
+ * assumes that multiple adjacent slashes are not present.
+ */
+char *
+ct_strip_slash(const char *path)
+{
+	if (path[0] == '/') {
+		if (path[1] == '\0')
+			return e_strdup(".");
+		return (e_strdup(&path[1]));
+	} else {
+		return (e_strdup(path));
+	}
 }
