@@ -28,7 +28,7 @@
 #define CT_IV_LEN	(256>>3)
 
 struct fnode {
-	/* TAILQ_ENTRY(fnode)	fl_list; */
+	TAILQ_ENTRY(fnode)	fn_list;
 	char			*fn_hlname;
 	struct dnode		*fn_parent_dir;
 	struct dnode		*fn_curdir_dir;
@@ -55,6 +55,8 @@ struct fnode {
 #define CT_FILE_FINISHED	(2)
 	SHA_CTX			fn_shactx;
 	int			fn_skip_file;
+	/* XXX LIST? */
+	TAILQ_HEAD(, fnode)	fn_hardlinks;
 };
 
 struct dnode {
@@ -72,6 +74,7 @@ struct dnode {
 	int                      d_mtime;       /* last modification time */
 };
 
+struct fnode		*ct_alloc_fnode(void);
 void			ct_free_fnode(struct fnode *);
 void			ct_free_dnode(struct dnode *);
 

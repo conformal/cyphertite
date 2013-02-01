@@ -105,6 +105,8 @@ int			 ct_mkdir(struct ct_extract_state *, struct fnode *,
 int			 ct_mknod(struct ct_extract_state *, struct fnode *);
 int			 ct_link(struct ct_extract_state *, struct fnode *,
 			     char *);
+int			 ct_link_belated(struct ct_extract_state *,
+			     struct fnode *, struct fnode *);
 int			 ct_symlink(struct ct_extract_state *, struct fnode *);
 int			 ct_rename(struct ct_extract_state *, struct fnode *);
 int			 ct_chown(struct ct_extract_state *, struct fnode *,
@@ -148,9 +150,27 @@ ct_free_dnode(struct dnode *dnode)
 	e_free(&dnode);
 }
 
+struct fnode *
+ct_alloc_fnode(void)
+{
+	struct fnode	*fnode;
+
+	fnode = e_calloc(1, sizeof(*fnode));
+	TAILQ_INIT(&fnode->fn_hardlinks);
+
+	return (fnode);
+}
+
 void
 ct_free_fnode(struct fnode *fnode)
 {
+	struct fnode	*link;
+
+	while ((link = TAILQ_FIRST(&fnode->fn_hardlinks)) != NULL) {
+		TAILQ_REMOVE(&fnode->fn_hardlinks, link, fn_list);
+		ct_free_fnode(link);
+	}
+
 	if (fnode->fn_hlname != NULL)
 		e_free(&fnode->fn_hlname);
 	if (fnode->fn_fullname != NULL)
@@ -286,7 +306,7 @@ ct_populate_fnode_from_flist(struct ct_archive_state *cas,
 		return NULL;
 	}
 
-	fnode = e_calloc(1, sizeof(*fnode));
+	fnode = ct_alloc_fnode();
 
 	fnode->fn_name = fname;
 	fnode->fn_fullname = gen_fname(flnode);
@@ -1773,8 +1793,9 @@ ct_file_extract_write(struct ct_extract_state *ces, struct fnode *fnode,
 void
 ct_file_extract_close(struct ct_extract_state *ces, struct fnode *fnode)
 {
-	struct timeval          tv[2];
-	int                     safe_mode;
+	struct fnode		*link;
+	struct timeval           tv[2];
+	int                      safe_mode;
 
 	safe_mode = S_IRWXU | S_IRWXG | S_IRWXO;
 	if (ces->ces_attr) {
@@ -1798,6 +1819,18 @@ ct_file_extract_close(struct ct_extract_state *ces, struct fnode *fnode)
 		CWARN("rename to %s failed", fnode->fn_fullname);
 		/* nuke temp file */
 		(void)ct_unlink(ces, fnode);
+	}
+	/*
+	 * XXX can't use ct_link here since we have the wrong dir open
+	 * consider refcoutning the opening of the dir.
+	 */
+	while ((link = TAILQ_FIRST(&fnode->fn_hardlinks)) != NULL) {
+		TAILQ_REMOVE(&fnode->fn_hardlinks, link, fn_list);
+		CNDBG(CT_LOG_FILE, "doing belated link for %s to %s",
+		    link->fn_fullname,  fnode->fn_fullname);
+		ct_link_belated(ces, link, fnode);
+
+		ct_free_fnode(link);
 	}
 
 	close(ces->ces_fd);
@@ -2287,6 +2320,65 @@ ct_link(struct ct_extract_state *ces, struct fnode *fnode, char *destination)
 	return (linkat(AT_FDCWD, destination, fnode->fn_parent_dir->d_fd,
 	    fnode->fn_name, AT_SYMLINK_FOLLOW));
 #endif
+}
+
+int
+ct_link_belated(struct ct_extract_state *ces, struct fnode *fnode,
+    struct fnode *dest)
+{
+	const char 	*slash;
+	char		 path[PATH_MAX];
+	int		 ret;
+
+	/* check that we aren't trying to make a .. */
+	if ((slash = strrchr(dest->fn_fullname, CT_PATHSEP)) == NULL) {
+		slash = dest->fn_fullname;
+	} else {
+		slash++;
+	}
+	if (strcmp(slash, "..") == 0)
+		return (0);
+
+	/* XXX we don't have dir open anymore for the link's cwd. */
+	if (ct_absolute_path(fnode->fn_fullname)) {
+		strlcpy(path, fnode->fn_fullname, sizeof(path));
+	} else {
+		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
+		    CT_PATHSEP, fnode->fn_fullname);
+	}
+#ifdef CT_NO_OPENAT
+	char	destpath[PATH_MAX];
+
+	if (ct_absolute_path(dest->fn_fullname)) {
+		strlcpy(destpath, dest->fn_fullname, sizeof(destpath));
+	} else {
+		snprintf(destpath, sizeof(destpath), "%s%c%s",
+		ces->ces_rootdir->d_name,
+		    CT_PATHSEP, dest->fn_fullname);
+	}
+again:
+	ret =  link(destpath, path);
+#else
+again:
+	ret =  linkat(dest->fn_parent_dir->d_fd, dest->fn_name,
+	    AT_FDCWD, path, AT_SYMLINK_FOLLOW);
+#endif
+	if (ret && errno == EEXIST) {
+		/*
+		 * don't have to worry about links already matching, we just
+		 * wrote the file anew
+		 */
+		if (unlink(path) == 0) {
+			goto again;
+		}
+		CWARN("can't remove old link %s", fnode->fn_fullname);
+	}
+	if (ret) {
+		CWARN("%s failed: %s to %s", fnode->fn_hardlink ?
+		    "link" : "symlink", fnode->fn_fullname, dest->fn_fullname);
+	}
+
+	return (ret);
 }
 
 int

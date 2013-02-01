@@ -191,7 +191,7 @@ ctfile_archive(struct ct_global_state *state, struct ct_op *op)
 			goto dying;
 		}
 		cas->cas_size = sb.st_size;
-		cas->cas_fnode = e_calloc(1, sizeof(*cas->cas_fnode));
+		cas->cas_fnode = ct_alloc_fnode();
 
 		if (rname == NULL) {
 			if ((rname = ctfile_cook_name(ctfile)) == NULL) {
@@ -519,7 +519,7 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 	}
 	trans->tr_statemachine = ct_state_ctfile_extract;
 	if (ces->ces_open_sent == 0) {
-		ces->ces_fnode = e_calloc(1, sizeof(*ces->ces_fnode));
+		ces->ces_fnode = ct_alloc_fnode();
 		ces->ces_fnode->fn_type = C_TY_REG;
 		ces->ces_fnode->fn_parent_dir =
 		    ct_file_extract_get_rootdir(state->extract_state);

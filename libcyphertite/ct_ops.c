@@ -33,6 +33,99 @@
 const uint8_t	 zerosha[SHA_DIGEST_LENGTH];
 
 /*
+ * RB Tree for pending ctfile
+ */
+struct ct_pending_file {
+	RB_ENTRY(ct_pending_file)	 cpf_entry;
+	const char 			*cpf_name;
+	uint32_t			 cpf_uid;
+	uint32_t			 cpf_gid;
+	int				 cpf_mode;
+	int64_t				 cpf_atime;
+	int64_t				 cpf_mtime;
+	TAILQ_HEAD(fnode_list, fnode) 	 cpf_links;
+};
+
+static inline int
+ct_cmp_pending_file(struct ct_pending_file *a, struct ct_pending_file *b)
+{
+	return (strcmp(a->cpf_name, b->cpf_name));
+}
+RB_HEAD(ct_pending_files, ct_pending_file);
+RB_PROTOTYPE_STATIC(ct_pending_files, ct_pending_file, cpf_entry,
+    ct_cmp_pending_file);
+RB_GENERATE_STATIC(ct_pending_files, ct_pending_file, cpf_entry,
+    ct_cmp_pending_file);
+
+void
+ct_extract_insert_entry(struct ct_pending_files *head, struct fnode *fnode)
+{
+	struct ct_pending_file	*cpf;
+
+	CNDBG(CT_LOG_FILE, "%s: inserting %s", __func__, fnode->fn_fullname);
+	cpf = e_calloc(1, sizeof(*cpf));
+	cpf->cpf_name = e_strdup(fnode->fn_fullname);
+	cpf->cpf_uid = fnode->fn_uid;
+	cpf->cpf_gid = fnode->fn_gid;
+	cpf->cpf_mode = fnode->fn_mode;
+	cpf->cpf_mtime = fnode->fn_mtime;
+	cpf->cpf_atime = fnode->fn_atime;
+
+	TAILQ_INIT(&cpf->cpf_links);
+	RB_INSERT(ct_pending_files, head, cpf);
+}
+
+int
+ct_extract_rb_empty(struct  ct_pending_files *head)
+{
+	return (RB_EMPTY(head));
+}
+
+struct ct_pending_file *
+ct_extract_find_entry(struct ct_pending_files *head, const char *name)
+{
+	struct ct_pending_file	sfile;
+
+	CNDBG(CT_LOG_FILE, "%s: looking for %s", __func__, name);
+	sfile.cpf_name = name;
+	return (RB_FIND(ct_pending_files, head, &sfile));
+}
+
+
+void
+ct_extract_free_entry(struct ct_pending_files *head,
+    struct ct_pending_file *file)
+{
+	struct fnode	*fnode;
+
+	RB_REMOVE(ct_pending_files, head, file);
+	while ((fnode = TAILQ_FIRST(&file->cpf_links)) != NULL) {
+		TAILQ_REMOVE(&file->cpf_links, fnode, fn_list);
+		ct_free_fnode(fnode);
+	}
+	e_free(&file->cpf_name);
+	e_free(&file);
+}
+
+void
+ct_extract_pending_cleanup(struct ct_pending_files *head)
+{
+	struct ct_pending_file	*file;
+	while ((file = RB_ROOT(head)) != NULL) {
+		ct_extract_free_entry(head, file);
+	}
+}
+void
+ct_pending_file_add_link(struct ct_pending_file *file, struct fnode *link)
+{
+	TAILQ_INSERT_TAIL(&file->cpf_links, link, fn_list);
+}
+
+/*
+ * function to just get without removing
+ */
+
+/*
  * Code for extract.
  */
 static int	ct_extract_setup_queue(struct ct_extract_head *,
@@ -295,7 +388,7 @@ struct ct_extract_priv {
 	struct ctfile_parse_state	 xdr_ctx;
 	struct ct_match			*inc_match;
 	struct ct_match			*ex_match;
-	struct ct_match			*rb_match;
+	struct ct_pending_files		 pending_tree;
 	struct fnode			*fl_ex_node;
 	int				 doextract;
 	int				 fillrb;
@@ -352,7 +445,7 @@ ct_extract_calculate_total(struct ct_global_state *state,
 				continue;
 			}
 
-			fnode = e_calloc(1, sizeof(*fnode));
+			fnode = ct_alloc_fnode();
 			/* XXX need the fnode for the correct paths */
 			ct_populate_fnode(state->extract_state,
 			    &xdr_ctx, fnode, &tr_state, allfiles,
@@ -477,6 +570,7 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 				goto dying;
 			}
 			op->op_priv = ex_priv;
+			RB_INIT(&ex_priv->pending_tree);
 		}
 		
 		if ((ret = ct_file_extract_init(&state->extract_state,
@@ -511,13 +605,6 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			    ex_priv->xdr_ctx.xs_gh.cmg_chunk_size);
 		/* create rb tree head, prepare to start inserting */
 		if (ex_priv->allfiles) {
-			char *nothing = NULL;
-			if ((ret = ct_match_compile(&ex_priv->rb_match,
-			    CT_MATCH_RB, &nothing)) != 0) {
-				ct_fatal(state, "Couldn't create match tree",
-				    ret);
-				goto dying;
-			}
 			ex_priv->fillrb = 1;
 		}
 		break;
@@ -554,7 +641,7 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 
 			trans = ct_trans_realloc_local(state, trans);
 			trans->tr_fl_node = ex_priv->fl_ex_node = fnode =
-			    e_calloc(1, sizeof(*fnode));
+			    ct_alloc_fnode();
 
 			ct_populate_fnode(state->extract_state,
 			    &ex_priv->xdr_ctx, fnode, &trans->tr_state,
@@ -569,11 +656,62 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 				trans->tr_cleanup = NULL;
 			}
 
-			ex_priv->doextract = !ct_match(ex_priv->inc_match,
-			    fnode->fn_fullname);
-			if (ex_priv->doextract && ex_priv->ex_match != NULL &&
-			    !ct_match(ex_priv->ex_match, fnode->fn_fullname))
-				ex_priv->doextract = 0;
+			if (ex_priv->haverb) {
+				struct ct_pending_file *cpf;
+				if ((cpf = ct_extract_find_entry(
+				    &ex_priv->pending_tree,
+				    fnode->fn_fullname)) != NULL) {
+					struct fnode *link;
+					/* copy permissions over */
+					fnode->fn_uid = cpf->cpf_uid;
+					fnode->fn_gid = cpf->cpf_gid;
+					fnode->fn_mode = cpf->cpf_mode;
+					fnode->fn_mtime = cpf->cpf_mtime;
+					fnode->fn_atime = cpf->cpf_atime;
+
+					/* copy list of pending links over */
+					while ((link =
+					    TAILQ_FIRST(&cpf->cpf_links))) {
+						TAILQ_REMOVE(&cpf->cpf_links,
+						    link, fn_list);
+						TAILQ_INSERT_TAIL(
+						    &fnode->fn_hardlinks, link,
+						    fn_list);
+					}
+					
+					ex_priv->doextract = 1;
+					ct_extract_free_entry(
+					    &ex_priv->pending_tree, cpf);
+				} else {
+					ex_priv->doextract = 0;
+				}
+				
+			} else {
+				ex_priv->doextract =
+				    !ct_match(ex_priv->inc_match,
+				    fnode->fn_fullname);
+				if (ex_priv->doextract &&
+				    ex_priv->ex_match != NULL &&
+				    !ct_match(ex_priv->ex_match,
+				    fnode->fn_fullname)) {
+					ex_priv->doextract = 0;
+				}
+			}
+			if (ex_priv->doextract && fnode->fn_hardlink) {
+				struct ct_pending_file	*file;
+				if ((file = ct_extract_find_entry(
+				    &ex_priv->pending_tree,
+				    fnode->fn_hlname)) != NULL) {
+					CNDBG(CT_LOG_FILE,
+					    "adding pending link for %s to %s",
+					    file->cpf_name, fnode->fn_fullname);
+					ct_pending_file_add_link(file,
+					    fnode);
+					ex_priv->doextract = 0;
+					goto skip;
+				}
+			}
+
 			/*
 			 * If we're on the first ctfile in an allfiles backup
 			 * put the matches with -1 on the rb tree so we'll
@@ -581,13 +719,13 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			 */
 			if (ex_priv->doextract == 1 && ex_priv->fillrb &&
 			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas == -1) {
-				ct_match_insert_rb(ex_priv->rb_match,
-					    fnode->fn_fullname);
+				ct_extract_insert_entry(&ex_priv->pending_tree,
+				    fnode);
+
 				ex_priv->doextract = 0;
-				goto skipfree;
+				/* XXX reconsider the freeing */
 			}
 			if (ex_priv->doextract == 0) {
-skipfree:
 				ct_free_fnode(fnode);
 skip:
 				fnode = NULL;
@@ -675,10 +813,8 @@ skip:
 			CNDBG(CT_LOG_CTFILE, "Hit end of ctfile");
 			ctfile_parse_close(&ex_priv->xdr_ctx);
 			/* if rb tree and rb is empty, goto end state */
-			if ((ex_priv->haverb &&
-			    ct_match_rb_is_empty(ex_priv->inc_match)) ||
-			    (ex_priv->fillrb &&
-			    ct_match_rb_is_empty(ex_priv->rb_match))) {
+			if ((ex_priv->haverb || ex_priv->fillrb) &&
+			    ct_extract_rb_empty(&ex_priv->pending_tree)) {
 				/*
 				 * Cleanup extract queue, in case we had files
 				 * left.
@@ -701,8 +837,7 @@ skip:
 						ct_match_unwind(
 						    ex_priv->ex_match);
 					ex_priv->ex_match = NULL;
-					ex_priv->inc_match = ex_priv->rb_match;
-					ex_priv->rb_match = NULL;
+					ex_priv->inc_match = NULL;
 					ex_priv->haverb = 1;
 					ex_priv->fillrb = 0;
 				}
@@ -729,15 +864,20 @@ skip:
 				 */
 				/* XXX print out missing files */
 				if ((ex_priv->haverb || ex_priv->fillrb) &&
-				    !ct_match_rb_is_empty(ex_priv->inc_match))
+				    ct_extract_rb_empty(
+				    &ex_priv->pending_tree)) {
 					CWARNX("out of ctfiles but some "
 					    "files are not found");
+				}
 
 we_re_done_here:
-				ct_match_unwind(ex_priv->inc_match);
+				if (ex_priv->inc_match)
+					ct_match_unwind(ex_priv->inc_match);
 				if (ex_priv->ex_match)
 					ct_match_unwind(
 					    ex_priv->ex_match);
+				ct_extract_pending_cleanup(
+				    &ex_priv->pending_tree);
 				e_free(&ex_priv);
 				op->op_priv = NULL;
 				trans->tr_state = TR_S_DONE;
@@ -772,8 +912,9 @@ dying:
 			ct_match_unwind(ex_priv->inc_match);
 		if (ex_priv->ex_match)
 			ct_match_unwind(ex_priv->ex_match);
-		if (ex_priv->rb_match)
-			ct_match_unwind(ex_priv->rb_match);
+		if (!ct_extract_rb_empty(&ex_priv->pending_tree)) {
+			ct_extract_pending_cleanup(&ex_priv->pending_tree);
+		}
 		/* XXX what about ex_priv->xdr_ctx ? */
 		e_free(&ex_priv);
 		op->op_priv = NULL;
