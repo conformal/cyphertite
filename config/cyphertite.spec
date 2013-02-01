@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.4.5
+%define version		1.5.0
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,10 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Fri Feb 01 2013 - davec 1.5.0-1
+- Improve relative path handling to ensure incremental change detection
+- Automatically strip ../ from paths unless -P is specified to match gtar
+- Other minor code cleanup
 * Fri Jan 18 2013 - davec 1.4.5-1
 - Fix an issue that caused a crash on older versions of Fedora during
   certificate download (bz #40)

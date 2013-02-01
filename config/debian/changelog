@@ -1,3 +1,11 @@
+cyphertite (1.5.0-1) unstable; urgency=low
+
+  * Improve relative path handling to ensure incremental change detection
+  * Automatically strip ../ from paths unless -P is specified to match gtar
+  * Other minor code cleanup
+
+ -- Conformal Systems <package-discuss@conformal.com>  Fri, 01 Feb 2013 12:09:20 -0600
+
 cyphertite (1.4.5-1) unstable; urgency=low
 
   * Fix an issue that caused a crash on older versions of Fedora during

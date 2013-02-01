@@ -3,6 +3,11 @@ User visible changes for cyphertite
   A high-security scalable solution for online backups
 ============================================================================
 
+Changes in 1.5.0 (Fri Feb 01 2013)
+  - Improve relative path handling to ensure incremental change detection
+  - Automatically strip ../ from paths unless -P is specified to match gtar
+  - Other minor code cleanup
+
 Changes in 1.4.5 (Fri Jan 18 2013)
   - Fix an issue that caused a crash on older versions of Fedora during
     certificate download (bz #40)
