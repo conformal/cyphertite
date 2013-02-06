@@ -116,9 +116,9 @@ ct_extract_pending_cleanup(struct ct_pending_files *head)
 	}
 }
 void
-ct_pending_file_add_link(struct ct_pending_file *file, struct fnode *link)
+ct_pending_file_add_link(struct ct_pending_file *file, struct fnode *hardlink)
 {
-	TAILQ_INSERT_TAIL(&file->cpf_links, link, fn_list);
+	TAILQ_INSERT_TAIL(&file->cpf_links, hardlink, fn_list);
 }
 
 /*
@@ -661,7 +661,7 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 				if ((cpf = ct_extract_find_entry(
 				    &ex_priv->pending_tree,
 				    fnode->fn_fullname)) != NULL) {
-					struct fnode *link;
+					struct fnode *hardlink;
 					/* copy permissions over */
 					fnode->fn_uid = cpf->cpf_uid;
 					fnode->fn_gid = cpf->cpf_gid;
@@ -670,13 +670,13 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 					fnode->fn_atime = cpf->cpf_atime;
 
 					/* copy list of pending links over */
-					while ((link =
+					while ((hardlink =
 					    TAILQ_FIRST(&cpf->cpf_links))) {
 						TAILQ_REMOVE(&cpf->cpf_links,
-						    link, fn_list);
+						    hardlink, fn_list);
 						TAILQ_INSERT_TAIL(
-						    &fnode->fn_hardlinks, link,
-						    fn_list);
+						    &fnode->fn_hardlinks,
+						    hardlink, fn_list);
 					}
 					
 					ex_priv->doextract = 1;
