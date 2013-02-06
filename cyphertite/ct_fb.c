@@ -69,7 +69,7 @@ struct ct_vertree_entry *
 ctfb_follow_path(struct ct_fb_state *cfs, const char *path,
     char *newcwd, size_t newcwdsz)
 {
-	struct ct_vertree_entry	*cwd;
+	struct ct_vertree_entry	*cwd, *tcwd;
 	char			*next, *cur, cwdbuf[PATH_MAX], pbuf[PATH_MAX];
 	int			 absolute = 0, home = 0;
 
@@ -104,56 +104,60 @@ ctfb_follow_path(struct ct_fb_state *cfs, const char *path,
 	 * do the whole thing in jumps.
 	 */
 	while (next != NULL) {
+		struct ct_vertree_entry	sentry;
 		cur = next;
 
 		/* XXX directory separator */
 		if ((next = strchr(cur, '/')) != NULL)
 			*(next++) = '\0';
-		CNDBG(CT_LOG_VERTREE, "next segment = %s", cur);
-
 		if (*cur == '\0')
 			continue;
-		else if (strcmp(cur, "..") == 0) {
-			char		*end;
 
-			CNDBG(CT_LOG_VERTREE, "goback");
-			/* ignore .. from root */
-			if (cwd->cve_parent == NULL) {
-				CNDBG(CT_LOG_VERTREE, "at root");
+		CNDBG(CT_LOG_VERTREE, "next dir = %s", cur);
+
+		/*
+		 * first search for the name in the list.
+		 * ctfiles may contain "." and "..", so search those first.
+		 * If they dont' exist then treat "." and ".." specially.
+		 */
+		sentry.cve_name = cur;
+		if ((tcwd = RB_FIND(ct_vertree_entries, &cwd->cve_children,
+		    &sentry)) == NULL) {
+			if (strcmp(cur, ".") == 0) {
+				CNDBG(CT_LOG_VERTREE, ".: doing nothing");
+				continue;
+			} else if (strcmp(cur, "..") == 0) {
+				char		*end;
+
+				CNDBG(CT_LOG_VERTREE, "goback");
+				/* ignore .. from root */
+				if (cwd->cve_parent == NULL) {
+					CNDBG(CT_LOG_VERTREE, "at root");
+					continue;
+				}
+				cwd = cwd->cve_parent;
+
+				if (newcwd == NULL)
+					continue;
+
+				/* update our buffer */
+				if ((end = strrchr(cwdbuf, '/')) == NULL)
+					end = cwdbuf; /* first directory */
+				*(end) = '\0'; /* Amend curpath */
 				continue;
 			}
-			cwd = cwd->cve_parent;
-
-			if (newcwd == NULL)
-				continue;
-
-			/* update our buffer */
-			if ((end = strrchr(cwdbuf, '/')) == NULL)
-				end = cwdbuf; /* first directory */
-			*(end) = '\0'; /* Amend curpath */
-		} else if (strcmp(cur, ".") == 0) {
-			CNDBG(CT_LOG_VERTREE, ".: doing nothing");
-		} else {
-			struct ct_vertree_entry	sentry;
-			CNDBG(CT_LOG_VERTREE, "next dir = %s", cur);
-
-			sentry.cve_name = cur;
-			if ((cwd = RB_FIND(ct_vertree_entries,
-			    &cwd->cve_children,
-			    &sentry)) == NULL) {
-				CNDBG(CT_LOG_VERTREE,
-				    "can't find directory %s", cur);
-				errno = ENOENT;
-				return (NULL);
-			}
-			if (newcwd == NULL)
-				continue;
-
-			/* update our buffer */
-			if (cwdbuf[0] != '\0')
-				strlcat(cwdbuf, "/", sizeof(cwdbuf));
-			strlcat(cwdbuf, cur, sizeof(cwdbuf));
+			CNDBG(CT_LOG_VERTREE, "can't find directory %s", cur);
+			errno = ENOENT;
+			return (NULL);
 		}
+		cwd = tcwd;
+		if (newcwd == NULL)
+			continue;
+
+		/* update our buffer */
+		if (cwdbuf[0] != '\0')
+			strlcat(cwdbuf, "/", sizeof(cwdbuf));
+		strlcat(cwdbuf, cur, sizeof(cwdbuf));
 	}
 
 	if (newcwd != NULL)
