@@ -1793,7 +1793,7 @@ ct_file_extract_write(struct ct_extract_state *ces, struct fnode *fnode,
 void
 ct_file_extract_close(struct ct_extract_state *ces, struct fnode *fnode)
 {
-	struct fnode		*link;
+	struct fnode		*hardlink;
 	struct timeval           tv[2];
 	int                      safe_mode;
 
@@ -1824,13 +1824,13 @@ ct_file_extract_close(struct ct_extract_state *ces, struct fnode *fnode)
 	 * XXX can't use ct_link here since we have the wrong dir open
 	 * consider refcoutning the opening of the dir.
 	 */
-	while ((link = TAILQ_FIRST(&fnode->fn_hardlinks)) != NULL) {
-		TAILQ_REMOVE(&fnode->fn_hardlinks, link, fn_list);
-		CNDBG(CT_LOG_FILE, "doing belated link for %s to %s",
-		    link->fn_fullname,  fnode->fn_fullname);
-		ct_link_belated(ces, link, fnode);
+	while ((hardlink = TAILQ_FIRST(&fnode->fn_hardlinks)) != NULL) {
+		TAILQ_REMOVE(&fnode->fn_hardlinks, hardlink, fn_list);
+		CNDBG(CT_LOG_FILE, "doing belated hardlink for %s to %s",
+		    hardlink->fn_fullname,  fnode->fn_fullname);
+		ct_link_belated(ces, hardlink, fnode);
 
-		ct_free_fnode(link);
+		ct_free_fnode(hardlink);
 	}
 
 	close(ces->ces_fd);
