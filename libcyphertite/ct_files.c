@@ -164,11 +164,11 @@ ct_alloc_fnode(void)
 void
 ct_free_fnode(struct fnode *fnode)
 {
-	struct fnode	*link;
+	struct fnode	*hardlink;
 
-	while ((link = TAILQ_FIRST(&fnode->fn_hardlinks)) != NULL) {
-		TAILQ_REMOVE(&fnode->fn_hardlinks, link, fn_list);
-		ct_free_fnode(link);
+	while ((hardlink = TAILQ_FIRST(&fnode->fn_hardlinks)) != NULL) {
+		TAILQ_REMOVE(&fnode->fn_hardlinks, hardlink, fn_list);
+		ct_free_fnode(hardlink);
 	}
 
 	if (fnode->fn_hlname != NULL)
