@@ -285,7 +285,8 @@ ct_config_parse(struct ct_settings *settings, const char *filename)
 		return 1;
 
 	for (;;) {
-		if ((line = fparseln(config, &len, &lineno, NULL, 0)) == NULL)
+		if ((line = fparseln(config, &len, &lineno, NULL,
+		   FPARSELN_UNESCALL)) == NULL)
 			if (feof(config) || ferror(config))
 				break;
 
