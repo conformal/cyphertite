@@ -42,7 +42,7 @@ CTUTILDIR=../ctutil
 endif
 
 # curl
-CURL.LDLIBS = $(shell $(BINDIR)/curl-config --static-libs | \
+CURL.LDLIBS = $(shell PATH=$(BINDIR):$$PATH curl-config --static-libs | \
     sed -e 's/-lssl//g' -e 's/-lcrypto//g' -e 's/-lz//g' -e 's/ \+/ /g')
 
 # Compiler and linker flags.
