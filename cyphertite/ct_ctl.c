@@ -162,15 +162,16 @@ cpasswd(struct ct_cli_cmd *c, int argc, char **argv)
 		    !strncmp(buf, "crypto_password",
 		    strlen("crypto_password"))) {
 			if (write_crypto_passphrase) {
-				fprintf(fw, "crypto_passphrase\t\t= %s\n",
-				    crypto_passphrase);
+				fprintf(fw, "crypto_passphrase\t\t\t= ");
+				ct_write_escaped(fw, crypto_passphrase);
 				crypto_passphrase_written = 1;
 			}
 		} else
 			fprintf(fw, "%s\n", buf);
 	}
 	if (crypto_passphrase_written == 0 && write_crypto_passphrase)
-		fprintf(fw, "crypto_passphrase\t\t= %s\n", crypto_passphrase);
+		fprintf(fw, "crypto_passphrase\t\t\t= ");
+		ct_write_escaped(fw, crypto_passphrase);
 
 	fclose(fr);
 	fclose(fw);

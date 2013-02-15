@@ -528,7 +528,7 @@ ct_default_config(struct ct_config *config)
 }
 
 /* slow as anything, but meh, we are writing out the config file. */
-static void
+void
 ct_write_escaped(FILE *f, const char *entry)
 {
 	char		 backslash = '\\', newline = '\n';

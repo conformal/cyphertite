@@ -64,6 +64,7 @@ void			 ct_unload_config(char *, struct ct_config *);
 char *ct_system_config(void);
 char *ct_user_config(void);
 char *ct_user_config_old(void);
+void ct_write_escaped(FILE *, const char *);
 void ct_write_config(struct ct_config *, FILE *, int, int);
 void ct_default_config(struct ct_config *);
 int ct_download_decode_and_save_certs(struct ct_config *);
