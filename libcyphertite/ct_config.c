@@ -550,6 +550,8 @@ void
 ct_write_config(struct ct_config *config, FILE *f, int save_password,
     int save_crypto_passphrase)
 {
+	fprintf(f, "# NOTE: '#' and '\\' must be entered as '\\#' and "
+	    "'\\\\\\\\', respectively.\n");
 	if (config->ct_host) {
 		fprintf(f, "host\t\t\t\t\t= ");
 		ct_write_escaped(f, config->ct_host);

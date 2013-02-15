@@ -32,6 +32,17 @@ sign, and the value to assign.
 Lines beginning with
 .Ql #
 are comments. Blank lines are ignored.
+If any of the configuration values contain a literal
+.Ql #
+or
+.Ql \\\\ ,
+they must be escaped with a
+.Ql \\\\ .
+This means they should be entered as
+.Ql \\\\#
+and
+.Ql \\\\\\\\ ,
+respectively.
 .Sh CONFIGURATION
 There are a few settings that affect the operation of
 .Xr cyphertite 1
