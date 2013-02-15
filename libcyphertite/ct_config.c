@@ -527,49 +527,83 @@ ct_default_config(struct ct_config *config)
 	config->ct_max_trans = 100;
 }
 
+/* slow as anything, but meh, we are writing out the config file. */
+static void
+ct_write_escaped(FILE *f, const char *entry)
+{
+	char		 backslash = '\\', newline = '\n';
+	int		 i = 0;
+
+	/*
+	 * XXX can probably batch up the writing of all non escaped chars.
+	 */
+	while (entry[i] != '\0') {
+		if (entry[i] == '\\' || entry[i] == '#')
+			(void)fwrite(&backslash, 1, 1, f);
+		(void)fwrite(&entry[i], 1, 1, f);
+		i++;
+	}
+	fwrite(&newline, 1, 1, f);
+}
+
 void
 ct_write_config(struct ct_config *config, FILE *f, int save_password,
     int save_crypto_passphrase)
 {
-	if (config->ct_host)
-		fprintf(f, "host\t\t\t\t\t= %s\n", config->ct_host);
-	else
-		fprintf(f, "host\t\t\t\t=\n");
-	if (config->ct_hostport)
-		fprintf(f, "hostport\t\t\t\t= %s\n", config->ct_hostport);
-	else
-		fprintf(f, "hostport\t\t\t\t=\n");
+	if (config->ct_host) {
+		fprintf(f, "host\t\t\t\t\t= ");
+		ct_write_escaped(f, config->ct_host);
+	} else {
+		fprintf(f, "#host\t\t\t\t=\n");
+	}
+	if (config->ct_hostport) {
+		fprintf(f, "hostport\t\t\t\t= ");
+		ct_write_escaped(f, config->ct_hostport);
+	} else {
+		fprintf(f, "#hostport\t\t\t\t=\n");
+	}
 
-	fprintf(f, "username\t\t\t\t= %s\n", config->ct_username);
-	if (save_password && config->ct_password)
-		fprintf(f, "password\t\t\t\t= %s\n", config->ct_password);
-	else
+	fprintf(f, "username\t\t\t\t= ");
+	ct_write_escaped(f, config->ct_username);
+	if (save_password && config->ct_password) {
+		fprintf(f, "password\t\t\t\t= ");
+		ct_write_escaped(f, config->ct_password);
+	} else {
 		fprintf(f, "#password\t\t\t\t=\n");
-	if (save_crypto_passphrase && config->ct_crypto_passphrase)
-		fprintf(f, "crypto_passphrase\t\t\t= %s\n", config->ct_crypto_passphrase);
-	else
+	}
+	if (save_crypto_passphrase && config->ct_crypto_passphrase) {
+		fprintf(f, "crypto_passphrase\t\t\t= ");
+		ct_write_escaped(f, config->ct_crypto_passphrase);
+	} else {
 		fprintf(f, "#crypto_passphrase\t\t\t=\n");
+	}
 
-	if (config->ct_localdb)
-		fprintf(f, "cache_db\t\t\t\t= %s\n", config->ct_localdb);
-	else
+	if (config->ct_localdb) {
+		fprintf(f, "cache_db\t\t\t\t= ");
+		ct_write_escaped(f, config->ct_localdb);
+	} else {
 		fprintf(f, "#cache_db\t\t\t\t=\n");
+	}
 	fprintf(f, "session_compression\t\t\t= lzo\n");
-	fprintf(f, "crypto_secrets\t\t\t\t= %s\n", config->ct_crypto_secrets);
-	fprintf(f, "ca_cert\t\t\t\t\t= %s\n", config->ct_ca_cert);
-	fprintf(f, "cert\t\t\t\t\t= %s\n", config->ct_cert);
-	fprintf(f, "key\t\t\t\t\t= %s\n", config->ct_key);
+	fprintf(f, "crypto_secrets\t\t\t\t= ");
+	ct_write_escaped(f, config->ct_crypto_secrets);
+	fprintf(f, "ca_cert\t\t\t\t\t= ");
+	ct_write_escaped(f, config->ct_ca_cert);
+	fprintf(f, "cert\t\t\t\t\t= ");
+	ct_write_escaped(f, config->ct_cert);
+	fprintf(f, "key\t\t\t\t\t= ");
+	ct_write_escaped(f, config->ct_key);
 
 	fprintf(f, "ctfile_mode\t\t\t\t= %s\n",
 	    config->ct_ctfile_mode == CT_MDMODE_REMOTE ? "remote" : "local");
 	if (config->ct_ctfile_mode == CT_MDMODE_REMOTE) {
-		fprintf(f, "ctfile_cachedir\t\t\t\t= %s\n",
-		    config->ct_ctfile_cachedir);
+		fprintf(f, "ctfile_cachedir\t\t\t\t= ");
+		ct_write_escaped(f, config->ct_ctfile_cachedir);
 		fprintf(f, "ctfile_remote_auto_incremental\t\t= %d\n",
 		    config->ct_auto_incremental);
 	} else {
-		fprintf(f, "#ctfile_cachedir\t\t\t= %s\n",
-		    config->ct_ctfile_cachedir);
+		fprintf(f, "#ctfile_cachedir\t\t\t= ");
+		ct_write_escaped(f, config->ct_ctfile_cachedir);
 		fprintf(f, "#ctfile_remote_auto_incremental\t= %d\n",
 		    config->ct_auto_incremental);
 	}
