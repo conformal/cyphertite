@@ -2287,10 +2287,10 @@ ct_mknod(struct ct_extract_state *ces, struct fnode *fnode)
 		snprintf(path, sizeof(path), "%s%c%s", ces->ces_rootdir->d_name,
 		    CT_PATHSEP, fnode->fn_fullname);
 	}
-	return (mknod(path, fnode->fn_mode, fnode->fn_dev));
+	return (mknod(path, fnode->fn_mode, fnode->fn_rdev));
 #else
 	return (mknodat(fnode->fn_parent_dir->d_fd, fnode->fn_name,
-	    fnode->fn_mode, fnode->fn_dev));
+	    fnode->fn_mode, fnode->fn_rdev));
 #endif
 }
 
