@@ -74,6 +74,8 @@ clean:
 	$(RM) $(OBJPREFIX)$(LIB.STATIC)
 	$(RM) $(LIB.DEPS)
 
+test:
+
 -include $(LIB.DEPS)
 
 .PHONY: clean depend install uninstall

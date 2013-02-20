@@ -33,6 +33,7 @@ LN ?= ln
 LNFORCE ?= -f
 MKDIR ?= mkdir
 RM ?= rm -f
+RMDIR ?= rmdir
 
 # Get correct ctutil directory.
 ifeq "$(wildcard ../../ctutil/obj)" ""
@@ -56,8 +57,8 @@ LDLIBS += -lclens -levent_core -lexpat -lsqlite3 -llzma -llzo2 $(CURL.LDLIBS)
 LDLIBS += ${LIB.LINKSTATIC} -lssl -lcrypto
 LDLIBS += ${LIB.LINKDYNAMIC} -ldl -ledit -lncurses -lz
 
-BIN.NAME = ct_list
-BIN.SRCS = ct_list.c
+BIN.NAME = test_ct_fts
+BIN.SRCS = test_ct_fts.c
 BIN.OBJS = $(addprefix $(OBJPREFIX), $(BIN.SRCS:.c=.o))
 BIN.DEPS = $(addsuffix .depend, $(BIN.OBJS))
 BIN.LDFLAGS = $(LDFLAGS.EXTRA) $(LDFLAGS)
@@ -65,8 +66,15 @@ BIN.LDLIBS = $(LDLIBS) $(LDADD)
 BIN.MDIRS = $(foreach page, $(BIN.MANPAGES), $(subst ., man, $(suffix $(page))))
 BIN.MLINKS := $(foreach page, $(BIN.MLINKS), $(subst ., man, $(suffix $(page)))/$(page))
 
-all: $(OBJPREFIX)$(BIN.NAME)
+TESTDIR = testdir
 
+all:
+
+test: $(OBJPREFIX)$(BIN.NAME)
+	${CURDIR}/build_environment.sh ${TESTDIR} || exit 1
+	$(OBJPREFIX)$(BIN.NAME) ${TESTDIR} 2>&1 | tee testlog
+	diff -u testlog.expected testlog
+	$(RM) ${TESTDIR}/twogig
 obj:
 	-$(MKDIR) obj
 
@@ -91,8 +99,9 @@ clean:
 	$(RM) $(BIN.OBJS)
 	$(RM) $(OBJPREFIX)$(BIN.NAME)
 	$(RM) $(BIN.DEPS)
-
-test:
+	$(RM) testlog
+	$(RM) ${TESTDIR}/twogig
+	$(RMDIR) $(TESTDIR)
 
 -include $(BIN.DEPS)
 

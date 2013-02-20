@@ -1,5 +1,5 @@
 SUBDIRS = ct_list ct_archive ct_extract ct_exists ct_delete
-TARGETS = clean obj install uninstall depend
+TARGETS = clean obj install uninstall depend test
 
 all: $(SUBDIRS)
 

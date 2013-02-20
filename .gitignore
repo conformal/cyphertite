@@ -5,6 +5,7 @@
 *.exe
 *.cat[1-9]
 *.manlint
+*~
 ID
 *.swp
 *.diff*
@@ -17,3 +18,6 @@ examples/remote_extract/remote_extract
 examples/remote_list/remote_list
 examples/exists_ctfile/exists_ctfile
 tags
+ut/test_ct_fts/test_ct_fts
+ut/test_ct_fts/testdir/
+ut/test_ct_fts/testlog

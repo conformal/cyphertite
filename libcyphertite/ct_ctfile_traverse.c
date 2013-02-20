@@ -32,13 +32,13 @@
 #include <assl.h>
 #include <clog.h>
 #include <exude.h>
-#include <fts.h>
 
 #include <ctutil.h>
 
 #include <cyphertite.h>
 #include <ct_types.h>
 #include <ct_crypto.h>
+#include "ct_fts.h"
 
 /* Taken from OpenBSD ls */
 static void
@@ -109,14 +109,14 @@ ctfile_list_print(struct ct_global_state *state, struct ct_op *op)
  */
 #ifdef __FreeBSD__
 static int
-datecompare(const FTSENT * const *a, const FTSENT * const *b)
+datecompare(const CT_FTSENT * const *a, const CT_FTSENT * const *b)
 {
 	return (timespeccmp(&(*a)->fts_statp->st_mtimespec,
 	    &(*b)->fts_statp->st_mtimespec, <));
 }
 #else
 static int
-datecompare(const FTSENT **a, const FTSENT **b)
+datecompare(const CT_FTSENT **a, const CT_FTSENT **b)
 {
 	return (timespeccmp(&(*a)->fts_statp->st_mtim,
 	    &(*b)->fts_statp->st_mtim, <));
@@ -135,22 +135,22 @@ int
 ctfile_trim_cache(const char *cachedir, long long max_size)
 {
 	char		*paths[2];
-	FTS		*ftsp;
-	FTSENT		*fe;
+	CT_FTS		*ftsp;
+	CT_FTSENT		*fe;
 	long long	 dirsize = 0;
 
 	paths[0] = (char *)cachedir;
 	paths[1] = NULL;
 
-	if ((ftsp = fts_open(paths, FTS_XDEV | FTS_PHYSICAL | FTS_NOCHDIR,
+	if ((ftsp = ct_fts_open(paths, CT_FTS_XDEV | CT_FTS_PHYSICAL | CT_FTS_NOCHDIR,
 	   NULL)) == NULL) {
 		CNDBG(CT_LOG_CTFILE, "can't open metadata cache to scan");
 		return (CTE_ERRNO);
 	}
 
-	while ((fe = fts_read(ftsp)) != NULL) {
+	while ((fe = ct_fts_read(ftsp)) != NULL) {
 		switch(fe->fts_info) {
-		case FTS_F:
+		case CT_FTS_F:
 			/*
 			 * XXX no OFF_T_MAX in posix, on openbsd it is always a
 			 * long long
@@ -159,15 +159,15 @@ ctfile_trim_cache(const char *cachedir, long long max_size)
 				CWARNX("dirsize overflowed");
 			dirsize += fe->fts_statp->st_size;
 			break;
-		case FTS_ERR:
-		case FTS_DNR:
-		case FTS_NS:
+		case CT_FTS_ERR:
+		case CT_FTS_DNR:
+		case CT_FTS_NS:
 			CNDBG(CT_LOG_CTFILE, "can't read directory entry %s",
 			    strerror(fe->fts_errno));
-			(void)fts_close(ftsp);
+			(void)ct_fts_close(ftsp);
 			errno = fe->fts_errno;
 			return (CTE_ERRNO);
-		case FTS_DC:
+		case CT_FTS_DC:
 			CNDBG(CT_LOG_CTFILE, "file system cycle found");
 			/* FALLTHROUGH */
 		default:
@@ -176,22 +176,22 @@ ctfile_trim_cache(const char *cachedir, long long max_size)
 		}
 	}
 
-	(void)fts_close(ftsp);
+	(void)ct_fts_close(ftsp);
 
 	if (dirsize <= max_size)
 		return (0);
 	CNDBG(CT_LOG_CTFILE, "cleaning up cachedir, %llu > %llu",
 	    (long long)dirsize, (long long)max_size);
 
-	if ((ftsp = fts_open(paths, FTS_XDEV | FTS_PHYSICAL | FTS_NOCHDIR,
+	if ((ftsp = ct_fts_open(paths, CT_FTS_XDEV | CT_FTS_PHYSICAL | CT_FTS_NOCHDIR,
 	    datecompare)) == NULL) {
 		CNDBG(CT_LOG_CTFILE, "can't open metadata cache to trim");
 		return (CTE_ERRNO);
 	}
 
-	while ((fe = fts_read(ftsp)) != NULL) {
+	while ((fe = ct_fts_read(ftsp)) != NULL) {
 		switch(fe->fts_info) {
-		case FTS_F:
+		case CT_FTS_F:
 			CNDBG(CT_LOG_CTFILE, "%s %llu", fe->fts_path,
 			    (long long)fe->fts_statp->st_size);
 			if (unlink(fe->fts_path) != 0) {
@@ -201,15 +201,15 @@ ctfile_trim_cache(const char *cachedir, long long max_size)
 			}
 			dirsize -= fe->fts_statp->st_size;
 			break;
-		case FTS_ERR:
-		case FTS_DNR:
-		case FTS_NS:
+		case CT_FTS_ERR:
+		case CT_FTS_DNR:
+		case CT_FTS_NS:
 			CNDBG(CT_LOG_CTFILE, "can't read directory entry %s",
 			    strerror(fe->fts_errno));
-			(void)fts_close(ftsp);
+			(void)ct_fts_close(ftsp);
 			errno = fe->fts_errno;
 			return (CTE_ERRNO);
-		case FTS_DC:
+		case CT_FTS_DC:
 			CNDBG(CT_LOG_CTFILE, "file system cycle found");
 			/* FALLTHROUGH */
 		default:
@@ -222,7 +222,7 @@ ctfile_trim_cache(const char *cachedir, long long max_size)
 			break;
 	}
 
-	(void)fts_close(ftsp);
+	(void)ct_fts_close(ftsp);
 
 	return (0);
 }
@@ -230,7 +230,7 @@ ctfile_trim_cache(const char *cachedir, long long max_size)
 int
 ctfile_cache_remove(const char *file, const char *cachedir)
 {
-	
+
 	char		*cachename;
 	int		 s_errno = 0, ret = 0;
 

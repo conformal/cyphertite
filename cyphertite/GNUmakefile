@@ -135,6 +135,8 @@ clean:
 	$(RM) $(OBJPREFIX)$(BIN.NAME)
 	$(RM) $(BIN.DEPS)
 
+test:
+
 -include $(BIN.DEPS)
 
 .PHONY: clean depend install uninstall

@@ -31,7 +31,6 @@
 #include <string.h>
 #include <errno.h>
 #include <libgen.h>
-#include <fts.h>
 #include <pwd.h>
 #include <limits.h>
 
@@ -43,6 +42,7 @@
 #include <cyphertite.h>
 #include <ct_internal.h>
 #include "ct_archive.h"
+#include "ct_fts.h"
 
 /*
  * flist is a structure that keeps track of the files that still need to be
@@ -1369,50 +1369,50 @@ ct_traverse(struct ct_global_state *state, struct ct_archive_state *cas,
     char **paths, struct flist_head *files, int no_cross_mounts,
     int follow_root_symlink, int follow_symlinks, struct ct_statistics *ct_stats)
 {
-	FTS			*ftsp;
-	FTSENT			*fe;
+	CT_FTS			*ftsp;
+	CT_FTSENT		*fe;
 	struct fl_tree		 ino_tree;
 	int			 fts_options, cnt, forcedir, ret;
 
 	RB_INIT(&ino_tree);
-	fts_options = FTS_NOCHDIR;
+	fts_options = CT_FTS_NOCHDIR;
 	if (follow_symlinks)
-		fts_options |= FTS_LOGICAL;
+		fts_options |= CT_FTS_LOGICAL;
 	else
-		fts_options |= FTS_PHYSICAL;
+		fts_options |= CT_FTS_PHYSICAL;
 	if (follow_root_symlink) {
-		fts_options |= FTS_COMFOLLOW;
+		fts_options |= CT_FTS_COMFOLLOW;
 	}
 	if (no_cross_mounts)
-		fts_options |= FTS_XDEV;
+		fts_options |= CT_FTS_XDEV;
 	CDBG("options =  %d", fts_options);
-	ftsp = fts_open(paths, fts_options, NULL);
+	ftsp = ct_fts_open(paths, fts_options, NULL);
 	if (ftsp == NULL) {
-		ct_fatal(state, "fts_open", CTE_ERRNO);
+		ct_fatal(state, "ct_fts_open", CTE_ERRNO);
 		return (1);
 	}
 
 	cnt = 0;
-	while ((fe = fts_read(ftsp)) != NULL) {
+	while ((fe = ct_fts_read(ftsp)) != NULL) {
 		forcedir = 0;
 		switch (fe->fts_info) {
-		case FTS_D:
-		case FTS_DEFAULT:
-		case FTS_F:
-		case FTS_SL:
-		case FTS_SLNONE:
+		case CT_FTS_D:
+		case CT_FTS_DEFAULT:
+		case CT_FTS_F:
+		case CT_FTS_SL:
+		case CT_FTS_SLNONE:
 			cnt++;
 			/* these are ok */
 			/* FALLTHROUGH */
-		case FTS_DP: /* Setup for close dir, no stats */
-			if (fe->fts_info == FTS_DP)
+		case CT_FTS_DP: /* Setup for close dir, no stats */
+			if (fe->fts_info == CT_FTS_DP)
 				goto sched;
 			break;
-		case FTS_DC:
+		case CT_FTS_DC:
 			CWARNX("file system cycle found");
 			continue;
-		case FTS_DNR:
-		case FTS_NS:
+		case CT_FTS_DNR:
+		case CT_FTS_NS:
 			errno = fe->fts_errno;
 			CWARN("unable to access %s", fe->fts_path);
 			continue;
@@ -1423,7 +1423,7 @@ ct_traverse(struct ct_global_state *state, struct ct_archive_state *cas,
 		/* backup dirs above fts starting point */
 		if (fe->fts_level == 0) {
 			/* XXX technically this should apply to files too */
-			if (follow_root_symlink && fe->fts_info == FTS_D)
+			if (follow_root_symlink && fe->fts_info == CT_FTS_D)
 				forcedir = 1;
 			if ((ret = backup_prefix(cas, fe->fts_path, files,
 			    &ino_tree, ct_stats)) != 0) {
@@ -1436,8 +1436,8 @@ ct_traverse(struct ct_global_state *state, struct ct_archive_state *cas,
 		/* backup all other files */
 sched:
 		ct_sched_backup_file(cas, fe->fts_statp, fe->fts_path,
-		    forcedir, fe->fts_info == FTS_DP ? 1 : 0, files, &ino_tree,
-		    ct_stats);
+		    forcedir, fe->fts_info == CT_FTS_DP ? 1 : 0, files,
+		    &ino_tree, ct_stats);
 
 	}
 
@@ -1447,11 +1447,11 @@ sched:
 	}
 
 	if (fe == NULL && errno) {
-		ct_fatal(state, "fts_read", CTE_ERRNO);
+		ct_fatal(state, "ct_fts_read", CTE_ERRNO);
 		return (1);
 	}
-	if (fts_close(ftsp)) {
-		ct_fatal(state, "fts_close", CTE_ERRNO);
+	if (ct_fts_close(ftsp)) {
+		ct_fatal(state, "ct_fts_close", CTE_ERRNO);
 		return (1);
 	}
 	gettimeofday(&ct_stats->st_time_scan_end, NULL);
