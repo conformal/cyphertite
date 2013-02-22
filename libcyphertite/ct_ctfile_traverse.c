@@ -104,24 +104,12 @@ ctfile_list_print(struct ct_global_state *state, struct ct_op *op)
 /*
  * make fts_* return entities in mtime order, oldest first
  */
-/* XXX: Need to clean this up with more portable code.  Using ifdefs for now
- * to make it compile.
- */
-#ifdef __FreeBSD__
-static int
-datecompare(const CT_FTSENT * const *a, const CT_FTSENT * const *b)
-{
-	return (timespeccmp(&(*a)->fts_statp->st_mtimespec,
-	    &(*b)->fts_statp->st_mtimespec, <));
-}
-#else
 static int
 datecompare(const CT_FTSENT **a, const CT_FTSENT **b)
 {
 	return (timespeccmp(&(*a)->fts_statp->st_mtim,
 	    &(*b)->fts_statp->st_mtim, <));
 }
-#endif
 
 /*
  * Trim down the metadata cachedir to be smaller than ``max_size''.
