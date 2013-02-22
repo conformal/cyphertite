@@ -912,7 +912,7 @@ ct_fts_alloc(CT_FTS *sp, char *name, size_t namelen)
 	 * fts_name field is declared to be of size 1, the fts_name pointer is
 	 * namelen + 2 before the first possible address of the stat structure.
 	 */
-	len = sizeof(CT_FTSENT) + namelen;
+	len = sizeof(CT_FTSENT) + namelen + 1;
 	if (!ISSET(CT_FTS_NOSTAT))
 		len += sizeof(struct stat) + ALIGNBYTES;
 	if ((p = malloc(len)) == NULL)

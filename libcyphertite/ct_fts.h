@@ -110,7 +110,7 @@ typedef struct _ftsent {
 	unsigned short fts_spare;	/* unused */
 
 	struct stat *fts_statp;		/* stat(2) information */
-	char fts_name[1];		/* file name */
+	char fts_name[];		/* file name */
 } CT_FTSENT;
 
 __BEGIN_DECLS
