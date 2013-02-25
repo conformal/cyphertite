@@ -56,6 +56,8 @@ run-regress-${PROG}: ${PROG}
 	./${PROG} ${TESTDIR} 2>&1 | tee testlog
 	diff -u ${.CURDIR}/testlog.expected testlog
 	rm -f ${TESTDIR}/twogig
+	rm -f ${TESTDIR}/subdir/smaller
+	rm -f ${TESTDOR}/subdir/subdir2/smaller2
 
 .include <bsd.regress.mk>
 

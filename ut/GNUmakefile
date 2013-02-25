@@ -1,5 +1,5 @@
 SUBDIRS = test_ct_fts
-TARGETS = clean obj install uninstall depend test
+TARGETS = clean obj install uninstall depend test regress
 
 all: $(SUBDIRS)
 

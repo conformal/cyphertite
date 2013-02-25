@@ -1,4 +1,4 @@
-SUBDIRS = ctutil libcyphertite cyphertite examples ut
+SUBDIRS = ctutil libcyphertite cyphertite examples
 TARGETS = clean obj install uninstall depend test
 
 all: $(SUBDIRS)

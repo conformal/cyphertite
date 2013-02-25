@@ -72,9 +72,14 @@ all:
 
 test: $(OBJPREFIX)$(BIN.NAME)
 	${CURDIR}/build_environment.sh ${TESTDIR} || exit 1
-	$(OBJPREFIX)$(BIN.NAME) ${TESTDIR} 2>&1 | tee testlog
+	./$(OBJPREFIX)$(BIN.NAME) ${TESTDIR} 2>&1 | tee testlog
 	diff -u testlog.expected testlog
 	$(RM) ${TESTDIR}/twogig
+	$(RM) ${TESTDIR}/subdir/smaller
+	$(RM) ${TESTDOR}/subdir/subdir2/smaller2
+
+regress: test
+
 obj:
 	-$(MKDIR) obj
 
