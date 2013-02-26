@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.5.0
+%define version		1.5.1
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,13 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Tue Feb 26 2013 - davec 1.5.1-1
+- Fix an issue preventing archival of files >2GB on 32-bit Linux (bz #50)
+- Fix an issue where passwords with certain symbols would not work when
+  stored in cyphertite.conf (bz #41)
+- Fix an issue with extraction of special devices
+- Correct case where hardlinks could fail to be created during restore
+- Other minor code cleanup
 * Fri Feb 01 2013 - davec 1.5.0-1
 - Improve relative path handling to ensure incremental change detection
 - Automatically strip ../ from paths unless -P is specified to match gtar

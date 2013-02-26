@@ -1,3 +1,14 @@
+cyphertite (1.5.1-1) unstable; urgency=low
+
+  * Fix an issue preventing archival of files >2GB on 32-bit Linux (bz #50)
+  * Fix an issue where passwords with certain symbols would not work when
+    stored in cyphertite.conf (bz #41)
+  * Fix an issue with extraction of special devices
+  * Correct case where hardlinks could fail to be created during restore
+  * Other minor code cleanup
+
+ -- Conformal Systems <package-discuss@conformal.com>  Tue, 26 Feb 2013 12:01:39 -0600
+
 cyphertite (1.5.0-1) unstable; urgency=low
 
   * Improve relative path handling to ensure incremental change detection
