@@ -489,15 +489,29 @@ ct_cb_thread(void *vctx)
 	struct ct_ctx *ctx = vctx;
 
 	do {
+		ct_func_cb	*callback;
+		void		*arg;
+
 		pthread_mutex_lock(&ctx->ctx_mtx);
 		pthread_cond_wait(&ctx->ctx_cv, &ctx->ctx_mtx);
 		if (ctx->ctx_exiting) {
 			pthread_mutex_unlock(&ctx->ctx_mtx);
 			break;
 		}
+		/*
+		 * Grab a copy of this while we are locked since it can
+		 * be changed underneath us if we ct_event_shutdown() is called
+		 * immediately after we unlock and before we cal the callback
+		 * then we would call the NULLed out function pointer.
+		 *
+		 * shutdown waits on the thread to join so no resources can
+		 * have been freed in the meantime if we call a saved pointer.
+		 */
+		callback = ctx->ctx_fn;
+		arg = ctx->ctx_varg;
 		pthread_mutex_unlock(&ctx->ctx_mtx);
 
-		ctx->ctx_fn(ctx->ctx_varg);
+		callback(arg);
 
 	} while (1);
 
