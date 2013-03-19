@@ -1326,7 +1326,7 @@ ct_compute_csha(void *vctx)
 		state->ct_stats->st_bytes_csha += trans->tr_size[slot];
 
 		if (clog_mask_is_set(CT_LOG_SHA)) {
-			ct_sha1_encode(trans->tr_sha, shat);
+			ct_sha1_encode(trans->tr_csha, shat);
 			CNDBG(CT_LOG_SHA, "block tr_id %" PRIu64 " sha %s",
 			    trans->tr_trans_id, shat);
 		}
