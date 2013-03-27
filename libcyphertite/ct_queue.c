@@ -1358,13 +1358,13 @@ ct_process_write(void *vctx)
 	int			 nchunks;
 
 	/*
-	 * If we fatalled. just state transiition everything and don't
-	 * send any more. This should complete everything even if we
-	 * need to reconnect.
+	 * If we fataled. just state transition all the transaction and don't
+	 * send any more. Else we will try and reconnect first, which is a
+	 * waste of time.
 	 */
 	if (state->ct_dying != 0) {
 		while ((trans = ct_dequeue_write(state)) != NULL) {
-			ct_queeu_transfer(state, trans);
+			ct_queue_transfer(state, trans);
 		}
 		return;
 	}
