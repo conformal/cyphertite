@@ -861,6 +861,9 @@ ct_reconnect_internal(struct ct_global_state *state)
 
 	if ((ret = ct_ssl_connect(state)) == 0) {
 		if ((ret = ct_assl_negotiate_poll(state)) != 0) {
+			ct_ssl_cleanup(state);
+			if (ret == CTE_SHORT_READ || ret == CTE_SHORT_WRITE)
+				goto disconnected;
 			ct_fatal(state, "negotiate failed on reconnect", ret);
 			goto out;
 		}
@@ -953,6 +956,7 @@ ct_reconnect_internal(struct ct_global_state *state)
 unlock:
 		CT_UNLOCK(&state->ct_write_lock);
 	} else {
+disconnected:
 		CNDBG(CT_LOG_NET, "failed to reconnect to server: %s",
 		    ct_strerror(ret));
 		if (state->ct_disconnected == 2)
