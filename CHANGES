@@ -3,6 +3,9 @@ User visible changes for cyphertite
   A high-security scalable solution for online backups
 ============================================================================
 
+Changes in 1.5.3 (Wed Apr 17 2013)
+  - Improve automatic reconnect handling
+
 Changes in 1.5.1 (Tue Feb 26 2013)
   - Fix an issue preventing archival of files >2GB on 32-bit Linux (bz #50)
   - Fix an issue where passwords with certain symbols would not work when

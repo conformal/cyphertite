@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.5.1
+%define version		1.5.3
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,8 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Wed Apr 17 2013 - davec 1.5.3-1
+- Improve automatic reconnect handling
 * Tue Feb 26 2013 - davec 1.5.1-1
 - Fix an issue preventing archival of files >2GB on 32-bit Linux (bz #50)
 - Fix an issue where passwords with certain symbols would not work when

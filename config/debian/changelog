@@ -1,3 +1,9 @@
+cyphertite (1.5.3-1) unstable; urgency=low
+
+  * Improve automatic reconnect handling
+
+ -- Conformal Systems <package-discuss@conformal.com>  Wed, 17 Apr 2013 15:29:33 -0500
+
 cyphertite (1.5.1-1) unstable; urgency=low
 
   * Fix an issue preventing archival of files >2GB on 32-bit Linux (bz #50)
