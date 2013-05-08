@@ -79,18 +79,17 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 		s_errno = errno;
 		CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" wlen %d len %ld",
 		    (int64_t)c_pid, wlen, (long) len);
-		if (len == 0) {
-			/* lost socket */
-			CNDBG(CTUTIL_LOG_SOCKET, "socket disconnected");
-			ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
-			    NULL, NULL, 0);
-			return;
-		} else if (len == -1) {
+		if (len == -1 || len == 0) {
 			errno = s_errno;
-			if (errno != EINTR && errno != EAGAIN &&
-			    errno != ECONNRESET && errno != EPIPE)
-				CWARN("wrote -1 ");
-			return; /* no data? */
+			if (len == 0 || (errno != EINTR && errno != EAGAIN)) {
+				/* lost socket */
+				CNDBG(CTUTIL_LOG_SOCKET,
+					"socket disconnected: %s",
+					strerror(errno));
+				ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
+				    NULL, NULL, 0);
+			}
+			return;
 		}
 
 		ioctx->io_write_count++;
@@ -133,21 +132,14 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 		CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" wlen1 %d len %ld",
 		    (int64_t)c_pid, wlen, (long) len);
 
-		if (len == 0 && wlen != 0) {
-			/* lost socket */
-			CNDBG(CTUTIL_LOG_SOCKET, "socket disconnected");
-			ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
-			    NULL, NULL, 0);
-			goto done;
-		} else if (len == -1) {
+		if (len == -1 || (len == 0 && wlen != 0)) {
 			errno = s_errno;
-			if (errno == EFAULT) {
-				CABORT("opcode %d sz %d resid %d p %p "
-				    "wrote -1 ", hdr->c_opcode, hdr->c_size,
-				    wlen, body + ioctx->io_o_off);
-			} else if (errno != EINTR && errno != EAGAIN &&
-			    errno != ECONNRESET && errno != EPIPE)
-				CWARN("wrote -1 ");
+			if (len == 0 || (errno != EINTR && errno != EAGAIN)) {
+				/* lost socket */
+				CNDBG(CTUTIL_LOG_SOCKET, "socket disconnected");
+				ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
+				    NULL, NULL, 0);
+			}
 			return;
 		}
 		ioctx->io_write_count++;
@@ -200,8 +192,6 @@ ct_event_assl_write(evutil_socket_t fd_notused, short events, void *arg)
 	}
 	if (ioctx->io_over_bw_check != NULL)
 		ioctx->io_over_bw_check(ioctx->io_cb_arg, ioctx);
-done:
-	return;
 }
 
 void
@@ -237,16 +227,16 @@ ct_event_assl_read(evutil_socket_t fd, short events, void *arg)
 		rlen = sizeof(*hdr) - ioctx->io_i_off;
 		len = assl_read(c, (uint8_t *)hdr + ioctx->io_i_off, rlen);
 
-		if (len == 0) {
-			/* lost socket */
-			CNDBG(CTUTIL_LOG_SOCKET, "socket disconnected");
-			ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
+		if (len == -1 || len == 0) {
+			errno = s_errno;
+			if (len == 0 || (errno != EINTR && errno != EAGAIN)) {
+				/* lost socket */
+				CNDBG(CTUTIL_LOG_SOCKET,
+					"socket disconnected: %s",
+					strerror(errno));
+				ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
+			}
 			return;
-		} else if (len == -1) {
-			if (errno != EINTR && errno != EAGAIN &&
-			    errno != ECONNRESET && errno != EPIPE)
-				CWARN("read -1 ");
-			return; /* no data? */
 		}
 		ioctx->io_read_count++;
 		ioctx->io_read_bytes += len;
@@ -284,17 +274,16 @@ ct_event_assl_read(evutil_socket_t fd, short events, void *arg)
 		    "read %ld, rlen %d off %d", (int64_t)c_pid, hdr->c_opcode,
 		    hdr->c_size, (long) len, rlen, ioctx->io_i_off);
 
-		if (len == 0 && rlen != 0) {
-			/* lost socket */
-			CNDBG(CTUTIL_LOG_SOCKET, "socket disconnected");
-			ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
-			return;
-		} else if (len == -1) {
+		if (len == -1 || (len == 0 && rlen != 0)) {
 			errno = s_errno;
-			if (errno != EINTR && errno != EAGAIN &&
-			    errno != ECONNRESET && errno != EPIPE)
-				CWARN("read -1 ");
-			return; /* no data? */
+			if (len == 0 || (errno != EINTR && errno != EAGAIN)) {
+				/* lost socket */
+				CNDBG(CTUTIL_LOG_SOCKET,
+					"socket disconnected: %s",
+					strerror(errno));
+				ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
+			}
+			return;
 		}
 
 		ioctx->io_read_count++;
@@ -365,18 +354,17 @@ ct_event_io_write(evutil_socket_t fd, short events, void *arg)
 		CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" wlen %d len %ld",
 		    (int64_t)c_pid, wlen, (long) len);
 
-		if (len == 0) {
-			/* lost socket */
-			CNDBG(CTUTIL_LOG_SOCKET, "socket disconnected");
-			ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
-			    NULL, NULL, 0);
-			return;
-		} else if (len == -1) {
+		if (len == -1 || len == 0) {
 			errno = s_errno;
-			if (errno != EINTR && errno != EAGAIN &&
-			    errno != ECONNRESET && errno != EPIPE)
-				CWARN("wrote -1 ");
-			return; /* no data? */
+			if (len == 0 || (errno != EINTR && errno != EAGAIN)) {
+				/* lost socket */
+				CNDBG(CTUTIL_LOG_SOCKET,
+					"socket disconnected: %s",
+					strerror(errno));
+				ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
+				    NULL, NULL, 0);
+			}
+			return;
 		}
 		ioctx->io_write_count++;
 		ioctx->io_write_bytes += len;
@@ -415,21 +403,16 @@ write_next_iov:
 		CNDBG(CTUTIL_LOG_SOCKET, "pid %"PRId64" wlen1 %d len %ld",
 		    (int64_t)c_pid, wlen, (long) len);
 
-		if (len == 0 && wlen != 0) {
-			/* lost socket */
-			CNDBG(CTUTIL_LOG_SOCKET, "socket disconnected");
-			ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
-			    NULL, NULL, 0);
-			goto done;
-		} else if (len == -1) {
+		if (len == -1 || (len == 0 && wlen != 0)) {
 			errno = s_errno;
-			if (errno == EFAULT) {
-				CABORT("opcode %d sz %d resid %d p %p "
-				    "wrote -1 ", hdr->c_opcode, hdr->c_size,
-				    wlen, body + ioctx->io_o_off);
-			} else if (errno != EINTR && errno != EAGAIN &&
-			    errno != ECONNRESET && errno != EPIPE)
-				CWARN("wrote -1 ");
+			if (len == 0 || (errno != EINTR && errno != EAGAIN)) {
+				/* lost socket */
+				CNDBG(CTUTIL_LOG_SOCKET,
+					"socket disconnected: %s",
+					strerror(errno));
+				ioctx->io_wrcomplete_cb(ioctx->io_cb_arg,
+				    NULL, NULL, 0);
+			}
 			return;
 		}
 
@@ -481,8 +464,6 @@ write_next_iov:
 		}
 		CT_UNLOCK(&ioctx->io_lock);
 	}
-done:
-	return;
 }
 
 void
@@ -516,16 +497,15 @@ ct_event_io_read(evutil_socket_t fd, short events, void *arg)
 		rlen = sizeof(*hdr) - ioctx->io_i_off;
 		len = read(fd, (uint8_t *)hdr + ioctx->io_i_off, rlen);
 
-		if (len == 0) {
-			/* lost socket */
-			CNDBG(CTUTIL_LOG_SOCKET, "socket disconnected");
-			ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
+		if (len == -1 || len == 0) {
+			if (len == 0 || (errno != EINTR && errno != EAGAIN)) {
+				/* lost socket */
+				CNDBG(CTUTIL_LOG_SOCKET,
+					"socket disconnected: %s",
+					strerror(errno));
+				ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
+			}
 			return;
-		} else if (len == -1) {
-			if (errno != EINTR && errno != EAGAIN &&
-			    errno != ECONNRESET && errno != EPIPE)
-				CWARN("read -1 ");
-			return; /* no data? */
 		}
 		ioctx->io_read_count++;
 		ioctx->io_read_bytes += len;
@@ -561,17 +541,15 @@ ct_event_io_read(evutil_socket_t fd, short events, void *arg)
 		    "read %ld, rlen %d off %d", (int64_t)c_pid, hdr->c_opcode,
 		    hdr->c_size, (long) len, rlen, ioctx->io_i_off);
 
-		if (len == 0 && rlen != 0) {
-			/* lost socket */
-			CNDBG(CTUTIL_LOG_SOCKET, "socket disconnected");
-			ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
+		if (len == -1 || (len == 0 && rlen != 0)) {
+			if (len == 0 || (errno != EINTR && errno != EAGAIN)) {
+				/* lost socket */
+				CNDBG(CTUTIL_LOG_SOCKET,
+					"socket disconnected: %s",
+					strerror(errno));
+				ioctx->io_rd_cb(ioctx->io_cb_arg, NULL, NULL);
+			}
 			return;
-		} else if (len == -1) {
-			errno = s_errno;
-			if (errno != EINTR && errno != EAGAIN &&
-			    errno != ECONNRESET && errno != EPIPE)
-				CWARN("read -1 ");
-			return; /* no data? */
 		}
 
 		ioctx->io_read_count++;
