@@ -541,6 +541,7 @@ ct_event_io_read(evutil_socket_t fd, short events, void *arg)
 		    hdr->c_size, (long) len, rlen, ioctx->io_i_off);
 
 		if (len == -1 || (len == 0 && rlen != 0)) {
+			errno = s_errno;
 			if (len == 0 || (errno != EINTR && errno != EAGAIN)) {
 				/* lost socket */
 				CNDBG(CTUTIL_LOG_SOCKET,
