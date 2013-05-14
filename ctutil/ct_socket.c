@@ -228,7 +228,6 @@ ct_event_assl_read(evutil_socket_t fd, short events, void *arg)
 		len = assl_read(c, (uint8_t *)hdr + ioctx->io_i_off, rlen);
 
 		if (len == -1 || len == 0) {
-			errno = s_errno;
 			if (len == 0 || (errno != EINTR && errno != EAGAIN)) {
 				/* lost socket */
 				CNDBG(CTUTIL_LOG_SOCKET,
