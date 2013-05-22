@@ -128,6 +128,7 @@ const char *ct_errmsgs[] = {
 	[CTE_CAN_NOT_DELETE] = "Can not delete specified files",
 	[CTE_SNAPSHOT] = "Failed to initialize operating system snapshot "
 	    "services.  Please review system logs for further details",
+	[CTE_CANCELLED] = "Cancelled by user",
 };
 
 const char *
@@ -762,6 +763,16 @@ ct_shutdown(struct ct_global_state *state)
 	state->ct_db_state = NULL;
 	ct_event_shutdown(state->event_state);
 	ct_event_loopbreak(state->event_state);
+}
+
+/*
+ * Cancel an event loop.
+ * To be called from *outside* the event loop.
+ */
+void
+ct_cancel(struct ct_global_state *state)
+{
+	state->ct_cancelled = 1;
 }
 
 void

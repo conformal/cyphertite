@@ -1350,6 +1350,11 @@ ct_process_completions(void *vctx)
 		if (ct_get_file_state(state) != CT_S_FINISHED)
 			ct_wakeup_file(state->event_state);
 	}
+
+	if (state->ct_cancelled) {
+		ct_fatal(state, NULL, CTE_CANCELLED);
+		state->ct_cancelled = 0;
+	}
 }
 
 void

@@ -70,6 +70,7 @@ void ct_default_config(struct ct_config *);
 int ct_download_decode_and_save_certs(struct ct_config *);
 void ct_info_sig(evutil_socket_t fd, short event, void *vctx);
 
+
 /* Statistics */
 struct ct_statistics {
 	struct timeval		st_time_start;
@@ -202,6 +203,7 @@ struct ct_global_state {
 
 	int				 ct_cull_occurred;
 	int				 ct_dying;
+	int			 	 ct_cancelled;
 	struct ct_trans			*ct_fatal_trans;
 	int				 ct_errno;
 	/* XXX reasonable size? */
@@ -209,6 +211,7 @@ struct ct_global_state {
 };
 
 int		 ct_setup_state(struct ct_global_state **, struct ct_config *);
+void		 ct_cancel(struct ct_global_state *);
 
 /* File status */
 #define CT_S_STARTING		(0)

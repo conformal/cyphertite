@@ -173,7 +173,8 @@ struct ctfile_list_file {
 #define CTE_NOTHING_TO_DELETE		57
 #define CTE_CAN_NOT_DELETE		58
 #define CTE_SNAPSHOT			59
-#define CTE_MAX				(CTE_SNAPSHOT + 1)
+#define CTE_CANCELLED			60
+#define CTE_MAX				(CTE_CANCELLED + 1)
 /*
  * NOTE: Update CTE_MAX when adding new error codes.  Also be sure to add an
  * appropriate error string to the ct_errmsgs array in ct_util.c.
