@@ -1083,7 +1083,7 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 	ct_set_file_state(state, CT_S_RUNNING);
 
 	if (cap->cap_curnode == NULL)
-		goto done;
+		goto next_file;
 loop:
 	CNDBG(CT_LOG_CTFILE, "file %s state %d", cap->cap_curnode->fn_fullname,
 	    cap->cap_curnode->fn_state);
@@ -1120,6 +1120,7 @@ loop:
 				    cap->cap_curnode->fn_fullname);
 				ct_free_fnode(cap->cap_curnode);
 				ct_trans_free(state, ct_trans);
+				cap->cap_curnode = NULL;
 				goto skip;
 			}
 		}
@@ -1131,6 +1132,7 @@ loop:
 		ct_trans->tr_type = TR_T_SPECIAL;
 		ct_trans->tr_complete = ct_archive_complete_special;
 		ct_trans->tr_cleanup = ct_archive_cleanup_fnode;
+		cap->cap_curnode = NULL;
 		ct_trans->tr_eof = 0;
 		ct_queue_first(state, ct_trans);
 		goto next_file;
@@ -1153,6 +1155,7 @@ loop:
 			    cap->cap_curnode->fn_fullname);
 			ct_free_fnode(cap->cap_curnode);
 			ct_trans_free(state, ct_trans);
+			cap->cap_curnode = NULL;
 			goto skip;
 		}
 
@@ -1163,6 +1166,7 @@ loop:
 			cap->cap_fd = -1;
 			ct_free_fnode(cap->cap_curnode);
 			ct_trans_free(state, ct_trans);
+			cap->cap_curnode = NULL;
 			goto skip;
 		} 
 		/*
@@ -1177,6 +1181,7 @@ loop:
 			cap->cap_fd = -1;
 			ct_free_fnode(cap->cap_curnode);
 			ct_trans_free(state, ct_trans);
+			cap->cap_curnode = NULL;
 			goto skip;
 		}
 		cap->cap_curnode->fn_dev = sb.st_dev;
@@ -1207,6 +1212,7 @@ loop:
 			ct_trans->tr_eof = 1;
 			ct_trans->tr_cleanup = ct_archive_cleanup_fnode;
 			cap->cap_curnode->fn_state = CT_FILE_FINISHED;
+			cap->cap_curnode = NULL;
 		} else {
 			ct_trans->tr_eof = 0;
 			ct_trans->tr_cleanup = NULL;
@@ -1214,10 +1220,8 @@ loop:
 
 		ct_queue_first(state, ct_trans);
 
-		if (cap->cap_curnode->fn_size == 0 ||
-		    cap->cap_curnode->fn_skip_file) {
+		if (cap->cap_curnode == NULL)
 			goto next_file;
-		}
 		goto loop;
 	} else {
 		if (cap->cap_fd == -1) {
@@ -1276,6 +1280,7 @@ loop:
 			ct_trans->tr_state = TR_S_WMD_READY;
 			ct_trans->tr_eof = 2;
 		}
+		cap->cap_curnode = NULL;
 	} else {
 		cap->cap_curnode->fn_offset += rlen;
 	}
@@ -1288,16 +1293,14 @@ loop:
 	/* XXX is there other file metadata that needs to be saved?  */
 next_file:
 	/* XXX should node be removed from list at this time? */
-	if (cap->cap_curnode->fn_state == CT_FILE_FINISHED) {
-		CNDBG(CT_LOG_FILE, "going to next file %s",
-		    cap->cap_curnode->fn_fullname);
+	if (cap->cap_curnode == NULL) {
 skip:
 		if ((cap->cap_curnode = ct_get_next_fnode(state->archive_state,
 		    &cap->cap_flist, &cap->cap_curlist, cap->cap_include,
 		    cap->cap_exclude, caa->caa_follow_symlinks)) == NULL) {
 			CNDBG(CT_LOG_FILE, "no more files");
 		} else {
-			CNDBG(CT_LOG_FILE, "going to next file %s",
+			CNDBG(CT_LOG_FILE, "got new file %s",
 			    cap->cap_curnode->fn_fullname);
 		}
 	}
@@ -1305,7 +1308,6 @@ skip:
 	if (cap->cap_curnode != NULL)
 		goto loop;
 
-done:
 	CNDBG(CT_LOG_FILE, "last file read");
 	/* done with backup */
 
