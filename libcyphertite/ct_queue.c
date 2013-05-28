@@ -1058,6 +1058,10 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 		    hdr->c_opcode);
 	}
 
+	if (state->ct_dying) {
+		goto dying;
+	}
+		
 	if (trans)
 		CNDBG(CT_LOG_NET,
 		    "trans %" PRIu64 " found", trans->tr_trans_id);
@@ -1214,6 +1218,8 @@ ct_compute_sha(void *vctx)
 		 */
 		if (trans->tr_local)
 			CABORTX("%s: local sha found on list", __func__);
+		if (state->ct_dying)
+			goto out;
 		fnode = trans->tr_fl_node;
 
 		switch (trans->tr_state) {
@@ -1289,6 +1295,7 @@ ct_compute_sha(void *vctx)
 		default:
 			CABORTX("unexpected return value");
 		}
+out:
 		ct_queue_transfer(state, trans);
 	}
 }
@@ -1309,6 +1316,8 @@ ct_compute_csha(void *vctx)
 		 */
 		if (trans->tr_local)
 			CABORTX("%s: local sha found on list", __func__);
+		if (state->ct_dying)
+			goto out;
 
 		slot = trans->tr_dataslot;
 		ct_sha1(trans->tr_data[slot], trans->tr_csha,
@@ -1331,6 +1340,7 @@ ct_compute_csha(void *vctx)
 			 */
 			trans->tr_state = TR_S_NEXISTS;
 		}
+out:
 		ct_queue_transfer(state, trans);
 	}
 }
@@ -1408,6 +1418,10 @@ ct_process_write(void *vctx)
 		 */
 		if (trans->tr_local)
 			CABORTX("%s: local sha found on list", __func__);
+		if (state->ct_dying) {
+			ct_queue_transfer(state, trans);
+			continue;
+		}
 
 		CNDBG(CT_LOG_NET, "wakeup write going");
 		hdr = &trans->hdr;
@@ -1610,6 +1624,8 @@ ct_compute_compress(void *vctx)
 		 */
 		if (trans->tr_local)
 			CABORTX("%s: local sha found on list", __func__);
+		if (state->ct_dying)
+			goto out;
 
 		switch(trans->tr_state) {
 		case TR_S_EX_DECRYPTED:
@@ -1730,6 +1746,8 @@ ct_compute_encrypt(void *vctx)
 		 */
 		if (trans->tr_local)
 			CABORTX("%s: local sha found on list", __func__);
+		if (state->ct_dying)
+			goto out;
 
 		switch(trans->tr_state) {
 		case TR_S_EX_READ:
