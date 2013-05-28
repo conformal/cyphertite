@@ -1208,6 +1208,12 @@ ct_compute_sha(void *vctx)
 	int			slot;
 
 	while ((trans = ct_dequeue_sha(state)) != NULL) {
+		/*
+		 * Local transactions should only ever be seen in the file
+		 * and complete ``threads''.
+		 */
+		if (trans->tr_local)
+			CABORTX("%s: local sha found on list", __func__);
 		fnode = trans->tr_fl_node;
 
 		switch (trans->tr_state) {
@@ -1297,6 +1303,13 @@ ct_compute_csha(void *vctx)
 
 
 	while ((trans = ct_dequeue_csha(state)) != NULL) {
+		/*
+		 * Local transactions should only ever be seen in the file
+		 * and complete ``threads''.
+		 */
+		if (trans->tr_local)
+			CABORTX("%s: local sha found on list", __func__);
+
 		slot = trans->tr_dataslot;
 		ct_sha1(trans->tr_data[slot], trans->tr_csha,
 		    trans->tr_size[slot]);
@@ -1389,6 +1402,13 @@ ct_process_write(void *vctx)
 	CNDBG(CT_LOG_NET, "wakeup write");
 	while (state->ct_disconnected == 0 &&
 	    (trans = ct_dequeue_write(state)) != NULL) {
+		/*
+		 * Local transactions should only ever be seen in the file
+		 * and complete ``threads''.
+		 */
+		if (trans->tr_local)
+			CABORTX("%s: local sha found on list", __func__);
+
 		CNDBG(CT_LOG_NET, "wakeup write going");
 		hdr = &trans->hdr;
 
@@ -1584,6 +1604,13 @@ ct_compute_compress(void *vctx)
 
 
 	while ((trans = ct_dequeue_compress(state)) != NULL) {
+		/*
+		 * Local transactions should only ever be seen in the file
+		 * and complete ``threads''.
+		 */
+		if (trans->tr_local)
+			CABORTX("%s: local sha found on list", __func__);
+
 		switch(trans->tr_state) {
 		case TR_S_EX_DECRYPTED:
 		case TR_S_EX_READ:
@@ -1697,6 +1724,13 @@ ct_compute_encrypt(void *vctx)
 	int			ret;
 
 	while ((trans = ct_dequeue_encrypt(state)) != NULL) {
+		/*
+		 * Local transactions should only ever be seen in the file
+		 * and complete ``threads''.
+		 */
+		if (trans->tr_local)
+			CABORTX("%s: local sha found on list", __func__);
+
 		switch(trans->tr_state) {
 		case TR_S_EX_READ:
 			/* decrypt */
