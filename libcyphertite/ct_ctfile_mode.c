@@ -235,7 +235,6 @@ loop:
 
 	/* Are we done here? */
 	if (cas->cas_size == cas->cas_offset) {
-
 		ct_trans->tr_fl_node = NULL;
 		ct_trans->tr_state = TR_S_XML_CLOSE;
 		ct_trans->tr_complete = ctfile_complete_noop_final;
@@ -269,12 +268,13 @@ loop:
 
 	state->ct_stats->st_bytes_read += rlen;
 
+	ct_ref_fnode(cas->cas_fnode);
 	ct_trans->tr_fl_node = cas->cas_fnode;
 	ct_trans->tr_chsize = ct_trans->tr_size[0] = rlen;
 	ct_trans->tr_state = TR_S_READ;
 	/* nothing to do when the data is on the server */
 	ct_trans->tr_complete = ctfile_complete_noop;
-	ct_trans->tr_cleanup = NULL;
+	ct_trans->tr_cleanup = ctfile_archive_free_fnode;
 	ct_trans->tr_type = TR_T_WRITE_CHUNK;
 	ct_trans->tr_eof = 0;
 	ct_trans->hdr.c_flags = C_HDR_F_METADATA;
@@ -308,7 +308,11 @@ loop:
 		 */
 		cas->cas_offset = cas->cas_size;
 		ct_trans->tr_eof = 1;
-		ct_trans->tr_cleanup = ctfile_archive_free_fnode;
+
+		/* done with fnode, release ref */
+		ct_free_fnode(cas->cas_fnode);
+		cas->cas_fnode = NULL;
+
 	} else {
 		cas->cas_offset += rlen;
 	}
@@ -326,7 +330,7 @@ dying:
 	/* Clean up */
 	if (cas != NULL) {
 		if (cas->cas_fnode != NULL)
-			e_free(&cas->cas_fnode);
+			ct_free_fnode(cas->cas_fnode);
 		if (cas->cas_handle != NULL)
 			fclose(cas->cas_handle);
 		e_free(&cas);
@@ -458,6 +462,18 @@ ctfile_extract_complete_read(struct ct_global_state *state, struct ct_trans
 	return (0);
 }
 
+/*
+ * Normal transaction cleanup function for ctfile_extract, we call
+ * ct_free_fnode  to release our refcount on the fnode.
+ */
+void
+ctfile_extract_cleanup_trans(struct ct_global_state *state,
+    struct ct_trans *trans)
+{
+	/* release trans reference */
+	ct_free_fnode(trans->tr_fl_node);
+}
+
 struct ctfile_extract_state {
 	struct fnode	*ces_fnode;
 	int		 ces_block_no;
@@ -541,10 +557,11 @@ ctfile_extract(struct ct_global_state *state, struct ct_op *op)
 		return;
 	}
 
+	ct_ref_fnode(ces->ces_fnode);
 	trans->tr_fl_node = ces->ces_fnode;
 	trans->tr_state = TR_S_EX_SHA;
 	trans->tr_complete = ctfile_extract_complete_read;
-	trans->tr_cleanup = NULL;
+	trans->tr_cleanup = ctfile_extract_cleanup_trans;
 	trans->tr_type = TR_T_READ_CHUNK;
 	trans->tr_eof = 0;
 	trans->tr_ctfile_chunkno = ces->ces_block_no++;
@@ -591,12 +608,19 @@ ctfile_extract_complete_eof(struct ct_global_state *state,
 	return (1); /* we are done here */
 }
 
+/*
+ * EOF transaction cleanup function for ctfile_extract, we cleanup the extract
+ * state since we are done with it then call ct_free_fnode  to release our
+ * refcount on the fnode. WE call it twice since we now own have the file
+ * threads refcount too.
+ */
 void
 ctfile_extract_cleanup_eof(struct ct_global_state *state,
     struct ct_trans *trans)
 {
 	ct_file_extract_cleanup(state->extract_state);
 	state->extract_state = NULL;
+	ct_free_fnode(trans->tr_fl_node);
 	ct_free_fnode(trans->tr_fl_node);
 }
 
@@ -1276,7 +1300,6 @@ next_file:
 		ret = ctfile_parse(&xs_ctx);
 		switch (ret) {
 		case XS_RET_FILE:
-			/* nothing to do, ct_populate_fnode2 is optional now */
 			break;
 		case XS_RET_FILE_END:
 			/* nothing to do */

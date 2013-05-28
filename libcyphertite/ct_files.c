@@ -157,14 +157,31 @@ ct_alloc_fnode(void)
 
 	fnode = e_calloc(1, sizeof(*fnode));
 	TAILQ_INIT(&fnode->fn_hardlinks);
+	fnode->fn_refcount = 1;
 
 	return (fnode);
+}
+
+void
+ct_ref_fnode(struct fnode *fnode)
+{
+	/*
+	 * no atomic ops here since curently all reference handling is
+	 * handled in the file or complete ``threads'' which are actually.
+	 * the same operating system thread. if that changes this should be
+	 * locked or atomic.
+	 */
+	fnode->fn_refcount++;
 }
 
 void
 ct_free_fnode(struct fnode *fnode)
 {
 	struct fnode	*hardlink;
+
+	if (--fnode->fn_refcount > 0) {
+		return;
+	}
 
 	while ((hardlink = TAILQ_FIRST(&fnode->fn_hardlinks)) != NULL) {
 		TAILQ_REMOVE(&fnode->fn_hardlinks, hardlink, fn_list);
@@ -1136,6 +1153,7 @@ loop:
 		ct_trans->tr_cleanup = ct_archive_cleanup_fnode;
 		cap->cap_curnode = NULL;
 		ct_trans->tr_eof = 0;
+		/* we give our reference to the transaction */
 		ct_queue_first(state, ct_trans);
 		goto next_file;
 	}
@@ -1203,7 +1221,9 @@ loop:
 		}
 
 		ct_trans->tr_ctfile = cap->cap_cws;
+		ct_ref_fnode(cap->cap_curnode);
 		ct_trans->tr_fl_node = cap->cap_curnode;
+		ct_trans->tr_cleanup = ct_archive_cleanup_fnode;
 		ct_trans->tr_state = TR_S_FILE_START;
 		ct_trans->tr_type = TR_T_WRITE_HEADER;
 		ct_trans->tr_complete = ct_archive_complete_file_start;
@@ -1212,12 +1232,12 @@ loop:
 			close(cap->cap_fd);
 			cap->cap_fd = -1;
 			ct_trans->tr_eof = 1;
-			ct_trans->tr_cleanup = ct_archive_cleanup_fnode;
+			/* give up our reference, trans took one above */
+			ct_free_fnode(cap->cap_curnode);
 			cap->cap_curnode->fn_state = CT_FILE_FINISHED;
 			cap->cap_curnode = NULL;
 		} else {
 			ct_trans->tr_eof = 0;
-			ct_trans->tr_cleanup = NULL;
 		}
 
 		ct_queue_first(state, ct_trans);
@@ -1250,7 +1270,9 @@ loop:
 		state->ct_stats->st_bytes_read += rlen;
 
 	ct_trans->tr_ctfile = cap->cap_cws;
+	ct_ref_fnode(cap->cap_curnode);
 	ct_trans->tr_fl_node = cap->cap_curnode;
+	ct_trans->tr_cleanup = ct_archive_cleanup_fnode;
 	ct_trans->tr_size[0] = rlen;
 	ct_trans->tr_chsize = rlen;
 	ct_trans->tr_state = TR_S_READ;
@@ -1268,7 +1290,6 @@ loop:
 		close(cap->cap_fd);
 		cap->cap_fd = -1;
 		ct_trans->tr_eof = 1;
-		ct_trans->tr_cleanup = ct_archive_cleanup_fnode;
 		cap->cap_curnode->fn_state = CT_FILE_FINISHED;
 
 		if (error) {
@@ -1282,6 +1303,8 @@ loop:
 			ct_trans->tr_state = TR_S_WMD_READY;
 			ct_trans->tr_eof = 2;
 		}
+		/* give up our reference, took one for trans above */
+		ct_free_fnode(cap->cap_curnode);
 		cap->cap_curnode = NULL;
 	} else {
 		cap->cap_curnode->fn_offset += rlen;
@@ -1353,9 +1376,11 @@ dying:
 		if (cap->cap_exclude)
 			ct_match_unwind(cap->cap_exclude);
 		ct_flnode_cleanup(&cap->cap_flist);
+		/* release local reference */
 		if (cap->cap_curnode)
 			ct_free_fnode(cap->cap_curnode);
-		/* this doesn't race with completiona handler because
+		/*
+		 * this doesn't race with completion handler because
 		 * for now they are in the same thread
 		 */
 		if (cap->cap_cws)

@@ -55,6 +55,7 @@ struct fnode {
 #define CT_FILE_FINISHED	(2)
 	SHA_CTX			fn_shactx;
 	int			fn_skip_file;
+	int			fn_refcount;
 	/* XXX LIST? */
 	TAILQ_HEAD(, fnode)	fn_hardlinks;
 };
@@ -75,6 +76,7 @@ struct dnode {
 };
 
 struct fnode		*ct_alloc_fnode(void);
+void			ct_ref_fnode(struct fnode *);
 void			ct_free_fnode(struct fnode *);
 void			ct_free_dnode(struct dnode *);
 

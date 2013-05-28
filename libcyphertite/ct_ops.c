@@ -539,7 +539,6 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 	const char		*ctfile = cea->cea_local_ctfile;
 	char			**filelist = cea->cea_filelist;
 	int			 match_mode = cea->cea_matchmode;
-	struct fnode		*fnode;
 	struct ct_extract_priv	*ex_priv = op->op_priv;
 	int			ret;
 	struct ct_trans		*trans;
@@ -623,8 +622,6 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			ct_set_file_state(state, CT_S_WAITING_TRANS);
 			return;
 		}
-		/* Correct unless new file or EOF. Will fix in those cases  */
-		trans->tr_fl_node = ex_priv->fl_ex_node;
 		trans->tr_statemachine = ct_state_extract;
 
 		switch ((ret = ctfile_parse(&ex_priv->xdr_ctx))) {
@@ -640,34 +637,39 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			}
 
 			trans = ct_trans_realloc_local(state, trans);
-			trans->tr_fl_node = ex_priv->fl_ex_node = fnode =
+			trans->tr_fl_node = ex_priv->fl_ex_node = 
 			    ct_alloc_fnode();
 
 			ct_populate_fnode(state->extract_state,
-			    &ex_priv->xdr_ctx, fnode, &trans->tr_state,
-			    ex_priv->allfiles, cea->cea_strip_slash);
+			    &ex_priv->xdr_ctx, trans->tr_fl_node,
+			    &trans->tr_state, ex_priv->allfiles,
+			    cea->cea_strip_slash);
 			if (trans->tr_state == TR_S_EX_SPECIAL) {
 				trans->tr_complete =
 				    ct_extract_complete_special;
-				trans->tr_cleanup = ct_extract_cleanup_fnode;
 			} else {
 				trans->tr_complete =
 				    ct_extract_complete_file_start;
-				trans->tr_cleanup = NULL;
 			}
+			trans->tr_cleanup = ct_extract_cleanup_fnode;
 
 			if (ex_priv->haverb) {
 				struct ct_pending_file *cpf;
 				if ((cpf = ct_extract_find_entry(
 				    &ex_priv->pending_tree,
-				    fnode->fn_fullname)) != NULL) {
+				    trans->tr_fl_node->fn_fullname)) != NULL) {
 					struct fnode *hardlink;
 					/* copy permissions over */
-					fnode->fn_uid = cpf->cpf_uid;
-					fnode->fn_gid = cpf->cpf_gid;
-					fnode->fn_mode = cpf->cpf_mode;
-					fnode->fn_mtime = cpf->cpf_mtime;
-					fnode->fn_atime = cpf->cpf_atime;
+					trans->tr_fl_node->fn_uid =
+					    cpf->cpf_uid;
+					trans->tr_fl_node->fn_gid =
+					    cpf->cpf_gid;
+					trans->tr_fl_node->fn_mode =
+					    cpf->cpf_mode;
+					trans->tr_fl_node->fn_mtime =
+					    cpf->cpf_mtime;
+					trans->tr_fl_node->fn_atime =
+					    cpf->cpf_atime;
 
 					/* copy list of pending links over */
 					while ((hardlink =
@@ -675,7 +677,7 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 						TAILQ_REMOVE(&cpf->cpf_links,
 						    hardlink, fn_list);
 						TAILQ_INSERT_TAIL(
-						    &fnode->fn_hardlinks,
+						    &trans->tr_fl_node->fn_hardlinks,
 						    hardlink, fn_list);
 					}
 					
@@ -689,24 +691,27 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			} else {
 				ex_priv->doextract =
 				    !ct_match(ex_priv->inc_match,
-				    fnode->fn_fullname);
+				    trans->tr_fl_node->fn_fullname);
 				if (ex_priv->doextract &&
 				    ex_priv->ex_match != NULL &&
 				    !ct_match(ex_priv->ex_match,
-				    fnode->fn_fullname)) {
+				    trans->tr_fl_node->fn_fullname)) {
 					ex_priv->doextract = 0;
 				}
 			}
-			if (ex_priv->doextract && fnode->fn_hardlink) {
+			if (ex_priv->doextract &&
+			    trans->tr_fl_node->fn_hardlink) {
 				struct ct_pending_file	*file;
 				if ((file = ct_extract_find_entry(
 				    &ex_priv->pending_tree,
-				    fnode->fn_hlname)) != NULL) {
+				    trans->tr_fl_node->fn_hlname)) != NULL) {
 					CNDBG(CT_LOG_FILE,
 					    "adding pending link for %s to %s",
-					    file->cpf_name, fnode->fn_fullname);
+					    file->cpf_name,
+					    trans->tr_fl_node->fn_fullname);
+					/* our reference to node passed */
 					ct_pending_file_add_link(file,
-					    fnode);
+					    trans->tr_fl_node);
 					ex_priv->doextract = 0;
 					goto skip;
 				}
@@ -720,28 +725,39 @@ ct_extract(struct ct_global_state *state, struct ct_op *op)
 			if (ex_priv->doextract == 1 && ex_priv->fillrb &&
 			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas == -1) {
 				ct_extract_insert_entry(&ex_priv->pending_tree,
-				    fnode);
+				    trans->tr_fl_node);
 
 				ex_priv->doextract = 0;
 				/* XXX reconsider the freeing */
 			}
 			if (ex_priv->doextract == 0) {
-				ct_free_fnode(fnode);
+				ct_free_fnode(trans->tr_fl_node);
 skip:
-				fnode = NULL;
+				ex_priv->fl_ex_node = NULL;
 				ct_trans_free(state, trans);
 				continue;
 			}
 
 			CNDBG(CT_LOG_CTFILE,
-			    "file %s numshas %" PRId64, fnode->fn_fullname,
+			    "file %s numshas %" PRId64,
+			    trans->tr_fl_node->fn_fullname,
 			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas);
 
+			/*
+			 * special files we give our refcount up
+			 * regular files we need a new one since we need to
+			 * keep ours.
+			 */
+			if (trans->tr_state != TR_S_EX_SPECIAL) {
+				ct_ref_fnode(trans->tr_fl_node);
+			} else {
+				ex_priv->fl_ex_node = NULL;
+			}
 			ct_queue_first(state, trans);
 			break;
 		case XS_RET_SHA:
 			if (ex_priv->doextract == 0 ||
-			    trans->tr_fl_node->fn_skip_file != 0) {
+			    ex_priv->fl_ex_node->fn_skip_file != 0) {
 				if (ctfile_parse_seek(&ex_priv->xdr_ctx)) {
 					ct_fatal(state, "Can't seek past shas",
 					    ex_priv->xdr_ctx.xs_errno);
@@ -750,6 +766,9 @@ skip:
 				ct_trans_free(state, trans);
 				continue;
 			}
+
+			/* use saved fnode */
+			trans->tr_fl_node = ex_priv->fl_ex_node;
 
 			if (memcmp(zerosha, ex_priv->xdr_ctx.xs_sha,
 				SHA_DIGEST_LENGTH) == 0) {
@@ -787,19 +806,28 @@ skip:
 			}
 			trans->tr_state = TR_S_EX_SHA;
 			trans->tr_complete = ct_extract_complete_file_read;
-			trans->tr_cleanup = NULL;
 			trans->tr_dataslot = 0;
+			ct_ref_fnode(trans->tr_fl_node);
+			trans->tr_cleanup = ct_extract_cleanup_fnode;
 			ct_queue_first(state, trans);
 			break;
 		case XS_RET_FILE_END:
 			trans = ct_trans_realloc_local(state, trans);
-			trans->tr_fl_node = ex_priv->fl_ex_node; /* reload */
+
 
 			if (ex_priv->doextract == 0 ||
-			    trans->tr_fl_node->fn_skip_file != 0) {
+			    ex_priv->fl_ex_node->fn_skip_file != 0) {
+				/* release our reference done with file */
+				if (ex_priv->fl_ex_node) {
+					ct_free_fnode(ex_priv->fl_ex_node);
+					ex_priv->fl_ex_node = NULL;
+				}
 				ct_trans_free(state, trans);
 				continue;
 			}
+
+			/* use saved fnode from state */
+			trans->tr_fl_node = ex_priv->fl_ex_node;
 			bcopy(ex_priv->xdr_ctx.xs_trl.cmt_sha, trans->tr_sha,
 			    sizeof(trans->tr_sha));
 			trans->tr_state = TR_S_EX_FILE_END;
@@ -807,6 +835,11 @@ skip:
 			trans->tr_cleanup = ct_extract_cleanup_fnode;
 			trans->tr_fl_node->fn_size =
 			    ex_priv->xdr_ctx.xs_trl.cmt_orig_size;
+			/*
+			 * no reference here since we give our reference to the
+			 * last transaction on that file. We are done with it.
+			 */
+			ex_priv->fl_ex_node = NULL;
 			ct_queue_first(state, trans);
 			break;
 		case XS_RET_EOF:
@@ -914,6 +947,9 @@ dying:
 			ct_match_unwind(ex_priv->ex_match);
 		if (!ct_extract_rb_empty(&ex_priv->pending_tree)) {
 			ct_extract_pending_cleanup(&ex_priv->pending_tree);
+		}
+		if (ex_priv->fl_ex_node != NULL) {
+			ct_free_fnode(ex_priv->fl_ex_node);
 		}
 		/* XXX what about ex_priv->xdr_ctx ? */
 		e_free(&ex_priv);
@@ -1030,12 +1066,11 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			if (trans->tr_state == TR_S_EX_SPECIAL) {
 				trans->tr_complete =
 				    ct_extract_complete_special;
-				trans->tr_cleanup = ct_extract_cleanup_fnode;
 			} else {
 				trans->tr_complete =
 				    ct_extract_complete_file_start;
-				trans->tr_cleanup = NULL;
 			}
+			trans->tr_cleanup = ct_extract_cleanup_fnode;
 
 			/* XXX Check filename matches what we expect */
 			e_free(&trans->tr_fl_node->fn_fullname);
@@ -1045,6 +1080,16 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			CNDBG(CT_LOG_CTFILE, "file %s numshas %" PRId64,
 			    trans->tr_fl_node->fn_fullname,
 			    ex_priv->xdr_ctx.xs_hdr.cmh_nr_shas);
+			/*
+			 * special files we give our refcount up
+			 * regular files we need a new one since we need to
+			 * keep ours.
+			 */
+			if (trans->tr_state != TR_S_EX_SPECIAL) {
+				ct_ref_fnode(trans->tr_fl_node);
+			} else {
+				ex_priv->fl_ex_node = NULL;
+			}
 			break;
 		case XS_RET_SHA:
 			CNDBG(CT_LOG_SHA, "sha!");
@@ -1070,8 +1115,9 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			}
 			trans->tr_state = TR_S_EX_SHA;
 			trans->tr_complete = ct_extract_complete_file_read;
-			trans->tr_cleanup = NULL;
+			trans->tr_cleanup = ct_extract_cleanup_fnode;
 			trans->tr_dataslot = 0;
+			ct_ref_fnode(trans->tr_fl_node);
 			break;
 		case XS_RET_FILE_END:
 			trans = ct_trans_realloc_local(state, trans);
@@ -1087,6 +1133,12 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			    ex_priv->xdr_ctx.xs_trl.cmt_orig_size;
 			/* Done now, don't parse further. */
 			ex_priv->done = 1;
+			/*
+			 * no reference here since we give our reference to the
+			 * last transaction on that file.
+			 */
+			ex_priv->fl_ex_node = NULL;
+
 			break;
 		case XS_RET_FAIL:
 			ct_fatal(state, "Failed to parse ctfile",
@@ -1103,6 +1155,9 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 dying:
 	if (ex_priv) {
 		ctfile_parse_close(&ex_priv->xdr_ctx);
+		if (ex_priv->fl_ex_node != NULL) {
+			ct_free_fnode(ex_priv->fl_ex_node);
+		}
 		e_free(&ex_priv);
 		/* will be cleaned up by trans if ex_priv already gone */
 		if (state->extract_state)
