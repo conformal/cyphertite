@@ -685,6 +685,7 @@ struct ct_archive_priv {
 	struct flist			*cap_curlist;
 	int				 cap_fd;
 	int				 cap_cull_occurred;
+	int				 cap_done;
 };
 
 int
@@ -1060,7 +1061,6 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 			goto dying;
 		}
 
-
 		/* XXX - deal with stdin */
 		/* XXX - if basisbackup should the type change ? */
 		if ((error = ctfile_write_init(&cap->cap_cws, ctfile,
@@ -1082,6 +1082,8 @@ ct_archive(struct ct_global_state *state, struct ct_op *op)
 	}
 	ct_set_file_state(state, CT_S_RUNNING);
 
+	if (cap->cap_done)
+		goto done;
 	if (cap->cap_curnode == NULL)
 		goto next_file;
 loop:
@@ -1299,15 +1301,17 @@ skip:
 		    &cap->cap_flist, &cap->cap_curlist, cap->cap_include,
 		    cap->cap_exclude, caa->caa_follow_symlinks)) == NULL) {
 			CNDBG(CT_LOG_FILE, "no more files");
+			cap->cap_done = 1;
 		} else {
 			CNDBG(CT_LOG_FILE, "got new file %s",
 			    cap->cap_curnode->fn_fullname);
 		}
 	}
 
-	if (cap->cap_curnode != NULL)
+	if (cap->cap_done == 0)
 		goto loop;
 
+done:
 	CNDBG(CT_LOG_FILE, "last file read");
 	/* done with backup */
 
