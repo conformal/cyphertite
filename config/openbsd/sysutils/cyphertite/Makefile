@@ -3,6 +3,7 @@
 COMMENT =		tar-like secure remote deduplicating archiver
 
 DISTNAME =		cyphertite-1.5.4
+EPOCH=			1
 CATEGORIES =		sysutils archivers security
 
 HOMEPAGE =		https://www.cyphertite.com/
@@ -10,9 +11,6 @@ MAINTAINER=		Conformal Systems LLC <info@conformal.com>
 
 # ISC
 PERMIT_PACKAGE_CDROM=	Yes
-PERMIT_PACKAGE_FTP=	Yes
-PERMIT_DISTFILES_CDROM= Yes
-PERMIT_DISTFILES_FTP=	Yes
 
 WANTLIB =		assl>=5 c clog>=2 crypto curl edit event_core expat \
 			exude>=3 ncurses shrink>=2 sqlite3 ssl util xmlsd>=3
@@ -34,6 +32,6 @@ LIB_DEPENDS =		archivers/libshrink>=0.4.0	\
 			security/assl>=1.1.0		\
 			textproc/libxmlsd>=0.9.0
 
-NO_REGRESS =		Yes
+NO_TEST =		Yes
 
 .include <bsd.port.mk>
