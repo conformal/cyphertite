@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.5.3
+%define version		1.6.0
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,14 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Fri May 31 2013 - davec 1.6.0-1
+- Add the ability to cancel running backups to the underlying library
+- Fix an issue where a handshake failure was considered a fatal error
+- Improve the way disconnects are handled
+- Correct some issues with error paths when archive operations are
+  ended prematurely
+- Fix OpenBSD port Makefile for modern OpenBSD ports
+- Other minor bug fixes and code cleanup
 * Wed Apr 17 2013 - davec 1.5.3-1
 - Improve automatic reconnect handling
 * Tue Feb 26 2013 - davec 1.5.1-1

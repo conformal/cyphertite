@@ -1,3 +1,15 @@
+cyphertite (1.6.0-1) unstable; urgency=low
+
+  * Add the ability to cancel running backups to the underlying library
+  * Fix an issue where a handshake failure was considered a fatal error
+  * Improve the way disconnects are handled
+  * Correct some issues with error paths when archive operations are
+    ended prematurely
+  * Fix OpenBSD port Makefile for modern OpenBSD ports
+  * Other minor bug fixes and code cleanup
+
+ -- Conformal Systems <package-discuss@conformal.com>  Fri, 31 May 2013 12:38:40 -0500
+
 cyphertite (1.5.3-1) unstable; urgency=low
 
   * Improve automatic reconnect handling
