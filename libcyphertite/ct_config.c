@@ -304,6 +304,56 @@ out:
 	return (rv);
 }
 
+/* 
+ * Returns 1 if cert can not be read, or if it will expire withint 30 days.
+ */
+static int
+ct_cert_expiring_soon(const char *path)
+{
+	FILE	*fp;
+	X509	*x509;
+	time_t	 now;
+	int	 ret;
+	if ((fp = fopen(path, "rb")) == NULL) {
+		return (1); /* can't read, assume we need new ones for now */
+	}
+
+	if ((x509 = PEM_read_X509(fp, NULL, NULL, NULL)) == NULL) {
+		fclose(fp);
+		return (1);
+	}
+
+	time(&now);
+	/* replace certs that expire in 30 days or less */
+	now += 30*60*60*24;
+	if (X509_cmp_time(X509_get_notBefore(x509), &now) > 0) {
+		ret = 1;
+	} else {
+		ret = 0;
+	}
+
+
+
+	X509_free(x509);
+	fclose(fp);
+
+	return (ret);
+}
+
+/*
+ * See if certificates are expiring soon, and if so download new ones.
+ */
+int
+ct_check_expired_certs(struct ct_config *config)
+{
+	if (!ct_cert_expiring_soon(config->ct_cert)) {
+		return (0);
+	}
+
+	/* get new certs */
+	return (ct_download_decode_and_save_certs(config));
+}
+
 int
 ct_load_config(struct ct_config **config, char **configfile)
 {

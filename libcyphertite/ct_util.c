@@ -188,6 +188,11 @@ ct_init(struct ct_global_state **statep, struct ct_config *conf,
 
 	/* Run with restricted umask as we create numerous sensitive files. */
 	umask(S_IRWXG|S_IRWXO);
+	if ((ret = ct_check_expired_certs(conf)) != 0) {
+		CNDBG(CT_LOG_NET, "can't updated expired certificates: %s",
+		    ct_strerror(ret));
+		goto fail;
+	}
 
 	if ((ret = ct_setup_state(&state, conf)) != 0)
 		goto fail;
