@@ -44,13 +44,15 @@ static CURLcode
 sslctx_cb(CURL *c, void *ssl_ctx, void *parm)
 {
 	unsigned long	 ssl_err;
-	int rv;
+	int		 rv;
 	X509_STORE 	*cert_store;
 	X509		*cert = NULL;
 	BIO		*bio;
+	char		**cert_str;
+
+	char		*root_ca_certs[] = {
 	/* ValiCert Class 1 CA */
-	char		*root_ca_cert =
-	"-----BEGIN CERTIFICATE-----\n"\
+        "-----BEGIN CERTIFICATE-----\n"\
 	"MIIC5zCCAlACAQEwDQYJKoZIhvcNAQEFBQAwgbsxJDAiBgNVBAcTG1ZhbGlDZXJ0\n"\
 	"IFZhbGlkYXRpb24gTmV0d29yazEXMBUGA1UEChMOVmFsaUNlcnQsIEluYy4xNTAz\n"\
 	"BgNVBAsTLFZhbGlDZXJ0IENsYXNzIDIgUG9saWN5IFZhbGlkYXRpb24gQXV0aG9y\n"\
@@ -67,24 +69,58 @@ sslctx_cb(CURL *c, void *ssl_ctx, void *parm)
 	"UJSZSWI4OB9L+KXIPqeCgfYrx+jFzug6EILLGACOTb2oWH+heQC1u+mNr0HZDzTu\n"\
 	"IYEZoDJJKPTEjlbVUjP9UNV+mWwD5MlM/Mtsq2azSiGM5bUMMj4QssxsodyamEwC\n"\
 	"W/POuZ6lcg5Ktz885hZo+L7tdEy8W9ViH0Pd\n"\
-	"-----END CERTIFICATE-----\n";
+	"-----END CERTIFICATE-----\n",
 
-	bio = BIO_new_mem_buf(root_ca_cert, -1);
-	PEM_read_bio_X509(bio, &cert, 0, NULL);
-	if (cert == NULL) {
-		return CURLE_PEER_FAILED_VERIFICATION;
-	}
+	/* Starfield Class 2 CA */
+	"-----BEGIN CERTIFICATE-----\n"\
+	"MIIEDzCCAvegAwIBAgIBADANBgkqhkiG9w0BAQUFADBoMQswCQYDVQQGEwJVUzEl\n"\
+	"MCMGA1UEChMcU3RhcmZpZWxkIFRlY2hub2xvZ2llcywgSW5jLjEyMDAGA1UECxMp\n"\
+	"U3RhcmZpZWxkIENsYXNzIDIgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkwHhcNMDQw\n"\
+	"NjI5MTczOTE2WhcNMzQwNjI5MTczOTE2WjBoMQswCQYDVQQGEwJVUzElMCMGA1UE\n"\
+	"ChMcU3RhcmZpZWxkIFRlY2hub2xvZ2llcywgSW5jLjEyMDAGA1UECxMpU3RhcmZp\n"\
+	"ZWxkIENsYXNzIDIgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkwggEgMA0GCSqGSIb3\n"\
+	"DQEBAQUAA4IBDQAwggEIAoIBAQC3Msj+6XGmBIWtDBFk385N78gDGIc/oav7PKaf\n"\
+	"8MOh2tTYbitTkPskpD6E8J7oX+zlJ0T1KKY/e97gKvDIr1MvnsoFAZMej2YcOadN\n"\
+	"+lq2cwQlZut3f+dZxkqZJRRU6ybH838Z1TBwj6+wRir/resp7defqgSHo9T5iaU0\n"\
+	"X9tDkYI22WY8sbi5gv2cOj4QyDvvBmVmepsZGD3/cVE8MC5fvj13c7JdBmzDI1aa\n"\
+	"K4UmkhynArPkPw2vCHmCuDY96pzTNbO8acr1zJ3o/WSNF4Azbl5KXZnJHoe0nRrA\n"\
+	"1W4TNSNe35tfPe/W93bC6j67eA0cQmdrBNj41tpvi/JEoAGrAgEDo4HFMIHCMB0G\n"\
+	"A1UdDgQWBBS/X7fRzt0fhvRbVazc1xDCDqmI5zCBkgYDVR0jBIGKMIGHgBS/X7fR\n"\
+	"zt0fhvRbVazc1xDCDqmI56FspGowaDELMAkGA1UEBhMCVVMxJTAjBgNVBAoTHFN0\n"\
+	"YXJmaWVsZCBUZWNobm9sb2dpZXMsIEluYy4xMjAwBgNVBAsTKVN0YXJmaWVsZCBD\n"\
+	"bGFzcyAyIENlcnRpZmljYXRpb24gQXV0aG9yaXR5ggEAMAwGA1UdEwQFMAMBAf8w\n"\
+	"DQYJKoZIhvcNAQEFBQADggEBAAWdP4id0ckaVaGsafPzWdqbAYcaT1epoXkJKtv3\n"\
+	"L7IezMdeatiDh6GX70k1PncGQVhiv45YuApnP+yz3SFmH8lU+nLMPUxA2IGvd56D\n"\
+	"eruix/U0F47ZEUD0/CwqTRV/p2JdLiXTAAsgGh1o+Re49L2L7ShZ3U0WixeDyLJl\n"\
+	"xy16paq8U4Zt3VekyvggQQto8PT7dL5WXXp59fkdheMtlb71cZBDzI0fmgAKhynp\n"\
+	"VSJYACPq4xJDKVtHCN2MQWplBqjlIapBtJUhlbl90TSrE9atvNziPTnNvT51cKEY\n"\
+	"WQPJIrSPnNVeKtelttQKbfi3QBFGmh95DmK/D5fs4C8fF5Q=\n"\
+	"-----END CERTIFICATE-----\n",
 
+	/* End */
+	NULL
+	};
+
+	/* Add all of the trusted cyphertite.com root certs. */
 	cert_store = SSL_CTX_get_cert_store((SSL_CTX *) ssl_ctx);
-	if ((rv = X509_STORE_add_cert(cert_store, cert)) == 0) {
-		ssl_err = ERR_get_error();
-		if (ERR_GET_REASON(ssl_err) !=
-		    X509_R_CERT_ALREADY_IN_HASH_TABLE) {
+	for (cert_str = root_ca_certs; *cert_str != NULL; cert_str++) {
+		bio = BIO_new_mem_buf(*cert_str, -1);
+		cert = NULL;
+		PEM_read_bio_X509(bio, &cert, 0, NULL);
+		if (cert == NULL) {
 			return CURLE_PEER_FAILED_VERIFICATION;
+		}
+
+		if ((rv = X509_STORE_add_cert(cert_store, cert)) == 0) {
+			ssl_err = ERR_get_error();
+			if (ERR_GET_REASON(ssl_err) !=
+			    X509_R_CERT_ALREADY_IN_HASH_TABLE) {
+				return CURLE_PEER_FAILED_VERIFICATION;
+			}
 		}
 	}
 
-	return CURLE_OK ;
+	return CURLE_OK;
 }
 
 static size_t
