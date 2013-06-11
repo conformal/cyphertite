@@ -1,3 +1,11 @@
+cyphertite (1.6.1-1) unstable; urgency=low
+
+  * Add support for automatic user certificate rotation
+  * Fix an issue where the initial cyphertite configuration failed to
+    retrieve the user certificate bundle (bz #52)
+
+ -- Conformal Systems <package-discuss@conformal.com>  Tue, 11 Jun 2013 09:45:00 -0500
+
 cyphertite (1.6.0-1) unstable; urgency=low
 
   * Add the ability to cancel running backups to the underlying library

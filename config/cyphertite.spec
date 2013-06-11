@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.6.0
+%define version		1.6.1
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,10 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Tue Jun 11 2013 - davec 1.6.1-1
+- Add support for automatic user certificate rotation
+- Fix an issue where the initial cyphertite configuration failed to
+  retrieve the user certificate bundle (bz #52)
 * Fri May 31 2013 - davec 1.6.0-1
 - Add the ability to cancel running backups to the underlying library
 - Fix an issue where a handshake failure was considered a fatal error

@@ -2,7 +2,7 @@
 
 COMMENT =		tar-like secure remote deduplicating archiver
 
-DISTNAME =		cyphertite-1.6.0
+DISTNAME =		cyphertite-1.6.1
 EPOCH=			1
 CATEGORIES =		sysutils archivers security
 
