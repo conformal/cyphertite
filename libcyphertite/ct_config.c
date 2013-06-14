@@ -326,7 +326,7 @@ ct_cert_expiring_soon(const char *path)
 	time(&now);
 	/* replace certs that expire in 30 days or less */
 	now += 30*60*60*24;
-	if (X509_cmp_time(X509_get_notBefore(x509), &now) > 0) {
+	if (X509_cmp_time(X509_get_notAfter(x509), &now) < 0) {
 		ret = 1;
 	} else {
 		ret = 0;
