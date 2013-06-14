@@ -207,6 +207,9 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 		if (ca_cert != NULL) {
 			e_free(&ca_cert);
 		}
+	} else {
+			rv = CTE_OPERATION_FAILED;
+			goto out;
 	}
 
 	/* user cert */
@@ -252,6 +255,9 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 		if (user_cert != NULL) {
 			e_free(&user_cert);
 		}
+	} else {
+			rv = CTE_OPERATION_FAILED;
+			goto out;
 	}
 
 	/* user key */
@@ -297,6 +303,9 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 		if (user_key != NULL) {
 			e_free(&user_key);
 		}
+	} else {
+			rv = CTE_OPERATION_FAILED;
+			goto out;
 	}
 
 out:
@@ -349,6 +358,9 @@ ct_check_expired_certs(struct ct_config *config)
 	if (!ct_cert_expiring_soon(config->ct_cert)) {
 		return (0);
 	}
+	unlink(config->ct_ca_cert);
+	unlink(config->ct_cert);
+	unlink(config->ct_key);
 
 	/* get new certs */
 	return (ct_download_decode_and_save_certs(config));
