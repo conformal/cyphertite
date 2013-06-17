@@ -234,6 +234,8 @@ ct_version_tree_build(const char *filename, const char *ctfile_basedir,
 	int				 rv = 0;
 
 	TAILQ_INIT(&extract_head);
+	TAILQ_INIT(&dnode_cache);
+
 	if ((rv = ct_extract_setup(&extract_head, &parse_state, filename,
 	    ctfile_basedir, &allfiles))) {
 		CNDBG(CT_LOG_VERTREE,
@@ -242,8 +244,6 @@ ct_version_tree_build(const char *filename, const char *ctfile_basedir,
 		goto out;
 	}
 
-	/* Init dnode cache */
-	TAILQ_INIT(&dnode_cache);
 
 	/* Create and init ctfile cache */
 	tree = e_calloc(1, sizeof(*tree));
