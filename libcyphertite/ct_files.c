@@ -840,7 +840,7 @@ ct_rearchive_cleanup(struct ct_global_state *state, struct ct_op *op)
 		e_free(&caa->caa_filelist);
 	}
 	if (caa->caa_excllist) {
-		str = caa->caa_filelist;
+		str = caa->caa_excllist;
 		while (*str != NULL) {
 			e_free(str);
 			str++;
@@ -848,7 +848,7 @@ ct_rearchive_cleanup(struct ct_global_state *state, struct ct_op *op)
 		e_free(&caa->caa_excllist);
 	}
 	if (caa->caa_includelist) {
-		str = caa->caa_filelist;
+		str = caa->caa_includelist;
 		while (*str != NULL) {
 			e_free(str);
 			str++;
