@@ -3,6 +3,11 @@ User visible changes for cyphertite
   A high-security scalable solution for online backups
 ============================================================================
 
+Changes in 1.6.2 (Fri Jun 28 2013)
+  - Support automatic certificate rotation
+  - Fix expiration time computation
+  - Minor bug fixes
+
 Changes in 1.6.1 (Tue Jun 11 2013)
   - Add support for automatic user certificate rotation
   - Fix an issue where the initial cyphertite configuration failed to

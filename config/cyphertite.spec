@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.6.1
+%define version		1.6.2
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,10 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Fri Jun 28 2013 - dhill 1.6.2-1
+- Support automatic certificate rotation
+- Fix expiration time computation
+- Minor bug fixes
 * Tue Jun 11 2013 - davec 1.6.1-1
 - Add support for automatic user certificate rotation
 - Fix an issue where the initial cyphertite configuration failed to
