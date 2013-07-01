@@ -1051,7 +1051,7 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 
 			trans = ct_trans_realloc_local(state, trans);
 			trans->tr_fl_node = ex_priv->fl_ex_node =
-			    e_calloc(1, sizeof(*trans->tr_fl_node));
+			    ct_alloc_fnode();
 
 			/* Make it local directory, it won't be set up right. */
 			ex_priv->xdr_ctx.xs_hdr.cmh_parent_dir = -1;
