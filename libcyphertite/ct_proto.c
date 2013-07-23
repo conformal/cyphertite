@@ -162,7 +162,7 @@ ct_create_login(struct ct_header *hdr, void **vbody, const char *username,
 	    payload_sz - user_len - 1);
 
 	/* login in polled mode */
-	bzero(hdr, sizeof hdr);
+	bzero(hdr, sizeof(*hdr));
 	hdr->c_version = C_HDR_VERSION;
 	hdr->c_opcode = C_HDR_O_LOGIN;
 	hdr->c_tag = 1;
