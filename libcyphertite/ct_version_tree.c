@@ -184,12 +184,29 @@ ct_vertree_add(struct ct_vertree_dnode_cache *dnode_cache,
 		 * missing.
 		 */
 		file = (struct ct_vertree_file *)ver;
-		if (file->cvf_nr_shas != -1 && file->cvf_nr_shas !=
-		    hdr->cmh_nr_shas) {
-			CNDBG(CT_LOG_VERTREE,
-			    "sha mismatch before %" PRIu64 " now %" PRIu64,
-			    file->cvf_nr_shas, hdr->cmh_nr_shas);
-			goto err;
+
+		/*
+		 * bugs in previous editions with incremental selection and
+		 * off_t on linux mean that there are ctfiles in the wild which
+		 * provide a list of shas in a later level when the file is
+		 * defined in an earlier level file, also. For example for the 
+		 * same filename and date we have level 0: 3 shas, level 1: -1
+		 * shas (i.e. in a previous level), level 2: 3 shas (same as
+		 * level * 0). In that case we just assume that if we already
+		 * have sha data for a file * then it is correct and we skip
+		 * previous versions.
+		 */ 
+		if (file->cvf_nr_shas != -1) {
+			goto out;
+		}
+
+		/*
+		 * previous linux off_t bugs with files over 2gb mean that there
+		 * are sign extended ctfiles in the wild, so we count those as
+		 * zero length for purposes of the version tree.
+		 */
+		if (hdr->cmh_nr_shas < -1) {
+			hdr->cmh_nr_shas = 0;
 		}
 		if (hdr->cmh_nr_shas != -1)  {
 			file->cvf_nr_shas = hdr->cmh_nr_shas;
@@ -206,9 +223,11 @@ ct_vertree_add(struct ct_vertree_dnode_cache *dnode_cache,
 			CNDBG(CT_LOG_VERTREE, "no file trailer found");
 			goto err;
 		}
+
 		file->cvf_file_size = parse_state->xs_trl.cmt_orig_size;
 	}
 
+out:
 	return (entry);
 
 err:
