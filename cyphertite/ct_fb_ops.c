@@ -355,9 +355,12 @@ ctfb_main(int argc, char *argv[])
 		ct_fb_filename = e_strdup(ctfile);
 	}
 	/* now have name of the file we actually want to open... */
-	ct_version_tree_build(ct_fb_filename, 
+	if ((ret = ct_version_tree_build(ct_fb_filename, 
 	    conf->ct_ctfile_mode == CT_MDMODE_REMOTE ?
-	    conf->ct_ctfile_cachedir : NULL, &cfs.cfs_tree);
+	    conf->ct_ctfile_cachedir : NULL, &cfs.cfs_tree)) != 0) {
+		CFATALX("failed to build version tree: %s", ct_strerror(ret));
+	}
+
 	ctfb_cfs = &cfs;
 	ctfb_cfs->cfs_cwd = &ctfb_cfs->cfs_tree->cvt_head;
 	ctfb_cfs->cfs_curpath[0] = '\0';
