@@ -275,7 +275,7 @@ ct_populate_fnode_from_flist(struct ct_archive_state *cas,
 	struct fnode		*fnode;
 	struct stat		*sb, sbstore;
 	struct dnode		*dfound;
-	char			*fname, *dname;
+	char			*dname;
 #ifndef CT_NO_OPENAT
 	int			dopenflags;
 #endif
@@ -297,7 +297,8 @@ ct_populate_fnode_from_flist(struct ct_archive_state *cas,
 
 	sb = &sbstore;
 #ifdef CT_NO_OPENAT
-	char	path[PATH_MAX];
+	char	*fname;
+	char	 path[PATH_MAX];
 
 	fname = gen_fname(flnode);
 
@@ -307,25 +308,24 @@ ct_populate_fnode_from_flist(struct ct_archive_state *cas,
 		snprintf(path, sizeof(path), "%s%c%s",
 		    ct_archive_get_rootdir(cas)->d_name, CT_PATHSEP, fname);
 	}
+	e_free(&fname);
 
 	if (follow_symlinks)
 		ret = stat(path, sb);
 	else
 		ret = lstat(path, sb);
 #else
-	fname = e_strdup(flnode->fl_fname);
 	ret = fstatat(flnode->fl_parent_dir->d_fd, flnode->fl_fname,
 	    sb, follow_symlinks ? 0 : AT_SYMLINK_NOFOLLOW);
 #endif
 	if (ret != 0) {
-		e_free(&fname);
 		/* file no longer available return failure */
 		return NULL;
 	}
 
 	fnode = ct_alloc_fnode();
 
-	fnode->fn_name = fname;
+	fnode->fn_name = e_strdup(flnode->fl_fname);
 	fnode->fn_fullname = gen_fname(flnode);
 	CNDBG(CT_LOG_FILE, "name = %s fname = %s", fnode->fn_name,
 	    fnode->fn_fullname);
