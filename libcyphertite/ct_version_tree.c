@@ -16,6 +16,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <stdbool.h>
 
 #include <clog.h>
 #include <exude.h>
@@ -26,7 +27,17 @@
 
 
 /* Subclass of dnode for faster lookup. */
-TAILQ_HEAD(ct_vertree_dnode_cache, ct_vertree_dnode);
+struct ct_vertree_dnode_cache {
+	TAILQ_HEAD(cvdc_list, ct_vertree_dnode)	 cache;
+	/*
+	 * special dnode in the case that / was explicitly backed up.
+	 * in this case we put all entries that would have been in /
+	 * straight off the root directory so that users can keep the
+	 * assumption that the path separator is never part of the name.
+	 */
+	struct ct_vertree_dnode			*root_dnode;
+};
+
 struct ct_vertree_dnode {
 	struct dnode			 cvd_dnode;
 	TAILQ_ENTRY(ct_vertree_dnode)	 cvd_link;
@@ -47,7 +58,7 @@ RB_GENERATE(ct_vertree_entries, ct_vertree_entry, cve_entry,
  * Insert or update an entry in the tree with the information received from
  * the ctfile.
  */
-static struct ct_vertree_entry *
+static int
 ct_vertree_add(struct ct_vertree_dnode_cache *dnode_cache,
     struct ct_vertree_entry *head, struct ctfile_parse_state *parse_state,
     struct ct_vertree_ctfile *ctfile, off_t fileoffset, int allfiles)
@@ -62,6 +73,7 @@ ct_vertree_add(struct ct_vertree_dnode_cache *dnode_cache,
 	struct ct_vertree_spec		*spec;
 	struct ct_vertree_link		*linkver;
 	size_t				 sz;
+	bool				 root_dnode = false;
 
 	entry = NULL;
 
@@ -71,19 +83,28 @@ ct_vertree_add(struct ct_vertree_dnode_cache *dnode_cache,
 		    hdr->cmh_parent_dir)) == NULL) {
 			CNDBG(CT_LOG_VERTREE, "can't find dir %" PRId64,
 			    hdr->cmh_parent_dir);
-			return NULL;
+			return (CTE_CTFILE_CORRUPT);
 		}
 		fb_dnode = (struct ct_vertree_dnode *)dnode;
-		parent = fb_dnode->cvd_dir;
+		if (fb_dnode == dnode_cache->root_dnode) {
+			// If we have the root dnode, store in head.
+			parent = head;
+		} else {
+			parent = fb_dnode->cvd_dir;
+		}
+
 	} else {
 		parent = head;
 	}
 
+	if (parent == head && strcmp(hdr->cmh_filename, CT_PATHSEP_STR) == 0) { 
+		root_dnode = true;
+	}
 	/*
 	 * Have parent node, search children to see if we already exist.
 	 * Else make a new one and insert.
 	 */
-	sentry.cve_name = e_strdup(hdr->cmh_filename);
+	sentry.cve_name = hdr->cmh_filename;
 	if ((entry = RB_FIND(ct_vertree_entries, &parent->cve_children,
 	    &sentry)) == NULL) {
 		/* new name, insert node */
@@ -92,7 +113,13 @@ ct_vertree_add(struct ct_vertree_dnode_cache *dnode_cache,
 		TAILQ_INIT(&entry->cve_versions);
 		RB_INIT(&entry->cve_children);
 		entry->cve_parent = parent;
-		entry->cve_name = sentry.cve_name;
+		entry->cve_name = e_strdup(sentry.cve_name);
+
+		/* don't insert root dnodes, just do dnode dance */
+		if (root_dnode) {
+			goto rootdir;
+		}
+
 		if (RB_INSERT(ct_vertree_entries, &parent->cve_children,
 		    entry) != NULL) {
 			CNDBG(CT_LOG_VERTREE, "entry %s already exists",
@@ -100,8 +127,6 @@ ct_vertree_add(struct ct_vertree_dnode_cache *dnode_cache,
 			e_free(&sentry.cve_name);
 			goto err;
 		}
-	} else {
-		e_free(&sentry.cve_name);
 	}
 
 	/*
@@ -161,6 +186,8 @@ ct_vertree_add(struct ct_vertree_dnode_cache *dnode_cache,
 		}
 	}
 
+rootdir:
+
 	/*
 	 * Each ctfile only has each directory referenced once, so put it
 	 * in the cache regardless of whether it was known of before, that
@@ -170,11 +197,18 @@ ct_vertree_add(struct ct_vertree_dnode_cache *dnode_cache,
 	if (C_ISDIR(hdr->cmh_type)) {
 		fb_dnode = e_calloc(1, sizeof(*fb_dnode));
 		fb_dnode->cvd_dnode.d_name = e_strdup(entry->cve_name);
+		/*
+		 * in the root_dnode case this will be a bad pointer but it
+		 * will never be derefed.
+		 */
 		fb_dnode->cvd_dir = entry;
 		if ((dnode = ctfile_parse_insertdir(parse_state,
 		    &fb_dnode->cvd_dnode)) != NULL)
 			CABORTX("duplicate dentry");
-		TAILQ_INSERT_TAIL(dnode_cache, fb_dnode, cvd_link);
+		TAILQ_INSERT_TAIL(&dnode_cache->cache, fb_dnode, cvd_link);
+		if (root_dnode) {
+			dnode_cache->root_dnode = fb_dnode;
+		}
 	} else if (C_ISREG(hdr->cmh_type)) {
 		/*
 		 * Allfiles ctfiles may have shas == -1, so in some cases we
@@ -228,12 +262,19 @@ ct_vertree_add(struct ct_vertree_dnode_cache *dnode_cache,
 	}
 
 out:
-	return (entry);
+	/*
+	 * If we're an explicit "/" entry then we don't want to be added to
+	 * the tree. all our children will be added to the root entry.
+	 */
+	if (root_dnode) {
+		e_free(&entry);
+	}
+	return (0);
 
 err:
 	if (entry != NULL)
 		e_free(&entry);
-	return (NULL);
+	return (CTE_CTFILE_CORRUPT);
 }
 
 int
@@ -253,7 +294,8 @@ ct_version_tree_build(const char *filename, const char *ctfile_basedir,
 	int				 rv = 0;
 
 	TAILQ_INIT(&extract_head);
-	TAILQ_INIT(&dnode_cache);
+	TAILQ_INIT(&dnode_cache.cache);
+	dnode_cache.root_dnode = NULL;
 
 	if ((rv = ct_extract_setup(&extract_head, &parse_state, filename,
 	    ctfile_basedir, &allfiles))) {
@@ -297,9 +339,8 @@ nextfile:
 	    (rv != XS_RET_FAIL)) {
 		switch(rv) {
 		case XS_RET_FILE:
-			if (ct_vertree_add(&dnode_cache, &tree->cvt_head,
-			    &parse_state, ctfile, offset, allfiles) == NULL) {
-				rv = CTE_CTFILE_CORRUPT;
+			if ((rv = ct_vertree_add(&dnode_cache, &tree->cvt_head,
+			    &parse_state, ctfile, offset, allfiles)) != 0) {
 				goto out;
 			}
 			break;
@@ -319,6 +360,7 @@ nextfile:
 	if (rv == XS_RET_EOF) {
 		ctfile_parse_close(&parse_state);
 		if (!TAILQ_EMPTY(&extract_head)) {
+			/* XXX do we need to zero root dnode? */
 			ct_extract_open_next(&extract_head, &parse_state);
 			goto nextfile;
 		}
@@ -333,8 +375,8 @@ nextfile:
 
 out:
 	/* Free dnode_cache entries. */
-	while ((dnode_entry = TAILQ_FIRST(&dnode_cache)) != NULL) {
-		TAILQ_REMOVE(&dnode_cache, dnode_entry, cvd_link);
+	while ((dnode_entry = TAILQ_FIRST(&dnode_cache.cache)) != NULL) {
+		TAILQ_REMOVE(&dnode_cache.cache, dnode_entry, cvd_link);
 		if (dnode_entry->cvd_dnode.d_name != NULL)
 			e_free(&dnode_entry->cvd_dnode.d_name);
 		e_free(&dnode_entry);
