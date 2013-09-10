@@ -1262,7 +1262,7 @@ next_file:
 				}
 			}
 			if (doprint && verbose > 1)
-				printf(" sz: %" PRIu64 " shas: %" PRIu64
+				printf(" sz: %" PRIu64 " shas: %" PRId64
 				    " reduction: %s%" PRIu64 "%%\n",
 				    xs_ctx.xs_trl.cmt_orig_size,
 				    xs_ctx.xs_hdr.cmh_nr_shas,
