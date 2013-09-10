@@ -508,6 +508,7 @@ ct_extract_calculate_total(struct ct_global_state *state,
 					    "Can't open next ctfile", ret);
 					goto done;
 				}
+				continue;
 			}
 			retval = 0;
 			goto done;
