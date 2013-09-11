@@ -186,7 +186,6 @@ ct_vertree_add(struct ct_vertree_dnode_cache *dnode_cache,
 		}
 	}
 
-rootdir:
 
 	/*
 	 * Each ctfile only has each directory referenced once, so put it
@@ -195,6 +194,7 @@ rootdir:
 	 * then.
 	 */
 	if (C_ISDIR(hdr->cmh_type)) {
+rootdir:
 		fb_dnode = e_calloc(1, sizeof(*fb_dnode));
 		fb_dnode->cvd_dnode.d_name = e_strdup(entry->cve_name);
 		/*
