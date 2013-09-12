@@ -83,6 +83,7 @@ struct ct_statistics {
 
 	uint64_t		st_bytes_read;
 	uint64_t		st_bytes_written;
+	uint64_t		st_bytes_skipped;
 	uint64_t		st_bytes_compressed;
 	uint64_t		st_bytes_uncompressed;
 	uint64_t		st_bytes_crypted;

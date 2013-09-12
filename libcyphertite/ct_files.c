@@ -1218,6 +1218,8 @@ loop:
 		if (!ct_archive_needs_archive(state->archive_state,
 		    cap->cap_curnode)) {
 			cap->cap_curnode->fn_skip_file = 1;
+			state->ct_stats->st_bytes_skipped +=
+			    cap->cap_curnode->fn_size;
 		}
 
 		ct_trans->tr_ctfile = cap->cap_cws;

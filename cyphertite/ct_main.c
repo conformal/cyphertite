@@ -769,9 +769,12 @@ ct_dump_stats(struct ct_global_state *state, FILE *outfh)
 	}
 
 	if (ct_action == CT_A_ARCHIVE &&
-	    state->ct_stats->st_bytes_tot != state->ct_stats->st_bytes_read)
+	    state->ct_stats->st_bytes_tot != state->ct_stats->st_bytes_read) {
 		ct_print_scaled_stat(outfh, "Data read\t\t",
 		    (int64_t)state->ct_stats->st_bytes_read, sec, 1);
+		ct_print_scaled_stat(outfh, "Data skipped\t\t",
+		    (int64_t)state->ct_stats->st_bytes_skipped, sec, 1);
+	}
 
 	if (ct_action == CT_A_EXTRACT)
 		ct_print_scaled_stat(outfh, "Data written\t\t",
