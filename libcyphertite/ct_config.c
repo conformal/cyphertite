@@ -135,7 +135,6 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 	struct xmlsd_element	*root, *xe;
 	char			*ca_cert, *user_cert, *user_key;
 	FILE			*f = NULL;
-	struct stat		sb;
 
 	ct_sha512((uint8_t *)config->ct_password, pwd_digest,
 	    strlen(config->ct_password));
@@ -164,148 +163,133 @@ ct_download_decode_and_save_certs(struct ct_config *config)
 	root = xmlsd_doc_get_first_elem(xd);
 
 	/* ca cert */
-	if (stat(config->ct_ca_cert , &sb) != 0) {
-		xe = xmlsd_elem_find_child(root, "ca_cert");
-		if (xe == NULL) {
-			CNDBG(CT_LOG_XML, "unable to get ca_cert xml node");
-			rv = CTE_XML_PARSE_FAIL;
-			goto out;
-		}
-		xml_val = xmlsd_elem_get_value(xe);
-		if (xml_val == NULL) {
-			CNDBG(CT_LOG_XML, "unable to get ca_cert xml value");
-			rv = CTE_XML_PARSE_FAIL;
-			goto out;
-		}
-		bzero(b64, sizeof b64);
-		if (ct_base64_encode(CT_B64_M_DECODE, (uint8_t *)xml_val,
-		    strlen(xml_val), (uint8_t *)b64, sizeof b64)) {
-			CDBG("failed to decode ca cert xml");
-			rv = CTE_CANT_BASE64;
-			goto out;
-		}
-		e_asprintf(&ca_cert, "%s", b64);
-		if (ct_make_full_path(config->ct_ca_cert, 0700)) {
-			CDBG("failed to make path to %s", config->ct_ca_cert);
-			rv = CTE_ERRNO;
-			goto out;
-		}
-		if ((fd = open(config->ct_ca_cert, O_RDWR | O_CREAT | O_TRUNC,
-				    0644)) == -1) {
-			CDBG("unable to open file for writing %s",
-			    config->ct_ca_cert);
-			rv = CTE_ERRNO;
-			goto out;
-		}
-		if ((f = fdopen(fd, "r+")) == NULL) {
-			CDBG("unable to open file %s", config->ct_ca_cert);
-			rv = CTE_ERRNO;
-			goto out;
-		}
-		fprintf(f, "%s", ca_cert);
-		fclose(f);
-		if (ca_cert != NULL) {
-			e_free(&ca_cert);
-		}
-	} else {
-			rv = CTE_OPERATION_FAILED;
-			goto out;
+	xe = xmlsd_elem_find_child(root, "ca_cert");
+	if (xe == NULL) {
+		CNDBG(CT_LOG_XML, "unable to get ca_cert xml node");
+		rv = CTE_XML_PARSE_FAIL;
+		goto out;
+	}
+	xml_val = xmlsd_elem_get_value(xe);
+	if (xml_val == NULL) {
+		CNDBG(CT_LOG_XML, "unable to get ca_cert xml value");
+		rv = CTE_XML_PARSE_FAIL;
+		goto out;
+	}
+	bzero(b64, sizeof b64);
+	if (ct_base64_encode(CT_B64_M_DECODE, (uint8_t *)xml_val,
+	    strlen(xml_val), (uint8_t *)b64, sizeof b64)) {
+		CDBG("failed to decode ca cert xml");
+		rv = CTE_CANT_BASE64;
+		goto out;
+	}
+	e_asprintf(&ca_cert, "%s", b64);
+	if (ct_make_full_path(config->ct_ca_cert, 0700)) {
+		CDBG("failed to make path to %s", config->ct_ca_cert);
+		rv = CTE_ERRNO;
+		goto out;
+	}
+	if ((fd = open(config->ct_ca_cert, O_RDWR | O_CREAT | O_TRUNC,
+			    0644)) == -1) {
+		CDBG("unable to open file for writing %s",
+		    config->ct_ca_cert);
+		rv = CTE_ERRNO;
+		goto out;
+	}
+	if ((f = fdopen(fd, "r+")) == NULL) {
+		CDBG("unable to open file %s", config->ct_ca_cert);
+		rv = CTE_ERRNO;
+		goto out;
+	}
+	fprintf(f, "%s", ca_cert);
+	fclose(f);
+	if (ca_cert != NULL) {
+		e_free(&ca_cert);
 	}
 
 	/* user cert */
-	if (stat(config->ct_cert , &sb) != 0) {
-		xe = xmlsd_elem_find_child(root, "user_cert");
-		if (xe == NULL) {
-			CNDBG(CT_LOG_XML, "unable to get user cert xml node");
-			rv = CTE_XML_PARSE_FAIL;
-			goto out;
-		}
-		xml_val = xmlsd_elem_get_value(xe);
-		if (xml_val == NULL) {
-			CNDBG(CT_LOG_XML, "unable to get user cert xml");
-			rv = CTE_XML_PARSE_FAIL;
-			goto out;
-		}
-		bzero(b64, sizeof b64);
-		if (ct_base64_encode(CT_B64_M_DECODE, (uint8_t *)xml_val,
-		    strlen(xml_val), (uint8_t *)b64, sizeof b64)) {
-			rv = CTE_CANT_BASE64;
-			goto out;
-		}
-		e_asprintf(&user_cert, "%s", b64);
-		if (ct_make_full_path(config->ct_cert, 0700)) {
-			CDBG("failed to make path to %s", config->ct_cert);
-			rv = CTE_ERRNO;
-			goto out;
-		}
-		if ((fd = open(config->ct_cert, O_RDWR | O_CREAT | O_TRUNC,
-				    0644)) == -1) {
-			CDBG("unable to open file for writing %s",
-			    config->ct_cert);
-			rv = CTE_ERRNO;
-			goto out;
-		}
-		if ((f = fdopen(fd, "r+")) == NULL) {
-			CDBG("unable to open file %s", config->ct_cert);
-			rv = CTE_ERRNO;
-			goto out;
-		}
-		fprintf(f, "%s", user_cert);
-		fclose(f);
-		if (user_cert != NULL) {
-			e_free(&user_cert);
-		}
-	} else {
-			rv = CTE_OPERATION_FAILED;
-			goto out;
+	xe = xmlsd_elem_find_child(root, "user_cert");
+	if (xe == NULL) {
+		CNDBG(CT_LOG_XML, "unable to get user cert xml node");
+		rv = CTE_XML_PARSE_FAIL;
+		goto out;
+	}
+	xml_val = xmlsd_elem_get_value(xe);
+	if (xml_val == NULL) {
+		CNDBG(CT_LOG_XML, "unable to get user cert xml");
+		rv = CTE_XML_PARSE_FAIL;
+		goto out;
+	}
+	bzero(b64, sizeof b64);
+	if (ct_base64_encode(CT_B64_M_DECODE, (uint8_t *)xml_val,
+	    strlen(xml_val), (uint8_t *)b64, sizeof b64)) {
+		rv = CTE_CANT_BASE64;
+		goto out;
+	}
+	e_asprintf(&user_cert, "%s", b64);
+	if (ct_make_full_path(config->ct_cert, 0700)) {
+		CDBG("failed to make path to %s", config->ct_cert);
+		rv = CTE_ERRNO;
+		goto out;
+	}
+	if ((fd = open(config->ct_cert, O_RDWR | O_CREAT | O_TRUNC,
+			    0644)) == -1) {
+		CDBG("unable to open file for writing %s",
+		    config->ct_cert);
+		rv = CTE_ERRNO;
+		goto out;
+	}
+	if ((f = fdopen(fd, "r+")) == NULL) {
+		CDBG("unable to open file %s", config->ct_cert);
+		rv = CTE_ERRNO;
+		goto out;
+	}
+	fprintf(f, "%s", user_cert);
+	fclose(f);
+	if (user_cert != NULL) {
+		e_free(&user_cert);
 	}
 
 	/* user key */
-	if (stat(config->ct_key, &sb) != 0) {
-		xe = xmlsd_elem_find_child(root, "user_key");
-		if (xe == NULL) {
-			CNDBG(CT_LOG_XML, "unable to get user key xml node");
-			rv = CTE_XML_PARSE_FAIL;
-			goto out;
-		}
-		xml_val = xmlsd_elem_get_value(xe);
-		if (xml_val == NULL) {
-			CNDBG(CT_LOG_XML, "unable to get user key xml");
-			rv = CTE_XML_PARSE_FAIL;
-			goto out;
-		}
-		bzero(b64, sizeof b64);
-		if (ct_base64_encode(CT_B64_M_DECODE, (uint8_t *)xml_val,
-		    strlen(xml_val), (uint8_t *)b64, sizeof b64)) {
-			rv = CTE_CANT_BASE64;
-			goto out;
-		}
-		e_asprintf(&user_key, "%s", b64);
-		if (ct_make_full_path(config->ct_key, 0700)) {
-			CDBG("failed to make path to %s", config->ct_key);
-			rv = CTE_ERRNO;
-			goto out;
-		}
-		if ((fd = open(config->ct_key, O_RDWR | O_CREAT | O_TRUNC,
-				    0600)) == -1) {
-			CDBG("unable to open file for writing %s",
-			    config->ct_key);
-			rv = CTE_ERRNO;
-			goto out;
-		}
-		if ((f = fdopen(fd, "r+")) == NULL) {
-			CDBG("unable to open file %s", config->ct_key);
-			rv = CTE_ERRNO;
-			goto out;
-		}
-		fprintf(f, "%s", user_key);
-		fclose(f);
-		if (user_key != NULL) {
-			e_free(&user_key);
-		}
-	} else {
-			rv = CTE_OPERATION_FAILED;
-			goto out;
+	xe = xmlsd_elem_find_child(root, "user_key");
+	if (xe == NULL) {
+		CNDBG(CT_LOG_XML, "unable to get user key xml node");
+		rv = CTE_XML_PARSE_FAIL;
+		goto out;
+	}
+	xml_val = xmlsd_elem_get_value(xe);
+	if (xml_val == NULL) {
+		CNDBG(CT_LOG_XML, "unable to get user key xml");
+		rv = CTE_XML_PARSE_FAIL;
+		goto out;
+	}
+	bzero(b64, sizeof b64);
+	if (ct_base64_encode(CT_B64_M_DECODE, (uint8_t *)xml_val,
+	    strlen(xml_val), (uint8_t *)b64, sizeof b64)) {
+		rv = CTE_CANT_BASE64;
+		goto out;
+	}
+	e_asprintf(&user_key, "%s", b64);
+	if (ct_make_full_path(config->ct_key, 0700)) {
+		CDBG("failed to make path to %s", config->ct_key);
+		rv = CTE_ERRNO;
+		goto out;
+	}
+	if ((fd = open(config->ct_key, O_RDWR | O_CREAT | O_TRUNC,
+			    0600)) == -1) {
+		CDBG("unable to open file for writing %s",
+		    config->ct_key);
+		rv = CTE_ERRNO;
+		goto out;
+	}
+	if ((f = fdopen(fd, "r+")) == NULL) {
+		CDBG("unable to open file %s", config->ct_key);
+		rv = CTE_ERRNO;
+		goto out;
+	}
+	fprintf(f, "%s", user_key);
+	fclose(f);
+	if (user_key != NULL) {
+		e_free(&user_key);
 	}
 
 out:
