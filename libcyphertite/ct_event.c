@@ -390,6 +390,8 @@ ct_event_cleanup(struct ct_event_state *ev_st)
 	if (ev_st == NULL)
 		return;
 
+	ct_event_shutdown(ev_st);
+
 	if (ev_st->ct_ev_sig_info != NULL)
 		event_free(ev_st->ct_ev_sig_info);
 	if (ev_st->ct_ev_sig_usr1 != NULL)
