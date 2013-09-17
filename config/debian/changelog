@@ -1,3 +1,11 @@
+cyphertite (1.6.5-1) unstable; urgency=low
+
+  * Unconditionally replace certs in download_and_decode_certs()
+  * Shutdown events during cleanup if not already
+  * Add a bytes skipped statistic to -R option
+
+ -- Conformal Systems <package-discuss@conformal.com>  Tue, 17 Sep 2013 12:31:57 -0400
+
 cyphertite (1.6.4-1) unstable; urgency=low
 
   * Fix ctfb when / is explicitly backed up 

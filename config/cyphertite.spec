@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.6.4
+%define version		1.6.5
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,10 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Tue Sep 17 2013 - dhill 1.6.5-1
+- Unconditionally replace certs in download_and_decode_certs()
+- Shutdown events during cleanup if not already
+- Add a bytes skipped statistic to -R option
 * Thu Sep 12 2013 - dhill 1.6.4-1
 - Fix ctfb when / is explicitly backed up 
 - Fix size calculation on differential extracts
