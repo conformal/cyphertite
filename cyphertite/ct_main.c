@@ -381,7 +381,7 @@ ct_main(int argc, char **argv)
 		int	nentries;
 		excludelist = ct_matchlist_fromfile(ct_excludefile, &nentries);
 		if (nentries == -1)
-			CFATAL("can't get excludelsit from %s", ct_excludefile);
+			CFATAL("can't get excludelist from %s", ct_excludefile);
 	}
 
 
