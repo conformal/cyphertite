@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.6.5
+%define version		1.6.6
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,10 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Thu Oct 17 2013 - dhill 1.6.6-1
+- Fix bug on extract with -p.  Empty directories were not set with
+  the correct ownership and permissions
+- Loop in the libevent handler to read/write as much as possible
 * Tue Sep 17 2013 - dhill 1.6.5-1
 - Unconditionally replace certs in download_and_decode_certs()
 - Shutdown events during cleanup if not already

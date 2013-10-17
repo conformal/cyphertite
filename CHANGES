@@ -3,6 +3,11 @@ User visible changes for cyphertite
   A high-security scalable solution for online backups
 ============================================================================
 
+Changes in 1.6.6 (Thu Oct 17 2013)
+  - Fix bug on extract with -p.  Empty directories were not set with
+    the correct ownership and permissions
+  - Loop in the libevent handler to read/write as much as possible
+
 Changes in 1.6.5 (Tue Sep 17 2013)
   - Unconditionally replace certs in download_and_decode_certs()
   - Shutdown events during cleanup if not already

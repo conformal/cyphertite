@@ -1,3 +1,11 @@
+cyphertite (1.6.6-1) unstable; urgency=low
+
+  * Fix bug on extract with -p.  Empty directories were not set with
+    the correct ownership and permissions
+  * Loop in the libevent handler to read/write as much as possible
+
+ -- Conformal Systems <package-discuss@conformal.com>  Thu, 17 Oct 2013 16:28:14 -0400
+
 cyphertite (1.6.5-1) unstable; urgency=low
 
   * Unconditionally replace certs in download_and_decode_certs()
