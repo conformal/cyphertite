@@ -1572,7 +1572,7 @@ struct ct_extract_state {
 	ct_log_chown_failed_fn	*ces_log_chown_failed;
 };
 
-void	ct_file_extract_nextdir(struct ct_extract_state *, struct fnode *);
+void	ct_file_extract_nextdir(struct ct_extract_state *, struct dnode *);
 void	ct_file_extract_closefrom(struct ct_extract_state *, struct dnode *,
 	    struct dnode *);
 void	ct_file_extract_opento(struct ct_extract_state *, struct dnode *,
@@ -1765,7 +1765,7 @@ ct_file_extract_open(struct ct_extract_state *ces, struct fnode *fnode)
 		CABORTX("file open on extract_open");
 	}
 
-	ct_file_extract_nextdir(ces, fnode);
+	ct_file_extract_nextdir(ces, fnode->fn_parent_dir);
 
 	CNDBG(CT_LOG_FILE, "opening %s for writing", fnode->fn_fullname);
 
@@ -1882,7 +1882,7 @@ ct_file_extract_special(struct ct_extract_state *ces, struct fnode *fnode)
 	 * Create dependant directories and open/close any relvevant directory
 	 * filedescriptors.
 	 */
-	ct_file_extract_nextdir(ces, fnode);
+	ct_file_extract_nextdir(ces, fnode->fn_parent_dir);
 
 	CNDBG(CT_LOG_FILE, "special %s mode %d", fnode->fn_fullname,
 	    fnode->fn_mode);
@@ -1973,8 +1973,9 @@ link_out:
 		/*
 		 * Directory permissions are handled at directory close
 		 * time when all dependancies are finished.
+		 * We call nextdir now incase the dir is empty.
 		 */
-		;
+		ct_file_extract_nextdir(ces, fnode->fn_curdir_dir);
 	} else if (C_ISLINK(fnode->fn_type)){
 		if (!fnode->fn_hardlink) {
 			/* symlinks have no 'real' permissions */
@@ -2010,9 +2011,9 @@ link_out:
 }
 
 void
-ct_file_extract_nextdir(struct ct_extract_state *ces, struct fnode *fnode)
+ct_file_extract_nextdir(struct ct_extract_state *ces, struct dnode *newdir)
 {
-	struct dnode	*newdir = fnode->fn_parent_dir, *tdir;
+	struct dnode	*tdir;
 	struct dnode	**newdirlist;
 	int		 ndirs, i;
 
@@ -2680,6 +2681,7 @@ ct_populate_fnode(struct ct_extract_state *ces, struct ctfile_parse_state *ctx,
 		}
 		/* XXX check duplicates? */
 		ctfile_parse_insertdir(ctx, dnode);
+		fnode->fn_curdir_dir = dnode;
 		CNDBG(CT_LOG_CTFILE, "inserting %s as %" PRId64,
 		    dnode->d_name, dnode->d_num );
 	}
