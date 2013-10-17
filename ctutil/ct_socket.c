@@ -195,8 +195,8 @@ send_another:
 	}
 	if (ioctx->io_over_bw_check != NULL)
 		ioctx->io_over_bw_check(ioctx->io_cb_arg, ioctx);
-	if (write_complete && ioctx->io_write_io_enabled != 0 &&
-	    !TAILQ_EMPTY(&ioctx->io_o_q))
+	if (write_complete && ioctx->io_disconnecting == 0 &&
+	    ioctx->io_write_io_enabled != 0 && !TAILQ_EMPTY(&ioctx->io_o_q))
 		goto send_another;
 }
 
@@ -317,7 +317,8 @@ again:
 		CFATALX("invalid io state %d fd %"PRId64, ioctx->io_i_state,
 		    (int64_t)fd);
 	}
-	goto again;
+	if (ioctx->io_disconnecting == 0)
+		goto again;
 }
 
 void
@@ -474,8 +475,8 @@ write_next_iov:
 		}
 		CT_UNLOCK(&ioctx->io_lock);
 	}
-	if (write_complete && ioctx->io_write_io_enabled != 0 &&
-	    !TAILQ_EMPTY(&ioctx->io_o_q))
+	if (write_complete && ioctx->io_disconnecting == 0 &&
+	    ioctx->io_write_io_enabled != 0 && !TAILQ_EMPTY(&ioctx->io_o_q))
 		goto send_another;
 }
 
@@ -592,7 +593,8 @@ again:
 		CFATALX("invalid io state %d fd %"PRId64, ioctx->io_i_state,
 		    (int64_t)fd);
 	}
-	goto again;
+	if (ioctx->io_disconnecting == 0)
+		goto again;
 }
 
 void
@@ -757,6 +759,9 @@ ct_io_disconnect(struct ct_io_ctx *ioctx)
 	/* XXX -check state? */
 	struct ct_io_queue	*ioq;
 
+	/* In case we are called from one of the callbacks, stop event loop */
+	ioctx->io_disconnecting = 1;
+
 	CNDBG(CTUTIL_LOG_SOCKET, "disconnecting");
 	if (ioctx->io_ev_rd != NULL) {
 		event_free(ioctx->io_ev_rd);
@@ -830,6 +835,9 @@ ct_assl_disconnect(struct ct_assl_io_ctx *ioctx)
 {
 	/* XXX -check state? */
 	struct ct_io_queue	*ioq;
+
+	/* In case we are called from one of the callbacks, stop event loop */
+	ioctx->io_disconnecting = 1;
 
 	if (ioctx->io_ev_rd != NULL) {
 		event_free(ioctx->io_ev_rd);

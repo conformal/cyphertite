@@ -88,6 +88,8 @@ struct ct_io_ctx {
 	int				io_user_flow_control;
 	int				io_write_io_enabled;
 
+	int				io_disconnecting;
+
 	CT_LOCK_STORE(io_lock);
 
 	/* stats */
@@ -126,6 +128,8 @@ struct ct_assl_io_ctx {
 	int				io_o_written;
 
 	int				io_write_io_enabled;
+
+	int				io_disconnecting;
 
 	CT_LOCK_STORE(io_lock);
 
