@@ -525,9 +525,10 @@ ct_load_certs(struct ct_global_state *state, struct assl_context *c)
 int
 ct_ssl_connect(struct ct_global_state *state)
 {
-	struct ct_assl_io_ctx	*ctx;
-	struct assl_context	*c;
-	int			 ret;
+	struct ct_assl_io_ctx		*ctx;
+	struct assl_context		*c;
+	struct assl_connect_opts	 aco;
+	int				 ret;
 
 	ctx = e_calloc(1, sizeof (*ctx));
 
@@ -546,9 +547,12 @@ ct_ssl_connect(struct ct_global_state *state)
 	    state, ct_header_alloc, ct_header_free, ct_body_alloc,
 	    ct_body_free, ct_ioctx_alloc, ct_ioctx_free);
 
+	aco.aco_flags = ASSL_F_NONBLOCK|ASSL_F_KEEPALIVE|ASSL_F_THROUGHPUT,
+	aco.aco_rcvbuf = state->ct_config->ct_sock_rcvbuf;
+	aco.aco_sndbuf = state->ct_config->ct_sock_sndbuf;
+
 	if (ct_assl_connect(ctx, state->ct_config->ct_host,
-	    state->ct_config->ct_hostport,
-	    ASSL_F_NONBLOCK|ASSL_F_KEEPALIVE|ASSL_F_THROUGHPUT,
+	    state->ct_config->ct_hostport, &aco,
 	    ct_event_get_base(state->event_state))) {
 		ct_assl_disconnect(ctx);
 		e_free(&ctx);

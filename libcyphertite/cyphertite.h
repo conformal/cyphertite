@@ -57,6 +57,10 @@ struct ct_config {
 	long long	ct_ctfile_max_cachesize;
 	int	ct_secrets_upload;
 	int	ct_io_bw_limit;
+#define CT_DEFAULT_RCVBUF	(64*1024)
+	int	ct_sock_rcvbuf;
+#define CT_DEFAULT_SNDBUF	(64*1024)
+	int	ct_sock_sndbuf;
 };
 
 int			 ct_load_config(struct ct_config **, char **);

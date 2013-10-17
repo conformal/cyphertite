@@ -178,8 +178,13 @@ Specify the compression algorithm to be used for writes. (On reads,
 .Nm
 will transparently handle any of the compression algorithms.)
 .Pp
-.It Ic username = Ar string
-Specify the username with which to authenticate.
+.It Ic socket_rcvbuf = Ar size
+Specify the size of the socket receive buffer to be used with connection to
+server.
+.Pp
+.It Ic socket_sndbuf = Ar size
+Specify the size of the socket send buffer to be used with connection to
+server.
 .Pp
 .It Xo
 .Ic upload_crypto_secrets =

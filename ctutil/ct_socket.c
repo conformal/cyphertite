@@ -794,11 +794,11 @@ ct_io_disconnect(struct ct_io_ctx *ioctx)
 
 int
 ct_assl_connect(struct ct_assl_io_ctx *ctx, const char *host, const char *port,
-   int flags, struct event_base *ev_base)
+   struct assl_connect_opts *aco, struct event_base *ev_base)
 {
 	int	rv;
 
-	if ((rv = assl_connect(ctx->c, host, port, flags)) != 0)
+	if ((rv = assl_connect_opts(ctx->c, host, port, aco)) != 0)
 		return (rv);
 
 	ctx->io_ev_rd = event_new(ev_base, assl_fd(ctx->c), EV_READ|EV_PERSIST,

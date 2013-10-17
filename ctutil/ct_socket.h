@@ -22,6 +22,8 @@
 #include <event2/event.h>
 #include <sys/queue.h>
 
+#include <assl.h>
+
 #ifndef evutil_socket_t
 #define evutil_socket_t int
 #endif
@@ -162,7 +164,8 @@ int			ct_io_connect_fd_pair(struct ct_io_ctx *ctx, int, int,
 			    struct event_base *);
 void			ct_io_disconnect(struct ct_io_ctx *);
 int			ct_assl_connect(struct ct_assl_io_ctx *, const char *,
-			    const char *, int, struct event_base *);
+			    const char *, struct assl_connect_opts *,
+			    struct event_base *);
 void			ct_assl_disconnect(struct ct_assl_io_ctx *);
 
 void			ct_assl_io_block_writes(struct ct_assl_io_ctx *);

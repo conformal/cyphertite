@@ -417,6 +417,10 @@ ct_load_config(struct ct_config **config, char **configfile)
 		    NULL, NULL, NULL },
 		{ "crypto_password", CT_S_STR, NULL, &conf.ct_crypto_passphrase,
 		    NULL, NULL, NULL, 1 },
+		{ "socket_rcvbuf" , CT_S_INT, &conf.ct_sock_rcvbuf,
+		    NULL, NULL, NULL },
+		{ "socket_sndbuf" , CT_S_INT, &conf.ct_sock_sndbuf,
+		    NULL, NULL, NULL },
 #if defined(CT_EXT_SETTINGS)
 		CT_EXT_SETTINGS
 #endif	/* CT_EXT_SETTINGS */
@@ -571,6 +575,8 @@ ct_default_config(struct ct_config *config)
 	config->ct_ctfile_mode = CT_MDMODE_LOCAL;
 	config->ct_ctfile_max_cachesize = LLONG_MAX;
 	config->ct_max_trans = 100;
+	config->ct_sock_rcvbuf = CT_DEFAULT_RCVBUF;
+	config->ct_sock_sndbuf = CT_DEFAULT_SNDBUF;
 }
 
 /* slow as anything, but meh, we are writing out the config file. */
