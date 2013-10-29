@@ -2624,14 +2624,14 @@ ct_populate_fnode(struct ct_extract_state *ces, struct ctfile_parse_state *ctx,
 
 	if (C_ISLINK(ctx->xs_hdr.cmh_type)) {
 		/* hardlink/symlink */
-		if (strip_slash) {
+		fnode->fn_hardlink = !C_ISLINK(ctx->xs_lnkhdr.cmh_type);
+		if (fnode->fn_hardlink && strip_slash) {
 			fnode->fn_hlname =
 			    ct_strip_slash(ctx->xs_lnkhdr.cmh_filename);
 		} else {
 			fnode->fn_hlname =
 			    e_strdup(ctx->xs_lnkhdr.cmh_filename);
 		}
-		fnode->fn_hardlink = !C_ISLINK(ctx->xs_lnkhdr.cmh_type);
 		*state = TR_S_EX_SPECIAL;
 
 	} else if (!C_ISREG(ctx->xs_hdr.cmh_type)) {
