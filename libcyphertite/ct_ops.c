@@ -1073,9 +1073,10 @@ ct_extract_file(struct ct_global_state *state, struct ct_op *op)
 			}
 			trans->tr_cleanup = ct_extract_cleanup_fnode;
 
-			/* XXX Check filename matches what we expect */
 			e_free(&trans->tr_fl_node->fn_fullname);
 			trans->tr_fl_node->fn_fullname = e_strdup(localfile);
+			e_free(&trans->tr_fl_node->fn_name);
+			trans->tr_fl_node->fn_name = e_strdup(localfile);
 			/* Set name pointer to something else passed in */
 
 			CNDBG(CT_LOG_CTFILE, "file %s numshas %" PRId64,
