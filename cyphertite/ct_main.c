@@ -1190,6 +1190,7 @@ ct_list(const char *file, char **flist, char **excludelist, int match_mode,
 	int				 state;
 	int				 doprint = 0;
 	int				 ret;
+	int				 fnret = 0;
 	int				 s_errno = 0, ct_errno = 0;
 	char				 shat[SHA_DIGEST_STRING_LENGTH];
 	char				 cshat[SHA_DIGEST_STRING_LENGTH];
@@ -1311,6 +1312,7 @@ next_file:
 	if (ret != XS_RET_EOF) {
 		errno = s_errno;
 		CWARNX("corrupt ctfile: %s", ct_strerror(ct_errno));
+		fnret = ct_errno;
 	} else {
 		if (ct_next_filename) {
 			file = ct_next_filename;
@@ -1319,7 +1321,7 @@ next_file:
 	}
 	ct_match_unwind(match);
 	ct_file_extract_cleanup(ces);
-	return (0);
+	return (fnret);
 }
 
 ct_op_complete_cb ctfile_nextop_list_cleanup;
