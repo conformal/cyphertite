@@ -35,13 +35,8 @@
 #define ACCOUNT_CERT	"?do=xml-certs"
 #define INDEX		"index.php"
 
-struct memdesc {
-	char		*memory;
-	size_t		size;
-};
-
-static CURLcode
-sslctx_cb(CURL *c, void *ssl_ctx, void *parm)
+int
+sslctx_cb(void *curl, void *ssl_ctx, void *parm)
 {
 	unsigned long	 ssl_err;
 	int		 rv;
@@ -123,7 +118,7 @@ sslctx_cb(CURL *c, void *ssl_ctx, void *parm)
 	return CURLE_OK;
 }
 
-static size_t
+size_t
 write_mem_cb(void *contents, size_t size, size_t nmemb, void *userp)
 {
 	size_t		realsize = size * nmemb;

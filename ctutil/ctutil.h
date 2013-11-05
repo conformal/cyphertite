@@ -280,10 +280,22 @@ __dead void		ct_cli_usage(struct ct_cli_cmd *, struct ct_cli_cmd *);
 struct ct_cli_cmd	*ct_cli_validate(struct ct_cli_cmd *, int *, char ***);
 void			ct_cli_execute(struct ct_cli_cmd *, int *, char ***);
 
+/* generic curl callbacks */
+struct memdesc {
+	char		*memory;
+	size_t		size;
+};
+
+int			sslctx_cb(void *, void *, void *);
+size_t			write_mem_cb(void *, size_t, size_t, void *);
+
 /* cert bundle */
 #define CT_CERT_BUNDLE_LOGIN_FAILED	(-1000)
 int			ct_get_cert_bundle(const char *, const char *, char **,
 			    size_t *);
+
+/* update xml */
+int			ct_get_update_xml(char **, size_t *);
 
 /* Debug log levels */
 #define CTUTIL_LOG_SOCKET	(0x1)
