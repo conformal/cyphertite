@@ -644,14 +644,14 @@ ct_compare_secrets(struct ct_global_state *state, struct ct_op *op)
 		goto free;
 	}
 
-	if ((f = fopen(state->ct_config->ct_crypto_secrets, "rb")) == NULL) {
+	if ((f = ct_fopen(state->ct_config->ct_crypto_secrets, "rb")) == NULL) {
 		s_errno = errno;
 		ret = CTE_ERRNO;
 		CWARNX("\"%s\": %s", state->ct_config->ct_crypto_secrets,
 		    ct_strerror(ret));
 		goto free;
 	}
-	if ((tf = fopen(temp_path, "rb")) == NULL) {
+	if ((tf = ct_fopen(temp_path, "rb")) == NULL) {
 		s_errno = errno;
 		ret = CTE_ERRNO;
 		CWARNX("temp_path: %s", ct_strerror(ret));

@@ -36,6 +36,8 @@
 
 #include <ct_crypto.h>
 #include <ct_types.h>
+#include <cyphertite.h>
+#include <ct_internal.h>
 
 const EVP_CIPHER *EVP_aes_xts(void);
 
@@ -516,7 +518,7 @@ ct_unlock_secrets(const char *passphrase, const char *filename,
 		p = pwd;
 	}
 
-	f = fopen(filename, "r");
+	f = ct_fopen(filename, "r");
 	if (f == NULL)
 		return (CTE_INVALID_SECRETS_FILE);
 

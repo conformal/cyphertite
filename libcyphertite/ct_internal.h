@@ -58,4 +58,7 @@ void	ct_queue_write(struct ct_global_state *, struct ct_trans *);
 void	ct_queue_queued(struct ct_global_state *, struct ct_trans *);
 void	ct_queue_complete(struct ct_global_state *, struct ct_trans *);
 
+/* Platform-specific compatibility functions implemented in ct_platform.c */
+FILE 	*ct_fopen(const char *, const char *);
+
 #endif /* ! CT_INTERNAL_H */

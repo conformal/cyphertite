@@ -30,6 +30,8 @@
 
 #include <ct_match.h>
 #include <ct_types.h>
+#include <cyphertite.h>
+#include <ct_internal.h>
 
 
 struct ct_match_node {
@@ -324,7 +326,7 @@ ct_matchlist_fromfile(const char *file, int *nentries)
 	size_t		 len, lineno = 0;
 	int		 n = 0;
 
-	if ((f = fopen(file, "r")) == NULL) {
+	if ((f = ct_fopen(file, "r")) == NULL) {
 		*nentries = -1;
 		return (NULL);
 	}

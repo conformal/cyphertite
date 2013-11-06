@@ -143,7 +143,7 @@ ctfile_archive(struct ct_global_state *state, struct ct_op *op)
 			strlcpy(tpath, ctfile, sizeof(tpath));
 		}
 		CNDBG(CT_LOG_FILE, "opening ctfile for archive %s", ctfile);
-		if ((cas->cas_handle = fopen(tpath, "rb")) == NULL) {
+		if ((cas->cas_handle = ct_fopen(tpath, "rb")) == NULL) {
 			ct_fatal(state, ctfile, CTE_ERRNO);
 			goto dying;
 		}

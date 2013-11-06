@@ -38,6 +38,7 @@
 
 #include <cyphertite.h>
 #include <ct_ext.h>
+#include <ct_internal.h>
 
 
 int
@@ -307,7 +308,7 @@ ct_cert_expiring_soon(const char *path)
 	X509	*x509;
 	time_t	 now;
 	int	 ret;
-	if ((fp = fopen(path, "rb")) == NULL) {
+	if ((fp = ct_fopen(path, "rb")) == NULL) {
 		return (1); /* can't read, assume we need new ones for now */
 	}
 

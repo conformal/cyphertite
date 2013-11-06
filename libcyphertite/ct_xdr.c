@@ -231,7 +231,7 @@ int
 ctfile_open(const char *filename, const char *ctfile_basedir, FILE **f,
     struct ctfile_gheader *gh, XDR *xdr)
 {
-	if ((*f = fopen(filename, "rb")) == NULL)
+	if ((*f = ct_fopen(filename, "rb")) == NULL)
 		return (CTE_ERRNO);
 
 	return (ctfile_open_f(*f, ctfile_basedir, gh, xdr));
@@ -675,7 +675,7 @@ ctfile_write_init(struct ctfile_write_state **ctxp, const char *ctfile,
 		CABORTX("multilevel archive with no basis");
 
 	/* open metadata file */
-	if ((ctx->cws_f = fopen(ctfile, "wb")) == NULL) {
+	if ((ctx->cws_f = ct_fopen(ctfile, "wb")) == NULL) {
 		ret = CTE_ERRNO;
 		goto fail;
 	}
