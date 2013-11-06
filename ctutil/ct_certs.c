@@ -180,7 +180,8 @@ ct_get_cert_bundle(const char *user, const char *pass, char **xml,
 	}
 
 	/* verify cert */
-	curl_easy_setopt(c, CURLOPT_SSL_CTX_FUNCTION, sslctx_cb);
+	curl_easy_setopt(c, CURLOPT_SSL_CTX_FUNCTION,
+	    (curl_ssl_ctx_callback)sslctx_cb);
 	if (curl_easy_setopt(c, CURLOPT_SSL_VERIFYPEER, 1L)) {
 		rv = -5;
 		goto done;
