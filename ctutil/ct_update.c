@@ -74,7 +74,8 @@ ct_get_update_xml(char **xml, size_t *xml_sz)
 	}
 
 	/* verify cert */
-	curl_easy_setopt(c, CURLOPT_SSL_CTX_FUNCTION, sslctx_cb);
+	curl_easy_setopt(c, CURLOPT_SSL_CTX_FUNCTION,
+	    (curl_ssl_ctx_callback)sslctx_cb);
 	if (curl_easy_setopt(c, CURLOPT_SSL_VERIFYPEER, 1L)) {
 		rv = -5;
 		goto done;
