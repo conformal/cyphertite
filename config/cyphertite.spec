@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.6.6
+%define version		1.6.7
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,16 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Wed Nov 13 2013 - dhill 1.6.7-1
+- Add fopen compatibility layer
+- Fix hardlinks on extract
+- Fix destination filename in ctfb
+- Return nonzero if an error occurs listing a ctfile
+- Prevent excess looping in the socket code
+- Add support to check the current cyphertite version
+- Add new options socket_rcvbuf and socket_sndbuf to
+  set the size of the respective socket buffers.  Set
+  the default to 64k
 * Thu Oct 17 2013 - dhill 1.6.6-1
 - Fix bug on extract with -p.  Empty directories were not set with
   the correct ownership and permissions

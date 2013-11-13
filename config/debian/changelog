@@ -1,3 +1,17 @@
+cyphertite (1.6.7-1) unstable; urgency=low
+
+  * Add fopen compatibility layer
+  * Fix hardlinks on extract
+  * Fix destination filename in ctfb
+  * Return nonzero if an error occurs listing a ctfile
+  * Prevent excess looping in the socket code
+  * Add support to check the current cyphertite version
+  * Add new options socket_rcvbuf and socket_sndbuf to
+    set the size of the respective socket buffers.  Set
+    the default to 64k
+
+ -- Conformal Systems <package-discuss@conformal.com>  Wed, 13 Nov 2013 12:41:37 -0500
+
 cyphertite (1.6.6-1) unstable; urgency=low
 
   * Fix bug on extract with -p.  Empty directories were not set with
