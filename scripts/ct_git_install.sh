@@ -76,7 +76,7 @@ check_external_libs()
 	EXTERNAL_LIBS="expat z lzo2 lzma sqlite3 event_core edit ncurses"
 
 	# standard lib dirs - override below if needed
-	SLIB_DIRS="/usr/lib /usr/lib64 /usr/local/lib /usr/local/lib64"
+	SLIB_DIRS="/usr/lib /usr/lib64 /usr/local/lib /usr/local/lib64 /usr/local/lib/event2"
 
 	# attempt to extract lib dirs from ld
 	LIB_DIRS=$(ld --verbose 2>/dev/null | grep SEARCH_DIR)
