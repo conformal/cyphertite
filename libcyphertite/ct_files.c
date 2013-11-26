@@ -715,6 +715,7 @@ ct_archive_complete_special(struct ct_global_state *state,
 	if (ctfile_write_special(trans->tr_ctfile, trans->tr_fl_node))
 		CWARNX("failed to write special entry for %s",
 		    trans->tr_fl_node->fn_fullname);
+	state->ct_stats->st_files_completed++;
 
 	return (0);
 }
@@ -773,6 +774,7 @@ ct_archive_complete_write_chunk(struct ct_global_state *state,
 		    trans->tr_fl_node) != 0)
 			CWARNX("failed to write trailer for %s",
 			    trans->tr_fl_node->fn_fullname);
+		state->ct_stats->st_files_completed++;
 		state->ct_print_file_end(state->ct_print_state,
 		    trans->tr_fl_node, state->ct_max_block_size);
 	}
