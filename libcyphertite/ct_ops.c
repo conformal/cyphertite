@@ -354,7 +354,7 @@ ct_extract_complete_file_end(struct ct_global_state *state,
 	if (trans->tr_fl_node->fn_skip_file == 0) {
 		ct_sha1_final(trans->tr_csha,
 		    &trans->tr_fl_node->fn_shactx);
-		if (bcmp(trans->tr_csha, trans->tr_sha,
+		if (memcmp(trans->tr_csha, trans->tr_sha,
 		    sizeof(trans->tr_sha)) != 0)
 			CWARNX("extract sha mismatch on %s",
 			    trans->tr_fl_node->fn_fullname);

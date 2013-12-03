@@ -637,7 +637,7 @@ ct_unlock_secrets(const char *passphrase, const char *filename,
 				CFATAL("fchmod");
 		}
 
-		if (bcmp(digest, digest_v, sizeof digest)) {
+		if (memcmp(digest, digest_v, sizeof digest)) {
 			CWARNX("corrupt secrets file");
 			goto done;
 		}
@@ -654,7 +654,7 @@ ct_unlock_secrets(const char *passphrase, const char *filename,
 		SHA512_Final(digest_v, &ctx);
 	}
 
-	if (bcmp(digest, digest_v, sizeof digest)) {
+	if (memcmp(digest, digest_v, sizeof digest)) {
 		CWARNX("corrupt secrets file");
 		goto done;
 	}
@@ -679,7 +679,7 @@ ct_unlock_secrets(const char *passphrase, const char *filename,
 	HMAC_CTX_cleanup(&hctx);
 
 	/* step 3 */
-	if (bcmp(d_hmac_maskkey, hmac_maskkey, sizeof hmac_maskkey)) {
+	if (memcmp(d_hmac_maskkey, hmac_maskkey, sizeof hmac_maskkey)) {
 		rv = CTE_INVALID_PASSPHRASE;
 		goto done;
 	}
