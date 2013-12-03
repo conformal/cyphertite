@@ -1191,7 +1191,7 @@ RB_GENERATE(ct_sha_lookup, sha_entry, s_rb, ct_cmp_sha);
 int
 ct_cmp_sha(struct sha_entry *d1, struct sha_entry *d2)
 {
-	return bcmp(d1->sha, d2->sha, sizeof (d1->sha));
+	return memcmp(d1->sha, d2->sha, sizeof (d1->sha));
 }
 
 int
