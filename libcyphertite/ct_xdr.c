@@ -446,6 +446,11 @@ ctfile_parse(struct ctfile_parse_state *ctx)
 
 	switch (ctx->xs_state) {
 	case XS_STATE_FILE:
+		// free from last round
+		if (ctx->xs_hdr.cmh_filename != NULL) {
+			free(ctx->xs_hdr.cmh_filename);
+			ctx->xs_hdr.cmh_filename = NULL;
+		}
 		/* actually between files, next expected object is hdr */
 		ret = ctfile_parse_read_header(ctx, &ctx->xs_hdr);
 		if (ret) {
@@ -619,6 +624,10 @@ ctfile_parse_close(struct ctfile_parse_state *ctx)
 	if (ctx->xs_filename != NULL)
 		e_free(&ctx->xs_filename);
 	ctx->xs_dnum = 0;
+	if (ctx->xs_hdr.cmh_filename != NULL) {
+		free(ctx->xs_hdr.cmh_filename);
+		ctx->xs_hdr.cmh_filename = NULL;
+	}
 
 	/*
 	 * The directory number tree is provided as a convenience for looking
