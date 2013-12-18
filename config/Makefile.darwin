@@ -1,0 +1,21 @@
+ARFLAGS = crs
+CFLAGS+= -Dst_atimespec=st_atim -Dst_mtimespec=st_mtim -Dst_ctimespec=st_ctim
+CFLAGS+= -pthread
+INCFLAGS+= -I /usr/local/include/clens
+INCFLAGS+= -I /usr/local/opt/curl/include/
+INCFLAGS+= -I /usr/local/opt/openssl/include/
+
+LDFLAGS.EXTRA += -pthread
+LDFLAGS.EXTRA += -L /usr/local/opt/curl/lib/
+LDFLAGS.EXTRA += -lcurl
+LDFLAGS.EXTRA += -L /usr/local/opt/openssl/lib/
+LDFLAGS.SO = -dynamiclib
+
+LIB.SONAME = lib$(LIB.NAME).$(SO_MAJOR).dylib
+LIB.DEVLNK = lib$(LIB.NAME).dylib
+LIB.SHARED = lib$(LIB.NAME).$(SO_MAJOR).$(SO_MINOR).dylib
+LIB.STATIC = lib$(LIB.NAME).a
+
+PICFLAG = -fPIC
+
+SHARED_OBJ_EXT=os

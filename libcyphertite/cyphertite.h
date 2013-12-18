@@ -638,4 +638,9 @@ int			 ct_handle_unsolicited_xml(struct ct_header *, void *,
 #define CT_NO_OPENAT
 #endif
 
+/* Mac OS X doesn't have openat() */
+#if defined(__APPLE__)
+#define CT_NO_OPENAT
+#endif
+
 #endif /* ! CT_LIB_H */
