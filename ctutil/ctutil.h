@@ -92,7 +92,7 @@ struct ct_header {
 #define C_HDR_F_COMPRESSED_MASK	(0xf000)
 #define C_HDR_F_VALIDMASK	(0x3037)
 	uint16_t		c_unused;
-} __packed;
+} __attribute__((__packed__));
 
 /*
  * C_HDR_O_NOP: send no-operation request to server
@@ -101,12 +101,12 @@ struct ct_header {
 #define C_HDR_O_NOP		(10)
 struct ct_nop {
 	uint32_t		cn_id;
-} __packed;
+} __attribute__((__packed__));
 
 #define C_HDR_O_NOP_REPLY	(11)
 struct ct_nop_reply {
 	uint32_t		cnr_id;
-} __packed;
+} __attribute__((__packed__));
 
 /*
  * C_HDR_O_LOGIN: login with username/password provided in payload
@@ -133,7 +133,7 @@ extern char	*c_hdr_login_reply_ex_errstrs[];
 #define C_HDR_O_EXISTS		(12)
 struct ct_exists {
 	u_char			ce_digest[SHA_DIGEST_LENGTH];
-} __packed;
+} __attribute__((__packed__));
 #define C_HDR_O_EXISTS_REPLY	(13)
 
 /*
@@ -150,7 +150,7 @@ struct ct_exists {
 #define C_HDR_O_READ		(14)
 struct ct_read {
 	u_char			cr_digest[SHA_DIGEST_LENGTH];
-} __packed;
+} __attribute__((__packed__));
 #define C_HDR_O_READ_REPLY	(15)
 
 /*
@@ -169,7 +169,7 @@ struct ct_read {
 extern char	*c_hdr_write_reply_ex_errstr[];
 struct ct_write_reply {
 	u_char			cwr_digest[SHA_DIGEST_LENGTH];
-} __packed;
+} __attribute__((__packed__));
 
 #define C_HDR_O_XML		(18)
 #define C_HDR_O_XML_REPLY	(19)
@@ -177,7 +177,7 @@ struct ct_write_reply {
 struct ct_metadata_footer {
 	uint32_t	cmf_chunkno;
 	uint32_t	cmf_size;
-} __packed;
+} __attribute__((__packed__));
 
 /* stuff */
 #define CT_PASS_MAX	(128)
