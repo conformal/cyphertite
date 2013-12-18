@@ -1,0 +1,11 @@
+ARFLAGS = crs
+CFLAGS+= -Dst_atimespec=st_atim -Dst_mtimespec=st_mtim -Dst_ctimespec=st_ctim
+INCFLAGS+= -I /usr/local/include/clens
+
+LDFLAGS.EXTRA += -lcurl
+LDFLAGS.SO = -dynamiclib
+
+LIB.STATIC = lib$(LIB.NAME).a
+LIB.SHARED = lib$(LIB.NAME).dylib
+
+SHARED_OBJ_EXT=os
