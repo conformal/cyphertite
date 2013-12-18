@@ -49,6 +49,7 @@ LIB.HEADERS += ct_proto.h ct_types.h ct_version_tree.h ct_sapi.h
 LIB.OBJS = $(addprefix $(OBJPREFIX), $(LIB.SRCS:.c=.o))
 LIB.DEPS = $(addsuffix .depend, $(LIB.OBJS))
 LIB.MANPAGES = cyphertite.3 simplect.3
+LIB.MDIRS = $(foreach page, $(LIB.MANPAGES), $(subst ., man, $(suffix $(page))))
 LIB.MLINKS+=cyphertite.3 ct_create_secrets.3
 LIB.MLINKS+=cyphertite.3 ct_unlock_secrets.3
 LIB.MLINKS+=cyphertite.3 ctfile_parse.3
@@ -166,6 +167,7 @@ install:
 	$(INSTALL) -m 0644 $(OBJPREFIX)$(LIB.STATIC) $(DESTDIR)$(LIBDIR)/
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(INCDIR)/cyphertite
 	$(INSTALL) -m 0644 $(LIB.HEADERS) $(DESTDIR)$(INCDIR)/cyphertite
+	$(INSTALL) -m 0755 -d $(addprefix $(DESTDIR)$(MANDIR)/, $(LIB.MDIRS))
 	$(foreach page, $(LIB.MANPAGES), \
 		$(INSTALL) -m 0444 $(page) $(addprefix $(DESTDIR)$(MANDIR)/, \
 		$(subst ., man, $(suffix $(page))))/; \
