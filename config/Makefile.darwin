@@ -5,7 +5,11 @@ INCFLAGS+= -I /usr/local/include/clens
 LDFLAGS.EXTRA += -lcurl
 LDFLAGS.SO = -dynamiclib
 
+LIB.SONAME = lib$(LIB.NAME).$(SO_MAJOR).dylib
+LIB.DEVLNK = lib$(LIB.NAME).dylib
+LIB.SHARED = lib$(LIB.NAME).$(SO_MAJOR).$(SO_MINOR).dylib
 LIB.STATIC = lib$(LIB.NAME).a
-LIB.SHARED = lib$(LIB.NAME).dylib
+
+PICFLAG = -fPIC
 
 SHARED_OBJ_EXT=os
