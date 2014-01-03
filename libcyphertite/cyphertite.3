@@ -20,18 +20,13 @@
 .Nm cyphertite
 .Nd cyphertite library
 .Sh SYNOPSIS
-
 .Ss CRYPTO
-
 .In ct_crypto.h
-
 .Ft int
 .Fn ct_create_secrets "const char *passphrase" "const char *filename" "uint8_t *myaeskey" "uint8_t *myivkey"
 .Ft int
 .Fn ct_unlock_secrets "const char *passphrase" "const char *filename" "uint8_t *outaeskey" "size_t outaeskeylen" "uint8_t *outivkey" "size_t outivkeylen"
-
 ct_crypto.h functions used internally only:
-
 .Ft int
 .Fn ct_crypto_crypt "const EVP_CIPHER *type" "uint8_t *key" "size_t keylen" "uint8_t *iv" "size_t ivlen" "uint8_t *src" "size_t srclen" "uint8_t *dst" "size_t dstlen" "int enc"
 .Ft int
@@ -44,11 +39,8 @@ ct_crypto.h functions used internally only:
 .Fn ct_create_iv_ctfile "uint32_t chunkno" "uint8_t *iv" "size_t ivlen"
 .Ft int
 .Fn ct_crypto_blocksz "void"
-
 .Ss CTFILE
-
 .In ct_ctfile.h
-
 .Ft int
 .Fn ctfile_parse "struct ctfile_parse_state *ctx"
 .Ft int
@@ -63,9 +55,7 @@ ct_crypto.h functions used internally only:
 .Fn ctfile_parse_insertdir "struct ctfile_parse_state *ctx" "struct dnode *dnode"
 .Ft struct ctfile_write_state *
 .Fn ctfile_write_init "const char *ctfile" "const char *ctfile_basedir" "int type" "const char *basis" "int lvl" "char *cmd" "char **filelist" "int encrypted" "int max_block_size"
-
 ct_ctfile.h functions used internally only:
-
 .Ft int
 .Fn ctfile_parse_init_at "struct ctfile_parse_state *ctx" "const char *file" "const char *ctfile_basedir" "off_t offset"
 .Ft int
@@ -86,16 +76,11 @@ ct_ctfile.h functions used internally only:
 .Fn ctfile_write_close "struct ctfile_write_state *ctx"
 .Ft char *
 .Fn ctfile_get_previous "const char *path"
-
 .Ss DB
-
 .In ct_db.h
-
 .Ft void
 .Fn ctdb_shutdown "struct ctdb_state *state"
-
 ct_db.h functions used internally only:
-
 .Ft struct ctdb_state *
 .Fn ctdb_setup "const char *path" "int crypt_enabled"
 .Ft int
@@ -106,18 +91,12 @@ ct_db.h functions used internally only:
 .Fn ctdb_get_genid "struct ctdb_state *state"
 .Ft void
 .Fn ctdb_reopendb "struct ctdb_state *state" "int genid"
-
 .\"ct_ext.h
-
 .Ss INTERNAL
-
 .In ct_internal.h
-
 .Ft int
 .Fn ct_basis_setup "const char *basisbackup" "char **filelist" "int max_incrementals" "time_t *prev_backup"
-
 ct_internal.h functions used internally only:
-
 .Ft void
 .Fn ct_handle_xml_reply "struct ct_global_state *state" "struct ct_trans *trans" "struct ct_header *hdr" "void *vbody"
 .Ft void
@@ -128,11 +107,8 @@ ct_internal.h functions used internally only:
 .Fn ct_xml_file_close "struct ct_global_state *state"
 .Ft void
 .Fn ct_complete_metadata "struct ct_global_state *state" "struct ct_trans *trans"
-
 .Ss LIB
-
 .In cyphertite.h
-
 .Ft struct ct_config *
 .Fn ct_load_config "char **configfile"
 .Ft void
@@ -265,14 +241,12 @@ ct_internal.h functions used internally only:
 .Fn ct_prompt_password "char *prompt" "char *answer" "size_t answer_len" "char *answer2" "size_t answer2_len" "int confirm"
 .Ft char *
 .Fn ct_getloginbyuid "uid_t uid"
-
 cyphertite.h functions used internally only:
-
 .Ft int
 .Fn ct_get_file_state "struct ct_global_state *state"
 .Ft void
 .Fn ct_queue_first "struct ct_global_state *state" "struct ct_trans *trans"
-.Ft struct bw_limit_ctx	*
+.Ft struct bw_limit_ctx *
 .Fn ct_ssl_init_bw_lim "struct event_base *base" "struct ct_assl_io_ctx *ctx" "int io_bw_limit"
 .Ft void
 .Fn ct_ssl_cleanup_bw_lim "struct bw_limit_ctx *blc"
@@ -342,11 +316,8 @@ ct_event_shutdown "struct ct_event_state *ev_st"
 .Fn ct_archive_insert_dir "struct ct_archive_state *cas" "struct dnode *"
 .Ft void
 .Fn ct_archive_cleanup "struct ct_archive_state *cas"
-
 .Ss MATCH
-
 .In ct_match.h
-
 .Ft struct ct_match *
 .Fn ct_match_compile "int mode" "char **flist"
 .Ft struct ct_match *
@@ -359,23 +330,16 @@ ct_event_shutdown "struct ct_event_state *ev_st"
 .Fn ct_match "struct ct_match *match" "char *candidate"
 .Ft void
 .Fn ct_match_unwind "struct ct_match *match"
-
 ct_match.h functions used internally only:
-
 .Ft void
 .Fn ct_match_insert_rb "struct ct_match *match" "char *string"
 .Ft int
 .Fn ct_match_rb_is_empty "struct ct_match *match"
-
 .Ss PROTO
-
 .In ct_proto.h
-
 .Ft void *
 .Fn ct_body_alloc_xml "size_t sz"
-
 ct_proto.h functions used internally only:
-
 .Ft int
 .Fn ct_create_neg "struct ct_header *hdr" "void **vbody" "int max_trans" "int max_block_size"
 .Ft int
@@ -434,27 +398,18 @@ ct_proto.h functions used internally only:
 .Fn ct_parse_xml_cull_complete_reply "struct ct_header *hdr" "void *vbody"
 .Ft void
 .Fn ct_cleanup_packet "struct ct_header *hdr" "void *vbody"
-
 .Sh DESCRIPTION
-
 .Ss CRYPTO
-
 .Fd #include "ct_crypto.h"
-
 .\"ct_crypto.c
-
 .Ft int
 .Fn ct_create_secrets "const char *passphrase" "const char *filename" "uint8_t *myaeskey" "uint8_t *myivkey"
 .br
 .Ft int
 .Fn ct_unlock_secrets "const char *passphrase" "const char *filename" "uint8_t *outaeskey" "size_t outaeskeylen" "uint8_t *outivkey" "size_t outivkeylen"
-
 .Ss CTFILE
-
 .\" ct_ctfile.h
-
 .Fd #include "ct_types.h"
-
 .Bd -literal
 /* XDR for metadata global header */
 struct ctfile_gheader {
@@ -481,7 +436,6 @@ struct ctfile_gheader {
 	char			**cmg_paths;
 };
 .Ed
-
 .Bd -literal
 /* XDR for metadata header */
 struct ctfile_header {
@@ -509,7 +463,6 @@ struct ctfile_header {
 	char			*cmh_filename;	/* original filename */
 };
 .Ed
-
 .Bd -literal
 /* XDR for metadata trailer */
 struct ctfile_trailer {
@@ -518,11 +471,9 @@ struct ctfile_trailer {
 	uint8_t			cmt_sha[SHA_DIGEST_LENGTH];
 };
 .Ed
-
 .Fd #include <rpc/types.h>
 .br
 .Fd #include <rpc/xdr.h>
-
 .Bd -literal
 /* parser for cyphertite ctfile archives */
 RB_HEAD(d_num_tree, dnode);
@@ -556,7 +507,6 @@ struct ctfile_parse_state {
 #define	XS_RET_FAIL		4
 };
 .Ed
-
 .\"ct_xdr.c
 .Ft int
 .Fn ctfile_parse "struct ctfile_parse_state *ctx"
@@ -578,42 +528,27 @@ struct ctfile_parse_state {
 .br
 .Ft struct ctfile_write_state *
 .Fn ctfile_write_init "const char *ctfile" "const char *ctfile_basedir" "int type" "const char *basis" "int lvl" "char *cmd" "char **filelist" "int encrypted" "int max_block_size"
-
 .Ss DB
-
 .\"ct_db.h
-
 .Bd -literal
 /* localdb interface */
 .Ed
-
 .\"ct_db.c
-
 .Ft void
 .Fn ctdb_shutdown "struct ctdb_state *state"
-
 .\"ct_ext.h
-
 .Ss INTERNAL
-
 .\"ct_internal.h
-
 .Fd #include <ct_socket.h>
-
 .\"ct_ctfile_mode.c
-
 .Ft int
 .\"XXX ct_basis_setup is in ct_xdr.c ???
 .Fn ct_basis_setup "const char *basisbackup" "char **filelist" "int max_incrementals" "time_t *prev_backup"
-
 .Ss LIB
-
 .\"cyphertite.h
-
 .Fd #include <ct_types.h>
 .br
 .Fd #include <ct_socket.h>
-
 .Bd -literal
 struct ct_config {
 	char	*ct_host;
@@ -642,9 +577,7 @@ struct ct_config {
 	int	ct_io_bw_limit;
 };
 .Ed
-
 .\"ct_config.c
-
 .Ft struct ct_config *
 .Fn ct_load_config "char **configfile"
 .br
@@ -668,7 +601,6 @@ struct ct_config {
 .br
 .Ft void
 .Fn ct_download_decode_and_save_certs "struct ct_config *config"
-
 .Bd -literal
 /* Statistics */
 struct ct_statistics {
@@ -695,13 +627,11 @@ struct ct_statistics {
 	uint64_t		st_files_completed;
 } ;
 .Ed
-
 .Bd -literal
 RB_HEAD(ct_iotrans_lookup, ct_trans);
 RB_PROTOTYPE(ct_iotrans_lookup, ct_trans, tr_trans_id, ct_cmp_iotrans);
 RB_HEAD(ct_trans_lookup, ct_trans);
 RB_PROTOTYPE(ct_trans_lookup, ct_trans, tr_trans_id, ct_cmp_trans);
-
 struct ct_global_state {
 	struct ct_assl_io_ctx		*ct_assl_ctx; /* Connection state */
 	struct ct_config		*ct_config;
@@ -770,12 +700,9 @@ struct ct_global_state {
 	struct bw_limit_ctx		*bw_limit;
 };
 .Ed
-
 .\"ct_queue.c
-
 .Ft struct ct_global_state *
 .Fn ct_setup_state "struct ct_config *config"
-
 .Bd -literal
 /* File status */
 #define CT_S_STARTING		(0)
@@ -784,28 +711,21 @@ struct ct_global_state {
 #define CT_S_WAITING_TRANS	(3)
 #define CT_S_FINISHED		(4)
 .Ed
-
 .Ft void
 .Fn ct_set_file_state "struct ct_global_state *state" "int newstate"
 .br
 .Ft void
 .Fn ct_queue_transfer "struct ct_global_state *state" "struct ct_trans *trans"
-
 .\"ct_bw_lim.c
-
 .\"XXX ct_ssl_connect in ct_util.c
-
 .Ft struct ct_assl_io_ctx *
 .Fn ct_ssl_connect "struct ct_global_state *state" "int nonfatal"
 .br
 .Ft void
 .Fn ct_ssl_cleanup "struct ct_assl_io_ctx *ctx" "struct bw_limit_ctx *blc"
-
 .\"ct_queue.c
-
 .Ft int
 .Fn ct_assl_negotiate_poll "struct ct_global_state *state"
-
 .\"ct_util.c
 .Ft struct ct_global_state *
 .Fn ct_init "struct ct_config *conf" "int need_secrets" "int verbose" "void (*info_cb)(evutil_socket_t, short, void *)"
@@ -818,15 +738,11 @@ struct ct_global_state {
 .br
 .Ft void
 .Fn ct_cleanup_eventloop "struct ct_global_state *state"
-
 .\"ct_queue.c
-
 .\"ct_event.c
-
 .Bd -literal
 /* CT context state */
 .Ed
-
 .Ft struct ct_event_state *
 .Fn ct_event_init "struct ct_global_state *state" "void (*cb)(evutil_socket_t" "short" "void *)" "void (*info_cb)(evutil_socket_t" "short" "void *)"
 .br
@@ -859,11 +775,9 @@ struct ct_global_state {
 .br
 .Ft void
 .Fn ct_wakeup_complete "struct ct_event_state *ev_ct"
-
 .Bd -literal
 typedef void (ct_func_cb)(void *);
 .Ed
-
 .Ft void
 .Fn ct_setup_wakeup_file "struct ct_event_state *ev_ct" "void *vctx" "ct_func_cb *func_cb"
 .br
@@ -887,9 +801,7 @@ typedef void (ct_func_cb)(void *);
 .br
 .Ft void
 .Fn ct_set_reconnect_timeout "struct ct_event_state *ev_ct" "int delay"
-
 .\"XXX ct_shutdown in ct_util.c
-
 .Bd -literal
 /* Transaction  */
 RB_HEAD(ct_trans_head, ct_trans);
@@ -941,7 +853,6 @@ struct ct_trans {
 #define TR_S_XML_CLOSED		(25)
 #define TR_S_XML_LIST		(26)
 #define TR_S_XML_DELETE		(27)
-
 #define TR_S_XML_CULL_SEND	(28)
 #define TR_S_XML_CULL_SHA_SEND	(29)
 #define TR_S_XML_CULL_COMPLETE_SEND	(30)
@@ -963,9 +874,7 @@ struct ct_trans {
 	const char		*tr_ctfile_name;
 };
 .Ed
-
 .\"ct_qeue.c
-
 .Ft struct ct_trans *
 .Fn ct_trans_alloc "struct ct_global_state *state"
 .br
@@ -974,11 +883,9 @@ struct ct_trans {
 .br
 .Ft void
 .Fn ct_trans_free "struct ct_global_state *state" "struct ct_trans *trans"
-
 .Bd -literal
 /* Util path functions */
 .Ed
-
 .Ft char *
 .Fn ct_dirname "const char *orig_path"
 .br
@@ -987,35 +894,24 @@ struct ct_trans {
 .br
 .Ft int
 .Fn ct_absolute_path "const char *path"
-
 .\"ctfile_remote.c
-
 .Ft int
 .Fn ctfile_verify_name "char *ctfile"
-
 .\"ct_ctfile_traverse.c
-
 .Ft void
 .Fn ctfile_trim_cache "const char *cachedir" "long long max_size"
-
 .\"ct_util.c
-
 .Ft void
 .Fn ct_prompt_for_login_password "struct ct_config *conf"
 .br
 .Ft void
 .Fn ct_normalize_username "char *username"
-
 .\"ct_files.c
-
 .Ft char *
 .Fn ct_normalize_path "char *path"
-
 .\"ct_util.c
-
 .Ft void
 .Fn ct_normalize_filelist "char **filelist"
-
 .Bd -literal
 /* Operation API */
 typedef void (ct_op_cb)(struct ct_global_state *state, struct ct_op *);
@@ -1027,9 +923,7 @@ struct ct_op {
 	void			*op_priv;	/* operation private data */
 };
 .Ed
-
 .\"ct_util.c
-
 .Ft struct ct_op *
 .Fn ct_add_operation "struct ct_global_state *state" "ct_op_cb *start" "ct_op_cb *complete" "void *args"
 .br
@@ -1038,33 +932,21 @@ struct ct_op {
 .br
 .Ft int
 .Fn ct_do_operation "struct ct_config *conf" "ct_op_cb *start" "ct_op_cb *complete" "void *args" "int need_secrets"
-
 .\"ct_file_mode.c
-
 .Ft void
 .Fn ctfile_list_complete "struct ctfile_list *files" "int matchmode" "char **flist" "char **excludelist" "struct ctfile_list_tree *results"
-
 .Bd -literal
 /* return boolean whether or not the last ctfile_list contained the filename */
 .Ed
-
 .\"ct_ctfile_remote.c
-
 .Ft int
 .Fn ct_file_on_server "struct ct_global_state *state" "char *filename"
-
 .\"ct_ctfile_mode.c
-
 .Ft void
 .Fn ct_cull_kick "struct ct_global_state *state"
-
-
 .\"ct_ctfile_remote.c
-
 .Ft int
 .Fn ct_have_remote_secrets_file "struct ct_config *conf"
-
-
 .Bd -literal
 /*
  * For remote mode, adds the operations obtain the provided ctfile from the
@@ -1073,20 +955,15 @@ struct ct_op {
 typedef void	(ctfile_find_callback)(struct ct_global_state *,
 		    char *, void *);
 .Ed
-
 .Ft void
 .Fn ctfile_find_for_operation "struct ct_global_state *state" "char *tag" "ctfile_find_callback *nextop" "void *nextop_args" "int download_chain" "int empty_ok"
-
 .\"ct_ops.c
-
 .Ft void
 .Fn ct_extract_setup "struct ct_extract_head *extract_head" "struct ctfile_parse_state *ctx" "const char *file" "const char *ctfile_basedir" "int *is_allfiles"
 .br
 .Ft void
 .Fn ct_extract_open_next "struct ct_extract_head *extract_head" "struct ctfile_parse_state *ctx"
-
 .\"ct_files.c
-
 .br
 .Ft int
 .Fn ct_file_extract_open "struct ct_extract_state *ces" "struct fnode *fnode"
@@ -1099,56 +976,39 @@ typedef void	(ctfile_find_callback)(struct ct_global_state *,
 .br
 .Ft void
 .Fn ct_file_extract_special "struct ct_extract_state *ces" "struct fnode *fnode"
-
 .Bd -literal
 /* length of a ctfile tag's time string */
 #define			TIMEDATA_LEN	17	/* including NUL */
 .Ed
-
 .\"ct_config.c
-
 .Ft int
 .Fn ct_get_answer "char *prompt" "char *a1" "char *a2" "char *default_val" "char *answer" "size_t answer_len" "int secret"
 .br
 .Ft int
 .Fn ct_prompt_password "char *prompt" "char *answer" "size_t answer_len" "char *answer2" "size_t answer2_len" "int confirm"
-
 .\"ct_util.c
-
 .Bd -literal
 /* Probably doesn't belong here */
 .Ed
-
 .Ft char *
 .Fn ct_getloginbyuid "uid_t uid"
-
 .\" ct_sapi.c
-
 The following functions belong to the simple api and are described in
 .Xr simplect 3
-
 .Ft int
 .Fn ct_do_remotelist "struct ct_global_state *state" "char **search" "char **exclude" "int matchmode" "void (*printfn) (struct ct_global_state *state, struct ct_op *op)"
-
 .Ft int
 .Fn ct_do_remotearchive "struct ct_global_state *state" "char *ctfile" "char **flist" "char *tdir" "char **excludelist" "char *includefile" "int match_mode" "int no_cross_mounts" "int strip_slash" "int follow_root_symlink" "int follow_symlinks" "struct ct_config *conf"
-
 .Ft int
 .Fn ct_do_remoteextract "struct ct_global_state *state" "char *ctfile" "char *tdir" "char **excludelist" "char **includelist" "int match_mode" "int strip_slash" "int follow_symlinks" "int preserve_attr" "struct ct_config *conf"
-
 .Ft int
 .Fn ct_setup_flags "int flags" "int cflags" "int debug_mask"
-
 .Ft int
 .Fn ct_setup_config "char *configfile" "struct ct_config **config" "struct ct_global_state **state"
-
 .Ft int
 .Fn ct_cleanup_all "struct ct_global_state *state" "char *configfile" "struct ct_config *config"
-
 .Ss MATCH
-
 .\"ct_match.h
-
 .Bd -literal
 /* API to match straings against previously provided lists of criteria */
 #define CT_MATCH_INVALID	(0)
@@ -1156,9 +1016,7 @@ The following functions belong to the simple api and are described in
 #define CT_MATCH_RB		(2)
 #define CT_MATCH_GLOB		(3)
 .Ed
-
 .\"ct_match.c
-
 .Ft struct ct_match *
 .Fn ct_match_compile "int mode" "char **flist"
 .br
@@ -1176,32 +1034,23 @@ The following functions belong to the simple api and are described in
 .br
 .Ft void
 .Fn ct_match_unwind "struct ct_match *match"
-
 .Ss PROTO
-
 .\"ct_proto.h
-
 .Fd #include <ctutil.h>
 .br
 .Fd #include "ct_types.h"
 .br
 .Fd #include "ct_db.h"
-
 .\"ct_proto.c
-
 .Ft void *
 .Fn ct_body_alloc_xml "size_t sz"
-
 .Bd -literal
 #define MD_O_READ	0
 #define MD_O_WRITE	1
 #define MD_O_APPEND	2
-
 #define CT_CULL_PRECIOUS	0x1
 .Ed
-
 .\"ct_types.h
-
 .Fd #include <sys/tree.h>
 .br
 .Fd #include <sys/queue.h>
@@ -1211,7 +1060,6 @@ The following functions belong to the simple api and are described in
 .Fd #include <openssl/sha.h>
 .br
 .Fd #include <ctutil.h>
-
 .Bd -literal
 struct fnode {
 	TAILQ_ENTRY(fnode)	fn_list;
@@ -1244,7 +1092,6 @@ struct fnode {
 	TAILQ_HEAD(, fnode)	fn_hardlinks;
 };
 .Ed
-
 .Bd -literal
 struct dnode {
 	RB_ENTRY(dnode)		 d_rb_name;
@@ -1261,7 +1108,6 @@ struct dnode {
 	int                      d_mtime;       /* last modification time */
 };
 .Ed
-
 .Bd -literal
 /*
  * remote listing structures.
@@ -1270,7 +1116,6 @@ SIMPLEQ_HEAD(ctfile_list, ctfile_list_file);
 RB_HEAD(ctfile_list_tree, ctfile_list_file);
 RB_PROTOTYPE(ctfile_list_tree, ctfile_list_file, next, ct_cmp_ctfile);
 .Ed
-
 .Bd -literal
 struct ctfile_list_file {
 	union {
@@ -1285,7 +1130,6 @@ struct ctfile_list_file {
 	int					mlf_keep;
 };
 .Ed
-
 .Bd -literal
 /* debug log levels */
 /* 0x1 and 0x2 taken by ctutil */
@@ -1302,10 +1146,8 @@ struct ctfile_list_file {
 #define	CT_LOG_XML	(0x400)
 #define	CT_LOG_VERTREE	(0x800)
 .Ed
-
 .Sh SEE ALSO
 .Xr simplect 3
-
 .Sh HISTORY
 .An -nosplit
 .Nm

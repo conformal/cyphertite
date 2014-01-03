@@ -20,9 +20,7 @@
 .Nm simplect
 .Nd simple cyphertite library api
 .Sh SYNOPSIS
-
 .In cyphertite.h
-
 .Ft int
 .Fn ct_do_archive "struct ct_global_state *state" "char *ctfile" "char **flist" "char *tdir" "char **excludelist" "char *includefile" "int matchmode" "int no_cross_mounts" "int strip_slash" "int follow_root_symlink" "int follow_symlinks"
 .Ft int
@@ -42,21 +40,15 @@
 .Ft int
 .Fn list_print "struct ct_global_state *state" "struct ct_op *op"
 .Sh DESCRIPTION
-
 These functions provide a simple interface for the archiving, extraction,
 and listing of files via cyphertite (along with initializing and
 cleaning up for those operations).
-
 .Sh RETURN VALUES
-
 All functions return 0 on success and non-zero on failure.
 Specific error codes are available via errno.
-
 .Sh EXAMPLES
-
 .Sh SEE ALSO
 .Xr cyphertite 3
-
 .Sh HISTORY
 .An -nosplit
 .Nm
