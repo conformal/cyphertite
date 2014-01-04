@@ -3,6 +3,15 @@ User visible changes for cyphertite
   A high-security scalable solution for online backups
 ============================================================================
 
+Changes in 2.0.0 (Sat Jan 04 2014)
+  - Install ct_threads header, which is needed by ct_sockets
+  - Build support for Darwin
+  - Manpage cleanup
+  - Fix archive file completed statistics
+  - Stop leaking filenames when parsing xdr ctfiles
+  - Replace bcmp with memcmp
+  - Other minor fixes
+
 Changes in 1.6.7 (Wed Nov 13 2013)
   - Add fopen compatibility layer
   - Fix hardlinks on extract

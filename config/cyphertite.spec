@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		1.6.7
+%define version		2.0.0
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,14 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Sat Jan 04 2014 - dhill 2.0.0-1
+- Install ct_threads header, which is needed by ct_sockets
+- Build support for Darwin
+- Manpage cleanup
+- Fix archive file completed statistics
+- Stop leaking filenames when parsing xdr ctfiles
+- Replace bcmp with memcmp
+- Other minor fixes
 * Wed Nov 13 2013 - dhill 1.6.7-1
 - Add fopen compatibility layer
 - Fix hardlinks on extract

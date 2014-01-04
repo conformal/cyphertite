@@ -1,3 +1,15 @@
+cyphertite (2.0.0-1) unstable; urgency=low
+
+  * Install ct_threads header, which is needed by ct_sockets
+  * Build support for Darwin
+  * Manpage cleanup
+  * Fix archive file completed statistics
+  * Stop leaking filenames when parsing xdr ctfiles
+  * Replace bcmp with memcmp
+  * Other minor fixes
+
+ -- Conformal Systems <package-discuss@conformal.com>  Sat, 04 Jan 2014 18:39:44 -0500
+
 cyphertite (1.6.7-1) unstable; urgency=low
 
   * Add fopen compatibility layer
