@@ -501,8 +501,7 @@ ct_load_config(struct ct_config **config, char **configfile)
 		}
 		free(conf.ct_ctfile_cachedir);
 		conf.ct_ctfile_cachedir = strdup(ct_fullcachedir);
-		/* XXX Wtf is this? */
-		if (ct_fullcachedir == NULL) {
+		if (conf.ct_ctfile_cachedir == NULL) {
 			errno = ENOMEM;
 			return (CTE_ERRNO);
 		}
