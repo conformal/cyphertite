@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		2.0.0
+%define version		2.0.1
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,8 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Wed Feb 26 2014 - dhill 2.0.1-1
+- Sync with Windows
 * Sat Jan 04 2014 - dhill 2.0.0-1
 - Install ct_threads header, which is needed by ct_sockets
 - Build support for Darwin

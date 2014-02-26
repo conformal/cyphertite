@@ -1,3 +1,9 @@
+cyphertite (2.0.1-1) unstable; urgency=low
+
+  * Sync with Windows
+
+ -- Conformal Systems <package-discuss@conformal.com>  Wed, 26 Feb 2014 13:17:16 -0500
+
 cyphertite (2.0.0-1) unstable; urgency=low
 
   * Install ct_threads header, which is needed by ct_sockets
