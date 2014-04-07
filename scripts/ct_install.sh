@@ -122,7 +122,7 @@ ct_build_and_install()
 {
 	# build and install openssl source with ECDSA base system package
         # doesn't have it.
-	pkg="openssl-1.0.1c"
+	pkg="openssl-1.0.1g"
 	if ! openssl ciphers | grep ECDSA >/dev/null 2>&1; then
 		echo "Building ==> $pkg"
 		cd "$pkg"

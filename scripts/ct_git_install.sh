@@ -156,7 +156,7 @@ ct_get_source()
 
 	# download the openssl source tar if needed
 	if ! openssl ciphers | grep ECDSA >/dev/null 2>&1; then
-		OPENSSL_PKG="openssl-1.0.1c"
+		OPENSSL_PKG="openssl-1.0.1g"
 		OPENSSL_TGZ="$OPENSSL_PKG.tar.gz"
 		OPENSSL_URL="https://www.cyphertite.com/snapshots/OpenSSL/$OPENSSL_TGZ"
 		if [ ! -d "$OPENSSL_PKG" ]; then
