@@ -3,6 +3,9 @@ User visible changes for cyphertite
   A high-security scalable solution for online backups
 ============================================================================
 
+Changes in 2.0.2 (Mon Apr 07 2014)
+  - Update install scripts to use OpenSSL 1.0.1g
+
 Changes in 2.0.1 (Wed Feb 26 2014)
   - Sync with Windows
 

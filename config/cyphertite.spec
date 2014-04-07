@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		2.0.1
+%define version		2.0.2
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,8 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Mon Apr 07 2014 - davec 2.0.2-1
+- Update install scripts to use OpenSSL 1.0.1g
 * Wed Feb 26 2014 - dhill 2.0.1-1
 - Sync with Windows
 * Sat Jan 04 2014 - dhill 2.0.0-1

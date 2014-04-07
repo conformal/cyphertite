@@ -1,3 +1,9 @@
+cyphertite (2.0.2-1) unstable; urgency=low
+
+  * Update install scripts to use OpenSSL 1.0.1g
+
+ -- Conformal Systems <package-discuss@conformal.com>  Mon, 07 Apr 2014 17:25:31 -0500
+
 cyphertite (2.0.1-1) unstable; urgency=low
 
   * Sync with Windows
