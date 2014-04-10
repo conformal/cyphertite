@@ -166,6 +166,7 @@ ct_get_source()
 			fi
 			tar -zxf "$OPENSSL_TGZ"
 		fi
+		openssl_ver="OpenSSL/1.0.1g"
         else
                 openssl_ver=`openssl version | sed -e "s/ /\//" |cut -d"-" -f1`
                 echo "Found $openssl_ver, skipping build"
