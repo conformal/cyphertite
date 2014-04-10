@@ -51,7 +51,7 @@ check_root_perms()
 check_utils()
 {
 	# check for presence of utilities used by script
-	UTILS_USED="gcc grep make uname install rm"
+	UTILS_USED="cut gcc grep head install make sed uname rm"
 	for util in $UTILS_USED; do
 		type $util >/dev/null 2>&1 || report_util_err "$util"
 	done
