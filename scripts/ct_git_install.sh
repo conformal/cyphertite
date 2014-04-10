@@ -166,19 +166,28 @@ ct_get_source()
 			fi
 			tar -zxf "$OPENSSL_TGZ"
 		fi
-	fi
+        else
+                openssl_ver=`openssl version | sed -e "s/ /\//" |cut -d"-" -f1`
+                echo "Found $openssl_ver, skipping build"
+
+        fi
 
 	# download the curl source tar
-	CURL_PKG="curl-7.28.1"
-	CURL_TGZ="$CURL_PKG.tar.gz"
-	CURL_URL="https://www.cyphertite.com/snapshots/curl/$CURL_TGZ"
-	if [ ! -d "$CURL_PKG" ]; then
-		if [ ! -e "$CURL_TGZ" ]; then
-			echo "Getting source ==> $CURL_PKG"
-			ct_download_url "$CURL_TGZ" "$CURL_URL"
+        if ! curl --version | grep $openssl_ver >/dev/null 2>&1; then
+		CURL_PKG="curl-7.28.1"
+		CURL_TGZ="$CURL_PKG.tar.gz"
+		CURL_URL="https://www.cyphertite.com/snapshots/curl/$CURL_TGZ"
+		if [ ! -d "$CURL_PKG" ]; then
+			if [ ! -e "$CURL_TGZ" ]; then
+				echo "Getting source ==> $CURL_PKG"
+				ct_download_url "$CURL_TGZ" "$CURL_URL"
+			fi
+				tar -zxf "$CURL_TGZ"
 		fi
-			tar -zxf "$CURL_TGZ"
-	fi
+        else
+		curl_ver=`curl --version |cut -d" " -f1,2 |head -1`
+		echo "Found $curl_ver, skipping build"
+        fi
 
 	# clone the source or update existing repo for ct and all of its
 	# Conformal dependencies
@@ -216,14 +225,19 @@ ct_build_and_install()
 
 	# build and install curl source using the same openssl version as ct.
 	pkg="$CURL_PKG"
-	echo "Building ==> $pkg"
-	cd "$pkg"
-	./configure --disable-shared --disable-ldap --with-ssl || \
-	    report_err "config script failed for '$pkg'."
-	make || report_err "Make failed for '$pkg'."
-	echo "Installing ==> $pkg"
-	make install || report_err "Install failed for '$pkg'."
-	cd ..
+        if ! curl --version | grep $openssl_ver >/dev/null 2>&1; then
+		echo "Building ==> $pkg"
+		cd "$pkg"
+		./configure --disable-shared --disable-ldap --with-ssl || \
+		    report_err "config script failed for '$pkg'."
+		make || report_err "Make failed for '$pkg'."
+		echo "Installing ==> $pkg"
+		make install || report_err "Install failed for '$pkg'."
+		cd ..
+        else
+		curl_ver=`curl --version |cut -d" " -f1,2 |head -1`
+		echo "Found $curl_ver, skipping build"
+        fi
 
 	# build and install packages in dependency order
 	CT_PKGS="clens clog assl xmlsd shrink exude cyphertite"
