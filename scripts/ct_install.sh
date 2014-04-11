@@ -51,7 +51,7 @@ check_root_perms()
 check_utils()
 {
 	# check for presence of utilities used by script
-	UTILS_USED="gcc grep make uname install rm"
+	UTILS_USED="cut gcc grep head install make sed uname rm"
 	for util in $UTILS_USED; do
 		type $util >/dev/null 2>&1 || report_util_err "$util"
 	done
@@ -131,18 +131,29 @@ ct_build_and_install()
 		echo "Installing ==> $pkg"
 		make install || report_err "Install failed for '$pkg'."
 		cd ..
+		openssl_ver="OpenSSL/1.0.1g"
+	else
+		openssl_ver=$(openssl version | sed -e "s/ /\//" |cut -d"-" -f1)
+		echo "Found $openssl_ver, skipping build"
+
 	fi
 
 	# build and install curl source using the same openssl version as ct.
 	pkg="curl-7.28.1"
-	echo "Building ==> $pkg"
-	cd "$pkg"
-	./configure --disable-shared --disable-ldap --with-ssl || \
-	    report_err "config script failed for '$pkg'."
-	make || report_err "Make failed for '$pkg'."
-	echo "Installing ==> $pkg"
-	make install || report_err "Install failed for '$pkg'."
-	cd ..
+	if ! curl --version | grep $openssl_ver >/dev/null 2>&1;
+		then
+		echo "Building ==> $pkg"
+		cd "$pkg"
+		./configure --disable-shared --disable-ldap --with-ssl || \
+		    report_err "config script failed for '$pkg'."
+		make || report_err "Make failed for '$pkg'."
+		echo "Installing ==> $pkg"
+		make install || report_err "Install failed for '$pkg'."
+		cd ..
+	else
+		curl_ver=$(curl --version |cut -d" " -f1,2 |head -1)
+		echo "Found $curl_ver, skipping build"
+	fi
 
 	# build and install packages in dependency order
 	CT_PKGS="clens clog assl xmlsd shrink exude cyphertite"
