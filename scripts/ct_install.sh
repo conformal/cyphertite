@@ -133,7 +133,7 @@ ct_build_and_install()
 		cd ..
 		openssl_ver="OpenSSL/1.0.1g"
 	else
-		openssl_ver=`openssl version | sed -e "s/ /\//" |cut -d"-" -f1`
+		openssl_ver=$(openssl version | sed -e "s/ /\//" |cut -d"-" -f1)
 		echo "Found $openssl_ver, skipping build"
 
 	fi
@@ -151,7 +151,7 @@ ct_build_and_install()
 		make install || report_err "Install failed for '$pkg'."
 		cd ..
 	else
-		curl_ver=`curl --version |cut -d" " -f1,2 |head -1`
+		curl_ver=$(curl --version |cut -d" " -f1,2 |head -1)
 		echo "Found $curl_ver, skipping build"
 	fi
 
