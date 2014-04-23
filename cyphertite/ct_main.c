@@ -372,6 +372,7 @@ ct_main(int argc, char **argv)
 		if (nentries == -1)
 			CFATAL("can't get includelist from %s",
 			    ct_includefile);
+		argc = nentries;
 
 		freeincludes = 1;
 	} else if ((ct_action == CT_A_LIST || ct_action == CT_A_EXTRACT)) {
