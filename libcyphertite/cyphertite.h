@@ -553,7 +553,7 @@ int	ct_download_secrets(struct ct_config *);
 
 /*
  * For remote mode, adds the operations obtain the provided ctfile from the
- * server then calls the callback to add your dependant op.
+ * server then calls the callback to add your dependent op.
  */
 typedef int	(ctfile_find_callback)(struct ct_global_state *,
 		    char *, void *);

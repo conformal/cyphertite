@@ -406,7 +406,7 @@ out:
 }
 
 /*
- * Download all dependant ctfiles of the current ctfile.
+ * Download all dependent ctfiles of the current ctfile.
  * (called repeatedly until all are fetched).
  */
 int

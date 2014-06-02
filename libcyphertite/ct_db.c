@@ -68,7 +68,7 @@ ctdb_end_transaction(struct ctdb_state *state)
 {
 	char			*errmsg = NULL;
 
-	CNDBG(CT_LOG_DB, "commiting transaction");
+	CNDBG(CT_LOG_DB, "committing transaction");
 	if (sqlite3_exec(state->ctdb_db, "COMMIT", NULL,
 	    0, &errmsg) != 0) {
 		/* this isn't a failure case because ctdb is a cache */

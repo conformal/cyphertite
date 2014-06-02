@@ -1881,7 +1881,7 @@ ct_file_extract_special(struct ct_extract_state *ces, struct fnode *fnode)
 	int                     safe_mode;
 
 	/*
-	 * Create dependant directories and open/close any relvevant directory
+	 * Create dependent directories and open/close any relvevant directory
 	 * filedescriptors.
 	 */
 	ct_file_extract_nextdir(ces, fnode->fn_parent_dir);
