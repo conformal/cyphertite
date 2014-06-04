@@ -1,3 +1,11 @@
+cyphertite (2.0.3-1) unstable; urgency=low
+
+  * Fix bug on extraction when using -I (includefile)
+  * Fix spelling mistakes in man pages
+  * Build environment improvements
+
+ -- Conformal Systems <package-discuss@conformal.com>  Wed, 04 Jun 2014 12:48:02 -0400
+
 cyphertite (2.0.2-1) unstable; urgency=low
 
   * Update install scripts to use OpenSSL 1.0.1g
