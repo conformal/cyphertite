@@ -69,6 +69,7 @@ struct ct_header {
 #define C_HDR_S_BADXML		(7)
 #define C_HDR_S_ADMINCMDFAILED	(8)
 #define C_HDR_S_INVALIDCOMP	(9)
+#define C_HDR_S_AGAIN		(10)
 	u_char			c_ex_status; /* command specific */
 	uint32_t		c_tag;
 	uint32_t		c_size;

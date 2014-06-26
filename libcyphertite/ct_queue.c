@@ -1033,6 +1033,13 @@ ct_handle_msg(void *ctx, struct ct_header *hdr, void *vbody)
 		return;
 	}
 
+	if (hdr->c_status == C_HDR_S_AGAIN) {
+		/* temporary error, disconnect and retry in ten minutes. */
+		state->ct_reconnect_timeout = 600;
+		ct_handle_disconnect(state);
+		return;
+	}
+
 	/* if a reply, lookup transaction */
 	    /* update state */
 	    /* requeue transaction */
