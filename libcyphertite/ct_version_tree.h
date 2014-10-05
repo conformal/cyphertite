@@ -66,6 +66,7 @@ struct ct_vertree_entry {
 	struct ct_vertree_entries	 cve_children;
 	char				*cve_name;	/* filename */
 	struct ct_vertree_entry		*cve_parent;	/* parent dir. */
+	int				 cve_exists;
 };
 RB_PROTOTYPE(ct_vertree_entries, ct_vertree_entry, cve_entry,
     ct_cmp_entry);

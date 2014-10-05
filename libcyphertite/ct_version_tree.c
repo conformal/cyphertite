@@ -61,7 +61,8 @@ RB_GENERATE(ct_vertree_entries, ct_vertree_entry, cve_entry,
 static int
 ct_vertree_add(struct ct_vertree_dnode_cache *dnode_cache,
     struct ct_vertree_entry *head, struct ctfile_parse_state *parse_state,
-    struct ct_vertree_ctfile *ctfile, off_t fileoffset, int allfiles)
+    struct ct_vertree_ctfile *ctfile, off_t fileoffset, int allfiles,
+    int is_requested_ctfile)
 {
 	struct ctfile_header		*hdr = &parse_state->xs_hdr;
 	struct ctfile_header		*hdrlnk= &parse_state->xs_lnkhdr;
@@ -114,6 +115,7 @@ ct_vertree_add(struct ct_vertree_dnode_cache *dnode_cache,
 		RB_INIT(&entry->cve_children);
 		entry->cve_parent = parent;
 		entry->cve_name = e_strdup(sentry.cve_name);
+		entry->cve_exists = is_requested_ctfile;
 
 		/* don't insert root dnodes, just do dnode dance */
 		if (root_dnode) {
@@ -292,6 +294,7 @@ ct_version_tree_build(const char *filename, const char *ctfile_basedir,
 	off_t				 offset;
 	int				 allfiles;
 	int				 rv = 0;
+	int				 is_requested_ctfile;
 
 	TAILQ_INIT(&extract_head);
 	TAILQ_INIT(&dnode_cache.cache);
@@ -335,12 +338,19 @@ nextfile:
 	offset = ctfile_parse_tell(&parse_state);
 	TAILQ_INSERT_TAIL(&tree->cvt_ctfiles, ctfile, cvc_link);
 
+	/*
+	 * Is this the ctfile the caller requested? Each node will set
+	 * cve_exists based on existence in the requested ctfile.
+	 */
+	is_requested_ctfile = (strcmp(ctfile->cvc_path, filename) == 0);
+
 	while (((rv = ctfile_parse(&parse_state)) != XS_RET_EOF) &&
 	    (rv != XS_RET_FAIL)) {
 		switch(rv) {
 		case XS_RET_FILE:
 			if ((rv = ct_vertree_add(&dnode_cache, &tree->cvt_head,
-			    &parse_state, ctfile, offset, allfiles)) != 0) {
+			    &parse_state, ctfile, offset, allfiles,
+			    is_requested_ctfile)) != 0) {
 				goto out;
 			}
 			break;
