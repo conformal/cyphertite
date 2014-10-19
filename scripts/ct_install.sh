@@ -122,7 +122,7 @@ ct_build_and_install()
 {
 	# build and install openssl source with ECDSA base system package
         # doesn't have it.
-	pkg="openssl-1.0.1g"
+	pkg="openssl-1.0.1j"
 	if ! openssl ciphers | grep ECDSA >/dev/null 2>&1; then
 		echo "Building ==> $pkg"
 		cd "$pkg"
@@ -131,7 +131,7 @@ ct_build_and_install()
 		echo "Installing ==> $pkg"
 		make install || report_err "Install failed for '$pkg'."
 		cd ..
-		openssl_ver="OpenSSL/1.0.1g"
+		openssl_ver="OpenSSL/1.0.1j"
 	else
 		openssl_ver=$(openssl version | sed -e "s/ /\//" |cut -d"-" -f1)
 		echo "Found $openssl_ver, skipping build"

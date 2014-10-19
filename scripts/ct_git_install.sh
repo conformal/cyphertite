@@ -156,7 +156,7 @@ ct_get_source()
 
 	# download the openssl source tar if needed
 	if ! openssl ciphers | grep ECDSA >/dev/null 2>&1; then
-		OPENSSL_PKG="openssl-1.0.1g"
+		OPENSSL_PKG="openssl-1.0.1j"
 		OPENSSL_TGZ="$OPENSSL_PKG.tar.gz"
 		OPENSSL_URL="https://www.cyphertite.com/snapshots/OpenSSL/$OPENSSL_TGZ"
 		if [ ! -d "$OPENSSL_PKG" ]; then
@@ -166,7 +166,7 @@ ct_get_source()
 			fi
 			tar -zxf "$OPENSSL_TGZ"
 		fi
-		openssl_ver="OpenSSL/1.0.1g"
+		openssl_ver="OpenSSL/1.0.1j"
         else
 		openssl_ver=$(openssl version | sed -e "s/ /\//" |cut -d"-" -f1)
                 echo "Found $openssl_ver, skipping build"
