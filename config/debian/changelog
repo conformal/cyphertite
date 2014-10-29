@@ -1,3 +1,11 @@
+cyphertite (2.0.4-1) unstable; urgency=low
+
+  * Improve handling of deleted files when browsing individual ctfiles
+  * Update to use OpenSSL 1.0.1j
+  * Reconnect if a temporary error is received from the server
+
+ -- Conformal Systems <package-discuss@conformal.com>  Wed, 29 Oct 2014 11:14:19 -0400
+
 cyphertite (2.0.3-1) unstable; urgency=low
 
   * Fix bug on extraction when using -I (includefile)

@@ -3,6 +3,11 @@ User visible changes for cyphertite
   A high-security scalable solution for online backups
 ============================================================================
 
+Changes in 2.0.4 (Wed Oct 29 2014)
+  - Improve handling of deleted files when browsing individual ctfiles
+  - Update to use OpenSSL 1.0.1j
+  - Reconnect if a temporary error is received from the server
+
 Changes in 2.0.3 (Wed Jun 04 2014)
   - Fix bug on extraction when using -I (includefile)
   - Fix spelling mistakes in man pages

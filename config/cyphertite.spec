@@ -1,5 +1,5 @@
 %define name		cyphertite
-%define version		2.0.3
+%define version		2.0.4
 %define release		1
 
 %define libeventpkg	libevent
@@ -58,6 +58,10 @@ rm -f $RPM_BUILD_ROOT/usr/lib/libcyphertite.a
 /usr/bin/cyphertitefb
 
 %changelog
+* Wed Oct 29 2014 - dhill 2.0.4-1
+- Improve handling of deleted files when browsing individual ctfiles
+- Update to use OpenSSL 1.0.1j
+- Reconnect if a temporary error is received from the server
 * Wed Jun 04 2014 - dhill 2.0.3-1
 - Fix bug on extraction when using -I (includefile)
 - Fix spelling mistakes in man pages
